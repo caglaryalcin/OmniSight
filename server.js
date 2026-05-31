@@ -91,10 +91,15 @@ function genToken() {
 
 function authMiddleware(req, res, next) {
   const auth = loadAuth();
-  if (!auth) return next();
   const token = req.headers['x-session-token'] || req.cookies?.session;
   if (token && sessions.has(token) && Date.now() < sessions.get(token).expires) return next();
   if (config.publicStatus && (req.path === '/status' || req.path === '/api/public/status')) return next();
+  if (!auth) {
+    // first run: only the login/register page and its APIs are reachable
+    if (['/login', '/api/login', '/api/auth-status', '/api/set-password'].includes(req.path)) return next();
+    if (req.path.startsWith('/api/')) return res.status(401).json({ error: 'Setup required' });
+    return res.redirect('/login');
+  }
   if (req.path === '/login' || req.path === '/api/login') return next();
   if (req.path.startsWith('/api/')) return res.status(401).json({ error: 'Unauthorized' });
   return res.redirect('/login');
