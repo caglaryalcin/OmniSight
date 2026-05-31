@@ -217,6 +217,7 @@ html[data-theme="light"] .menu-drop{box-shadow:0 8px 24px rgba(0,0,0,.15)}
 .gh-green{color:var(--green)} .gh-green .gh-dot{background:var(--green);animation:pg 2.5s infinite}
 .gh-yellow{color:var(--yellow)} .gh-yellow .gh-dot{background:var(--yellow)}
 .gh-red{color:var(--red)} .gh-red .gh-dot{background:var(--red);animation:pg 2.5s infinite}
+.gh-gray{color:var(--muted)} .gh-gray .gh-dot{background:var(--muted)}
 #thbtn{background:var(--row);border:1px solid var(--border);color:var(--text);width:36px;height:34px;border-radius:7px;cursor:pointer;display:flex;align-items:center;justify-content:center}
 #thbtn:hover{border-color:#4a5568}
 .logmodal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1000;align-items:center;justify-content:center}
@@ -1039,7 +1040,8 @@ function render(data){
   const gh=document.getElementById('ghealth');
   if(gh){
     let cls,txt;
-    if(downCount>0){ cls='red'; txt=downCount+' down'; }
+    if(!platforms.length){ cls='gray'; txt='Unconfigured'; }
+    else if(downCount>0){ cls='red'; txt=downCount+' down'; }
     else if(degradedCount>0){ cls='yellow'; txt=degradedCount+' degraded'; }
     else { cls='green'; txt='All healthy'; }
     gh.className='ghealth gh-'+cls;
@@ -1272,6 +1274,7 @@ async function initialLoad(){
     render(data);
     startPbar();
     scheduleRefresh();
+    if(!document.querySelector('.sb-card')) openEmbed('/settings');
   } catch(e){ if(e.message!=='Unauthorized') console.error(e); }
 }
 
