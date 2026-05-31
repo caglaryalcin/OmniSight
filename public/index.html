@@ -1069,7 +1069,7 @@ function render(data){
   const ids = ALL_IDS.filter(id => panels[id]);
   if(!ids.length){
     document.getElementById('sidebar').innerHTML = '';
-    document.getElementById('detail').innerHTML = '<div class="empty" style="padding:48px">No data configured</div>';
+    if(!embedOpen) document.getElementById('detail').innerHTML = '<div class="empty" style="padding:48px">No data configured</div>';
     return;
   }
 
