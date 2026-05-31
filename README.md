@@ -47,22 +47,23 @@ cp config.example.yaml config.yaml   # edit it
 docker compose up -d --build
 ```
 
-The provided `docker-compose.yml` mounts `config.yaml` and the `credentials/` folder (which holds `secret.key`, `kube.bin`, `auth.yaml`, `sessions.yaml` and any SSH keys). Standalone Docker:
+The provided `docker-compose.yml` mounts `config.yaml` and the `credentials/` folder (which holds `secret.key`, `kube.bin`, `auth.yaml`, `sessions.yaml` and any SSH keys). Standalone Docker using the published image:
 
 ```bash
-docker build -t omnisight .
 docker run -d --name omnisight -p 3000:3000 \
   -v $(pwd)/config.yaml:/app/config.yaml \
   -v $(pwd)/credentials:/app/credentials \
-  omnisight
+  ghcr.io/caglaryalcin/omnisight
 ```
+
+To build the image yourself instead, replace the last line with `omnisight` after running `docker build -t omnisight .`.
 
 ### Pre-built image (CI/CD)
 
 A GitHub Actions workflow (`.github/workflows/deploy.yml`) builds and pushes the image to GitHub Container Registry on every push to `main`/`master` and on `v*` tags:
 
 ```bash
-docker pull ghcr.io/<owner>/<repo>:latest
+docker pull ghcr.io/caglaryalcin/omnisight
 ```
 
 ### Docker Stack (Swarm)
@@ -73,7 +74,7 @@ Use the published image (Swarm ignores `build:`), then deploy the stack:
 docker stack deploy -c docker-stack.yml omnisight
 ```
 
-`docker-stack.yml` is a Swarm-ready compose file using `image: ghcr.io/<owner>/omnisight:latest` instead of `build:`.
+`docker-stack.yml` is a Swarm-ready compose file using `image: ghcr.io/caglaryalcin/omnisight:latest` instead of `build:`.
 
 ### Kubernetes
 
@@ -93,7 +94,7 @@ kubectl apply -f deploy/kubernetes.yaml
 |---|---|---|---|
 | `PORT` | No | `3000` | HTTP port |
 | `OMNISIGHT_ENCRYPT` | No | `true` | Config encryption is **enabled by default**. Set to `false` (or `0`/`off`/`no`) to disable. |
-| `OMNISIGHT_SECRET` | No | auto | Encryption key. If unset, a random key is generated and stored in `secret.key` (auto-managed). Set this to use your own key (e.g. shared across instances). |
+| `OMNISIGHT_SECRET` | No | auto | Encryption key. If unset, a random key is generated and stored in `credentials/secret.key` (auto-managed). Set this to use your own key (e.g. shared across instances). |
 
 ### Encryption
 
@@ -177,4 +178,4 @@ Notifications are sent only on **state changes** (running→down = DOWN, down→
 
 ## License
 
-MIT
+[MIT](LICENSE)
