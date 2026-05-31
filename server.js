@@ -36,8 +36,8 @@ console.log   = (...a) => { try { _log(...a); } catch {} pushLog('info',  a); };
 console.warn  = (...a) => { try { _warn(...a); } catch {} pushLog('warn',  a); };
 console.error = (...a) => { try { _error(...a); } catch {} pushLog('error', a); };
 const REFRESH_INTERVAL = 15000;
-const CONFIG_PATH = path.join(__dirname, 'config.yaml');
 try { fs.mkdirSync(path.join(__dirname, 'credentials'), { recursive: true }); } catch {}
+const CONFIG_PATH = path.join(__dirname, 'credentials', 'config.yaml');
 const AUTH_PATH  = path.join(__dirname, 'credentials', 'auth.yaml');
 
 /* ── Auth ── */

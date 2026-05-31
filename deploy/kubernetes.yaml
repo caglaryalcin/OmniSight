@@ -1,17 +1,37 @@
 # OmniSight — example Kubernetes deployment
-# Replace OWNER with your GitHub owner (lowercase). Image is published by the
+# Replace OWNER with your GitHub owner (lowercase); image is published by the
 # GitHub Actions workflow to ghcr.io/OWNER/omnisight.
 #
-#   kubectl create configmap omnisight-config --from-file=config.yaml
-#   kubectl create secret generic omnisight-secret --from-literal=OMNISIGHT_SECRET=$(openssl rand -hex 32)
 #   kubectl apply -f deploy/kubernetes.yaml
+#
+# No ConfigMap/Secret to create: the app starts empty and you configure it from
+# the Settings UI. config.yaml, secret.key, auth.yaml and sessions.yaml are
+# stored on the PVC and persist across restarts.
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: omnisight-credentials
+spec:
+  capacity:
+    storage: 64Mi
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: ""
+  persistentVolumeReclaimPolicy: Retain
+  hostPath:
+    path: /yourhostpath
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: omnisight-credentials
+  namespace: default
 spec:
-  accessModes: ["ReadWriteOnce"]
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: ""
+  volumeName: omnisight-credentials
   resources:
     requests:
       storage: 64Mi
@@ -20,14 +40,16 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: omnisight
-  labels: { app: omnisight }
+  namespace: default
 spec:
   replicas: 1
   selector:
-    matchLabels: { app: omnisight }
+    matchLabels:
+      app: omnisight
   template:
     metadata:
-      labels: { app: omnisight }
+      labels:
+        app: omnisight
     spec:
       containers:
         - name: omnisight
@@ -44,10 +66,7 @@ spec:
                   key: OMNISIGHT_SECRET
                   optional: true
           volumeMounts:
-            - name: config
-              mountPath: /app/config.yaml
-              subPath: config.yaml
-            - name: credentials
+            - name: data
               mountPath: /app/credentials
           livenessProbe:
             httpGet: { path: /login, port: 3000 }
@@ -61,10 +80,7 @@ spec:
             requests: { cpu: 50m, memory: 128Mi }
             limits: { cpu: 500m, memory: 512Mi }
       volumes:
-        - name: config
-          configMap:
-            name: omnisight-config
-        - name: credentials
+        - name: data
           persistentVolumeClaim:
             claimName: omnisight-credentials
 ---
@@ -72,9 +88,12 @@ apiVersion: v1
 kind: Service
 metadata:
   name: omnisight
+  namespace: default
 spec:
-  selector: { app: omnisight }
+  type: NodePort
+  selector:
+    app: omnisight
   ports:
     - port: 80
       targetPort: 3000
-  type: ClusterIP
+      nodePort: 30133

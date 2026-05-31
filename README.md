@@ -1,4 +1,4 @@
-# 🟢 OmniSight
+# OmniSight
 
 A simple, single-glance monitoring dashboard for Proxmox, Linux servers, Kubernetes, SNMP devices, Docker and Healthchecks.
 
@@ -34,11 +34,12 @@ Node.js + Express backend · single-file vanilla HTML/CSS/JS frontend (no framew
 
 ```bash
 git clone https://github.com/caglaryalcin/OmniSight.git
-cd .\OmniSight\
+cd OmniSight
 npm install
+npm start
 ```
 
-Dashboard: `http://localhost:3000`
+Dashboard: `http://localhost:3000` — the app starts with no config; set up your account and configure platforms from the Settings UI.
 
 ## Quick start (Docker)
 
@@ -46,16 +47,15 @@ Dashboard: `http://localhost:3000`
 docker compose up -d --build
 ```
 
-The provided `docker-compose.yml` mounts `config.yaml` and the `credentials/` folder (which holds `secret.key`, `kube.bin`, `auth.yaml`, `sessions.yaml` and any SSH keys). Standalone Docker using the published image:
+Nothing to pre-create. The single `credentials/` directory holds all state (`config.yaml`, `secret.key`, `auth.yaml`, `sessions.yaml`, `kube.bin`, SSH keys); Docker auto-creates it and it persists across restarts. The app starts empty — set up your account and configure platforms from the Settings UI. Standalone Docker using the published image:
 
 ```bash
 docker run -d --name omnisight -p 3000:3000 \
-  -v $(pwd)/config.yaml:/app/config.yaml \
   -v $(pwd)/credentials:/app/credentials \
-  omnisight
+  ghcr.io/caglaryalcin/omnisight
 ```
 
-To build the image yourself instead, replace the last line with `omnisight` after running `docker build -t omnisight .`.
+To build the image yourself instead, run `docker build -t omnisight .` and replace the last line with `omnisight`.
 
 ### Pre-built image (CI/CD)
 
@@ -67,9 +67,10 @@ docker pull ghcr.io/caglaryalcin/omnisight
 
 ### Docker Stack (Swarm)
 
-Use the published image (Swarm ignores `build:`), then deploy the stack:
+Use the published image (Swarm ignores `build:`). Enable Swarm once if you haven't, then deploy the stack:
 
 ```bash
+docker swarm init        # only if this node isn't a Swarm manager yet
 docker stack deploy -c docker-stack.yml omnisight
 ```
 
@@ -77,13 +78,13 @@ docker stack deploy -c docker-stack.yml omnisight
 
 ### Kubernetes
 
-A ready-to-edit manifest lives in `deploy/kubernetes.yaml` (Deployment + Service + PVC):
+A manifest lives in `deploy/kubernetes.yaml` (PVC + Deployment + Service). Edit it and replace `OWNER` in the image (`ghcr.io/OWNER/omnisight`) with your GitHub owner, then apply:
 
 ```bash
-kubectl create configmap omnisight-config --from-file=config.yaml
-kubectl create secret generic omnisight-secret --from-literal=OMNISIGHT_SECRET=$(openssl rand -hex 32)
 kubectl apply -f deploy/kubernetes.yaml
 ```
+
+No ConfigMap/Secret to create: the app starts empty and you configure it from the Settings UI, which writes `config.yaml` to the persistent volume (`config.yaml`, `secret.key`, `auth.yaml`, `sessions.yaml` all persist on the PVC).
 
 > **Docker path note:** Windows paths don't work inside the container. Put `kube.bin` and SSH keys in `./credentials/` and reference them with container paths, e.g. `kubeconfig: /app/credentials/kube.bin` and `privateKey: /app/credentials/id_ed25519`.
 
@@ -122,7 +123,7 @@ Unresolved `${VAR}` (no env value, no default) is left as-is. This works for eve
 
 ## Configuration (config.yaml)
 
-All sections are optional; include only what you use. See `config.example.yaml`.
+The live config is `credentials/config.yaml` (created automatically on first save). Easiest is to configure everything from the Settings UI; to hand-edit, copy the template — `cp config.example.yaml credentials/config.yaml` — and edit it. All sections are optional; include only what you use. See `config.example.yaml`.
 
 - `proxmox` — host, port, tokenId, tokenSecret, nodes[]
 - `linux.servers[]` — name, host, port, user, privateKey **or** password, services[]
@@ -170,8 +171,8 @@ Notifications are sent only on **state changes** (running→down = DOWN, down→
 
 ## Security
 
-- `config.yaml`, the `credentials/` folder (keys, kubeconfig, `auth.yaml`, `sessions.yaml`) and `.env` are git-ignored.
-- Sensitive state lives in `./credentials/` (`secret.key`, `kube.bin`, `auth.yaml`, `sessions.yaml`, SSH keys) — it never leaves your machine.
+- The `credentials/` folder and `.env` are git-ignored.
+- All state lives in `./credentials/` (`config.yaml`, `secret.key`, `kube.bin`, `auth.yaml`, `sessions.yaml`, SSH keys) — it never leaves your machine.
 - Login password is set on first run from `/profile`. Passwords must be at least 8 characters and contain both an uppercase and a lowercase letter.
 - Config secrets are encrypted at rest by default (see Encryption above).
 

@@ -12,6 +12,6 @@ services:
       - OMNISIGHT_SECRET=${OMNISIGHT_SECRET:-}
       # - OMNISIGHT_ENCRYPT=false   # disable config encryption
     volumes:
-      - ./config.yaml:/app/config.yaml
-      # credentials/ holds secret.key, kube.bin, auth.yaml, sessions.yaml and any SSH keys
+      # single persistent dir — holds config.yaml, secret.key, auth.yaml, sessions.yaml,
+      # kube.bin and any SSH keys. Docker auto-creates it; nothing to pre-create.
       - ./credentials:/app/credentials
