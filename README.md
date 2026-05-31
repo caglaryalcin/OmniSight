@@ -1,4 +1,4 @@
-# OmniSight
+# 🟢 OmniSight
 
 A simple, single-glance monitoring dashboard for Proxmox, Linux servers, Kubernetes, SNMP devices, Docker and Healthchecks.
 
@@ -33,9 +33,9 @@ Node.js + Express backend · single-file vanilla HTML/CSS/JS frontend (no framew
 ## Quick start (Node.js)
 
 ```bash
+git clone https://github.com/caglaryalcin/OmniSight.git
+cd .\OmniSight\
 npm install
-cp config.example.yaml config.yaml   # edit it
-npm start
 ```
 
 Dashboard: `http://localhost:3000`
@@ -43,7 +43,6 @@ Dashboard: `http://localhost:3000`
 ## Quick start (Docker)
 
 ```bash
-cp config.example.yaml config.yaml   # edit it
 docker compose up -d --build
 ```
 
@@ -53,7 +52,7 @@ The provided `docker-compose.yml` mounts `config.yaml` and the `credentials/` fo
 docker run -d --name omnisight -p 3000:3000 \
   -v $(pwd)/config.yaml:/app/config.yaml \
   -v $(pwd)/credentials:/app/credentials \
-  ghcr.io/caglaryalcin/omnisight
+  omnisight
 ```
 
 To build the image yourself instead, replace the last line with `omnisight` after running `docker build -t omnisight .`.

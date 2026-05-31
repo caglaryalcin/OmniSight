@@ -117,16 +117,28 @@ function parseCookies(req, res, next) {
 
 /* ── Config ── */
 function loadConfig() {
-  if (!fs.existsSync(CONFIG_PATH)) {
-    console.warn('config.yaml not found — starting with empty config.');
+  let text;
+  try {
+    if (!fs.existsSync(CONFIG_PATH)) {
+      console.warn('config.yaml not found — starting with empty config.');
+      return {};
+    }
+    if (fs.statSync(CONFIG_PATH).isDirectory()) {
+      console.error('config.yaml is a DIRECTORY, not a file. Docker likely created it because the host file was missing before "docker compose up". Run: docker compose down && rm -rf config.yaml && cp config.example.yaml config.yaml, then start again. Starting with empty config.');
+      return {};
+    }
+    text = fs.readFileSync(CONFIG_PATH, 'utf8');
+  } catch (e) {
+    console.error('Could not read config.yaml:', e.message, '— starting with empty config.');
     return {};
   }
-  let text = fs.readFileSync(CONFIG_PATH, 'utf8');
   text = text.replace(/\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-([^}]*))?\}/g, (m, name, def) => {
     const v = process.env[name];
     return v !== undefined ? v : (def !== undefined ? def : m);
   });
-  const raw = yaml.load(text) || {};
+  let raw;
+  try { raw = yaml.load(text) || {}; }
+  catch (e) { console.error('config.yaml parse error:', e.message, '— starting with empty config.'); return {}; }
   if (!encryptionEnabled()) return raw;
   try { return decryptConfig(raw); } catch { return raw; }
 }
