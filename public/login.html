@@ -89,7 +89,7 @@ document.getElementById('u').addEventListener('keydown', e => { if(e.key==='Ente
 document.getElementById('p').addEventListener('keydown', e => { if(e.key==='Enter') submitForm(); });
 
 (async () => {
-  try { const r = await fetch('/api/auth-status'); const d = await r.json(); if(!d.required) setMode('register'); } catch {}
+  try { const r = await fetch('/api/auth-status'); const d = await r.json(); if(r.ok && !d.required) setMode('register'); } catch {}
 })();
 </script>
 </body>

@@ -100,7 +100,7 @@ function authMiddleware(req, res, next) {
     if (req.path.startsWith('/api/')) return res.status(401).json({ error: 'Setup required' });
     return res.redirect('/login');
   }
-  if (req.path === '/login' || req.path === '/api/login') return next();
+  if (req.path === '/login' || req.path === '/api/login' || req.path === '/api/auth-status') return next();
   if (req.path.startsWith('/api/')) return res.status(401).json({ error: 'Unauthorized' });
   return res.redirect('/login');
 }
