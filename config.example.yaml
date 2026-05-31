@@ -1,0 +1,109 @@
+# OmniSight configuration
+# Any value may reference an environment variable: ${VAR} or ${VAR:-default}
+# Example:  tokenSecret: ${PVE_TOKEN_SECRET}   |   chatId: "${TG_CHAT_ID}"
+# Useful for Docker / secrets — set the env var and reference it here.
+# Keep key files (kubeconfig, SSH keys) in the ./credentials/ folder (git-ignored).
+
+proxmox:
+  host: "192.168.1.10"
+  port: 8006
+  tokenId: "root@pam!omnisight"
+  tokenSecret: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+  nodes:
+    - pve1
+    - pve2
+
+linux:
+  servers:
+    - name: "web-server"
+      host: "192.168.1.20"
+      port: 22
+      user: "youruser"
+      privateKey: '~/.ssh/id_ed25519'
+      services:
+        - nginx
+        - postgresql
+        - redis
+    - name: "db-server"
+      host: "192.168.1.21"
+      port: 22
+      user: "root"
+      # password auth instead of a key:
+      # password: "your-password"
+      privateKey: '~/.ssh/id_ed25519'
+      services:
+        - mysql
+        - backup-agent
+
+kubernetes:
+  kubeconfig: './credentials/kube.bin'   # put your kubeconfig in credentials/
+  namespaces:
+    - default
+    - production
+
+snmp:
+  devices:
+    - name: "NAS-01"
+      host: "192.168.1.5"
+      community: "public"
+
+healthchecks:
+  url: "https://healthchecks.yourdomain.com"
+  apiKey: "your-api-key-here"
+
+docker:
+  hosts:
+    # 1) Local Docker (same machine as OmniSight)
+    - name: "local"
+      type: socket
+      socketPath: /var/run/docker.sock
+
+    # 2) Remote Docker TCP daemon (2375/2376 exposed)
+    - name: "build-server"
+      type: tcp
+      host: "192.168.1.30"
+      port: 2375
+
+    # 3) Remote host over SSH (without exposing the daemon)
+    #    Tries socket-forward first; falls back to 'docker ps' if disabled.
+    #    'sudo' omitted = auto: tries without sudo first, then with sudo.
+    - name: "app-server"
+      type: ssh
+      sshHost: "192.168.1.31"
+      sshPort: 22
+      sshUser: "deploy"
+      privateKey: '~/.ssh/id_ed25519'
+      socketPath: /var/run/docker.sock
+
+    # SSH + password + sudo required (e.g. Synology, socket owned by root)
+    - name: "nas"
+      type: ssh
+      sshHost: "192.168.1.5"
+      sshPort: 22
+      sshUser: "admin"
+      sshPassword: "your-password"
+      sudo: true
+      socketPath: /var/run/docker.sock
+
+alerts:
+  enabled: true
+  ntfy:
+    url: "https://ntfy.sh"
+    topic: "omnisight-CHANGE-ME"
+    priority: "default"
+  telegram:
+    botToken: "123456:ABC-your-bot-token"
+    chatId: "123456789"
+  smtp:
+    host: "smtp.gmail.com"
+    port: 587
+    secure: false
+    user: "you@gmail.com"
+    password: "app-password"
+    from: "OmniSight <you@gmail.com>"
+    to:
+      - "alerts@yourdomain.com"
+
+# Optional: expose a read-only public status page at /status
+# publicStatus: true
+# publicTitle: "OmniSight Status"

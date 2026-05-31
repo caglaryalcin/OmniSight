@@ -1,0 +1,16 @@
+node_modules/
+
+# runtime config (keep local)
+config.yaml
+
+# sensitive credentials & state: keys, kubeconfig, auth, sessions (keep folder, ignore contents)
+credentials/*
+!credentials/.gitkeep
+
+.env
+.env.local
+
+*.log
+npm-debug.log*
+
+.fuse_hidden*

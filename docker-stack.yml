@@ -1,0 +1,20 @@
+# Swarm-ready stack file using the published image (no build step).
+# Replace OWNER with your GitHub owner (lowercase).
+#   docker stack deploy -c docker-stack.yml omnisight
+version: "3.8"
+
+services:
+  omnisight:
+    image: ghcr.io/OWNER/omnisight:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - OMNISIGHT_SECRET=${OMNISIGHT_SECRET:-}
+    volumes:
+      - ./config.yaml:/app/config.yaml
+      - ./credentials:/app/credentials
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure

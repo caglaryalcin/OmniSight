@@ -1,0 +1,80 @@
+# OmniSight — example Kubernetes deployment
+# Replace OWNER with your GitHub owner (lowercase). Image is published by the
+# GitHub Actions workflow to ghcr.io/OWNER/omnisight.
+#
+#   kubectl create configmap omnisight-config --from-file=config.yaml
+#   kubectl create secret generic omnisight-secret --from-literal=OMNISIGHT_SECRET=$(openssl rand -hex 32)
+#   kubectl apply -f deploy/kubernetes.yaml
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: omnisight-credentials
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 64Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: omnisight
+  labels: { app: omnisight }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: omnisight }
+  template:
+    metadata:
+      labels: { app: omnisight }
+    spec:
+      containers:
+        - name: omnisight
+          image: ghcr.io/OWNER/omnisight:latest
+          ports:
+            - containerPort: 3000
+          env:
+            - name: PORT
+              value: "3000"
+            - name: OMNISIGHT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: omnisight-secret
+                  key: OMNISIGHT_SECRET
+                  optional: true
+          volumeMounts:
+            - name: config
+              mountPath: /app/config.yaml
+              subPath: config.yaml
+            - name: credentials
+              mountPath: /app/credentials
+          livenessProbe:
+            httpGet: { path: /login, port: 3000 }
+            initialDelaySeconds: 20
+            periodSeconds: 30
+          readinessProbe:
+            httpGet: { path: /login, port: 3000 }
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { cpu: 500m, memory: 512Mi }
+      volumes:
+        - name: config
+          configMap:
+            name: omnisight-config
+        - name: credentials
+          persistentVolumeClaim:
+            claimName: omnisight-credentials
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: omnisight
+spec:
+  selector: { app: omnisight }
+  ports:
+    - port: 80
+      targetPort: 3000
+  type: ClusterIP

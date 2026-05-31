@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>OmniSight — Login</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%231E2021' stroke='%233dba7e' stroke-width='2'/><circle cx='16' cy='16' r='6' fill='%233dba7e'/><circle cx='16' cy='16' r='10' fill='none' stroke='%233dba7e' stroke-width='1.5' stroke-opacity='.4'/></svg>">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#181A1B;--panel:#1E2021;--border:#2E3234;
+  --text:#C9D1D9;--muted:#6E7681;--green:#3dba7e;--red:#e74c3c;
+}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  display:flex;align-items:center;justify-content:center;min-height:100vh}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:36px 32px;width:100%;max-width:360px}
+.logo{display:flex;align-items:center;gap:10px;margin-bottom:28px;justify-content:center}
+.ldot{width:10px;height:10px;border-radius:50%;background:var(--green)}
+.logo-text{font-size:18px;font-weight:700}
+label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;font-weight:500;text-transform:uppercase;letter-spacing:.4px}
+input{
+  width:100%;background:#242627;border:1px solid var(--border);border-radius:7px;
+  color:var(--text);font-size:14px;padding:10px 12px;outline:none;margin-bottom:16px;
+  transition:border-color .15s;
+}
+input:focus{border-color:#4a5568}
+.btn{
+  width:100%;background:var(--green);border:none;border-radius:7px;
+  color:#fff;font-size:14px;font-weight:600;padding:11px;cursor:pointer;
+  transition:opacity .15s;
+}
+.btn:hover{opacity:.88}
+.btn:disabled{opacity:.5;cursor:default}
+.err{color:var(--red);font-size:13px;text-align:center;margin-top:12px;min-height:18px}
+.remember{display:flex;align-items:center;gap:8px;margin-bottom:16px;cursor:pointer;user-select:none}
+.remember input{width:auto;margin:0;cursor:pointer}
+.remember span{font-size:13px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">
+    <div class="ldot"></div>
+    <span class="logo-text">OmniSight</span>
+  </div>
+  <label for="u">Username</label>
+  <input id="u" type="text" autocomplete="username" autofocus>
+  <label for="p">Password</label>
+  <input id="p" type="password" autocomplete="current-password">
+  <label class="remember"><input type="checkbox" id="rem"><span>Remember me for 30 days</span></label>
+  <button class="btn" id="btn" onclick="doLogin()">Sign in</button>
+  <div class="err" id="err"></div>
+</div>
+<script>
+document.getElementById('p').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+document.getElementById('u').addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('p').focus(); });
+
+async function doLogin(){
+  const btn = document.getElementById('btn');
+  const err = document.getElementById('err');
+  const username = document.getElementById('u').value.trim();
+  const password = document.getElementById('p').value;
+  if(!username||!password){ err.textContent='Enter username and password'; return; }
+  btn.disabled = true;
+  err.textContent = '';
+  try {
+    const remember = document.getElementById('rem').checked;
+    const r = await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,password,remember})});
+    const d = await r.json();
+    if(!r.ok||!d.ok){ err.textContent = d.error||'Login failed'; return; }
+    if(remember){
+      const exp = new Date(Date.now() + 30*24*60*60*1000).toUTCString();
+      document.cookie = `session=${d.token}; path=/; SameSite=Strict; expires=${exp}`;
+      localStorage.setItem('os_token', d.token);
+    } else {
+      document.cookie = `session=${d.token}; path=/; SameSite=Strict`;
+      sessionStorage.setItem('os_token', d.token);
+    }
+    window.location.href = '/';
+  } catch {
+    err.textContent = 'Network error';
+  } finally {
+    btn.disabled = false;
+  }
+}
+</script>
+</body>
+</html>

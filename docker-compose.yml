@@ -1,0 +1,17 @@
+services:
+  omnisight:
+    build: .
+    # image: omnisight:latest
+    container_name: omnisight
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      # Encryption is ON by default (auto-managed secret.key). Optional overrides:
+      - OMNISIGHT_SECRET=${OMNISIGHT_SECRET:-}
+      # - OMNISIGHT_ENCRYPT=false   # disable config encryption
+    volumes:
+      - ./config.yaml:/app/config.yaml
+      # credentials/ holds secret.key, kube.bin, auth.yaml, sessions.yaml and any SSH keys
+      - ./credentials:/app/credentials

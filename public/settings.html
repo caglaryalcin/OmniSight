@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>try{document.documentElement.setAttribute("data-theme",localStorage.getItem("os_theme")||"dark")}catch(e){}</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>OmniSight — Settings</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%231E2021' stroke='%233dba7e' stroke-width='2'/><circle cx='16' cy='16' r='6' fill='%233dba7e'/><circle cx='16' cy='16' r='10' fill='none' stroke='%233dba7e' stroke-width='1.5' stroke-opacity='.4'/></svg>">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#181A1B;--panel:#1E2021;--row:#242627;--border:#2E3234;
+  --text:#C9D1D9;--muted:#6E7681;--green:#3dba7e;--red:#e74c3c;
+  --yellow:#f39c12;--blue:#5086d4;
+}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px}
+
+header{
+  background:var(--panel);border-bottom:1px solid var(--border);
+  height:64px;padding:0 24px;
+  display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:100;
+}
+.logo{font-size:19px;font-weight:700;display:flex;align-items:center;gap:10px}
+.ldot{width:12px;height:12px;border-radius:50%;background:var(--green)}
+.menu-wrap{position:relative}
+.menu-btn{background:var(--row);border:1px solid var(--border);color:var(--text);padding:8px 13px;border-radius:7px;cursor:pointer;font-size:14px;display:flex;align-items:center;gap:6px}
+.menu-btn:hover{border-color:#4a5568}
+.menu-drop{display:none;position:absolute;right:0;top:calc(100% + 6px);background:var(--panel);border:1px solid var(--border);border-radius:8px;min-width:140px;overflow:hidden;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.menu-drop.open{display:block}
+.menu-item{display:block;padding:10px 16px;font-size:13px;color:var(--text);text-decoration:none;cursor:pointer;border:none;background:none;width:100%;text-align:left}
+.menu-item:hover{background:rgba(255,255,255,.05)}
+.menu-item.danger{color:var(--red)}
+.btn-save{
+  background:var(--green);color:#000;border:none;
+  padding:7px 18px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;
+  display:flex;align-items:center;gap:6px;
+}
+.btn-save:hover{filter:brightness(1.1)}
+.btn-save:disabled{opacity:.5;cursor:not-allowed}
+
+main{padding:20px;max-width:1100px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+
+.card{background:var(--panel);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.card-hdr{display:flex;align-items:center;justify-content:space-between;padding:14px 18px}
+.card-left{display:flex;align-items:center;gap:10px}
+.card-icon{width:10px;height:10px;border-radius:50%}
+.card-title{font-size:15px;font-weight:600}
+.card-body{border-top:1px solid var(--border);padding:18px}
+.card-body.hidden{display:none}
+
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form-grid.g3{grid-template-columns:1fr 1fr 1fr}
+.form-group{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+.form-group:last-child{margin-bottom:0}
+.form-group label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.form-group input,.form-group select{
+  background:var(--row);border:1px solid var(--border);border-radius:6px;
+  color:var(--text);padding:8px 12px;font-size:14px;transition:border-color .15s;
+}
+.form-group input:focus,.form-group select:focus{outline:none;border-color:var(--blue)}
+.form-group select option{background:var(--row)}
+
+.tag-list{display:flex;flex-wrap:wrap;gap:6px;min-height:30px;padding:4px 0}
+.tag{display:flex;align-items:center;gap:4px;background:var(--row);border:1px solid var(--border);border-radius:5px;padding:3px 8px;font-size:13px}
+.tag button{background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;line-height:1;padding:0 2px}
+.tag button:hover{color:var(--red)}
+.tag-add{display:flex;gap:8px;margin-top:8px}
+.tag-add input{flex:1;background:var(--row);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:6px 10px;font-size:13px}
+.tag-add input:focus{outline:none;border-color:var(--blue)}
+
+.btn-sm{background:var(--row);border:1px solid var(--border);color:var(--text);padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;white-space:nowrap}
+.btn-sm:hover{border-color:var(--blue)}
+
+.arr-item{border:1px solid var(--border);border-radius:8px;margin-bottom:10px;overflow:hidden}
+.arr-item:last-child{margin-bottom:0}
+.arr-hdr{display:flex;align-items:center;gap:8px;padding:10px 14px;cursor:pointer;background:var(--row);transition:background .1s;user-select:none}
+.arr-hdr:hover{background:rgba(255,255,255,.05)}
+.arr-hdr-name{font-size:13px;font-weight:600;flex:1}
+.arr-body{padding:14px;border-top:1px solid var(--border)}
+.arr-body.hidden{display:none}
+.btn-rm{background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:2px 6px;border-radius:4px;line-height:1}
+.btn-rm:hover{color:var(--red);background:rgba(231,76,60,.1)}
+
+.toggle{position:relative;display:inline-block;width:44px;height:24px;flex-shrink:0}
+.toggle input{display:none}
+.toggle-t{position:absolute;top:0;left:0;right:0;bottom:0;background:var(--border);border-radius:12px;cursor:pointer;transition:.2s}
+.toggle input:checked+.toggle-t{background:var(--green)}
+.toggle-t::after{content:'';position:absolute;width:20px;height:20px;background:#fff;border-radius:50%;top:2px;left:2px;transition:.2s}
+.toggle input:checked+.toggle-t::after{transform:translateX(20px)}
+
+#toast{position:fixed;bottom:24px;right:24px;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:12px 18px;font-size:13px;transform:translateY(80px);opacity:0;transition:all .3s;z-index:999}
+#toast.show{transform:translateY(0);opacity:1}
+#toast.ok{border-color:var(--green);color:var(--green)}
+#toast.err{border-color:var(--red);color:var(--red)}
+
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+html[data-theme="light"]{--bg:#f4f5f7;--panel:#ffffff;--row:#eef1f4;--border:#dce0e5;--text:#1f2933;--muted:#69707a;--green:#1f9d63;--red:#d63b2f;--yellow:#c9820a;--blue:#3b6fc4;}
+</style>
+<style>html.embed header{display:none}</style>
+<script>if(window.self!==window.top)document.documentElement.classList.add('embed');</script>
+</head>
+<body>
+
+<header>
+  <a href="/" class="logo" style="text-decoration:none;color:inherit"><div class="ldot"></div>OmniSight</a>
+  <div style="display:flex;align-items:center;gap:8px">
+    <div class="menu-wrap">
+      <button class="menu-btn" onclick="toggleMenu()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+      </button>
+      <div class="menu-drop" id="menu-drop">
+        <a class="menu-item" href="/profile">Profile</a>
+        <a class="menu-item" href="/settings">Settings</a>
+        <a class="menu-item" href="/logs">Logs</a>
+        <button class="menu-item danger" onclick="doLogout()">Sign out</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main>
+
+<!-- General -->
+<div class="card">
+  <div class="card-hdr">
+    <div class="card-left">
+      <div class="card-icon" id="dot-statuspage" style="background:var(--muted)"></div>
+      <span class="card-title">Status Page</span>
+    </div>
+  </div>
+  <div class="card-body">
+    <div class="form-group" style="flex-direction:row;align-items:center;justify-content:space-between;gap:16px">
+      <div>
+        <label style="text-transform:none;font-size:13px;color:var(--text)">Public status page</label>
+        <div style="font-size:12px;color:var(--muted);margin-top:3px">Read-only summary at <a href="/status" target="_blank" style="color:var(--blue)">/status</a>, no login required</div>
+      </div>
+      <label class="toggle"><input type="checkbox" id="en-public" onchange="refreshDots()"><span class="toggle-t"></span></label>
+    </div>
+    <div class="form-group"><label>Public page title</label><input type="text" id="public-title" placeholder="OmniSight Status"></div>
+  </div>
+</div>
+
+<!-- Proxmox -->
+<div class="card">
+  <div class="card-hdr">
+    <div class="card-left">
+      <div class="card-icon" id="dot-proxmox" style="background:var(--muted)"></div>
+      <span class="card-title">Proxmox</span>
+    </div>
+    <label class="toggle"><input type="checkbox" id="en-proxmox" onchange="toggleCard('proxmox')"><span class="toggle-t"></span></label>
+  </div>
+  <div class="card-body hidden" id="cb-proxmox">
+    <div class="form-grid">
+      <div class="form-group"><label>Host</label><input type="text" id="pve-host" placeholder="192.168.1.10"></div>
+      <div class="form-group"><label>Port</label><input type="number" id="pve-port" value="8006"></div>
+    </div>
+    <div class="form-grid">
+      <div class="form-group"><label>Token ID</label><input type="text" id="pve-tokenid" placeholder="root@pam!token"></div>
+      <div class="form-group"><label>Token Secret</label><input type="password" id="pve-secret" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"></div>
+    </div>
+    <div class="form-group">
+      <label>Nodes</label>
+      <div id="pve-nodes" class="tag-list"></div>
+      <div class="tag-add">
+        <input type="text" id="pve-node-in" placeholder="node name" onkeydown="if(event.key==='Enter'){addTag('pve-nodes','pve-node-in');event.preventDefault()}">
+        <button class="btn-sm" onclick="addTag('pve-nodes','pve-node-in')">+ Add Node</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Linux Servers -->
+<div class="card">
+  <div class="card-hdr">
+    <div class="card-left">
+      <div class="card-icon" id="dot-linux" style="background:var(--muted)"></div>
+      <span class="card-title">Linux Servers</span>
+    </div>
+    <label class="toggle"><input type="checkbox" id="en-linux" onchange="toggleCard('linux')"><span class="toggle-t"></span></label>
+  </div>
+  <div class="card-body hidden" id="cb-linux">
+    <div id="linux-list"></div>
+    <button class="btn-sm" style="margin-top:4px" onclick="addLinuxServer()">+ Add Server</button>
+  </div>
+</div>
+
+<!-- Kubernetes -->
+<div class="card">
+  <div class="card-hdr">
+    <div class="card-left">
+      <div class="card-icon" id="dot-kubernetes" style="background:var(--muted)"></div>
+      <span class="card-title">Kubernetes</span>
+    </div>
+    <label class="toggle"><input type="checkbox" id="en-kubernetes" onchange="toggleCard('kubernetes')"><span class="toggle-t"></span></label>
+  </div>
+  <div class="card-body hidden" id="cb-kubernetes">
+    <div class="form-group"><label>Kubeconfig Path</label><input type="text" id="k8s-kubeconfig" placeholder="C:\Users\you\.kube\config"></div>
+    <div class="form-group">
+      <label>Namespaces</label>
+      <div id="k8s-ns" class="tag-list"></div>
+      <div class="tag-add">
+        <input type="text" id="k8s-ns-in" placeholder="namespace" onkeydown="if(event.key==='Enter'){addTag('k8s-ns','k8s-ns-in');event.preventDefault()}">
+        <button class="btn-sm" onclick="addTag('k8s-ns','k8s-ns-in')">+ Add</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Synology -->
+<div class="card">
+  <div class="card-hdr">
+    <div class="card-left">
+      <div class="card-icon" id="dot-synology" style="background:var(--muted)"></div>
+      <span class="card-title">SNMP</span>
+    </div>
+    <label class="toggle"><input type="checkbox" id="en-synology" onchange="toggleCard('synology')"><span class="toggle-t"></span></label>
+  </div>
+  <div class="card-body hidden" id="cb-synology">
+    <div id="syn-list"></div>
+    <button class="btn-sm" style="margin-top:4px" onclick="addSynDevice()">+ Add Device</button>
+  </div>
+</div>
+
+<!-- Healthchecks -->
+<div class="card">
+  <div class="card-hdr">
+    <div class="card-left">
+      <div class="card-icon" id="dot-healthchecks" style="background:var(--muted)"></div>
+      <span class="card-title">Healthchecks</span>
+    </div>
+    <label class="toggle"><input type="checkbox" id="en-healthchecks" onchange="toggleCard('healthchecks')"><span class="toggle-t"></span></label>
+  </div>
+  <div class="card-body hidden" id="cb-healthchecks">
+    <div class="form-grid">
+      <div class="form-group"><label>URL</label><input type="text" id="hc-url" placeholder="https://healthchecks.yourdomain.com"></div>
+      <div class="form-group"><label>API Key</label><input type="password" id="hc-apikey" placeholder="your-api-key"></div>
+    </div>
+  </div>
+</div>
+
+
+<!-- Docker -->
+<div class="card">
+  <div class="card-hdr">
+    <div class="card-left">
+      <div class="card-icon" id="dot-docker" style="background:var(--muted)"></div>
+      <span class="card-title">Docker</span>
+    </div>
+    <label class="toggle"><input type="checkbox" id="en-docker" onchange="toggleCard('docker')"><span class="toggle-t"></span></label>
+  </div>
+  <div class="card-body hidden" id="cb-docker">
+    <div id="docker-list"></div>
+    <button class="btn-sm" type="button" onclick="addDockerHost()" style="margin-top:8px">+ Add Host</button>
+  </div>
+</div>
+
+<!-- Alerts -->
+<div class="card">
+  <div class="card-hdr">
+    <div class="card-left">
+      <div class="card-icon" id="dot-alerts" style="background:var(--muted)"></div>
+      <span class="card-title">Alerts</span>
+    </div>
+    <label class="toggle"><input type="checkbox" id="en-alerts" onchange="toggleCard('alerts')"><span class="toggle-t"></span></label>
+  </div>
+  <div class="card-body hidden" id="cb-alerts">
+
+    <div class="arr-item">
+      <div class="arr-hdr">
+        <span class="arr-hdr-name">ntfy</span>
+        <label class="toggle"><input type="checkbox" id="al-ntfy-en" onchange="toggleAlertBody('al-ntfy-en','al-ntfy-body')"><span class="toggle-t"></span></label>
+      </div>
+      <div class="arr-body hidden" id="al-ntfy-body">
+        <div class="form-grid">
+          <div class="form-group"><label>Server URL</label><input type="text" id="al-ntfy-url" placeholder="https://ntfy.sh"></div>
+          <div class="form-group"><label>Topic</label><input type="text" id="al-ntfy-topic" placeholder="omnisight-xxxx"></div>
+        </div>
+        <div class="form-grid">
+          <div class="form-group"><label>Priority</label>
+            <select id="al-ntfy-priority">
+              <option value="min">min</option><option value="low">low</option>
+              <option value="default" selected>default</option><option value="high">high</option><option value="max">max</option>
+            </select>
+          </div>
+          <div class="form-group"><label>Token (optional)</label><input type="password" id="al-ntfy-token" placeholder=""></div>
+        </div>
+        <button class="btn-sm" type="button" onclick="sendTestAlert('ntfy')" style="margin-top:10px">Test ntfy</button>
+      </div>
+    </div>
+
+    <div class="arr-item">
+      <div class="arr-hdr">
+        <span class="arr-hdr-name">Telegram</span>
+        <label class="toggle"><input type="checkbox" id="al-tg-en" onchange="toggleAlertBody('al-tg-en','al-tg-body')"><span class="toggle-t"></span></label>
+      </div>
+      <div class="arr-body hidden" id="al-tg-body">
+        <div class="form-grid">
+          <div class="form-group"><label>Bot Token</label><input type="password" id="al-tg-token" placeholder="123456:ABC-..."></div>
+          <div class="form-group"><label>Chat ID</label><input type="text" id="al-tg-chat" placeholder="123456789"></div>
+        </div>
+        <button class="btn-sm" type="button" onclick="sendTestAlert('telegram')" style="margin-top:10px">Test Telegram</button>
+      </div>
+    </div>
+
+    <div class="arr-item">
+      <div class="arr-hdr">
+        <span class="arr-hdr-name">SMTP (E-mail)</span>
+        <label class="toggle"><input type="checkbox" id="al-smtp-en" onchange="toggleAlertBody('al-smtp-en','al-smtp-body')"><span class="toggle-t"></span></label>
+      </div>
+      <div class="arr-body hidden" id="al-smtp-body">
+        <div class="form-grid g3">
+          <div class="form-group"><label>Host</label><input type="text" id="al-smtp-host" placeholder="smtp.gmail.com"></div>
+          <div class="form-group"><label>Port</label><input type="number" id="al-smtp-port" value="587"></div>
+          <div class="form-group"><label>Security</label>
+            <select id="al-smtp-secure"><option value="false" selected>STARTTLS (587)</option><option value="true">SSL (465)</option></select>
+          </div>
+        </div>
+        <div class="form-grid">
+          <div class="form-group"><label>Username</label><input type="text" id="al-smtp-user" placeholder="you@gmail.com"></div>
+          <div class="form-group"><label>Password</label><input type="password" id="al-smtp-pass" placeholder=""></div>
+        </div>
+        <div class="form-group"><label>From</label><input type="text" id="al-smtp-from" placeholder="OmniSight <you@gmail.com>"></div>
+        <div class="form-group">
+          <label>Recipients</label>
+          <div id="al-smtp-to" class="tag-list"></div>
+          <div class="tag-add">
+            <input type="text" id="al-smtp-to-in" placeholder="email@domain.com" onkeydown="if(event.key==='Enter'){addTag('al-smtp-to','al-smtp-to-in');event.preventDefault()}">
+            <button class="btn-sm" type="button" onclick="addTag('al-smtp-to','al-smtp-to-in')">+ Add</button>
+          </div>
+        </div>
+        <button class="btn-sm" type="button" onclick="sendTestAlert('smtp')" style="margin-top:10px">Test e-mail</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+</main>
+
+<div id="toast"></div>
+
+<script>
+let lCount = 0, sCount = 0, dCount = 0;
+
+function toggleAlertBody(enId, bodyId) {
+  document.getElementById(bodyId).classList.toggle('hidden', !document.getElementById(enId).checked);
+}
+function flushPendingTags() {
+  document.querySelectorAll('.tag-add').forEach(w => {
+    const inp = w.querySelector('input'), b = w.querySelector('button');
+    if (inp && b && inp.value.trim()) b.click();
+  });
+}
+function toggleCard(id) {
+  const cb = document.getElementById(`cb-${id}`);
+  cb.classList.toggle('hidden', !document.getElementById(`en-${id}`).checked);
+}
+
+function addTag(listId, inputId) {
+  const input = document.getElementById(inputId);
+  const val = input.value.trim();
+  if (!val) return;
+  appendTag(listId, val);
+  input.value = '';
+  input.focus();
+}
+
+function appendTag(listId, val) {
+  const tag = document.createElement('div');
+  tag.className = 'tag';
+  tag.innerHTML = `<span>${escHtml(val)}</span><button type="button" onclick="this.parentElement.remove()">✕</button>`;
+  document.getElementById(listId).appendChild(tag);
+}
+
+function getTagVals(listId) {
+  return [...document.querySelectorAll(`#${listId} .tag span`)].map(s => s.textContent.trim());
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function toggleArr(id) {
+  document.getElementById(`ab-${id}`)?.classList.toggle('hidden');
+}
+
+/* ── Linux server form ── */
+function addLinuxServer(data = {}) {
+  const idx = lCount++;
+  const id = `lsrv-${idx}`;
+  const el = document.createElement('div');
+  el.className = 'arr-item';
+  el.id = id;
+  el.innerHTML = `
+    <div class="arr-hdr" onclick="toggleArr('${id}')">
+      <div style="width:9px;height:9px;border-radius:50%;background:var(--green);flex-shrink:0"></div>
+      <span class="arr-hdr-name">${escHtml(data.name || 'New Server')}</span>
+      <button class="btn-rm" type="button" onclick="event.stopPropagation();this.closest('.arr-item').remove()">✕</button>
+    </div>
+    <div class="arr-body hidden" id="ab-${id}">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Name</label>
+          <input type="text" class="l-name" value="${escHtml(data.name||'')}" placeholder="web-server"
+            oninput="this.closest('.arr-item').querySelector('.arr-hdr-name').textContent=this.value||'New Server'">
+        </div>
+        <div class="form-group">
+          <label>Host / IP</label>
+          <input type="text" class="l-host" value="${escHtml(data.host||'')}" placeholder="192.168.1.1">
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>SSH Port</label>
+          <input type="number" class="l-port" value="${data.port||22}">
+        </div>
+        <div class="form-group">
+          <label>User</label>
+          <input type="text" class="l-user" value="${escHtml(data.user||'')}" placeholder="root">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Private Key Path (leave empty to use password)</label>
+        <input type="text" class="l-key" value="${escHtml(data.privateKey==='__set__'||data.privateKey==='__encrypted__'?'':data.privateKey||'')}" placeholder="${data.privateKey==='__set__'||data.privateKey==='__encrypted__'?'••••••••  (set — leave blank to keep)':'C:\\\\Users\\\\you\\\\.ssh\\\\id_ed25519'}" data-masked="${(data.privateKey==='__set__'||data.privateKey==='__encrypted__')?'1':''}">
+      </div>
+      <div class="form-group">
+        <label>Password (if no private key)</label>
+        <input type="password" class="l-pw" value="" placeholder="${data.password==='__set__'||data.password==='__encrypted__'?'••••••••  (set — leave blank to keep)':''}" data-masked="${(data.password==='__set__'||data.password==='__encrypted__')?'1':''}">
+      </div>
+      <div class="form-group">
+        <label>Services</label>
+        <div id="l-svc-${idx}" class="tag-list"></div>
+        <div class="tag-add">
+          <input type="text" id="l-svc-in-${idx}" placeholder="ex: cron.service"
+            onkeydown="if(event.key==='Enter'){addTag('l-svc-${idx}','l-svc-in-${idx}');event.preventDefault()}">
+          <button class="btn-sm" type="button" onclick="addTag('l-svc-${idx}','l-svc-in-${idx}')">+ Add</button>
+        </div>
+      </div>
+    </div>`;
+  document.getElementById('linux-list').appendChild(el);
+  (data.services || []).forEach(s => appendTag(`l-svc-${idx}`, s));
+}
+
+/* ── Synology device form ── */
+function addSynDevice(data = {}) {
+  const idx = sCount++;
+  const id = `syn-${idx}`;
+  const ver = data.snmpVersion === 3 ? '3' : '2c';
+  const el = document.createElement('div');
+  el.className = 'arr-item';
+  el.id = id;
+  el.innerHTML = `
+    <div class="arr-hdr" onclick="toggleArr('${id}')">
+      <div style="width:9px;height:9px;border-radius:50%;background:var(--yellow);flex-shrink:0"></div>
+      <span class="arr-hdr-name">${escHtml(data.name || 'New Device')}</span>
+      <span class="syn-ver-lbl" style="font-size:11px;color:var(--muted);margin-right:8px">SNMPv${ver}</span>
+      <button class="btn-rm" type="button" onclick="event.stopPropagation();this.closest('.arr-item').remove()">✕</button>
+    </div>
+    <div class="arr-body hidden" id="ab-${id}">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Name</label>
+          <input type="text" class="s-name" value="${escHtml(data.name||'')}" placeholder="NAS-01"
+            oninput="this.closest('.arr-item').querySelector('.arr-hdr-name').textContent=this.value||'New Device'">
+        </div>
+        <div class="form-group">
+          <label>Host / IP</label>
+          <input type="text" class="s-host" value="${escHtml(data.host||'')}" placeholder="192.168.1.5">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>SNMP Version</label>
+        <select class="s-ver" onchange="onSynVer(this,'${id}')">
+          <option value="2c" ${ver!=='3'?'selected':''}>v2c — Community string</option>
+          <option value="3" ${ver==='3'?'selected':''}>v3 — Username + Password (SHA / AES)</option>
+        </select>
+      </div>
+      <div id="sv2-${id}" style="${ver==='3'?'display:none':''}">
+        <div class="form-group">
+          <label>Community</label>
+          <input type="text" class="s-community" value="${escHtml(data.community||'public')}">
+        </div>
+      </div>
+      <div id="sv3-${id}" style="${ver!=='3'?'display:none':''}">
+        <div class="form-grid g3">
+          <div class="form-group"><label>Username</label><input type="text" class="s-username" value="${escHtml(data.username||'')}"></div>
+          <div class="form-group"><label>Auth Password</label><input type="password" class="s-authpw" value="" placeholder="${data.authPassword==='__set__'||data.authPassword==='__encrypted__'?'••••••••  (set — leave blank to keep)':''}" data-masked="${(data.authPassword==='__set__'||data.authPassword==='__encrypted__')?'1':''}"></div>
+          <div class="form-group"><label>Priv Password</label><input type="password" class="s-privpw" value="" placeholder="${data.privPassword==='__set__'||data.privPassword==='__encrypted__'?'••••••••  (set — leave blank to keep)':''}" data-masked="${(data.privPassword==='__set__'||data.privPassword==='__encrypted__')?'1':''}"></div>
+        </div>
+        <div class="form-grid g3">
+          <div class="form-group">
+            <label>Security Level</label>
+            <select class="s-seclevel" onchange="onSynSecLevel(this,'${id}')">
+              <option value="authPriv" ${(data.securityLevel||'authPriv')==='authPriv'?'selected':''}>authPriv (auth + encrypt)</option>
+              <option value="authNoPriv" ${data.securityLevel==='authNoPriv'?'selected':''}>authNoPriv (auth only)</option>
+              <option value="noAuthNoPriv" ${data.securityLevel==='noAuthNoPriv'?'selected':''}>noAuthNoPriv (none)</option>
+            </select>
+          </div>
+          <div class="form-group" id="sap-${id}" style="${data.securityLevel==='noAuthNoPriv'?'display:none':''}">
+            <label>Auth Protocol</label>
+            <select class="s-authproto">
+              <option value="sha" ${(data.authProtocol||'sha')==='sha'?'selected':''}>SHA-1 (default)</option>
+              <option value="sha256" ${data.authProtocol==='sha256'?'selected':''}>SHA-256</option>
+              <option value="sha512" ${data.authProtocol==='sha512'?'selected':''}>SHA-512</option>
+              <option value="md5" ${data.authProtocol==='md5'?'selected':''}>MD5</option>
+            </select>
+          </div>
+          <div class="form-group" id="spp-${id}" style="${(data.securityLevel&&data.securityLevel!=='authPriv')?'display:none':''}">
+            <label>Priv Protocol</label>
+            <select class="s-privproto">
+              <option value="aes" ${(data.privProtocol||'aes')==='aes'?'selected':''}>AES-128 (default)</option>
+              <option value="aes256b" ${data.privProtocol==='aes256b'?'selected':''}>AES-256</option>
+              <option value="des" ${data.privProtocol==='des'?'selected':''}>DES</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  document.getElementById('syn-list').appendChild(el);
+}
+
+/* ── Docker host form ── */
+function addDockerHost(data = {}) {
+  const idx = dCount++;
+  const id = `dhost-${idx}`;
+  const type = data.type || (data.host ? 'tcp' : 'socket');
+  const el = document.createElement('div');
+  el.className = 'arr-item';
+  el.id = id;
+  el.innerHTML = `
+    <div class="arr-hdr" onclick="toggleArr('${id}')">
+      <div style="width:9px;height:9px;border-radius:50%;background:#2496ed;flex-shrink:0"></div>
+      <span class="arr-hdr-name">${escHtml(data.name || 'New Host')}</span>
+      <button class="btn-rm" type="button" onclick="event.stopPropagation();this.closest('.arr-item').remove()">✕</button>
+    </div>
+    <div class="arr-body hidden" id="ab-${id}">
+      <div class="form-group">
+        <label>Name</label>
+        <input type="text" class="d-name" value="${escHtml(data.name||'')}" placeholder="NAS / prod-server"
+          oninput="this.closest('.arr-item').querySelector('.arr-hdr-name').textContent=this.value||'New Host'">
+      </div>
+      <div class="form-group">
+        <label>Connection Type</label>
+        <select class="d-type" onchange="onDockerType(this,'${id}')">
+          <option value="socket" ${type==='socket'?'selected':''}>Unix Socket (local)</option>
+          <option value="tcp"    ${type==='tcp'?'selected':''}>TCP (remote)</option>
+          <option value="ssh"    ${type==='ssh'?'selected':''}>SSH (remote, user/pass or key)</option>
+        </select>
+      </div>
+      <div id="d-socket-${id}" style="${type!=='socket'?'display:none':''}">
+        <div class="form-group">
+          <label>Socket Path</label>
+          <input type="text" class="d-socket" value="${escHtml(data.socketPath||'/var/run/docker.sock')}" placeholder="/var/run/docker.sock">
+        </div>
+      </div>
+      <div id="d-tcp-${id}" style="${type!=='tcp'?'display:none':''}">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Host / IP</label>
+            <input type="text" class="d-host" value="${escHtml(data.host||'')}" placeholder="192.168.1.10">
+          </div>
+          <div class="form-group">
+            <label>Port</label>
+            <input type="number" class="d-port" value="${data.port||2375}" placeholder="2375">
+          </div>
+        </div>
+      </div>
+      <div id="d-ssh-${id}" style="${type!=='ssh'?'display:none':''}">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>SSH Host / IP</label>
+            <input type="text" class="d-sshHost" value="${escHtml(data.sshHost||'')}" placeholder="192.168.1.10">
+          </div>
+          <div class="form-group">
+            <label>SSH Port</label>
+            <input type="number" class="d-sshPort" value="${data.sshPort||22}" placeholder="22">
+          </div>
+        </div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>SSH User</label>
+            <input type="text" class="d-sshUser" value="${escHtml(data.sshUser||'')}" placeholder="root">
+          </div>
+          <div class="form-group">
+            <label>SSH Password</label>
+            <input type="password" class="d-sshPassword" value="${escHtml(data.sshPassword&&data.sshPassword!=='__set__'?data.sshPassword:'')}" placeholder="${data.sshPassword==='__set__'?'(set — leave blank to keep)':'optional if using key'}">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Private Key (PEM, optional)</label>
+          <textarea class="d-sshKey" rows="3" style="width:100%;resize:vertical" placeholder="-----BEGIN OPENSSH PRIVATE KEY-----&#10;...&#10;-----END OPENSSH PRIVATE KEY-----">${escHtml(data.sshKey&&data.sshKey!=='__set__'?data.sshKey:'')}</textarea>
+          ${data.sshKey==='__set__'?'<div style="font-size:11px;color:var(--muted);margin-top:4px">Key is set — leave blank to keep</div>':''}
+        </div>
+        <div class="form-group">
+          <label>Docker Socket Path (on remote)</label>
+          <input type="text" class="d-sshSocket" value="${escHtml(data.socketPath||'/var/run/docker.sock')}" placeholder="/var/run/docker.sock">
+        </div>
+      </div>
+    </div>`;
+  document.getElementById('docker-list').appendChild(el);
+}
+
+function onDockerType(sel, id) {
+  document.getElementById(`d-socket-${id}`).style.display = sel.value === 'socket' ? '' : 'none';
+  document.getElementById(`d-tcp-${id}`).style.display    = sel.value === 'tcp'    ? '' : 'none';
+  document.getElementById(`d-ssh-${id}`).style.display    = sel.value === 'ssh'    ? '' : 'none';
+}
+
+function onSynVer(sel, id) {
+  const v3 = sel.value === '3';
+  document.getElementById(`sv2-${id}`).style.display = v3 ? 'none' : '';
+  document.getElementById(`sv3-${id}`).style.display = v3 ? '' : 'none';
+  sel.closest('.arr-item').querySelector('.syn-ver-lbl').textContent = `SNMPv${sel.value}`;
+}
+
+function onSynSecLevel(sel, id) {
+  const lvl = sel.value;
+  document.getElementById(`sap-${id}`).style.display = lvl === 'noAuthNoPriv' ? 'none' : '';
+  document.getElementById(`spp-${id}`).style.display = lvl === 'authPriv' ? '' : 'none';
+}
+
+/* ── Populate from config ── */
+function secVal(v, el) {
+  if (v === '__encrypted__' || v === '__set__') {
+    el.value = '';
+    el.placeholder = '••••••••  (set — leave blank to keep)';
+    el.dataset.masked = '1';
+  } else {
+    el.value = v || '';
+    el.dataset.masked = '';
+  }
+}
+function maskedVal(el) {
+  if (el.dataset.masked === '1' && !el.value.trim()) return '__set__';
+  return el.value.trim();
+}
+
+function populate(cfg) {
+  document.getElementById('en-public').checked = !!cfg.publicStatus;
+  if (cfg.publicTitle) document.getElementById('public-title').value = cfg.publicTitle;
+  if (cfg.proxmox) {
+    document.getElementById('en-proxmox').checked = true;
+    document.getElementById('cb-proxmox').classList.remove('hidden');
+    document.getElementById('pve-host').value = cfg.proxmox.host || '';
+    document.getElementById('pve-port').value = cfg.proxmox.port || 8006;
+    document.getElementById('pve-tokenid').value = cfg.proxmox.tokenId || '';
+    secVal(cfg.proxmox.tokenSecret, document.getElementById('pve-secret'));
+    (cfg.proxmox.nodes || []).forEach(n => appendTag('pve-nodes', n));
+  }
+  if (cfg.linux) {
+    document.getElementById('en-linux').checked = true;
+    document.getElementById('cb-linux').classList.remove('hidden');
+    (cfg.linux.servers || []).forEach(addLinuxServer);
+  }
+  if (cfg.kubernetes) {
+    document.getElementById('en-kubernetes').checked = true;
+    document.getElementById('cb-kubernetes').classList.remove('hidden');
+    document.getElementById('k8s-kubeconfig').value = cfg.kubernetes.kubeconfig || '';
+    (cfg.kubernetes.namespaces || []).forEach(n => appendTag('k8s-ns', n));
+  }
+  if (cfg.snmp) {
+    document.getElementById('en-synology').checked = true;
+    document.getElementById('cb-synology').classList.remove('hidden');
+    (cfg.snmp.devices || []).forEach(addSynDevice);
+  }
+  if (cfg.healthchecks) {
+    document.getElementById('en-healthchecks').checked = true;
+    document.getElementById('cb-healthchecks').classList.remove('hidden');
+    document.getElementById('hc-url').value = cfg.healthchecks.url || '';
+    secVal(cfg.healthchecks.apiKey, document.getElementById('hc-apikey'));
+  }
+  if (cfg.docker) {
+    document.getElementById('en-docker').checked = true;
+    document.getElementById('cb-docker').classList.remove('hidden');
+    (cfg.docker.hosts || []).forEach(addDockerHost);
+  }
+  if (cfg.alerts) {
+    document.getElementById('en-alerts').checked = true;
+    document.getElementById('cb-alerts').classList.remove('hidden');
+    const a = cfg.alerts;
+    if (a.ntfy) {
+      document.getElementById('al-ntfy-en').checked = a.ntfy.enabled !== false;
+      document.getElementById('al-ntfy-url').value = a.ntfy.url || '';
+      document.getElementById('al-ntfy-topic').value = a.ntfy.topic || '';
+      document.getElementById('al-ntfy-priority').value = a.ntfy.priority || 'default';
+      secVal(a.ntfy.token, document.getElementById('al-ntfy-token'));
+    }
+    if (a.telegram) {
+      document.getElementById('al-tg-en').checked = a.telegram.enabled !== false;
+      secVal(a.telegram.botToken, document.getElementById('al-tg-token'));
+      document.getElementById('al-tg-chat').value = a.telegram.chatId || '';
+    }
+    if (a.smtp) {
+      document.getElementById('al-smtp-en').checked = a.smtp.enabled !== false;
+      document.getElementById('al-smtp-host').value = a.smtp.host || '';
+      document.getElementById('al-smtp-port').value = a.smtp.port || 587;
+      document.getElementById('al-smtp-secure').value = a.smtp.secure ? 'true' : 'false';
+      document.getElementById('al-smtp-user').value = a.smtp.user || '';
+      secVal(a.smtp.password, document.getElementById('al-smtp-pass'));
+      document.getElementById('al-smtp-from').value = a.smtp.from || '';
+      (Array.isArray(a.smtp.to) ? a.smtp.to : (a.smtp.to ? [a.smtp.to] : [])).forEach(t => appendTag('al-smtp-to', t));
+    }
+    toggleAlertBody('al-ntfy-en', 'al-ntfy-body');
+    toggleAlertBody('al-tg-en', 'al-tg-body');
+    toggleAlertBody('al-smtp-en', 'al-smtp-body');
+  }
+}
+
+/* ── Collect config ── */
+function collect() {
+  const cfg = {};
+
+  if (document.getElementById('en-proxmox').checked) {
+    cfg.proxmox = {
+      host: document.getElementById('pve-host').value.trim(),
+      port: parseInt(document.getElementById('pve-port').value) || 8006,
+      tokenId: document.getElementById('pve-tokenid').value.trim(),
+      tokenSecret: maskedVal(document.getElementById('pve-secret')),
+      nodes: getTagVals('pve-nodes'),
+    };
+  }
+
+  if (document.getElementById('en-linux').checked) {
+    const servers = [];
+    document.querySelectorAll('#linux-list .arr-item').forEach(item => {
+      const idx = item.id.replace('lsrv-', '');
+      const srv = {
+        name: item.querySelector('.l-name').value.trim(),
+        host: item.querySelector('.l-host').value.trim(),
+        port: parseInt(item.querySelector('.l-port').value) || 22,
+        user: item.querySelector('.l-user').value.trim(),
+        services: getTagVals(`l-svc-${idx}`),
+      };
+      const key = maskedVal(item.querySelector('.l-key'));
+      const pw  = maskedVal(item.querySelector('.l-pw'));
+      if (key) srv.privateKey = key;
+      else if (pw) srv.password = pw;
+      if (srv.name && srv.host) servers.push(srv);
+    });
+    cfg.linux = { servers };
+  }
+
+  if (document.getElementById('en-kubernetes').checked) {
+    cfg.kubernetes = {
+      kubeconfig: document.getElementById('k8s-kubeconfig').value.trim(),
+      namespaces: getTagVals('k8s-ns'),
+    };
+  }
+
+  if (document.getElementById('en-synology').checked) {
+    const devices = [];
+    document.querySelectorAll('#syn-list .arr-item').forEach(item => {
+      const ver = item.querySelector('.s-ver').value;
+      const dev = {
+        name: item.querySelector('.s-name').value.trim(),
+        host: item.querySelector('.s-host').value.trim(),
+        snmpVersion: ver === '3' ? 3 : 2,
+      };
+      if (ver === '3') {
+        dev.username     = item.querySelector('.s-username').value.trim();
+        dev.authPassword = maskedVal(item.querySelector('.s-authpw'));
+        dev.privPassword = maskedVal(item.querySelector('.s-privpw'));
+        dev.securityLevel = item.querySelector('.s-seclevel').value;
+        dev.authProtocol  = item.querySelector('.s-authproto')?.value || 'sha';
+        dev.privProtocol  = item.querySelector('.s-privproto')?.value || 'aes';
+      } else {
+        dev.community = item.querySelector('.s-community').value.trim() || 'public';
+      }
+      if (dev.name && dev.host) devices.push(dev);
+    });
+    cfg.snmp = { devices };
+  }
+
+  if (document.getElementById('en-healthchecks').checked) {
+    cfg.healthchecks = {
+      url: document.getElementById('hc-url').value.trim(),
+      apiKey: maskedVal(document.getElementById('hc-apikey')),
+    };
+  }
+
+  if (document.getElementById('en-docker').checked) {
+    const hosts = [];
+    document.querySelectorAll('#docker-list .arr-item').forEach(item => {
+      const type = item.querySelector('.d-type').value;
+      const h = { name: item.querySelector('.d-name').value.trim() };
+      if (type === 'socket') {
+        h.socketPath = item.querySelector('.d-socket').value.trim() || '/var/run/docker.sock';
+      } else if (type === 'tcp') {
+        h.host = item.querySelector('.d-host').value.trim();
+        h.port = parseInt(item.querySelector('.d-port').value) || 2375;
+      } else if (type === 'ssh') {
+        h.type = 'ssh';
+        h.sshHost = item.querySelector('.d-sshHost').value.trim();
+        h.sshPort = parseInt(item.querySelector('.d-sshPort').value) || 22;
+        h.sshUser = item.querySelector('.d-sshUser').value.trim();
+        const pw = item.querySelector('.d-sshPassword').value;
+        if (pw) h.sshPassword = pw;
+        const key = item.querySelector('.d-sshKey').value.trim();
+        if (key) h.sshKey = key;
+        h.socketPath = item.querySelector('.d-sshSocket').value.trim() || '/var/run/docker.sock';
+      }
+      if (h.name) hosts.push(h);
+    });
+    cfg.docker = { hosts };
+  }
+
+  if (document.getElementById('en-alerts').checked) {
+    const a = { enabled: true };
+    if (document.getElementById('al-ntfy-en').checked) {
+      a.ntfy = {
+        enabled: true,
+        url: document.getElementById('al-ntfy-url').value.trim() || 'https://ntfy.sh',
+        topic: document.getElementById('al-ntfy-topic').value.trim(),
+        priority: document.getElementById('al-ntfy-priority').value,
+      };
+      const tok = maskedVal(document.getElementById('al-ntfy-token'));
+      if (tok) a.ntfy.token = tok;
+    }
+    if (document.getElementById('al-tg-en').checked) {
+      a.telegram = {
+        enabled: true,
+        botToken: maskedVal(document.getElementById('al-tg-token')),
+        chatId: document.getElementById('al-tg-chat').value.trim(),
+      };
+    }
+    if (document.getElementById('al-smtp-en').checked) {
+      a.smtp = {
+        enabled: true,
+        host: document.getElementById('al-smtp-host').value.trim(),
+        port: parseInt(document.getElementById('al-smtp-port').value) || 587,
+        secure: document.getElementById('al-smtp-secure').value === 'true',
+        user: document.getElementById('al-smtp-user').value.trim(),
+        password: maskedVal(document.getElementById('al-smtp-pass')),
+        from: document.getElementById('al-smtp-from').value.trim(),
+        to: getTagVals('al-smtp-to'),
+      };
+    }
+    cfg.alerts = a;
+  }
+
+  if (document.getElementById('en-public').checked) cfg.publicStatus = true;
+  const pubTitle = document.getElementById('public-title').value.trim();
+  if (pubTitle) cfg.publicTitle = pubTitle;
+
+  return cfg;
+}
+
+function toggleMenu(){ document.getElementById('menu-drop').classList.toggle('open'); }
+document.addEventListener('click', e => { if(!e.target.closest('.menu-wrap')) document.getElementById('menu-drop')?.classList.remove('open'); });
+
+function authHeaders(){ const t=sessionStorage.getItem('os_token')||localStorage.getItem('os_token'); return t?{'x-session-token':t}:{}; }
+function handleUnauth(r){ if(r.status===401){ sessionStorage.removeItem('os_token'); localStorage.removeItem('os_token'); document.cookie='session=; path=/; max-age=0'; window.location.href='/login'; throw new Error('Unauthorized'); } }
+async function doLogout(){
+  await fetch('/api/logout',{method:'POST',headers:authHeaders()}).catch(()=>{});
+  sessionStorage.removeItem('os_token'); localStorage.removeItem('os_token');
+  window.location.href='/login';
+}
+
+/* ── Save ── */
+async function saveConfig() {
+  const btns = document.querySelectorAll('.btn-save');
+  btns.forEach(b => b.disabled = true);
+  flushPendingTags();
+  try {
+    const r = await fetch('/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify(collect()),
+    });
+    handleUnauth(r);
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(body.error || r.statusText);
+    toast('Saved and applied!', 'ok');
+    refreshDots();
+  } catch (e) {
+    toast('Error: ' + e.message, 'err');
+  } finally {
+    btns.forEach(b => b.disabled = false);
+  }
+}
+
+async function sendTestAlert(channel) {
+  try {
+    await saveConfig();
+    const url = '/api/alerts/test' + (channel ? '?channel=' + encodeURIComponent(channel) : '');
+    const r = await fetch(url, { method: 'POST', headers: authHeaders() });
+    handleUnauth(r);
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(body.error || r.statusText);
+    const results = body.results || [];
+    if (!results.length) { toast((channel || 'alert') + ': not enabled / configured', 'err'); return; }
+    const ok = results.filter(x => x.ok).map(x => x.channel);
+    const bad = results.filter(x => !x.ok);
+    let msg = ok.length ? ('Sent: ' + ok.join(', ')) : '';
+    if (bad.length) msg += (msg ? ' | ' : '') + 'Failed: ' + bad.map(b => b.channel + ' (' + b.error + ')').join(', ');
+    toast(msg, bad.length ? 'err' : 'ok');
+  } catch (e) { toast('Error: ' + e.message, 'err'); }
+}
+
+/* ── Toast ── */
+let toastTimer;
+function toast(msg, type) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'show ' + type;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.className = ''; }, 3500);
+}
+
+function dotColor(st){ return st==='ok'?'var(--green)':st==='bad'?'var(--red)':'var(--muted)'; }
+function setDot(id, st){ const el=document.getElementById(id); if(el) el.style.background=dotColor(st); }
+async function refreshDots(cfg){
+  try { if(!cfg){ const rc=await fetch('/api/config',{headers:authHeaders()}); cfg=await rc.json(); } } catch { cfg={}; }
+  let d={};
+  try { const rs=await fetch('/api/status',{headers:authHeaders()}); d=await rs.json(); } catch {}
+  const loading = d.loading === true;
+  const ev=(configured, ok)=> !configured ? 'gray' : loading ? 'gray' : (ok ? 'ok' : 'bad');
+  setDot('dot-proxmox', ev(!!cfg.proxmox, (d.proxmox?.nodes||[]).length>0 && (d.proxmox?.nodes||[]).every(n=>n.node?.online)));
+  setDot('dot-linux', ev(!!cfg.linux, (d.linux||[]).length>0 && (d.linux||[]).every(l=>l.online && (l.services||[]).every(s=>s.active))));
+  setDot('dot-kubernetes', ev(!!cfg.kubernetes, !!(d.kubernetes && d.kubernetes.online) && !((d.kubernetes?.pods)||[]).some(p=>p.failed)));
+  setDot('dot-synology', ev(!!cfg.snmp, (d.snmp||[]).length>0 && (d.snmp||[]).every(x=>x.online)));
+  setDot('dot-healthchecks', ev(!!cfg.healthchecks, !!(d.healthchecks && d.healthchecks.online) && ((d.healthchecks?.summary?.down)||0)===0));
+  setDot('dot-docker', ev(!!cfg.docker, (d.docker||[]).length>0 && (d.docker||[]).every(h=>h.online)));
+  const a=cfg.alerts, hasCh=!!(a && (a.ntfy||a.telegram||a.smtp));
+  setDot('dot-alerts', (!a || a.enabled===false || !hasCh) ? 'gray' : 'ok');
+  let pubLive=false;
+  try { const pr=await fetch('/api/public/status'); pubLive=pr.ok; } catch {}
+  const wantPublic=!!document.getElementById('en-public')?.checked;
+  setDot('dot-statuspage', pubLive ? 'ok' : (wantPublic ? 'bad' : 'gray'));
+}
+
+(function(){
+  const svg='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>';
+  document.querySelectorAll('.card-body').forEach(cb => {
+    const bar = document.createElement('div');
+    bar.style.cssText = 'display:flex;justify-content:flex-end;margin-top:16px';
+    bar.innerHTML = '<button class="btn-save" type="button" onclick="saveConfig()">' + svg + ' Save & Apply</button>';
+    cb.appendChild(bar);
+  });
+})();
+
+/* ── Init ── */
+(async () => {
+  try {
+    const r = await fetch('/api/config', { headers: authHeaders() });
+    handleUnauth(r);
+    const cfg = await r.json();
+    populate(cfg);
+    refreshDots(cfg);
+    setInterval(() => refreshDots(), 15000);
+  } catch (e) {
+    toast('Could not load config: ' + e.message, 'err');
+  }
+})();
+</script>
+</body>
+</html>
