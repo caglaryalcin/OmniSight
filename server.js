@@ -166,6 +166,7 @@ async function fetchAllData() {
     snmp:         synology.value     || [],
     healthchecks: healthchecks.value || null,
     docker:       docker.value       || [],
+    publicStatus: !!config.publicStatus,
   };
 }
 
@@ -246,6 +247,7 @@ const EMPTY = {
   snmp: [],
   healthchecks: null,
   docker: [],
+  publicStatus: false,
 };
 
 function getCachedData() {

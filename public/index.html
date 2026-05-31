@@ -218,6 +218,9 @@ html[data-theme="light"] .menu-drop{box-shadow:0 8px 24px rgba(0,0,0,.15)}
 .gh-yellow{color:var(--yellow)} .gh-yellow .gh-dot{background:var(--yellow)}
 .gh-red{color:var(--red)} .gh-red .gh-dot{background:var(--red);animation:pg 2.5s infinite}
 .gh-gray{color:var(--muted)} .gh-gray .gh-dot{background:var(--muted)}
+.pubstatus{display:none;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--green);text-decoration:none;border:1px solid var(--green);background:rgba(61,186,126,.12);padding:6px 12px;border-radius:20px}
+.pubstatus.on{display:inline-flex}
+.pubstatus:hover{background:rgba(61,186,126,.22)}
 #thbtn{background:var(--row);border:1px solid var(--border);color:var(--text);width:36px;height:34px;border-radius:7px;cursor:pointer;display:flex;align-items:center;justify-content:center}
 #thbtn:hover{border-color:#4a5568}
 .logmodal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1000;align-items:center;justify-content:center}
@@ -250,6 +253,10 @@ html[data-theme="light"] .menu-drop{box-shadow:0 8px 24px rgba(0,0,0,.15)}
     OmniSight
   </a>
   <div class="hdr-r">
+    <a class="pubstatus" id="pubstatus" href="/status" target="_blank" rel="noopener" title="Public status page is enabled">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+      Public status
+    </a>
     <span class="ghealth gh-green" id="ghealth"><span class="gh-dot"></span></span>
     <button id="thbtn" onclick="toggleTheme()" title="Theme"></button>
     <span id="lupd"></span>
@@ -1047,6 +1054,8 @@ function render(data){
     gh.className='ghealth gh-'+cls;
     gh.innerHTML='<span class="gh-dot"></span>'+txt;
   }
+  const ps=document.getElementById('pubstatus');
+  if(ps) ps.classList.toggle('on', !!data.publicStatus);
   document.getElementById('lupd').textContent =
     `Updated ${new Date(data.timestamp).toLocaleTimeString('en-GB')}`;
 
@@ -1069,7 +1078,7 @@ function render(data){
   const ids = ALL_IDS.filter(id => panels[id]);
   if(!ids.length){
     document.getElementById('sidebar').innerHTML = '';
-    if(!embedOpen) document.getElementById('detail').innerHTML = '<div class="empty" style="padding:48px">No data configured</div>';
+    document.getElementById('detail').innerHTML = '<div class="empty" style="padding:48px">No data configured</div>';
     return;
   }
 
