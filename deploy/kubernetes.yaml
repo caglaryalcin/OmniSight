@@ -31,7 +31,7 @@ spec:
     spec:
       containers:
         - name: omnisight
-          image: ghcr.io/OWNER/omnisight:latest
+          image: ghcr.io/caglaryalcin/omnisight
           ports:
             - containerPort: 3000
           env:
