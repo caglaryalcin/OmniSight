@@ -9,11 +9,22 @@ A simple, single-glance monitoring dashboard for Proxmox, Linux servers, Kuberne
 - **Kubernetes** — pod / deployment / service status and live pod log viewer (kubeconfig)
 - **SNMP** — status of any SNMP v2c/v3 device (Synology, switches, routers, …)
 - **Docker** — container status, ports, unused (dangling) image count, live container log viewer. Local socket, remote TCP, or over SSH (socket-forward, with `docker ps` / `sudo` fallback)
+
+![](https://raw.githubusercontent.com/caglaryalcin/OmniSight/refs/heads/main/screenshots/dashboard.png)
+
 - **Healthchecks** — cron monitoring status
 - **Alerts** — notifications on state changes (down/up) via **ntfy**, **Telegram** and **SMTP**
 - **Public status** — Uptime-Kuma-style, read-only public summary page (`/status`)
+
+![](https://raw.githubusercontent.com/caglaryalcin/OmniSight/refs/heads/main/screenshots/public-page.png)
+
 - **Logs** — live application log/warning/error stream at `/logs`
+
+![](https://raw.githubusercontent.com/caglaryalcin/OmniSight/refs/heads/main/screenshots/logs.png)
+
 - Dark / light theme, global health badge in the header, live configuration from the Settings page
+
+![](https://raw.githubusercontent.com/caglaryalcin/OmniSight/refs/heads/main/screenshots/light-dark.png)
 
 ## Stack
 
