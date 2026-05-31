@@ -4,6 +4,13 @@ on:
   push:
     branches: [ main, master ]
     tags: [ 'v*' ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'LICENSE'
+      - '.gitignore'
+      - '.dockerignore'
+      - 'config.example.yaml'
   workflow_dispatch:
 
 permissions:
