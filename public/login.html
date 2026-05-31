@@ -84,42 +84,13 @@ async function submitForm(){
     window.location.href = '/';
   } catch { err.textContent = 'Network error'; } finally { btn.disabled = false; }
 }
+
+document.getElementById('u').addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('p').focus(); });
 document.getElementById('p').addEventListener('keydown', e => { if(e.key==='Enter') submitForm(); });
+
 (async () => {
   try { const r = await fetch('/api/auth-status'); const d = await r.json(); if(!d.required) setMode('register'); } catch {}
 })();
-</script>
-document.getElementById('p').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
-document.getElementById('u').addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('p').focus(); });
-
-async function doLogin(){
-  const btn = document.getElementById('btn');
-  const err = document.getElementById('err');
-  const username = document.getElementById('u').value.trim();
-  const password = document.getElementById('p').value;
-  if(!username||!password){ err.textContent='Enter username and password'; return; }
-  btn.disabled = true;
-  err.textContent = '';
-  try {
-    const remember = document.getElementById('rem').checked;
-    const r = await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,password,remember})});
-    const d = await r.json();
-    if(!r.ok||!d.ok){ err.textContent = d.error||'Login failed'; return; }
-    if(remember){
-      const exp = new Date(Date.now() + 30*24*60*60*1000).toUTCString();
-      document.cookie = `session=${d.token}; path=/; SameSite=Strict; expires=${exp}`;
-      localStorage.setItem('os_token', d.token);
-    } else {
-      document.cookie = `session=${d.token}; path=/; SameSite=Strict`;
-      sessionStorage.setItem('os_token', d.token);
-    }
-    window.location.href = '/';
-  } catch {
-    err.textContent = 'Network error';
-  } finally {
-    btn.disabled = false;
-  }
-}
 </script>
 </body>
 </html>
