@@ -1064,11 +1064,15 @@ function render(data){
   setFavicon(anyOff);
   setLogoDot(anyOff);
 
+  const dataHas={ proxmox:!!(data.proxmox?.nodes?.length), linux:!!((data.linux||[]).length), kubernetes:!!data.kubernetes, snmp:!!((data.snmp||[]).length), healthchecks:!!data.healthchecks, docker:!!((data.docker||[]).length) };
+  const connectingCount=configuredIds.filter(id=>!dataHas[id]).length;
+
   const gh=document.getElementById('ghealth');
   if(gh){
     let cls,txt;
-    if(!platforms.length){ cls='gray'; txt='Unconfigured'; }
+    if(!platforms.length && !connectingCount){ cls='gray'; txt='Unconfigured'; }
     else if(downCount>0){ cls='red'; txt=downCount+' down'; }
+    else if(connectingCount>0){ cls='yellow'; txt='connecting…'; }
     else if(degradedCount>0){ cls='yellow'; txt=degradedCount+' degraded'; }
     else { cls='green'; txt='All healthy'; }
     gh.className='ghealth gh-'+cls;

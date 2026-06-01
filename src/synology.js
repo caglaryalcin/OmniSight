@@ -102,6 +102,39 @@ function buildMap(items) {
   return map;
 }
 
+async function getHrMemory(session) {
+  const rows = await snmpWalk(session, '1.3.6.1.2.1.25.2.3.1');
+  const BASE = '1.3.6.1.2.1.25.2.3.1.';
+  const PREFIX_LEN = BASE.split('.').length - 1;
+  const cols = {};
+  rows.forEach(({ oid, value }) => {
+    if (!oid.startsWith(BASE)) return;
+    const parts = oid.split('.');
+    if (parts.length < PREFIX_LEN + 2) return;
+    const col = parts[PREFIX_LEN];
+    const idx = parts[PREFIX_LEN + 1];
+    if (!cols[col]) cols[col] = {};
+    cols[col][idx] = value;
+  });
+  const typeMap = cols['2'] || {};
+  const descrMap = cols['3'] || {};
+  const unitMap = cols['4'] || {};
+  const sizeMap = cols['5'] || {};
+  const usedMap = cols['6'] || {};
+  let target = null;
+  for (const idx of Object.keys(sizeMap)) {
+    const type = String(typeMap[idx] || '');
+    const descr = Buffer.isBuffer(descrMap[idx]) ? descrMap[idx].toString('utf8') : String(descrMap[idx] || '');
+    if (type.endsWith('25.2.1.2') || /physical memory|real memory|^\s*ram\b/i.test(descr)) { target = idx; break; }
+  }
+  if (target == null) return null;
+  const units = toNum(unitMap[target]) || 1;
+  const size = toNum(sizeMap[target]);
+  const used = toNum(usedMap[target]);
+  if (!size) return null;
+  return { totalKB: (size * units) / 1024, freeKB: used != null ? ((size - used) * units) / 1024 : null };
+}
+
 async function getSystemInfo(session) {
   const synVals = await snmpGet(session, [
     '1.3.6.1.4.1.6574.1.4.1.0',
@@ -144,6 +177,13 @@ async function getSystemInfo(session) {
         memFreeKB  = uFree + uBuf + uCached;
       }
     } catch (e) { console.error('[SNMP ucd-mem]', e.message); }
+  }
+
+  if (memTotalKB == null) {
+    try {
+      const hr = await getHrMemory(session);
+      if (hr) { memTotalKB = hr.totalKB; memFreeKB = hr.freeKB; }
+    } catch (e) { console.error('[SNMP hrStorage mem]', e.message); }
   }
 
   const memTotal = memTotalKB != null ? memTotalKB * 1024 : null;

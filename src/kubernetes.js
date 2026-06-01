@@ -17,6 +17,11 @@ function extractItems(res) {
   return res?.body?.items || res?.items || [];
 }
 
+function inNs(namespaces, ns) {
+  if (!namespaces || !namespaces.length || namespaces.includes('*')) return true;
+  return namespaces.includes(ns);
+}
+
 async function getPods(kc, namespaces) {
   const coreV1 = kc.makeApiClient(k8s.CoreV1Api);
 
@@ -33,7 +38,7 @@ async function getPods(kc, namespaces) {
     }
   }
 
-  return items.map(pod => {
+  return items.filter(pod => inNs(namespaces, pod.metadata?.namespace)).map(pod => {
     const phase = pod.status?.phase || 'Unknown';
     const containerStatuses = pod.status?.containerStatuses || [];
     const ready = containerStatuses.length > 0 && containerStatuses.every(c => c.ready);
@@ -66,7 +71,7 @@ async function getServices(kc, namespaces) {
     }
   }
 
-  return items.map(svc => ({
+  return items.filter(svc => inNs(namespaces, svc.metadata?.namespace)).map(svc => ({
     name: svc.metadata.name,
     namespace: svc.metadata.namespace,
     type: svc.spec?.type || 'ClusterIP',
@@ -90,7 +95,7 @@ async function getDeployments(kc, namespaces) {
     }
   }
 
-  return items.map(d => {
+  return items.filter(d => inNs(namespaces, d.metadata?.namespace)).map(d => {
     const desired = d.spec?.replicas || 0;
     const ready = d.status?.readyReplicas || 0;
     return {

@@ -903,8 +903,13 @@ function uploadKubeconfig(input) {
 /* ── Save ── */
 async function saveConfig() {
   const btns = document.querySelectorAll('.btn-save');
-  btns.forEach(b => b.disabled = true);
   flushPendingTags();
+  if (document.getElementById('en-proxmox').checked && getTagVals('pve-nodes').length === 0) {
+    toast('Proxmox: at least one node name is required', 'err');
+    document.getElementById('pve-node-in').focus();
+    return;
+  }
+  btns.forEach(b => b.disabled = true);
   try {
     const r = await fetch('/api/config', {
       method: 'POST',
