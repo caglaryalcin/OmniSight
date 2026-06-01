@@ -751,12 +751,23 @@ function buildSynology(syn){
   const allOk = syn.every(d=>d.online);
   const onlineDevs = syn.filter(d=>d.online);
 
+  const avg = a => a.length ? Math.round(a.reduce((x,y)=>x+y,0)/a.length) : null;
+  const cpuAvg = avg(onlineDevs.filter(d=>d.cpu!=null).map(d=>d.cpu));
+  const ramAvg = avg(onlineDevs.filter(d=>d.ram).map(d=>d.ram.percent));
+  const volCount = onlineDevs.reduce((s,d)=>s+(d.volumes?.length||0),0);
+
   const sbSummaryHtml = `<div class="sb-csum">
     <div class="sb-csum-item"><div class="sb-csum-val">${onlineDevs.length}/${syn.length}</div><div class="sb-csum-lbl">Devices</div></div>
+    ${cpuAvg!=null?`<div class="sb-csum-item"><div class="sb-csum-val">${cpuAvg}%</div><div class="sb-csum-lbl">CPU</div></div>`:''}
+    ${ramAvg!=null?`<div class="sb-csum-item"><div class="sb-csum-val">${ramAvg}%</div><div class="sb-csum-lbl">RAM</div></div>`:''}
+    ${volCount?`<div class="sb-csum-item"><div class="sb-csum-val">${volCount}</div><div class="sb-csum-lbl">Volumes</div></div>`:''}
   </div>`;
 
   const summaryHtml = `<div class="csum">
     <div class="csum-item"><div class="csum-val">${onlineDevs.length}/${syn.length}</div><div class="csum-lbl">Devices</div></div>
+    ${cpuAvg!=null?`<div class="csum-item"><div class="csum-val">${cpuAvg}%</div><div class="csum-lbl">CPU</div></div>`:''}
+    ${ramAvg!=null?`<div class="csum-item"><div class="csum-val">${ramAvg}%</div><div class="csum-lbl">RAM</div></div>`:''}
+    ${volCount?`<div class="csum-item"><div class="csum-val">${volCount}</div><div class="csum-lbl">Volumes</div></div>`:''}
   </div>`;
 
   const body = syn.map(dev=>{
@@ -795,6 +806,18 @@ function buildSynology(syn){
             const fmt = gb => { const g = parseFloat(gb); return g >= 1000 ? (g/1024).toFixed(1)+' TB' : g+' GB'; };
             const sub = v.usedGB ? `${fmt(v.usedGB)} / ${fmt(v.totalGB)}${!v.healthy ? ' ⚠ '+v.status : ''}` : '';
             return bars(v.name, v.percent, sub);
+          }).join('')}
+        ` : ''}
+        ${dev.disks?.length ? `
+          <div class="syn-section" style="margin-top:6px">Disks</div>
+          ${dev.disks.map(d => {
+            const tc = d.temp==null?'var(--muted)':d.temp>=60?'var(--red)':d.temp>=50?'var(--yellow)':'var(--green)';
+            return `<div style="display:flex;align-items:center;gap:8px;padding:3px 0 3px 44px;font-size:12px">
+              <div class="mon-dot ${d.healthy?'md-green':'md-red'}"></div>
+              <span style="flex:1">${d.name}</span>
+              <span style="color:var(--muted)">${d.status}</span>
+              ${d.temp!=null?`<span style="color:${tc};min-width:42px;text-align:right">${d.temp}°C</span>`:''}
+            </div>`;
           }).join('')}
         ` : ''}
       </div>`;
