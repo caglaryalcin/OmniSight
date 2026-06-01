@@ -6,7 +6,7 @@ COPY package*.json ./
 RUN npm install --omit=dev --no-optional && npm cache clean --force
 
 COPY . .
-RUN mkdir -p /app/credentials
+RUN mkdir -p /app/data
 
 ENV PORT=3000
 EXPOSE 3000

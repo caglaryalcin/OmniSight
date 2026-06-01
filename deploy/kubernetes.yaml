@@ -11,7 +11,7 @@
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: omnisight-credentials
+  name: omnisight-data
 spec:
   capacity:
     storage: 64Mi
@@ -25,13 +25,13 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: omnisight-credentials
+  name: omnisight-data
   namespace: default
 spec:
   accessModes:
     - ReadWriteOnce
   storageClassName: ""
-  volumeName: omnisight-credentials
+  volumeName: omnisight-data
   resources:
     requests:
       storage: 64Mi
@@ -67,7 +67,7 @@ spec:
                   optional: true
           volumeMounts:
             - name: data
-              mountPath: /app/credentials
+              mountPath: /app/data
           livenessProbe:
             httpGet: { path: /login, port: 3000 }
             initialDelaySeconds: 20
@@ -82,7 +82,7 @@ spec:
       volumes:
         - name: data
           persistentVolumeClaim:
-            claimName: omnisight-credentials
+            claimName: omnisight-data
 ---
 apiVersion: v1
 kind: Service

@@ -47,11 +47,11 @@ Dashboard: `http://localhost:3000` — the app starts with no config; set up you
 docker compose up -d --build
 ```
 
-Nothing to pre-create. The single `credentials/` directory holds all state (`config.yaml`, `secret.key`, `auth.yaml`, `sessions.yaml`, `kube.bin`, SSH keys); Docker auto-creates it and it persists across restarts. The app starts empty — set up your account and configure platforms from the Settings UI. Standalone Docker using the published image:
+Nothing to pre-create. The single `data/` directory holds all state (`config.yaml`, `secret.key`, `auth.yaml`, `sessions.yaml`, `kube.bin`, SSH keys); Docker auto-creates it and it persists across restarts. The app starts empty — set up your account and configure platforms from the Settings UI. Standalone Docker using the published image:
 
 ```bash
 docker run -d --name omnisight -p 3000:3000 \
-  -v $(pwd)/credentials:/app/credentials \
+  -v $(pwd)/data:/app/data \
   ghcr.io/caglaryalcin/omnisight
 ```
 
@@ -86,7 +86,7 @@ kubectl apply -f deploy/kubernetes.yaml
 
 No ConfigMap/Secret to create: the app starts empty and you configure it from the Settings UI, which writes `config.yaml` to the persistent volume (`config.yaml`, `secret.key`, `auth.yaml`, `sessions.yaml` all persist on the PVC).
 
-> **Docker path note:** Windows paths don't work inside the container. Put `kube.bin` and SSH keys in `./credentials/` and reference them with container paths, e.g. `kubeconfig: /app/credentials/kube.bin` and `privateKey: /app/credentials/id_ed25519`.
+> **Docker path note:** Windows paths don't work inside the container. Put `kube.bin` and SSH keys in `./data/` and reference them with container paths, e.g. `kubeconfig: /app/data/kube.bin` and `privateKey: /app/data/id_ed25519`.
 
 ## Environment variables
 
@@ -94,14 +94,14 @@ No ConfigMap/Secret to create: the app starts empty and you configure it from th
 |---|---|---|---|
 | `PORT` | No | `3000` | HTTP port |
 | `OMNISIGHT_ENCRYPT` | No | `true` | Config encryption is **enabled by default**. Set to `false` (or `0`/`off`/`no`) to disable. |
-| `OMNISIGHT_SECRET` | No | auto | Encryption key. If unset, a random key is generated and stored in `credentials/secret.key` (auto-managed). Set this to use your own key (e.g. shared across instances). |
+| `OMNISIGHT_SECRET` | No | auto | Encryption key. If unset, a random key is generated and stored in `data/secret.key` (auto-managed). Set this to use your own key (e.g. shared across instances). |
 
 ### Encryption
 
 Encryption is on by default. Sensitive fields in `config.yaml` (`tokenSecret`, `password`, `apiKey`, `token`, `botToken`, `sshKey`, …) are stored encrypted (`enc:` prefix, AES-256-GCM) whenever the config is saved from the Settings page or via `npm run encrypt-config`.
 
-- The key lives in `OMNISIGHT_SECRET` if set, otherwise in the auto-generated `credentials/secret.key` file.
-- **Keep `credentials/secret.key` safe and persistent.** In Docker the whole `credentials/` folder is mounted as a volume — if the key is lost, previously encrypted values can no longer be decrypted.
+- The key lives in `OMNISIGHT_SECRET` if set, otherwise in the auto-generated `data/secret.key` file.
+- **Keep `data/secret.key` safe and persistent.** In Docker the whole `data/` folder is mounted as a volume — if the key is lost, previously encrypted values can no longer be decrypted.
 - To turn encryption off, set `OMNISIGHT_ENCRYPT=false` (do this before encrypting, or decrypt your config first).
 
 ### Referencing env vars inside config.yaml
@@ -123,7 +123,7 @@ Unresolved `${VAR}` (no env value, no default) is left as-is. This works for eve
 
 ## Configuration (config.yaml)
 
-The live config is `credentials/config.yaml` (created automatically on first save). Easiest is to configure everything from the Settings UI; to hand-edit, copy the template — `cp config.example.yaml credentials/config.yaml` — and edit it. All sections are optional; include only what you use. See `config.example.yaml`.
+The live config is `data/config.yaml` (created automatically on first save). Easiest is to configure everything from the Settings UI; to hand-edit, copy the template — `cp config.example.yaml data/config.yaml` — and edit it. All sections are optional; include only what you use. See `config.example.yaml`.
 
 - `proxmox` — host, port, tokenId, tokenSecret, nodes[]
 - `linux.servers[]` — name, host, port, user, privateKey **or** password, services[]
@@ -171,8 +171,8 @@ Notifications are sent only on **state changes** (running→down = DOWN, down→
 
 ## Security
 
-- The `credentials/` folder and `.env` are git-ignored.
-- All state lives in `./credentials/` (`config.yaml`, `secret.key`, `kube.bin`, `auth.yaml`, `sessions.yaml`, SSH keys) — it never leaves your machine.
+- The `data/` folder and `.env` are git-ignored.
+- All state lives in `./data/` (`config.yaml`, `secret.key`, `kube.bin`, `auth.yaml`, `sessions.yaml`, SSH keys) — it never leaves your machine.
 - Login password is set on first run from `/profile`. Passwords must be at least 8 characters and contain both an uppercase and a lowercase letter.
 - Config secrets are encrypted at rest by default (see Encryption above).
 

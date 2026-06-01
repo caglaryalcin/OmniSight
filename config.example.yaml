@@ -2,7 +2,7 @@
 # Any value may reference an environment variable: ${VAR} or ${VAR:-default}
 # Example:  tokenSecret: ${PVE_TOKEN_SECRET}   |   chatId: "${TG_CHAT_ID}"
 # Useful for Docker / secrets — set the env var and reference it here.
-# Keep key files (kubeconfig, SSH keys) in the ./credentials/ folder (git-ignored).
+# Keep key files (kubeconfig, SSH keys) in the ./data/ folder (git-ignored).
 
 proxmox:
   host: "192.168.1.10"
@@ -36,7 +36,7 @@ linux:
         - backup-agent
 
 kubernetes:
-  kubeconfig: './credentials/kube.bin'   # put your kubeconfig in credentials/
+  kubeconfig: './data/kube.bin'   # put your kubeconfig in data/
   namespaces:
     - default
     - production

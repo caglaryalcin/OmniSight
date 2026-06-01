@@ -5,5 +5,5 @@ npm-debug.log*
 .env
 .env.local
 config.yaml
-credentials
+data
 .fuse_hidden*

@@ -4,7 +4,7 @@ const path = require('path');
 
 const ALGO = 'aes-256-gcm';
 const PREFIX = 'enc:';
-const KEY_DIR = path.join(__dirname, '..', 'credentials');
+const KEY_DIR = path.join(__dirname, '..', 'data');
 const KEY_FILE = path.join(KEY_DIR, 'secret.key');
 
 function encryptionEnabled() {

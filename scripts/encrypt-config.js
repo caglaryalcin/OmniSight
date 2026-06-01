@@ -3,7 +3,7 @@ const path = require('path');
 const yaml = require('js-yaml');
 const { encryptConfigValue, encryptionEnabled } = require('../src/crypto');
 
-const CONFIG_PATH = path.join(__dirname, '..', 'credentials', 'config.yaml');
+const CONFIG_PATH = path.join(__dirname, '..', 'data', 'config.yaml');
 
 if (!encryptionEnabled()) {
   console.error('Encryption is disabled (OMNISIGHT_ENCRYPT=false). Nothing to do.');
