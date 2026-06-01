@@ -754,12 +754,14 @@ function buildSynology(syn){
   const avg = a => a.length ? Math.round(a.reduce((x,y)=>x+y,0)/a.length) : null;
   const cpuAvg = avg(onlineDevs.filter(d=>d.cpu!=null).map(d=>d.cpu));
   const ramAvg = avg(onlineDevs.filter(d=>d.ram).map(d=>d.ram.percent));
+  const tempAvg = avg(onlineDevs.filter(d=>d.systemTemp!=null).map(d=>d.systemTemp));
   const volCount = onlineDevs.reduce((s,d)=>s+(d.volumes?.length||0),0);
 
   const sbSummaryHtml = `<div class="sb-csum">
     <div class="sb-csum-item"><div class="sb-csum-val">${onlineDevs.length}/${syn.length}</div><div class="sb-csum-lbl">Devices</div></div>
     ${cpuAvg!=null?`<div class="sb-csum-item"><div class="sb-csum-val">${cpuAvg}%</div><div class="sb-csum-lbl">CPU</div></div>`:''}
     ${ramAvg!=null?`<div class="sb-csum-item"><div class="sb-csum-val">${ramAvg}%</div><div class="sb-csum-lbl">RAM</div></div>`:''}
+    ${tempAvg!=null?`<div class="sb-csum-item"><div class="sb-csum-val">${tempAvg}°C</div><div class="sb-csum-lbl">Temp</div></div>`:''}
     ${volCount?`<div class="sb-csum-item"><div class="sb-csum-val">${volCount}</div><div class="sb-csum-lbl">Volumes</div></div>`:''}
   </div>`;
 
@@ -767,6 +769,7 @@ function buildSynology(syn){
     <div class="csum-item"><div class="csum-val">${onlineDevs.length}/${syn.length}</div><div class="csum-lbl">Devices</div></div>
     ${cpuAvg!=null?`<div class="csum-item"><div class="csum-val">${cpuAvg}%</div><div class="csum-lbl">CPU</div></div>`:''}
     ${ramAvg!=null?`<div class="csum-item"><div class="csum-val">${ramAvg}%</div><div class="csum-lbl">RAM</div></div>`:''}
+    ${tempAvg!=null?`<div class="csum-item"><div class="csum-val">${tempAvg}°C</div><div class="csum-lbl">Temp</div></div>`:''}
     ${volCount?`<div class="csum-item"><div class="csum-val">${volCount}</div><div class="csum-lbl">Volumes</div></div>`:''}
   </div>`;
 
@@ -792,7 +795,7 @@ function buildSynology(syn){
       <div class="node-hdr" onclick="toggleSnmp('${skey}')">
         <div class="mon-dot md-green"></div>
         <div class="node-name">${dev.name}</div>
-        <div class="node-info">${dev.host}${dev.cpu!=null?' · CPU '+dev.cpu+'%':''}${dev.ram?' · RAM '+dev.ram.percent+'%':''}</div>
+        <div class="node-info">${dev.host}${dev.cpu!=null?' · CPU '+dev.cpu+'%':''}${dev.ram?' · RAM '+dev.ram.percent+'%':''}${dev.systemTemp!=null?' · '+dev.systemTemp+'°C':''}</div>
         ${bdg('green','healthy')}
       </div>
       <div class="node-body ${snmpOpen[skey]?'open':''}" id="snmp-${skey}">

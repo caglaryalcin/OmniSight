@@ -141,11 +141,13 @@ async function getSystemInfo(session) {
     '1.3.6.1.4.1.6574.1.4.2.0',
     '1.3.6.1.4.1.6574.1.1.1.0',
     '1.3.6.1.4.1.6574.1.1.2.0',
+    '1.3.6.1.4.1.6574.1.2.0',
   ]);
   let cpuUser   = synVals['1.3.6.1.4.1.6574.1.4.1.0'];
   let cpuSystem = synVals['1.3.6.1.4.1.6574.1.4.2.0'];
   let memTotalKB = synVals['1.3.6.1.4.1.6574.1.1.1.0'];
   let memFreeKB  = synVals['1.3.6.1.4.1.6574.1.1.2.0'];
+  const systemTemp = toNum(synVals['1.3.6.1.4.1.6574.1.2.0']);
 
 
   if (cpuUser == null) {
@@ -192,6 +194,7 @@ async function getSystemInfo(session) {
 
   return {
     cpu: cpuUser != null ? cpuUser + (cpuSystem || 0) : null,
+    systemTemp: systemTemp != null ? systemTemp : null,
     ram: memTotal ? {
       percent: Math.round((memUsed / memTotal) * 100),
       usedGB: (memUsed / 1024 ** 3).toFixed(1),
@@ -331,6 +334,7 @@ async function getDeviceData(device) {
       host: device.host,
       online: true,
       cpu:     sysInfo.cpu     ?? null,
+      systemTemp: sysInfo.systemTemp ?? null,
       ram:     sysInfo.ram     ?? null,
       disks,
       volumes,
