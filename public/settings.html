@@ -875,6 +875,7 @@ async function saveConfig() {
     if (!r.ok) throw new Error(body.error || r.statusText);
     toast('Saved and applied!', 'ok');
     refreshDots();
+    try { if(window.parent && window.parent !== window && typeof window.parent.doRefresh === 'function') window.parent.doRefresh(); } catch(e){}
   } catch (e) {
     toast('Error: ' + e.message, 'err');
   } finally {

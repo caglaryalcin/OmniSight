@@ -1075,20 +1075,23 @@ function render(data){
   });
   window._panels = panels;
 
-  if(embedOpen) return;
-
   const ids = ALL_IDS.filter(id => panels[id]);
+
+  if(embedOpen){
+    document.getElementById('sidebar').innerHTML = ids.map(id => sidebarCard(panels[id], false)).join('');
+    return;
+  }
+
   if(!ids.length){
     document.getElementById('sidebar').innerHTML = '';
     document.getElementById('detail').innerHTML = '<div class="empty" style="padding:48px">No data configured</div>';
     return;
   }
 
-  if(!embedOpen && (!activePanel || !panels[activePanel])) activePanel = ids[0];
+  if(!activePanel || !panels[activePanel]) activePanel = ids[0];
 
-  const activeId = embedOpen ? null : activePanel;
-  document.getElementById('sidebar').innerHTML = ids.map(id => sidebarCard(panels[id], id === activeId)).join('');
-  if(!embedOpen) selectPanel(activePanel);
+  document.getElementById('sidebar').innerHTML = ids.map(id => sidebarCard(panels[id], id === activePanel)).join('');
+  selectPanel(activePanel);
 }
 
 /* ── Sidebar resize (locked) ── */
