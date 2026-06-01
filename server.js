@@ -36,12 +36,12 @@ console.log   = (...a) => { try { _log(...a); } catch {} pushLog('info',  a); };
 console.warn  = (...a) => { try { _warn(...a); } catch {} pushLog('warn',  a); };
 console.error = (...a) => { try { _error(...a); } catch {} pushLog('error', a); };
 const REFRESH_INTERVAL = 15000;
-try { fs.mkdirSync(path.join(__dirname, 'credentials'), { recursive: true }); } catch {}
-const CONFIG_PATH = path.join(__dirname, 'credentials', 'config.yaml');
-const AUTH_PATH  = path.join(__dirname, 'credentials', 'auth.yaml');
+try { fs.mkdirSync(path.join(__dirname, 'data'), { recursive: true }); } catch {}
+const CONFIG_PATH = path.join(__dirname, 'data', 'config.yaml');
+const AUTH_PATH  = path.join(__dirname, 'data', 'auth.yaml');
 
 /* ── Auth ── */
-const SESSIONS_PATH = path.join(__dirname, 'credentials', 'sessions.yaml');
+const SESSIONS_PATH = path.join(__dirname, 'data', 'sessions.yaml');
 const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
 
 function loadSessions() {
@@ -274,7 +274,7 @@ backgroundRefresh();
 setInterval(backgroundRefresh, REFRESH_INTERVAL);
 
 /* ── Middleware ── */
-app.use(express.json());
+app.use(express.json({ limit: '5mb' }));
 app.use(parseCookies);
 app.use(authMiddleware);
 app.use(express.static(path.join(__dirname, 'public'), { extensions: ['html'] }));
@@ -379,6 +379,21 @@ app.post('/api/config', (req, res) => {
     cache.data = null;
     backgroundRefresh();
     res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/upload/kubeconfig', (req, res) => {
+  try {
+    const { name, content } = req.body || {};
+    if (!content || typeof content !== 'string') return res.status(400).json({ error: 'No file content' });
+    let base = path.basename(String(name || 'kube.bin')).replace(/[^a-zA-Z0-9._-]/g, '_');
+    if (!base || base === '.' || base === '..') base = 'kube.bin';
+    fs.mkdirSync(path.join(__dirname, 'data'), { recursive: true });
+    const dest = path.join(__dirname, 'data', base);
+    fs.writeFileSync(dest, content, { mode: 0o600 });
+    res.json({ path: dest });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

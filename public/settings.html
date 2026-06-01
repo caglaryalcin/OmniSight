@@ -62,6 +62,9 @@ main{padding:20px;max-width:1100px;margin:0 auto;display:flex;flex-direction:col
 .form-group select option{background:var(--row)}
 
 .tag-list{display:flex;flex-wrap:wrap;gap:6px;min-height:30px;padding:4px 0}
+.tag-list:empty{display:none}
+.path-row{display:flex;gap:8px;align-items:center}
+.path-row input[type=text]{flex:1}
 .tag{display:flex;align-items:center;gap:4px;background:var(--row);border:1px solid var(--border);border-radius:5px;padding:3px 8px;font-size:13px}
 .tag button{background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;line-height:1;padding:0 2px}
 .tag button:hover{color:var(--red)}
@@ -197,7 +200,13 @@ html[data-theme="light"]{--bg:#f4f5f7;--panel:#ffffff;--row:#eef1f4;--border:#dc
     <label class="toggle"><input type="checkbox" id="en-kubernetes" onchange="toggleCard('kubernetes')"><span class="toggle-t"></span></label>
   </div>
   <div class="card-body hidden" id="cb-kubernetes">
-    <div class="form-group"><label>Kubeconfig Path</label><input type="text" id="k8s-kubeconfig" placeholder="/app/data/example.bin"></div>
+    <div class="form-group"><label>Kubeconfig Path</label>
+      <div class="path-row">
+        <input type="text" id="k8s-kubeconfig" placeholder="/app/data/example.bin">
+        <button type="button" class="btn-sm" onclick="document.getElementById('k8s-kc-file').click()">Browse…</button>
+        <input type="file" id="k8s-kc-file" style="display:none" onchange="uploadKubeconfig(this)">
+      </div>
+    </div>
     <div class="form-group">
       <label>Namespaces</label>
       <div id="k8s-ns" class="tag-list"></div>
@@ -857,6 +866,31 @@ async function doLogout(){
   await fetch('/api/logout',{method:'POST',headers:authHeaders()}).catch(()=>{});
   sessionStorage.removeItem('os_token'); localStorage.removeItem('os_token');
   window.location.href='/login';
+}
+
+function uploadKubeconfig(input) {
+  const f = input.files && input.files[0];
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = async () => {
+    try {
+      const r = await fetch('/api/upload/kubeconfig', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ name: f.name, content: reader.result }),
+      });
+      handleUnauth(r);
+      const b = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(b.error || r.statusText);
+      document.getElementById('k8s-kubeconfig').value = b.path;
+      toast('Kubeconfig uploaded', 'ok');
+    } catch (e) {
+      toast('Upload failed: ' + e.message, 'err');
+    } finally {
+      input.value = '';
+    }
+  };
+  reader.readAsText(f);
 }
 
 /* ── Save ── */
