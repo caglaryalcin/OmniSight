@@ -53,7 +53,8 @@ spec:
     spec:
       containers:
         - name: omnisight
-          image: ghcr.io/caglaryalcin/omnisight
+          image: ghcr.io/caglaryalcin/omnisight:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 3000
           env:

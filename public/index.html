@@ -1075,6 +1075,8 @@ function render(data){
   });
   window._panels = panels;
 
+  if(embedOpen) return;
+
   const ids = ALL_IDS.filter(id => panels[id]);
   if(!ids.length){
     document.getElementById('sidebar').innerHTML = '';
