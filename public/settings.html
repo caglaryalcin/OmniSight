@@ -133,14 +133,12 @@ html[data-theme="light"]{--bg:#f4f5f7;--panel:#ffffff;--row:#eef1f4;--border:#dc
       <div class="card-icon" id="dot-statuspage" style="background:var(--muted)"></div>
       <span class="card-title">Status Page</span>
     </div>
+    <label class="toggle"><input type="checkbox" id="en-public" onchange="refreshDots()"><span class="toggle-t"></span></label>
   </div>
   <div class="card-body">
-    <div class="form-group" style="flex-direction:row;align-items:center;justify-content:space-between;gap:16px">
-      <div>
-        <label style="text-transform:none;font-size:13px;color:var(--text)">Public status page</label>
-        <div style="font-size:12px;color:var(--muted);margin-top:3px">Read-only summary at <a href="/status" target="_blank" style="color:var(--blue)">/status</a>, no login required</div>
-      </div>
-      <label class="toggle"><input type="checkbox" id="en-public" onchange="refreshDots()"><span class="toggle-t"></span></label>
+    <div class="form-group">
+      <label style="text-transform:none;font-size:13px;color:var(--text)">Public status page</label>
+      <div style="font-size:12px;color:var(--muted);margin-top:3px">Read-only summary at <a href="/status" target="_blank" style="color:var(--blue)">/status</a>, no login required</div>
     </div>
     <div class="form-group"><label>Public page title</label><input type="text" id="public-title" placeholder="OmniSight Status"></div>
   </div>
@@ -1023,8 +1021,10 @@ async function refreshDots(cfg){
     handleUnauth(r);
     const cfg = await r.json();
     populate(cfg);
+    document.querySelectorAll('.card-body').forEach(el => el.classList.add('hidden'));
+    document.querySelectorAll('#cb-alerts .arr-body').forEach(el => el.classList.add('hidden'));
     refreshDots(cfg);
-    setInterval(() => refreshDots(), 15000);
+    setInterval(() => refreshDots(), 7000);
   } catch (e) {
     toast('Could not load config: ' + e.message, 'err');
   }

@@ -65,6 +65,7 @@ header{
 
 /* ── Sidebar cards ── */
 .sb-card{margin:10px 10px 0;border-radius:10px;border:1px solid var(--border);cursor:pointer;transition:background .15s,border-color .15s,border-left-color .15s;border-left:3px solid var(--muted);overflow:hidden}
+.sb-card.dragging{opacity:.9;border:2px dashed var(--blue);border-left:3px solid var(--blue);background:rgba(80,134,212,.10);box-shadow:0 4px 14px rgba(0,0,0,.25)}
 .sb-card:last-child{margin-bottom:10px}
 .sb-card:hover{background:rgba(255,255,255,.03);border-color:#4a5568}
 .sb-card.active{background:var(--row);border-color:var(--green);border-left-color:var(--green)}
@@ -756,20 +757,21 @@ function buildSynology(syn){
   const ramAvg = avg(onlineDevs.filter(d=>d.ram).map(d=>d.ram.percent));
   const tempAvg = avg(onlineDevs.filter(d=>d.systemTemp!=null).map(d=>d.systemTemp));
   const volCount = onlineDevs.reduce((s,d)=>s+(d.volumes?.length||0),0);
+  const tcol = t => t>=60?'var(--red)':t>=50?'var(--yellow)':'var(--green)';
 
   const sbSummaryHtml = `<div class="sb-csum">
     <div class="sb-csum-item"><div class="sb-csum-val">${onlineDevs.length}/${syn.length}</div><div class="sb-csum-lbl">Devices</div></div>
-    ${cpuAvg!=null?`<div class="sb-csum-item"><div class="sb-csum-val">${cpuAvg}%</div><div class="sb-csum-lbl">CPU</div></div>`:''}
-    ${ramAvg!=null?`<div class="sb-csum-item"><div class="sb-csum-val">${ramAvg}%</div><div class="sb-csum-lbl">RAM</div></div>`:''}
-    ${tempAvg!=null?`<div class="sb-csum-item"><div class="sb-csum-val">${tempAvg}°C</div><div class="sb-csum-lbl">Temp</div></div>`:''}
+    ${cpuAvg!=null?`<div class="sb-csum-item"><div class="sb-csum-val" style="color:${bc(cpuAvg)}">${cpuAvg}%</div><div class="sb-csum-lbl">CPU</div></div>`:''}
+    ${ramAvg!=null?`<div class="sb-csum-item"><div class="sb-csum-val" style="color:${bc(ramAvg)}">${ramAvg}%</div><div class="sb-csum-lbl">RAM</div></div>`:''}
+    ${tempAvg!=null?`<div class="sb-csum-item"><div class="sb-csum-val" style="color:${tcol(tempAvg)}">${tempAvg}°C</div><div class="sb-csum-lbl">Temp</div></div>`:''}
     ${volCount?`<div class="sb-csum-item"><div class="sb-csum-val">${volCount}</div><div class="sb-csum-lbl">Volumes</div></div>`:''}
   </div>`;
 
   const summaryHtml = `<div class="csum">
     <div class="csum-item"><div class="csum-val">${onlineDevs.length}/${syn.length}</div><div class="csum-lbl">Devices</div></div>
-    ${cpuAvg!=null?`<div class="csum-item"><div class="csum-val">${cpuAvg}%</div><div class="csum-lbl">CPU</div></div>`:''}
-    ${ramAvg!=null?`<div class="csum-item"><div class="csum-val">${ramAvg}%</div><div class="csum-lbl">RAM</div></div>`:''}
-    ${tempAvg!=null?`<div class="csum-item"><div class="csum-val">${tempAvg}°C</div><div class="csum-lbl">Temp</div></div>`:''}
+    ${cpuAvg!=null?`<div class="csum-item"><div class="csum-val" style="color:${bc(cpuAvg)}">${cpuAvg}%</div><div class="csum-lbl">CPU</div></div>`:''}
+    ${ramAvg!=null?`<div class="csum-item"><div class="csum-val" style="color:${bc(ramAvg)}">${ramAvg}%</div><div class="csum-lbl">RAM</div></div>`:''}
+    ${tempAvg!=null?`<div class="csum-item"><div class="csum-val" style="color:${tcol(tempAvg)}">${tempAvg}°C</div><div class="csum-lbl">Temp</div></div>`:''}
     ${volCount?`<div class="csum-item"><div class="csum-val">${volCount}</div><div class="csum-lbl">Volumes</div></div>`:''}
   </div>`;
 
@@ -964,11 +966,50 @@ function toggleDocker(key){
   if(chev) chev.classList.toggle('open', !!dockerOpen[key]);
 }
 
+/* ── Sidebar order (drag & drop) ── */
+function getPanelOrder(){ try{ return JSON.parse(localStorage.getItem('os_panel_order'))||[]; }catch(e){ return []; } }
+function savePanelOrder(order){ try{ localStorage.setItem('os_panel_order', JSON.stringify(order)); }catch(e){} }
+function orderedIds(ids){
+  const saved = getPanelOrder().filter(id => ids.includes(id));
+  return [...saved, ...ids.filter(id => !saved.includes(id))];
+}
+(function(){
+  const sb = document.getElementById('sidebar');
+  if(!sb) return;
+  const afterEl = (y) => {
+    const els = [...sb.querySelectorAll('.sb-card:not(.dragging)')];
+    return els.reduce((closest, child) => {
+      const box = child.getBoundingClientRect();
+      const offset = y - box.top - box.height/2;
+      return (offset < 0 && offset > closest.offset) ? { offset, element: child } : closest;
+    }, { offset: -Infinity }).element;
+  };
+  sb.addEventListener('dragstart', e => {
+    const card = e.target.closest('.sb-card');
+    if(!card) return;
+    card.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+  });
+  sb.addEventListener('dragover', e => {
+    const dragging = sb.querySelector('.sb-card.dragging');
+    if(!dragging) return;
+    e.preventDefault();
+    const after = afterEl(e.clientY);
+    if(after == null) sb.appendChild(dragging);
+    else sb.insertBefore(dragging, after);
+  });
+  sb.addEventListener('dragend', e => {
+    const card = e.target.closest('.sb-card');
+    if(card) card.classList.remove('dragging');
+    savePanelOrder([...sb.querySelectorAll('.sb-card')].map(c => c.dataset.id));
+  });
+})();
+
 /* ── Sidebar card ── */
 function sidebarCard(panel, isActive){
   const iconSvg = SEC_ICONS[panel.iconKey] ? SEC_ICONS[panel.iconKey](panel.color) : '';
   return `
-  <div class="sb-card ${isActive?'active':''}" id="sbcard-${panel.id}" onclick="selectPanel('${panel.id}')">
+  <div class="sb-card ${isActive?'active':''}" id="sbcard-${panel.id}" data-id="${panel.id}" draggable="true" onclick="selectPanel('${panel.id}')">
     <div class="sb-hdr">
       <div class="sb-icon">${iconSvg}</div>
       <span class="sb-title">${panel.title}</span>
@@ -1126,7 +1167,7 @@ function render(data){
   configuredIds.forEach(id => { if(!panels[id]) panels[id] = skeletonPanel(id); });
   window._panels = panels;
 
-  const ids = ALL_IDS.filter(id => panels[id]);
+  const ids = orderedIds(ALL_IDS.filter(id => panels[id]));
 
   if(embedOpen){
     document.getElementById('sidebar').innerHTML = ids.map(id => sidebarCard(panels[id], false)).join('');
@@ -1324,6 +1365,7 @@ async function doRefresh(){
     handleUnauth(r);
     render(await r.json());
     resetPbar();
+    try{ document.querySelector('#detail iframe')?.contentWindow?.refreshDots?.(); }catch(e){}
   }catch(e){ if(e.message!=='Unauthorized') console.error(e); }
   btn.classList.remove('spin'); scheduleRefresh();
 }
