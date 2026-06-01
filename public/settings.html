@@ -197,7 +197,7 @@ html[data-theme="light"]{--bg:#f4f5f7;--panel:#ffffff;--row:#eef1f4;--border:#dc
     <label class="toggle"><input type="checkbox" id="en-kubernetes" onchange="toggleCard('kubernetes')"><span class="toggle-t"></span></label>
   </div>
   <div class="card-body hidden" id="cb-kubernetes">
-    <div class="form-group"><label>Kubeconfig Path</label><input type="text" id="k8s-kubeconfig" placeholder="C:\Users\you\.kube\config"></div>
+    <div class="form-group"><label>Kubeconfig Path</label><input type="text" id="k8s-kubeconfig" placeholder="/app/data/example.bin"></div>
     <div class="form-group">
       <label>Namespaces</label>
       <div id="k8s-ns" class="tag-list"></div>
@@ -875,7 +875,18 @@ async function saveConfig() {
     if (!r.ok) throw new Error(body.error || r.statusText);
     toast('Saved and applied!', 'ok');
     refreshDots();
-    try { if(window.parent && window.parent !== window && typeof window.parent.doRefresh === 'function') window.parent.doRefresh(); } catch(e){}
+    try {
+      const cfg = collect();
+      const ids = [];
+      if(cfg.proxmox && (cfg.proxmox.host || (cfg.proxmox.nodes||[]).length)) ids.push('proxmox');
+      if(cfg.kubernetes && cfg.kubernetes.kubeconfig) ids.push('kubernetes');
+      if(cfg.linux && (cfg.linux.servers||[]).length) ids.push('linux');
+      if(cfg.snmp && (cfg.snmp.devices||[]).length) ids.push('snmp');
+      if(cfg.healthchecks && cfg.healthchecks.url) ids.push('healthchecks');
+      if(cfg.docker && (cfg.docker.hosts||[]).length) ids.push('docker');
+      const p = window.parent;
+      if(p && p !== window && typeof p.applyConfigured === 'function') p.applyConfigured(ids);
+    } catch(e){}
   } catch (e) {
     toast('Error: ' + e.message, 'err');
   } finally {

@@ -343,6 +343,26 @@ function bchex(v){ return v>=90?'#e74c3c':v>=70?'#f39c12':'#3dba7e' }
 function dc(ok){ return ok?'md-green':'md-red' }
 function bdg(cls,txt){ return `<span class="badge bg-${cls}">${txt}</span>` }
 
+const PLATFORM_META = {
+  proxmox:     { title:'Proxmox',       iconKey:'proxmox',     color:'var(--blue)' },
+  kubernetes:  { title:'Kubernetes',    iconKey:'kubernetes',  color:'var(--purple,#9b59b6)' },
+  linux:       { title:'Linux Servers', iconKey:'linux',       color:'var(--green)' },
+  snmp:        { title:'SNMP',          iconKey:'snmp',        color:'var(--yellow)' },
+  healthchecks:{ title:'Healthchecks',  iconKey:'healthchecks',color:'var(--green)' },
+  docker:      { title:'Docker',        iconKey:'docker',      color:'var(--blue)' },
+};
+let configuredIds = [];
+function setConfiguredIds(ids){ configuredIds = Array.isArray(ids) ? ids : []; }
+function skeletonPanel(id){
+  const m = PLATFORM_META[id] || { title:id, iconKey:id, color:'var(--muted)' };
+  return { id, title:m.title, iconKey:m.iconKey, color:m.color, meta:'', badge:bdg('gray','connecting…'), sbSummary:'', summary:'', body:'' };
+}
+function applyConfigured(ids){
+  setConfiguredIds(ids);
+  render(window._lastData || { timestamp:new Date().toISOString(), proxmox:{nodes:[]}, linux:[], kubernetes:null, snmp:[], healthchecks:null, docker:[] });
+  doRefresh();
+}
+
 function histChart(data, key, pct) {
   const W=300, H=50, clr=bchex(pct);
   const empty = `<svg class="hist-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><rect width="${W}" height="${H}" fill="rgba(255,255,255,.03)" rx="3"/><line x1="0" y1="${H}" x2="${W}" y2="${H}" stroke="${clr}" stroke-width="1" stroke-opacity=".3"/></svg>`;
@@ -1073,6 +1093,7 @@ function render(data){
     const p = builders[id]?.();
     if(p) panels[id] = p;
   });
+  configuredIds.forEach(id => { if(!panels[id]) panels[id] = skeletonPanel(id); });
   window._panels = panels;
 
   const ids = ALL_IDS.filter(id => panels[id]);

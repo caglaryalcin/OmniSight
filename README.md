@@ -12,6 +12,10 @@ A simple, single-glance monitoring dashboard for Proxmox, Linux servers, Kuberne
 
 ![](https://raw.githubusercontent.com/caglaryalcin/OmniSight/refs/heads/main/screenshots/dashboard.png)
 
+> Highlight support for container and pod logs
+
+![](https://raw.githubusercontent.com/caglaryalcin/OmniSight/refs/heads/main/screenshots/container-logs.png)
+
 - **Healthchecks** — cron monitoring status
 - **Alerts** — notifications on state changes (down/up) via **ntfy**, **Telegram** and **SMTP**
 - **Public status** — Uptime-Kuma-style, read-only public summary page (`/status`)
