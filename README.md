@@ -1,5 +1,3 @@
-![Status](https://img.shields.io/badge/status-beta-orange) [![Latest Release](https://img.shields.io/github/v/release/caglaryalcin/OmniSight?include_prereleases&color=blue)](https://github.com/caglaryalcin/OmniSight/releases)
-
 # OmniSight
 
 A simple, single-glance monitoring dashboard for Proxmox, Linux servers, Kubernetes, SNMP devices, Docker and Healthchecks.
@@ -133,7 +131,7 @@ The live config is `data/config.yaml` (created automatically on first save). Eas
 
 - `proxmox` — host, port, tokenId, tokenSecret, nodes[]
 - `linux.servers[]` — name, host, port, user, privateKey **or** password, services[]
-- `kubernetes` — kubeconfig, namespaces[]
+- `kubernetes` — kubeconfig, namespaces[] (the Settings UI has a **Browse…** button that uploads a kubeconfig from your machine into `data/` and fills in the container path automatically)
 - `snmp.devices[]` — SNMP v2c (community) or v3 (username, authPassword, privPassword, …)
 - `healthchecks` — url, apiKey
 - `docker.hosts[]` — `type: socket | tcp | ssh` (for SSH: sshHost/sshUser + privateKey/sshPassword, optional `sudo`)
