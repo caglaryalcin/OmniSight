@@ -1,3 +1,5 @@
+![Status](https://img.shields.io/badge/status-beta-orange) [![Latest Release](https://img.shields.io/github/v/release/caglaryalcin/OmniSight?include_prereleases&color=blue)](https://github.com/caglaryalcin/OmniSight/releases)
+
 # OmniSight
 
 A simple, single-glance monitoring dashboard for Proxmox, Linux servers, Kubernetes, SNMP devices, Docker and Healthchecks.
