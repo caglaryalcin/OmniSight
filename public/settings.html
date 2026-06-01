@@ -296,6 +296,10 @@ html[data-theme="light"]{--bg:#f4f5f7;--panel:#ffffff;--row:#eef1f4;--border:#dc
           </div>
           <div class="form-group"><label>Token (optional)</label><input type="password" id="al-ntfy-token" placeholder=""></div>
         </div>
+        <div class="form-grid">
+          <div class="form-group"><label>Username (optional)</label><input type="text" id="al-ntfy-user" placeholder=""></div>
+          <div class="form-group"><label>Password (optional)</label><input type="password" id="al-ntfy-pass" placeholder=""></div>
+        </div>
         <button class="btn-sm" type="button" onclick="sendTestAlert('ntfy')" style="margin-top:10px">Test ntfy</button>
       </div>
     </div>
@@ -402,6 +406,12 @@ function escHtml(s) {
 function toggleArr(id) {
   document.getElementById(`ab-${id}`)?.classList.toggle('hidden');
 }
+
+document.addEventListener('click', e => {
+  const hdr = e.target.closest('#cb-alerts .arr-hdr');
+  if (!hdr || e.target.closest('.toggle')) return;
+  hdr.parentElement.querySelector('.arr-body')?.classList.toggle('hidden');
+});
 
 /* ── Linux server form ── */
 function addLinuxServer(data = {}) {
@@ -703,6 +713,8 @@ function populate(cfg) {
       document.getElementById('al-ntfy-topic').value = a.ntfy.topic || '';
       document.getElementById('al-ntfy-priority').value = a.ntfy.priority || 'default';
       secVal(a.ntfy.token, document.getElementById('al-ntfy-token'));
+      document.getElementById('al-ntfy-user').value = a.ntfy.username || '';
+      secVal(a.ntfy.password, document.getElementById('al-ntfy-pass'));
     }
     if (a.telegram) {
       document.getElementById('al-tg-en').checked = a.telegram.enabled !== false;
@@ -834,6 +846,10 @@ function collect() {
       };
       const tok = maskedVal(document.getElementById('al-ntfy-token'));
       if (tok) a.ntfy.token = tok;
+      const nuser = document.getElementById('al-ntfy-user').value.trim();
+      if (nuser) a.ntfy.username = nuser;
+      const npass = maskedVal(document.getElementById('al-ntfy-pass'));
+      if (npass) a.ntfy.password = npass;
     }
     if (document.getElementById('al-tg-en').checked) {
       a.telegram = {
