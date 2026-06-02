@@ -341,7 +341,6 @@ app.get('/api/status', async (req, res) => {
 
 app.get('/api/refresh', async (req, res) => {
   try {
-    cache.data = null;
     await backgroundRefresh();
     res.json(cache.data);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -377,7 +376,6 @@ app.post('/api/config', (req, res) => {
     const toSave = encryptionEnabled() ? encryptConfigObj(merged) : merged;
     fs.writeFileSync(CONFIG_PATH, yaml.dump(toSave, { lineWidth: -1 }), 'utf8');
     config = encryptionEnabled() ? decryptConfig(toSave) : toSave;
-    cache.data = null;
     backgroundRefresh();
     res.json({ ok: true });
   } catch (err) {
