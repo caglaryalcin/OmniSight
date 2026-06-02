@@ -671,7 +671,7 @@ function populate(cfg) {
   document.getElementById('en-public').checked = !!cfg.publicStatus;
   if (cfg.publicTitle) document.getElementById('public-title').value = cfg.publicTitle;
   if (cfg.proxmox) {
-    document.getElementById('en-proxmox').checked = true;
+    document.getElementById('en-proxmox').checked = cfg.proxmox.enabled !== false;
     document.getElementById('cb-proxmox').classList.remove('hidden');
     document.getElementById('pve-host').value = cfg.proxmox.host || '';
     document.getElementById('pve-port').value = cfg.proxmox.port || 8006;
@@ -680,34 +680,34 @@ function populate(cfg) {
     (cfg.proxmox.nodes || []).forEach(n => appendTag('pve-nodes', n));
   }
   if (cfg.linux) {
-    document.getElementById('en-linux').checked = true;
+    document.getElementById('en-linux').checked = cfg.linux.enabled !== false;
     document.getElementById('cb-linux').classList.remove('hidden');
     (cfg.linux.servers || []).forEach(addLinuxServer);
   }
   if (cfg.kubernetes) {
-    document.getElementById('en-kubernetes').checked = true;
+    document.getElementById('en-kubernetes').checked = cfg.kubernetes.enabled !== false;
     document.getElementById('cb-kubernetes').classList.remove('hidden');
     document.getElementById('k8s-kubeconfig').value = cfg.kubernetes.kubeconfig || '';
     (cfg.kubernetes.namespaces || []).forEach(n => appendTag('k8s-ns', n));
   }
   if (cfg.snmp) {
-    document.getElementById('en-synology').checked = true;
+    document.getElementById('en-synology').checked = cfg.snmp.enabled !== false;
     document.getElementById('cb-synology').classList.remove('hidden');
     (cfg.snmp.devices || []).forEach(addSynDevice);
   }
   if (cfg.healthchecks) {
-    document.getElementById('en-healthchecks').checked = true;
+    document.getElementById('en-healthchecks').checked = cfg.healthchecks.enabled !== false;
     document.getElementById('cb-healthchecks').classList.remove('hidden');
     document.getElementById('hc-url').value = cfg.healthchecks.url || '';
     secVal(cfg.healthchecks.apiKey, document.getElementById('hc-apikey'));
   }
   if (cfg.docker) {
-    document.getElementById('en-docker').checked = true;
+    document.getElementById('en-docker').checked = cfg.docker.enabled !== false;
     document.getElementById('cb-docker').classList.remove('hidden');
     (cfg.docker.hosts || []).forEach(addDockerHost);
   }
   if (cfg.alerts) {
-    document.getElementById('en-alerts').checked = true;
+    document.getElementById('en-alerts').checked = cfg.alerts.enabled !== false;
     document.getElementById('cb-alerts').classList.remove('hidden');
     const a = cfg.alerts;
     if (a.ntfy) {
@@ -744,17 +744,22 @@ function populate(cfg) {
 function collect() {
   const cfg = {};
 
-  if (document.getElementById('en-proxmox').checked) {
-    cfg.proxmox = {
-      host: document.getElementById('pve-host').value.trim(),
+  {
+    const on = document.getElementById('en-proxmox').checked;
+    const host = document.getElementById('pve-host').value.trim();
+    const nodes = getTagVals('pve-nodes');
+    if (on || host || nodes.length) cfg.proxmox = {
+      enabled: on,
+      host,
       port: parseInt(document.getElementById('pve-port').value) || 8006,
       tokenId: document.getElementById('pve-tokenid').value.trim(),
       tokenSecret: maskedVal(document.getElementById('pve-secret')),
-      nodes: getTagVals('pve-nodes'),
+      nodes,
     };
   }
 
-  if (document.getElementById('en-linux').checked) {
+  {
+    const on = document.getElementById('en-linux').checked;
     const servers = [];
     document.querySelectorAll('#linux-list .arr-item').forEach(item => {
       const idx = item.id.replace('lsrv-', '');
@@ -771,17 +776,21 @@ function collect() {
       else if (pw) srv.password = pw;
       if (srv.name && srv.host) servers.push(srv);
     });
-    cfg.linux = { servers };
+    if (on || servers.length) cfg.linux = { enabled: on, servers };
   }
 
-  if (document.getElementById('en-kubernetes').checked) {
-    cfg.kubernetes = {
-      kubeconfig: document.getElementById('k8s-kubeconfig').value.trim(),
+  {
+    const on = document.getElementById('en-kubernetes').checked;
+    const kubeconfig = document.getElementById('k8s-kubeconfig').value.trim();
+    if (on || kubeconfig) cfg.kubernetes = {
+      enabled: on,
+      kubeconfig,
       namespaces: getTagVals('k8s-ns'),
     };
   }
 
-  if (document.getElementById('en-synology').checked) {
+  {
+    const on = document.getElementById('en-synology').checked;
     const devices = [];
     document.querySelectorAll('#syn-list .arr-item').forEach(item => {
       const ver = item.querySelector('.s-ver').value;
@@ -802,17 +811,21 @@ function collect() {
       }
       if (dev.name && dev.host) devices.push(dev);
     });
-    cfg.snmp = { devices };
+    if (on || devices.length) cfg.snmp = { enabled: on, devices };
   }
 
-  if (document.getElementById('en-healthchecks').checked) {
-    cfg.healthchecks = {
-      url: document.getElementById('hc-url').value.trim(),
+  {
+    const on = document.getElementById('en-healthchecks').checked;
+    const url = document.getElementById('hc-url').value.trim();
+    if (on || url) cfg.healthchecks = {
+      enabled: on,
+      url,
       apiKey: maskedVal(document.getElementById('hc-apikey')),
     };
   }
 
-  if (document.getElementById('en-docker').checked) {
+  {
+    const on = document.getElementById('en-docker').checked;
     const hosts = [];
     document.querySelectorAll('#docker-list .arr-item').forEach(item => {
       const type = item.querySelector('.d-type').value;
@@ -835,11 +848,12 @@ function collect() {
       }
       if (h.name) hosts.push(h);
     });
-    cfg.docker = { hosts };
+    if (on || hosts.length) cfg.docker = { enabled: on, hosts };
   }
 
-  if (document.getElementById('en-alerts').checked) {
-    const a = { enabled: true };
+  {
+    const alertsOn = document.getElementById('en-alerts').checked;
+    const a = { enabled: alertsOn };
     if (document.getElementById('al-ntfy-en').checked) {
       a.ntfy = {
         enabled: true,
@@ -873,7 +887,7 @@ function collect() {
         to: getTagVals('al-smtp-to'),
       };
     }
-    cfg.alerts = a;
+    if (alertsOn || a.ntfy || a.telegram || a.smtp) cfg.alerts = a;
   }
 
   if (document.getElementById('en-public').checked) cfg.publicStatus = true;
@@ -942,13 +956,14 @@ async function saveConfig() {
     refreshDots();
     try {
       const cfg = collect();
+      const en = c => c && c.enabled !== false;
       const ids = [];
-      if(cfg.proxmox && (cfg.proxmox.host || (cfg.proxmox.nodes||[]).length)) ids.push('proxmox');
-      if(cfg.kubernetes && cfg.kubernetes.kubeconfig) ids.push('kubernetes');
-      if(cfg.linux && (cfg.linux.servers||[]).length) ids.push('linux');
-      if(cfg.snmp && (cfg.snmp.devices||[]).length) ids.push('snmp');
-      if(cfg.healthchecks && cfg.healthchecks.url) ids.push('healthchecks');
-      if(cfg.docker && (cfg.docker.hosts||[]).length) ids.push('docker');
+      if(en(cfg.proxmox) && (cfg.proxmox.host || (cfg.proxmox.nodes||[]).length)) ids.push('proxmox');
+      if(en(cfg.kubernetes) && cfg.kubernetes.kubeconfig) ids.push('kubernetes');
+      if(en(cfg.linux) && (cfg.linux.servers||[]).length) ids.push('linux');
+      if(en(cfg.snmp) && (cfg.snmp.devices||[]).length) ids.push('snmp');
+      if(en(cfg.healthchecks) && cfg.healthchecks.url) ids.push('healthchecks');
+      if(en(cfg.docker) && (cfg.docker.hosts||[]).length) ids.push('docker');
       const p = window.parent;
       if(p && p !== window && typeof p.applyConfigured === 'function') p.applyConfigured(ids);
     } catch(e){}
@@ -995,12 +1010,13 @@ async function refreshDots(cfg){
   try { const rs=await fetch('/api/status',{headers:authHeaders()}); d=await rs.json(); } catch {}
   const loading = d.loading === true;
   const ev=(configured, ok)=> !configured ? 'gray' : loading ? 'gray' : (ok ? 'ok' : 'bad');
-  setDot('dot-proxmox', ev(!!cfg.proxmox, (d.proxmox?.nodes||[]).length>0 && (d.proxmox?.nodes||[]).every(n=>n.node?.online)));
-  setDot('dot-linux', ev(!!cfg.linux, (d.linux||[]).length>0 && (d.linux||[]).every(l=>l.online && (l.services||[]).every(s=>s.active))));
-  setDot('dot-kubernetes', ev(!!cfg.kubernetes, !!(d.kubernetes && d.kubernetes.online) && !((d.kubernetes?.pods)||[]).some(p=>p.failed)));
-  setDot('dot-synology', ev(!!cfg.snmp, (d.snmp||[]).length>0 && (d.snmp||[]).every(x=>x.online)));
-  setDot('dot-healthchecks', ev(!!cfg.healthchecks, !!(d.healthchecks && d.healthchecks.online) && ((d.healthchecks?.summary?.down)||0)===0));
-  setDot('dot-docker', ev(!!cfg.docker, (d.docker||[]).length>0 && (d.docker||[]).every(h=>h.online)));
+  const en=c=>!!(c && c.enabled!==false);
+  setDot('dot-proxmox', ev(en(cfg.proxmox), (d.proxmox?.nodes||[]).length>0 && (d.proxmox?.nodes||[]).every(n=>n.node?.online)));
+  setDot('dot-linux', ev(en(cfg.linux), (d.linux||[]).length>0 && (d.linux||[]).every(l=>l.online && (l.services||[]).every(s=>s.active))));
+  setDot('dot-kubernetes', ev(en(cfg.kubernetes), !!(d.kubernetes && d.kubernetes.online) && !((d.kubernetes?.pods)||[]).some(p=>p.failed)));
+  setDot('dot-synology', ev(en(cfg.snmp), (d.snmp||[]).length>0 && (d.snmp||[]).every(x=>x.online)));
+  setDot('dot-healthchecks', ev(en(cfg.healthchecks), !!(d.healthchecks && d.healthchecks.online) && ((d.healthchecks?.summary?.down)||0)===0));
+  setDot('dot-docker', ev(en(cfg.docker), (d.docker||[]).length>0 && (d.docker||[]).every(h=>h.online)));
   const a=cfg.alerts, hasCh=!!(a && (a.ntfy||a.telegram||a.smtp));
   setDot('dot-alerts', (!a || a.enabled===false || !hasCh) ? 'gray' : 'ok');
   let pubLive=false;

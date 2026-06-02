@@ -161,13 +161,14 @@ let cache = { data: null };
 let refreshPromise = null;
 
 async function fetchAllData() {
+  const enabled = c => c && c.enabled !== false;
   const [proxmox, linux, kubernetes, synology, healthchecks, docker] = await Promise.allSettled([
-    config.proxmox     ? getAllProxmoxData(config.proxmox)         : Promise.resolve({ clusterSummary: null, nodes: [] }),
-    config.linux       ? getAllLinuxData(config.linux)             : Promise.resolve([]),
-    config.kubernetes  ? getAllKubernetesData(config.kubernetes)   : Promise.resolve(null),
-    config.snmp        ? getAllSynologyData(config.snmp)           : Promise.resolve([]),
-    config.healthchecks? getAllHealthchecks(config.healthchecks)   : Promise.resolve(null),
-    config.docker      ? getAllDockerData(config.docker)           : Promise.resolve([]),
+    enabled(config.proxmox)     ? getAllProxmoxData(config.proxmox)         : Promise.resolve({ clusterSummary: null, nodes: [] }),
+    enabled(config.linux)       ? getAllLinuxData(config.linux)             : Promise.resolve([]),
+    enabled(config.kubernetes)  ? getAllKubernetesData(config.kubernetes)   : Promise.resolve(null),
+    enabled(config.snmp)        ? getAllSynologyData(config.snmp)           : Promise.resolve([]),
+    enabled(config.healthchecks)? getAllHealthchecks(config.healthchecks)   : Promise.resolve(null),
+    enabled(config.docker)      ? getAllDockerData(config.docker)           : Promise.resolve([]),
   ]);
 
   return {
