@@ -135,7 +135,29 @@ async function getHrMemory(session) {
   return { totalKB: (size * units) / 1024, freeKB: used != null ? ((size - used) * units) / 1024 : null };
 }
 
-async function getSystemInfo(session) {
+const cpuPrev = new Map();
+// Vendor-neutral CPU via UCD ssCpuRaw counters (delta over poll interval).
+// Works on any net-snmp based device (Linux, UniFi, pfSense, …).
+async function ucdRawCpu(session, key) {
+  try {
+    const base = '1.3.6.1.4.1.2021.11';
+    const oids = ['50', '51', '52', '53', '54', '55', '56'].map(s => `${base}.${s}.0`);
+    const v = await snmpGet(session, oids);
+    const nums = oids.map(o => toNum(v[o]));
+    if (nums[0] == null || nums[2] == null || nums[3] == null) return null;
+    const idle = (nums[3] || 0) + (nums[4] || 0);
+    const total = nums.reduce((a, b) => a + (b || 0), 0);
+    const prev = cpuPrev.get(key);
+    cpuPrev.set(key, { idle, total });
+    if (!prev) return null;
+    const dTotal = total - prev.total;
+    const dIdle = idle - prev.idle;
+    if (dTotal <= 0) return null;
+    return Math.max(0, Math.min(100, Math.round(100 * (1 - dIdle / dTotal))));
+  } catch { return null; }
+}
+
+async function getSystemInfo(session, deviceKey) {
   const synVals = await snmpGet(session, [
     '1.3.6.1.4.1.6574.1.4.1.0',
     '1.3.6.1.4.1.6574.1.4.2.0',
@@ -151,13 +173,24 @@ async function getSystemInfo(session) {
 
 
   if (cpuUser == null) {
+    const raw = await ucdRawCpu(session, deviceKey);
+    if (raw != null) { cpuUser = raw; cpuSystem = 0; }
+  }
+
+  if (cpuUser == null) {
+    try {
+      const ss = await snmpGet(session, ['1.3.6.1.4.1.2021.11.11.0']);
+      const idle = toNum(ss['1.3.6.1.4.1.2021.11.11.0']);
+      if (idle != null && !Number.isNaN(idle)) { cpuUser = Math.max(0, Math.min(100, 100 - idle)); cpuSystem = 0; }
+    } catch (e) { console.error('[SNMP ssCpuIdle]', e.message); }
+  }
+
+  if (cpuUser == null) {
     try {
       const cpuItems = await snmpWalk(session, '1.3.6.1.2.1.25.3.3.1.2');
-      console.log('[SNMP sysInfo hrCPU fallback] items:', cpuItems.length);
-      if (cpuItems.length) {
-        const total = cpuItems.reduce((sum, v) => sum + Number(v.value), 0);
-        cpuUser = Math.round(total / cpuItems.length);
-        cpuSystem = 0;
+      if (cpuItems.length && cpuItems.length <= 64) {
+        const nums = cpuItems.map(v => Number(toNum(v.value))).filter(n => !Number.isNaN(n));
+        if (nums.length) { cpuUser = Math.round(nums.reduce((a, b) => a + b, 0) / nums.length); cpuSystem = 0; }
       }
     } catch (e) { console.error('[SNMP sysInfo hrCPU]', e.message); }
   }
@@ -318,13 +351,13 @@ async function getNetwork(session, deviceKey) {
 async function getDeviceData(device) {
   const session = createSession(device);
   try {
-    const sysInfo = await getSystemInfo(session).catch(e => { console.error(`[SNMP ${device.name}] sysInfo:`, e.message); return {}; });
+    const sysInfo = await getSystemInfo(session, device.host).catch(e => { console.error(`[SNMP ${device.name}] sysInfo:`, e.message); return {}; });
     const disks   = await getDisks(session).catch(e => { console.error(`[SNMP ${device.name}] disks:`, e.message); return []; });
     const volumes = await getVolumes(session).catch(e => { console.error(`[SNMP ${device.name}] volumes:`, e.message); return []; });
     const network = await getNetwork(session, device.host).catch(e => { console.error(`[SNMP ${device.name}] network:`, e.message); return []; });
     const hist = synHistory.get(device.host) || [];
-    if (sysInfo.cpu != null) {
-      hist.push({ time: Date.now(), cpu: sysInfo.cpu, ram: sysInfo.ram?.percent ?? 0 });
+    if (sysInfo.cpu != null || sysInfo.ram) {
+      hist.push({ time: Date.now(), cpu: sysInfo.cpu ?? 0, ram: sysInfo.ram?.percent ?? 0 });
       if (hist.length > 240) hist.shift();
       synHistory.set(device.host, hist);
     }

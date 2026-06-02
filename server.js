@@ -6,7 +6,7 @@ const crypto = require('crypto');
 const { getAllProxmoxData } = require('./src/proxmox');
 const { getAllLinuxData } = require('./src/linux');
 const { getAllKubernetesData, getPodLogs } = require('./src/kubernetes');
-const { getAllSynologyData } = require('./src/synology');
+const { getAllSynologyData } = require('./src/snmp');
 const { getAllHealthchecks } = require('./src/healthchecks');
 const { getAllDockerData, getContainerLogs } = require('./src/docker');
 const { dispatchAlert } = require('./src/alerts');
@@ -180,7 +180,20 @@ async function fetchAllData() {
     healthchecks: healthchecks.value || null,
     docker:       docker.value       || [],
     publicStatus: !!config.publicStatus,
+    configured:   configuredList(),
   };
+}
+
+function configuredList() {
+  const en = c => c && c.enabled !== false;
+  const ids = [];
+  if (en(config.proxmox)      && (config.proxmox.nodes || []).length)   ids.push('proxmox');
+  if (en(config.kubernetes)   && config.kubernetes.kubeconfig)          ids.push('kubernetes');
+  if (en(config.linux)        && (config.linux.servers || []).length)   ids.push('linux');
+  if (en(config.snmp)         && (config.snmp.devices || []).length)    ids.push('snmp');
+  if (en(config.healthchecks) && config.healthchecks.url)               ids.push('healthchecks');
+  if (en(config.docker)       && (config.docker.hosts || []).length)    ids.push('docker');
+  return ids;
 }
 
 function extractChecks(data) {
@@ -266,7 +279,7 @@ const EMPTY = {
 function getCachedData() {
   if (!cache.data) {
     backgroundRefresh();
-    return Promise.resolve({ ...EMPTY, timestamp: new Date().toISOString() });
+    return Promise.resolve({ ...EMPTY, timestamp: new Date().toISOString(), configured: configuredList() });
   }
   return Promise.resolve(cache.data);
 }

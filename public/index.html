@@ -93,7 +93,7 @@ header{
 }
 .mon-row:last-child{border-bottom:none}
 .mon-row:hover{background:rgba(255,255,255,.02)}
-.mon-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}
+.mon-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
 .md-green{background:var(--green);animation:pg 2.5s infinite}
 .md-red{background:var(--red)}
 .md-yellow{background:var(--yellow)}
@@ -118,7 +118,8 @@ header{
 .hist-svg{width:100%;height:48px;display:block;border-radius:3px}
 .hist-bg{fill:rgba(0,0,0,.25)}
 html[data-theme="light"] .hist-bg{fill:var(--bg)}
-.chart-row{margin-bottom:8px}
+.chart-row{margin-bottom:18px}
+.chart-row:last-child{margin-bottom:0}
 .chart-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;padding:0 1px}
 
 .csum{display:flex;gap:0;border-bottom:1px solid var(--border)}
@@ -165,14 +166,17 @@ html[data-theme="light"] .hist-bg{fill:var(--bg)}
 .k8s-n{font-size:24px;font-weight:700;line-height:1}
 .k8s-l{font-size:12px;color:var(--muted);margin-top:2px}
 
+.k8s-grp{margin:12px;border:1px solid var(--border);border-radius:10px;overflow:hidden}
 .k8s-grp-hdr{
   display:flex;align-items:center;gap:10px;
-  padding:9px 16px;cursor:pointer;border-bottom:1px solid var(--border);
+  padding:12px 16px;cursor:pointer;
   transition:background .1s;
 }
 .k8s-grp-hdr:hover{background:rgba(255,255,255,.02)}
-.k8s-grp-body{display:none;border-bottom:1px solid var(--border);background:rgba(0,0,0,.1)}
-.k8s-grp-body.open{display:block}
+.k8s-grp-body{display:none;background:rgba(0,0,0,.18)}
+.k8s-grp-body.open{display:block;border-top:1px solid var(--border)}
+.k8s-grp-body .mon-row{padding-left:34px}
+.k8s-colhdr{display:flex;align-items:center;gap:10px;padding:7px 16px 7px 34px;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);border-bottom:1px solid var(--border)}
 
 .syn-bar{display:flex;align-items:center;gap:8px;margin-bottom:6px}
 .syn-bl{font-size:13px;color:var(--muted);width:44px;flex-shrink:0}
@@ -356,11 +360,13 @@ let configuredIds = [];
 function setConfiguredIds(ids){ configuredIds = Array.isArray(ids) ? ids : []; }
 function skeletonPanel(id){
   const m = PLATFORM_META[id] || { title:id, iconKey:id, color:'var(--muted)' };
-  return { id, title:m.title, iconKey:m.iconKey, color:m.color, meta:'', badge:bdg('gray','connecting…'), sbSummary:'', summary:'', body:'' };
+  const connBody = `<div style="display:flex;align-items:center;justify-content:center;gap:10px;padding:60px;color:var(--muted);font-size:14px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>Connecting…</div>`;
+  return { id, title:m.title, iconKey:m.iconKey, color:m.color, meta:'', badge:bdg('gray','connecting…'), sbSummary:'', summary:'', body:connBody };
 }
 function applyConfigured(ids){
   setConfiguredIds(ids);
   const d = window._lastData || { timestamp:new Date().toISOString(), proxmox:{nodes:[]}, linux:[], kubernetes:null, snmp:[], healthchecks:null, docker:[] };
+  d.configured = ids;
   if(!ids.includes('proxmox')) d.proxmox = { clusterSummary:null, nodes:[] };
   if(!ids.includes('linux')) d.linux = [];
   if(!ids.includes('kubernetes')) d.kubernetes = null;
@@ -426,7 +432,7 @@ function toggleSnmp(key){
   snmpOpen[key] = !snmpOpen[key];
   setOverride('snmp:'+key, snmpOpen[key]);
   const el = document.getElementById(`snmp-${key}`);
-  if(el) el.classList.toggle('open', !!snmpOpen[key]);
+  if(el){ el.classList.toggle('open', !!snmpOpen[key]); el.style.display=''; }
 }
 
 function toggleLinux(key){
@@ -622,8 +628,9 @@ function buildLinux(linux){
             </div>
             ${srv.history?.length>1 ? histChart(srv.history,'ram',ramPct) : ''}
           </div>` : ''}
+        ${(srv.services||[]).length?`<div class="syn-section" style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">Services</div>`:''}
         ${(srv.services||[]).map(s=>`
-          <div class="row" style="padding:4px 0">
+          <div class="row" style="padding:6px 0">
             <div class="mon-dot ${s.active?'md-green':s.state==='unknown'?'md-gray':'md-red'}" style="flex-shrink:0"></div>
             <span class="nb-label" style="flex:1;margin-left:8px">${s.name}</span>
             ${bdg(s.active?'green':s.state==='unknown'?'gray':'red', s.active?'active':s.state||'unknown')}
@@ -637,7 +644,7 @@ function buildLinux(linux){
     iconKey: 'linux',
     color: 'var(--green)',
     meta: `${reachable}/${linux.length} reachable`,
-    badge: bdg(allOk?'green':failed?'red':'yellow', allOk?'healthy':`${failed} failed`),
+    badge: bdg(allOk?'green':failed?'red':'yellow', allOk?'healthy':failed?`${failed} services failed`:'offline'),
     sbSummary: sbSummaryHtml,
     summary: summaryHtml,
     body,
@@ -682,61 +689,89 @@ function buildKubernetes(k8s){
     <div class="k8s-stat"><div class="k8s-n" style="color:${failed>0?'var(--red)':'var(--muted)'}">${failed}</div><div class="k8s-l">Failed</div></div>
   </div>`;
 
+  const colHdr = `<div class="k8s-colhdr">
+    <div style="width:10px;flex-shrink:0"></div>
+    <span style="flex:0 1 300px;min-width:0">Name</span>
+    <span style="width:150px;flex-shrink:0;text-align:left">Namespace</span>
+    <div style="flex:1"></div>
+    <span style="flex-shrink:0">Status</span>
+  </div>`;
+  const colHdrPods = `<div class="k8s-colhdr">
+    <div style="width:10px;flex-shrink:0"></div>
+    <span style="flex:0 1 300px;min-width:0">Name</span>
+    <span style="width:150px;flex-shrink:0;text-align:left">Namespace</span>
+    <div style="flex:1"></div>
+    <span style="width:120px;flex-shrink:0;text-align:left">Restart Count</span>
+    <span style="width:90px;flex-shrink:0">Status</span>
+  </div>`;
+
   const body = `
-    <div class="k8s-grp-hdr" id="kh-pods" onclick="toggleGrp('pods')">
-      <div class="mon-dot ${failed>0?'md-red':'md-green'}"></div>
-      <span style="font-size:13px;font-weight:600;flex:1">Pods</span>
-      <span style="font-size:11px;color:var(--muted);margin-right:8px">${pods.length}</span>
-      <span class="chevron">▼</span>
+    <div class="k8s-grp">
+      <div class="k8s-grp-hdr" id="kh-pods" onclick="toggleGrp('pods')">
+        <div class="mon-dot ${failed>0?'md-red':'md-green'}"></div>
+        <span style="font-size:14px;font-weight:600;flex:1">Pods</span>
+        <span style="font-size:12px;color:var(--muted);margin-right:8px">${pods.length}</span>
+        <span class="chevron">▼</span>
+      </div>
+      <div class="k8s-grp-body" id="kg-pods">
+        ${colHdrPods}
+        ${sortedPods.map(p=>{
+          const dc2 = p.running?'md-green':p.phase==='Pending'?'md-yellow':p.phase==='Succeeded'?'md-blue':'md-red';
+          const rc  = p.restarts>10?'bg-red':p.restarts>3?'bg-yellow':'bg-gray';
+          return `<div class="mon-row clickable" onclick="showPodLogs('${p.namespace}','${p.name}')" title="View logs">
+            <div class="mon-dot ${dc2}"></div>
+            <div class="mon-name" style="flex:0 1 300px;min-width:0" title="${p.name}">${p.name}</div>
+            <div class="mon-sub" style="width:150px;text-align:left">${p.namespace}</div>
+            <div style="flex:1"></div>
+            <div style="width:120px;flex-shrink:0;text-align:left">${p.restarts>0?`<span class="badge ${rc}" style="font-size:12px">↺${p.restarts}</span>`:`<span style="color:var(--muted);font-size:13px">0</span>`}</div>
+            <span style="width:90px;flex-shrink:0">${bdg(p.running?'green':p.phase==='Succeeded'?'blue':p.phase==='Pending'?'yellow':'red', p.phase)}</span>
+          </div>`;
+        }).join('')}
+        ${!pods.length?'<div class="empty">No pods found</div>':''}
+      </div>
     </div>
-    <div class="k8s-grp-body" id="kg-pods">
-      ${sortedPods.map(p=>{
-        const dc2 = p.running?'md-green':p.phase==='Pending'?'md-yellow':p.phase==='Succeeded'?'md-blue':'md-red';
-        const rc  = p.restarts>10?'bg-red':p.restarts>3?'bg-yellow':'bg-gray';
-        return `<div class="mon-row clickable" onclick="showPodLogs('${p.namespace}','${p.name}')" title="View logs">
-          <div class="mon-dot ${dc2}"></div>
-          <div class="mon-name" style="width:260px" title="${p.name}">${p.name}</div>
-          <div class="mon-sub">${p.namespace}</div>
-          <div style="flex:1"></div>
-          ${p.restarts>0?`<span class="badge ${rc}" style="font-size:10px">↺${p.restarts}</span>`:''}
-          ${bdg(p.running?'green':p.phase==='Succeeded'?'blue':p.phase==='Pending'?'yellow':'red', p.phase)}
-        </div>`;
-      }).join('')}
-      ${!pods.length?'<div class="empty">No pods found</div>':''}
+    <div class="k8s-grp">
+      <div class="k8s-grp-hdr" id="kh-deps" onclick="toggleGrp('deps')">
+        <div class="mon-dot ${deployments.some(d=>!d.healthy)?'md-yellow':'md-green'}"></div>
+        <span style="font-size:14px;font-weight:600;flex:1">Deployments</span>
+        <span style="font-size:12px;color:var(--muted);margin-right:8px">${deployments.length}</span>
+        <span class="chevron">▼</span>
+      </div>
+      <div class="k8s-grp-body" id="kg-deps">
+        ${colHdr}
+        ${deployments.map(d=>`
+          <div class="mon-row">
+            <div class="mon-dot ${d.healthy?'md-green':'md-yellow'}"></div>
+            <div class="mon-name" style="flex:0 1 300px;min-width:0">${d.name}</div>
+            <div class="mon-sub" style="width:150px;text-align:left">${d.namespace}</div>
+            <div style="flex:1"></div>
+            <span style="font-size:15px;font-weight:600;color:${d.healthy?'var(--green)':'var(--yellow)'}">${d.ready}/${d.desired}</span>
+          </div>`).join('')}
+        ${!deployments.length?'<div class="empty">No deployments</div>':''}
+      </div>
     </div>
-    <div class="k8s-grp-hdr" id="kh-deps" onclick="toggleGrp('deps')">
-      <div class="mon-dot ${deployments.some(d=>!d.healthy)?'md-yellow':'md-green'}"></div>
-      <span style="font-size:13px;font-weight:600;flex:1">Deployments</span>
-      <span style="font-size:11px;color:var(--muted);margin-right:8px">${deployments.length}</span>
-      <span class="chevron">▼</span>
-    </div>
-    <div class="k8s-grp-body" id="kg-deps">
-      ${deployments.map(d=>`
-        <div class="mon-row">
-          <div class="mon-dot ${d.healthy?'md-green':'md-yellow'}"></div>
-          <div class="mon-name">${d.name}</div>
-          <div class="mon-sub">${d.namespace}</div>
-          <div style="flex:1"></div>
-          <span style="font-size:12px;font-weight:600;color:${d.healthy?'var(--green)':'var(--yellow)'}">${d.ready}/${d.desired}</span>
-        </div>`).join('')}
-      ${!deployments.length?'<div class="empty">No deployments</div>':''}
-    </div>
-    <div class="k8s-grp-hdr" id="kh-svcs" onclick="toggleGrp('svcs')" style="border-bottom:none">
-      <div class="mon-dot md-green"></div>
-      <span style="font-size:13px;font-weight:600;flex:1">Services</span>
-      <span style="font-size:11px;color:var(--muted);margin-right:8px">${services.length}</span>
-      <span class="chevron">▼</span>
-    </div>
-    <div class="k8s-grp-body" id="kg-svcs" style="border-bottom:none">
-      ${services.map(sv=>`
-        <div class="mon-row">
-          <div class="mon-dot md-green"></div>
-          <div class="mon-name">${sv.name}</div>
-          <div class="mon-sub">${sv.namespace}</div>
-          <div style="flex:1"></div>
-          ${bdg('gray',sv.type)}
-        </div>`).join('')}
-      ${!services.length?'<div class="empty">No services</div>':''}
+    <div class="k8s-grp">
+      <div class="k8s-grp-hdr" id="kh-svcs" onclick="toggleGrp('svcs')">
+        <div class="mon-dot md-green"></div>
+        <span style="font-size:14px;font-weight:600;flex:1">Services</span>
+        <span style="font-size:12px;color:var(--muted);margin-right:8px">${services.length}</span>
+        <span class="chevron">▼</span>
+      </div>
+      <div class="k8s-grp-body" id="kg-svcs">
+        ${colHdr}
+        ${services.map(sv=>{
+          const portStr = (sv.ports||[]).map(p=>p.nodePort?`${p.port}:${p.nodePort}`:`${p.port}`).join(', ');
+          return `<div class="mon-row">
+            <div class="mon-dot md-green"></div>
+            <div class="mon-name" style="flex:0 1 300px;min-width:0">${sv.name}</div>
+            <div class="mon-sub" style="width:150px;text-align:left">${sv.namespace}</div>
+            <div style="flex:1"></div>
+            ${portStr?`<span style="font-size:13px;color:var(--muted);margin-right:8px">${portStr}</span>`:''}
+            <span class="badge bg-gray" style="font-size:13px">${sv.type}</span>
+          </div>`;
+        }).join('')}
+        ${!services.length?'<div class="empty">No services</div>':''}
+      </div>
     </div>`;
 
   return {
@@ -759,30 +794,37 @@ function buildSynology(syn){
   const allOk = syn.every(d=>d.online);
   const onlineDevs = syn.filter(d=>d.online);
 
-  const avg = a => a.length ? Math.round(a.reduce((x,y)=>x+y,0)/a.length) : null;
-  const cpuAvg = avg(onlineDevs.filter(d=>d.cpu!=null).map(d=>d.cpu));
-  const ramAvg = avg(onlineDevs.filter(d=>d.ram).map(d=>d.ram.percent));
-  const tempAvg = avg(onlineDevs.filter(d=>d.systemTemp!=null).map(d=>d.systemTemp));
+  const cpuVals = onlineDevs.filter(d=>d.cpu!=null).map(d=>d.cpu);
+  const ramVals = onlineDevs.filter(d=>d.ram).map(d=>d.ram.percent);
+  const tempVals = onlineDevs.filter(d=>d.systemTemp!=null).map(d=>d.systemTemp);
   const volCount = onlineDevs.reduce((s,d)=>s+(d.volumes?.length||0),0);
   const tcol = t => t>=60?'var(--red)':t>=50?'var(--yellow)':'var(--green)';
+  const metric = (vals, unit, colorFn, limit) => {
+    if(!vals.length) return null;
+    if(vals.length === 1){ const v=vals[0]; return { val:v+unit, color:colorFn(v) }; }
+    const ok = vals.every(v=>v<limit);
+    return { val: ok?'healthy':'high', color: ok?'var(--green)':'var(--red)' };
+  };
+  const cpuM = metric(cpuVals,'%',bc,90), ramM = metric(ramVals,'%',bc,90), tempM = metric(tempVals,'°C',tcol,60);
+  const cell = (m,lbl,sb) => m ? `<div class="${sb?'sb-csum-item':'csum-item'}"><div class="${sb?'sb-csum-val':'csum-val'}" style="color:${m.color}">${m.val}</div><div class="${sb?'sb-csum-lbl':'csum-lbl'}">${lbl}</div></div>` : '';
 
   const sbSummaryHtml = `<div class="sb-csum">
     <div class="sb-csum-item"><div class="sb-csum-val">${onlineDevs.length}/${syn.length}</div><div class="sb-csum-lbl">Devices</div></div>
-    ${cpuAvg!=null?`<div class="sb-csum-item"><div class="sb-csum-val" style="color:${bc(cpuAvg)}">${cpuAvg}%</div><div class="sb-csum-lbl">CPU</div></div>`:''}
-    ${ramAvg!=null?`<div class="sb-csum-item"><div class="sb-csum-val" style="color:${bc(ramAvg)}">${ramAvg}%</div><div class="sb-csum-lbl">RAM</div></div>`:''}
-    ${tempAvg!=null?`<div class="sb-csum-item"><div class="sb-csum-val" style="color:${tcol(tempAvg)}">${tempAvg}°C</div><div class="sb-csum-lbl">Temp</div></div>`:''}
+    ${cell(cpuM,'CPU',true)}
+    ${cell(ramM,'RAM',true)}
+    ${cell(tempM,'Temp',true)}
     ${volCount?`<div class="sb-csum-item"><div class="sb-csum-val">${volCount}</div><div class="sb-csum-lbl">Volumes</div></div>`:''}
   </div>`;
 
   const summaryHtml = `<div class="csum">
     <div class="csum-item"><div class="csum-val">${onlineDevs.length}/${syn.length}</div><div class="csum-lbl">Devices</div></div>
-    ${cpuAvg!=null?`<div class="csum-item"><div class="csum-val" style="color:${bc(cpuAvg)}">${cpuAvg}%</div><div class="csum-lbl">CPU</div></div>`:''}
-    ${ramAvg!=null?`<div class="csum-item"><div class="csum-val" style="color:${bc(ramAvg)}">${ramAvg}%</div><div class="csum-lbl">RAM</div></div>`:''}
-    ${tempAvg!=null?`<div class="csum-item"><div class="csum-val" style="color:${tcol(tempAvg)}">${tempAvg}°C</div><div class="csum-lbl">Temp</div></div>`:''}
+    ${cell(cpuM,'CPU',false)}
+    ${cell(ramM,'RAM',false)}
+    ${cell(tempM,'Temp',false)}
     ${volCount?`<div class="csum-item"><div class="csum-val">${volCount}</div><div class="csum-lbl">Volumes</div></div>`:''}
   </div>`;
 
-  const body = syn.map(dev=>{
+  const body = syn.map((dev,i)=>{
     if(!dev.online) return `
       <div class="offline-row">
         <div class="mon-dot md-red"></div>
@@ -799,7 +841,7 @@ function buildSynology(syn){
       </div>${sub?`<div style="font-size:10px;color:var(--muted);margin:-4px 0 4px 44px">${sub}</div>`:''}`;
     };
 
-    const skey = dev.host;
+    const skey = 'd'+i;
     return `
       <div class="node-hdr" onclick="toggleSnmp('${skey}')">
         <div class="mon-dot md-green"></div>
@@ -809,9 +851,9 @@ function buildSynology(syn){
       </div>
       <div class="node-body ${snmpOpen[skey]?'open':''}" id="snmp-${skey}">
         ${bars('CPU', dev.cpu)}
-        ${dev.history?.length>1 ? `<div style="margin:-2px 0 6px 44px">${histChart(dev.history,'cpu',dev.cpu??0)}</div>` : ''}
+        ${dev.cpu!=null && dev.history?.length>1 ? `<div style="margin:-2px 0 16px 44px">${histChart(dev.history,'cpu',dev.cpu)}</div>` : ''}
         ${bars('RAM', dev.ram?.percent, dev.ram ? `${dev.ram.usedGB} / ${dev.ram.totalGB} GB` : '')}
-        ${dev.history?.length>1 ? `<div style="margin:-2px 0 6px 44px">${histChart(dev.history,'ram',dev.ram?.percent??0)}</div>` : ''}
+        ${dev.ram && dev.history?.length>1 ? `<div style="margin:-2px 0 16px 44px">${histChart(dev.history,'ram',dev.ram.percent)}</div>` : ''}
         ${dev.volumes?.length ? `
           <div class="syn-section" style="margin-top:6px">Volumes</div>
           ${dev.volumes.map(v => {
@@ -824,11 +866,12 @@ function buildSynology(syn){
           <div class="syn-section" style="margin-top:6px">Disks</div>
           ${dev.disks.map(d => {
             const tc = d.temp==null?'var(--muted)':d.temp>=60?'var(--red)':d.temp>=50?'var(--yellow)':'var(--green)';
-            return `<div style="display:flex;align-items:center;gap:8px;padding:3px 0 3px 44px;font-size:12px">
+            return `<div style="display:flex;align-items:center;gap:10px;padding:5px 0 5px 44px;font-size:14px">
               <div class="mon-dot ${d.healthy?'md-green':'md-red'}"></div>
-              <span style="flex:1">${d.name}</span>
+              <span style="width:150px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.name}</span>
               <span style="color:var(--muted)">${d.status}</span>
-              ${d.temp!=null?`<span style="color:${tc};min-width:42px;text-align:right">${d.temp}°C</span>`:''}
+              <span style="flex:1"></span>
+              ${d.temp!=null?`<span style="color:${tc};min-width:50px;text-align:right">${d.temp}°C</span>`:''}
             </div>`;
           }).join('')}
         ` : ''}
@@ -870,20 +913,36 @@ function buildHealthchecks(hc){
     <div class="csum-item"><div class="csum-val" style="color:var(--muted)">${s.paused??0}</div><div class="csum-lbl">Paused</div></div>
   </div>` : '';
 
+  const fmtDur = sec => {
+    if(sec==null) return '—';
+    if(sec>=86400) return (sec/86400).toFixed(sec%86400?1:0)+'d';
+    if(sec>=3600)  return (sec/3600).toFixed(sec%3600?1:0)+'h';
+    if(sec>=60)    return Math.round(sec/60)+'m';
+    return sec+'s';
+  };
+  const hcColHdr = `<div style="display:flex;align-items:center;gap:10px;padding:7px 16px;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);border-bottom:1px solid var(--border)">
+    <div style="width:10px;flex-shrink:0"></div>
+    <span style="flex:1;min-width:0">Name</span>
+    <span style="width:100px;flex-shrink:0">Last Ping</span>
+    <span style="width:130px;flex-shrink:0">Period / Grace</span>
+    <span style="width:74px;flex-shrink:0">Status</span>
+  </div>`;
   const body = !online
     ? `<div class="offline-row">
         <div class="mon-dot md-red"></div>
         <div>Healthchecks API unreachable<div class="offline-err">${hc.error||''}</div></div>
        </div>`
     : `<div id="hc-checks">
+        ${checks.length?hcColHdr:''}
         ${checks.map(c=>{
           const dc2 = c.status==='up'?'md-green':c.status==='down'?'md-red':c.status==='grace'?'md-yellow':'md-gray';
           const bc2 = c.status==='up'?'green':c.status==='down'?'red':c.status==='grace'?'yellow':'gray';
           return `<div class="mon-row">
             <div class="mon-dot ${dc2}"></div>
             <div class="mon-name" style="flex:1;width:0;min-width:0">${c.name}</div>
-            ${c.lastPing?`<span style="font-size:10px;color:var(--muted);flex-shrink:0;margin-right:6px">${relTime(c.lastPing)}</span>`:''}
-            ${bdg(bc2, c.status)}
+            <span style="width:100px;flex-shrink:0;font-size:13px;color:var(--muted)">${c.lastPing?relTime(c.lastPing):'—'}</span>
+            <span style="width:130px;flex-shrink:0;font-size:13px;color:var(--muted)">${fmtDur(c.periodSec)} / ${fmtDur(c.graceSec)}</span>
+            <span style="width:74px;flex-shrink:0"><span class="badge bg-${bc2}" style="font-size:13px">${c.status}</span></span>
           </div>`;
         }).join('')}
         ${!checks.length?'<div class="empty">No checks found</div>':''}
@@ -941,8 +1000,9 @@ function buildDocker(docker){
           return `<div class="mon-row clickable" onclick="showDockerLogs('${host.name}','${c.id}','${(c.name||'').replace(/'/g,"\\'")}')" title="View logs">
             <div class="mon-dot ${dotCls}"></div>
             <div class="mon-name" style="width:180px" title="${c.name}">${c.name}</div>
-            <div class="mon-sub" style="flex:1;width:auto" title="${c.image}">${c.imageShort}</div>
-            ${c.ports.length?`<span style="font-size:11px;color:var(--muted);flex-shrink:0;margin-right:6px">${c.ports.join(' ')}</span>`:''}
+            <div class="mon-sub" style="flex:0 1 220px;min-width:0" title="${c.image}">${c.imageShort}</div>
+            ${c.ports.length?`<span style="font-size:13px;color:var(--muted);flex-shrink:0;margin-right:10px">${c.ports.join(' ')}</span>`:''}
+            <div style="flex:1"></div>
             ${bdg(c.color, c.state)}
           </div>`;
         }).join('')}
@@ -1020,7 +1080,6 @@ function sidebarCard(panel, isActive){
     <div class="sb-hdr">
       <div class="sb-icon">${iconSvg}</div>
       <span class="sb-title">${panel.title}</span>
-      ${panel.meta?`<span style="font-size:13px;color:var(--muted);flex-shrink:0">${panel.meta}</span>`:''}
       <span style="flex-shrink:0;margin-left:4px">${panel.badge}</span>
     </div>
     ${panel.sbSummary?`<div class="sb-summary">${panel.sbSummary}</div>`:''}
@@ -1080,6 +1139,7 @@ function selectPanel(id){
     const s = k.summary || {};
     if(shouldOpen('k8s:pods', (s.failed??0) > 0)) openGrp('pods');
     if(shouldOpen('k8s:deps', (k.deployments||[]).some(d=>!d.healthy))) openGrp('deps');
+    if(shouldOpen('k8s:svcs', false)) openGrp('svcs');
   }
 
   if(id === 'linux'){
@@ -1090,8 +1150,9 @@ function selectPanel(id){
   }
 
   if(id === 'snmp'){
-    (data.snmp||[]).forEach(dev => {
-      if(shouldOpen('snmp:'+dev.host, !dev.online)){ snmpOpen[dev.host] = true; openEl(document.getElementById(`snmp-${dev.host}`)); }
+    (data.snmp||[]).forEach((dev,i) => {
+      const k='d'+i;
+      if(shouldOpen('snmp:'+k, !dev.online)){ snmpOpen[k] = true; openEl(document.getElementById(`snmp-${k}`)); }
     });
   }
 
@@ -1120,6 +1181,7 @@ function selectPanel(id){
 /* ── Render ── */
 function render(data){
   window._lastData = data;
+  if(Array.isArray(data.configured)) configuredIds = data.configured;
 
   const platforms = [];
   const px = data.proxmox?.nodes || [];
@@ -1380,13 +1442,9 @@ async function doRefresh(){
 async function initialLoad(){
   try {
     const data = await fetchStatus();
-    if(data.loading){
-      document.getElementById('detail').innerHTML='<div style="display:flex;align-items:center;justify-content:center;padding:80px;gap:12px;color:var(--muted);font-size:14px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>Loading…</div>';
-      setTimeout(initialLoad, 2000);
-      return;
-    }
     render(data);
     startPbar();
+    if(data.loading){ setTimeout(initialLoad, 2000); return; }
     scheduleRefresh();
     if(!document.querySelector('.sb-card')) openEmbed('/settings');
   } catch(e){ if(e.message!=='Unauthorized') console.error(e); }
