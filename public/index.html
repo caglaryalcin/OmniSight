@@ -360,7 +360,14 @@ function skeletonPanel(id){
 }
 function applyConfigured(ids){
   setConfiguredIds(ids);
-  render(window._lastData || { timestamp:new Date().toISOString(), proxmox:{nodes:[]}, linux:[], kubernetes:null, snmp:[], healthchecks:null, docker:[] });
+  const d = window._lastData || { timestamp:new Date().toISOString(), proxmox:{nodes:[]}, linux:[], kubernetes:null, snmp:[], healthchecks:null, docker:[] };
+  if(!ids.includes('proxmox')) d.proxmox = { clusterSummary:null, nodes:[] };
+  if(!ids.includes('linux')) d.linux = [];
+  if(!ids.includes('kubernetes')) d.kubernetes = null;
+  if(!ids.includes('snmp')) d.snmp = [];
+  if(!ids.includes('healthchecks')) d.healthchecks = null;
+  if(!ids.includes('docker')) d.docker = [];
+  render(d);
   doRefresh();
 }
 
