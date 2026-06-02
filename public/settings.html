@@ -372,6 +372,7 @@ function toggleCard(id) {
   const on = en.checked;
   card.classList.toggle('card-off', !on);
   card.querySelector('.card-body').classList.toggle('hidden', !on);
+  if (!on) saveConfig();
 }
 
 document.addEventListener('click', e => {
