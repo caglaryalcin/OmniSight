@@ -49,7 +49,7 @@ async function getServerData(serverConfig) {
   const serviceNames = serverConfig.services || [];
   const quoted = serviceNames.map(s => `'${s}'`).join(' ');
   const svcCmd = serviceNames.length ? `systemctl is-active ${quoted} 2>/dev/null; true` : 'true';
-  const statsCmd = `CPUIDLE=$(top -bn1 | grep -E '^(%Cpu|Cpu)' | sed 's/,/ /g' | awk '{for(i=1;i<=NF;i++){if($i=="id"){print 100-$(i-1);exit}}}'); free | awk -v cpu="\${CPUIDLE:-0}" '/^Mem:/{printf "%.0f|%.0f|%.2f|%.2f",cpu+0,$3*100/$2,$3/1073741824,$2/1073741824}'`;
+  const statsCmd = `CPUIDLE=$(top -bn1 | grep -E '^(%Cpu|Cpu)' | sed 's/,/ /g' | awk '{for(i=1;i<=NF;i++){if($i=="id"){print 100-$(i-1);exit}}}'); free -k | awk -v cpu="\${CPUIDLE:-0}" '/^Mem:/{printf "%.0f|%.0f|%.2f|%.2f",cpu+0,$3*100/$2,$3/1048576,$2/1048576}'`;
   const command = `${svcCmd}; echo "---STATS---"; ${statsCmd}`;
 
   try {

@@ -76,6 +76,7 @@ async function getServices(kc, namespaces) {
     namespace: svc.metadata.namespace,
     type: svc.spec?.type || 'ClusterIP',
     clusterIP: svc.spec?.clusterIP,
+    ports: (svc.spec?.ports || []).map(p => ({ port: p.port, nodePort: p.nodePort, target: p.targetPort, protocol: p.protocol })),
   }));
 }
 

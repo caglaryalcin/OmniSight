@@ -32,6 +32,8 @@ async function getAllHealthchecks(config) {
       grace: c.status === 'grace',
       paused: c.status === 'paused',
       lastPing: c.last_ping || null,
+      periodSec: c.timeout ?? null,
+      graceSec: c.grace ?? null,
       tags: c.tags || '',
       slug: c.slug || null,
     }));
