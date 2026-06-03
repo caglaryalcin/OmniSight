@@ -4,9 +4,20 @@
 #
 #   kubectl apply -f deploy/kubernetes.yaml
 #
-# No ConfigMap/Secret to create: the app starts empty and you configure it from
-# the Settings UI. config.yaml, secret.key, auth.yaml and sessions.yaml are
-# stored on the PVC and persist across restarts.
+# ── Custom CA certificate (optional) ──
+# 1) Create the ConfigMap with your CA, 2) uncomment the env, volumeMount and volume above.
+# Alternatively (no ConfigMap): drop the *.crt into the data PVC under /app/data/certs/ — auto-trusted.
+# ---
+# apiVersion: v1
+# kind: ConfigMap
+# metadata:
+#   name: omnisight-ca
+#   namespace: default
+# data:
+#   ca.crt: |
+#     -----BEGIN CERTIFICATE-----
+#     ...your CA cert here...
+#     -----END CERTIFICATE-----
 ---
 apiVersion: v1
 kind: PersistentVolume
@@ -66,9 +77,15 @@ spec:
                   name: omnisight-secret
                   key: OMNISIGHT_SECRET
                   optional: true
+            # Custom CA: uncomment to trust the cert mounted from the ConfigMap below.
+            # - name: NODE_EXTRA_CA_CERTS
+            #   value: "/app/certs/ca.crt"
           volumeMounts:
             - name: data
               mountPath: /app/data
+            # - name: ca-certs
+            #   mountPath: /app/certs
+            #   readOnly: true
           livenessProbe:
             httpGet: { path: /login, port: 3000 }
             initialDelaySeconds: 20
@@ -84,6 +101,9 @@ spec:
         - name: data
           persistentVolumeClaim:
             claimName: omnisight-data
+        # - name: ca-certs
+        #   configMap:
+        #     name: omnisight-ca
 ---
 apiVersion: v1
 kind: Service

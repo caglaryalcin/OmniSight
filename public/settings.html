@@ -155,6 +155,13 @@ html[data-theme="light"]{--bg:#f4f5f7;--panel:#ffffff;--row:#eef1f4;--border:#dc
     <label class="toggle"><input type="checkbox" id="en-proxmox" onchange="toggleCard('proxmox')"><span class="toggle-t"></span></label>
   </div>
   <div class="card-body hidden" id="cb-proxmox">
+    <div class="form-group"><label>Icon (optional)</label>
+      <div class="path-row">
+        <input type="text" id="icon-proxmox" placeholder="e.g. proxmox or proxmox.png — from dashboard-icons">
+        <button type="button" class="btn-sm" onclick="document.getElementById('icon-proxmox-f').click()">Browse…</button>
+        <input type="file" id="icon-proxmox-f" accept="image/*,.svg" style="display:none" onchange="uploadIcon(this,'icon-proxmox')">
+      </div>
+    </div>
     <div class="form-grid">
       <div class="form-group"><label>Host</label><input type="text" id="pve-host" placeholder="192.168.1.10"></div>
       <div class="form-group"><label>Port</label><input type="number" id="pve-port" value="8006"></div>
@@ -184,6 +191,13 @@ html[data-theme="light"]{--bg:#f4f5f7;--panel:#ffffff;--row:#eef1f4;--border:#dc
     <label class="toggle"><input type="checkbox" id="en-linux" onchange="toggleCard('linux')"><span class="toggle-t"></span></label>
   </div>
   <div class="card-body hidden" id="cb-linux">
+    <div class="form-group"><label>Icon (optional)</label>
+      <div class="path-row">
+        <input type="text" id="icon-linux" placeholder="e.g. linux or ubuntu.png — from dashboard-icons">
+        <button type="button" class="btn-sm" onclick="document.getElementById('icon-linux-f').click()">Browse…</button>
+        <input type="file" id="icon-linux-f" accept="image/*,.svg" style="display:none" onchange="uploadIcon(this,'icon-linux')">
+      </div>
+    </div>
     <div id="linux-list"></div>
     <button class="btn-sm" style="margin-top:4px" onclick="addLinuxServer()">+ Add Server</button>
   </div>
@@ -199,6 +213,13 @@ html[data-theme="light"]{--bg:#f4f5f7;--panel:#ffffff;--row:#eef1f4;--border:#dc
     <label class="toggle"><input type="checkbox" id="en-kubernetes" onchange="toggleCard('kubernetes')"><span class="toggle-t"></span></label>
   </div>
   <div class="card-body hidden" id="cb-kubernetes">
+    <div class="form-group"><label>Icon (optional)</label>
+      <div class="path-row">
+        <input type="text" id="icon-kubernetes" placeholder="e.g. kubernetes — from dashboard-icons">
+        <button type="button" class="btn-sm" onclick="document.getElementById('icon-kubernetes-f').click()">Browse…</button>
+        <input type="file" id="icon-kubernetes-f" accept="image/*,.svg" style="display:none" onchange="uploadIcon(this,'icon-kubernetes')">
+      </div>
+    </div>
     <div class="form-group"><label>Kubeconfig Path</label>
       <div class="path-row">
         <input type="text" id="k8s-kubeconfig" placeholder="/app/data/example.bin">
@@ -227,6 +248,13 @@ html[data-theme="light"]{--bg:#f4f5f7;--panel:#ffffff;--row:#eef1f4;--border:#dc
     <label class="toggle"><input type="checkbox" id="en-synology" onchange="toggleCard('synology')"><span class="toggle-t"></span></label>
   </div>
   <div class="card-body hidden" id="cb-synology">
+    <div class="form-group"><label>Icon (optional)</label>
+      <div class="path-row">
+        <input type="text" id="icon-synology" placeholder="e.g. synology or unifi.png — from dashboard-icons">
+        <button type="button" class="btn-sm" onclick="document.getElementById('icon-synology-f').click()">Browse…</button>
+        <input type="file" id="icon-synology-f" accept="image/*,.svg" style="display:none" onchange="uploadIcon(this,'icon-synology')">
+      </div>
+    </div>
     <div id="syn-list"></div>
     <button class="btn-sm" style="margin-top:4px" onclick="addSynDevice()">+ Add Device</button>
   </div>
@@ -242,6 +270,13 @@ html[data-theme="light"]{--bg:#f4f5f7;--panel:#ffffff;--row:#eef1f4;--border:#dc
     <label class="toggle"><input type="checkbox" id="en-healthchecks" onchange="toggleCard('healthchecks')"><span class="toggle-t"></span></label>
   </div>
   <div class="card-body hidden" id="cb-healthchecks">
+    <div class="form-group"><label>Icon (optional)</label>
+      <div class="path-row">
+        <input type="text" id="icon-healthchecks" placeholder="e.g. healthchecks — from dashboard-icons">
+        <button type="button" class="btn-sm" onclick="document.getElementById('icon-healthchecks-f').click()">Browse…</button>
+        <input type="file" id="icon-healthchecks-f" accept="image/*,.svg" style="display:none" onchange="uploadIcon(this,'icon-healthchecks')">
+      </div>
+    </div>
     <div class="form-grid">
       <div class="form-group"><label>URL</label><input type="text" id="hc-url" placeholder="https://healthchecks.yourdomain.com"></div>
       <div class="form-group"><label>API Key</label><input type="password" id="hc-apikey" placeholder="your-api-key"></div>
@@ -260,6 +295,13 @@ html[data-theme="light"]{--bg:#f4f5f7;--panel:#ffffff;--row:#eef1f4;--border:#dc
     <label class="toggle"><input type="checkbox" id="en-docker" onchange="toggleCard('docker')"><span class="toggle-t"></span></label>
   </div>
   <div class="card-body hidden" id="cb-docker">
+    <div class="form-group"><label>Icon (optional)</label>
+      <div class="path-row">
+        <input type="text" id="icon-docker" placeholder="e.g. docker — from dashboard-icons">
+        <button type="button" class="btn-sm" onclick="document.getElementById('icon-docker-f').click()">Browse…</button>
+        <input type="file" id="icon-docker-f" accept="image/*,.svg" style="display:none" onchange="uploadIcon(this,'icon-docker')">
+      </div>
+    </div>
     <div id="docker-list"></div>
     <button class="btn-sm" type="button" onclick="addDockerHost()" style="margin-top:8px">+ Add Host</button>
   </div>
@@ -673,6 +715,7 @@ function populate(cfg) {
   if (cfg.proxmox) {
     document.getElementById('en-proxmox').checked = cfg.proxmox.enabled !== false;
     document.getElementById('cb-proxmox').classList.remove('hidden');
+    document.getElementById('icon-proxmox').value = cfg.proxmox.icon || '';
     document.getElementById('pve-host').value = cfg.proxmox.host || '';
     document.getElementById('pve-port').value = cfg.proxmox.port || 8006;
     document.getElementById('pve-tokenid').value = cfg.proxmox.tokenId || '';
@@ -682,28 +725,33 @@ function populate(cfg) {
   if (cfg.linux) {
     document.getElementById('en-linux').checked = cfg.linux.enabled !== false;
     document.getElementById('cb-linux').classList.remove('hidden');
+    document.getElementById('icon-linux').value = cfg.linux.icon || '';
     (cfg.linux.servers || []).forEach(addLinuxServer);
   }
   if (cfg.kubernetes) {
     document.getElementById('en-kubernetes').checked = cfg.kubernetes.enabled !== false;
     document.getElementById('cb-kubernetes').classList.remove('hidden');
+    document.getElementById('icon-kubernetes').value = cfg.kubernetes.icon || '';
     document.getElementById('k8s-kubeconfig').value = cfg.kubernetes.kubeconfig || '';
     (cfg.kubernetes.namespaces || []).forEach(n => appendTag('k8s-ns', n));
   }
   if (cfg.snmp) {
     document.getElementById('en-synology').checked = cfg.snmp.enabled !== false;
     document.getElementById('cb-synology').classList.remove('hidden');
+    document.getElementById('icon-synology').value = cfg.snmp.icon || '';
     (cfg.snmp.devices || []).forEach(addSynDevice);
   }
   if (cfg.healthchecks) {
     document.getElementById('en-healthchecks').checked = cfg.healthchecks.enabled !== false;
     document.getElementById('cb-healthchecks').classList.remove('hidden');
+    document.getElementById('icon-healthchecks').value = cfg.healthchecks.icon || '';
     document.getElementById('hc-url').value = cfg.healthchecks.url || '';
     secVal(cfg.healthchecks.apiKey, document.getElementById('hc-apikey'));
   }
   if (cfg.docker) {
     document.getElementById('en-docker').checked = cfg.docker.enabled !== false;
     document.getElementById('cb-docker').classList.remove('hidden');
+    document.getElementById('icon-docker').value = cfg.docker.icon || '';
     (cfg.docker.hosts || []).forEach(addDockerHost);
   }
   if (cfg.alerts) {
@@ -755,6 +803,7 @@ function collect() {
       tokenId: document.getElementById('pve-tokenid').value.trim(),
       tokenSecret: maskedVal(document.getElementById('pve-secret')),
       nodes,
+      icon: document.getElementById('icon-proxmox').value.trim() || undefined,
     };
   }
 
@@ -776,7 +825,7 @@ function collect() {
       else if (pw) srv.password = pw;
       if (srv.name && srv.host) servers.push(srv);
     });
-    if (on || servers.length) cfg.linux = { enabled: on, servers };
+    if (on || servers.length) cfg.linux = { enabled: on, servers, icon: document.getElementById('icon-linux').value.trim() || undefined };
   }
 
   {
@@ -786,6 +835,7 @@ function collect() {
       enabled: on,
       kubeconfig,
       namespaces: getTagVals('k8s-ns'),
+      icon: document.getElementById('icon-kubernetes').value.trim() || undefined,
     };
   }
 
@@ -811,7 +861,7 @@ function collect() {
       }
       if (dev.name && dev.host) devices.push(dev);
     });
-    if (on || devices.length) cfg.snmp = { enabled: on, devices };
+    if (on || devices.length) cfg.snmp = { enabled: on, devices, icon: document.getElementById('icon-synology').value.trim() || undefined };
   }
 
   {
@@ -821,6 +871,7 @@ function collect() {
       enabled: on,
       url,
       apiKey: maskedVal(document.getElementById('hc-apikey')),
+      icon: document.getElementById('icon-healthchecks').value.trim() || undefined,
     };
   }
 
@@ -848,7 +899,7 @@ function collect() {
       }
       if (h.name) hosts.push(h);
     });
-    if (on || hosts.length) cfg.docker = { enabled: on, hosts };
+    if (on || hosts.length) cfg.docker = { enabled: on, hosts, icon: document.getElementById('icon-docker').value.trim() || undefined };
   }
 
   {
@@ -933,6 +984,31 @@ function uploadKubeconfig(input) {
   reader.readAsText(f);
 }
 
+function uploadIcon(input, targetId) {
+  const f = input.files && input.files[0];
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = async () => {
+    try {
+      const r = await fetch('/api/upload/icon', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ name: f.name, dataUrl: reader.result }),
+      });
+      handleUnauth(r);
+      const b = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(b.error || r.statusText);
+      document.getElementById(targetId).value = b.path;
+      toast('Icon uploaded', 'ok');
+    } catch (e) {
+      toast('Upload failed: ' + e.message, 'err');
+    } finally {
+      input.value = '';
+    }
+  };
+  reader.readAsDataURL(f);
+}
+
 /* ── Save ── */
 async function saveConfig() {
   const btns = document.querySelectorAll('.btn-save');
@@ -1012,7 +1088,7 @@ async function refreshDots(cfg){
   const ev=(configured, ok)=> !configured ? 'gray' : loading ? 'gray' : (ok ? 'ok' : 'bad');
   const en=c=>!!(c && c.enabled!==false);
   setDot('dot-proxmox', ev(en(cfg.proxmox), (d.proxmox?.nodes||[]).length>0 && (d.proxmox?.nodes||[]).every(n=>n.node?.online)));
-  setDot('dot-linux', ev(en(cfg.linux), (d.linux||[]).length>0 && (d.linux||[]).every(l=>l.online && (l.services||[]).every(s=>s.active))));
+  setDot('dot-linux', ev(en(cfg.linux), (d.linux||[]).length>0 && (d.linux||[]).every(l=>l.online)));
   setDot('dot-kubernetes', ev(en(cfg.kubernetes), !!(d.kubernetes && d.kubernetes.online) && !((d.kubernetes?.pods)||[]).some(p=>p.failed)));
   setDot('dot-synology', ev(en(cfg.snmp), (d.snmp||[]).length>0 && (d.snmp||[]).every(x=>x.online)));
   setDot('dot-healthchecks', ev(en(cfg.healthchecks), !!(d.healthchecks && d.healthchecks.online) && ((d.healthchecks?.summary?.down)||0)===0));

@@ -11,7 +11,9 @@ services:
       # Encryption is ON by default (auto-managed secret.key). Optional overrides:
       - OMNISIGHT_SECRET=${OMNISIGHT_SECRET:-}
       # - OMNISIGHT_ENCRYPT=false   # disable config encryption
+      # Custom CA: drop *.crt/*.pem into ./data/certs/ (auto-trusted), or point Node to a file:
+      # - NODE_EXTRA_CA_CERTS=/app/data/certs/ca.crt
     volumes:
       # single persistent dir (data/) — holds config.yaml, secret.key, auth.yaml, sessions.yaml,
-      # kube.bin and any SSH keys. Docker auto-creates it; nothing to pre-create.
+      # kube.bin, SSH keys, and certs/ (custom CA certificates). Docker auto-creates it.
       - ./data:/app/data

@@ -127,6 +127,15 @@ alerts:
 
 Unresolved `${VAR}` (no env value, no default) is left as-is. This works for every section — platforms and alerts alike.
 
+## Custom CA certificates
+
+To make OmniSight trust a private/self-signed CA (e.g. a corporate root for your Healthchecks/SMTP/ntfy endpoints), use either method:
+
+- **Drop-in (recommended):** place one or more `*.crt` / `*.pem` files into `data/certs/`. They are auto-trusted on startup — no env needed. In Docker/Kubernetes this directory lives inside the mounted `data` volume.
+- **Env var (Node standard):** set `NODE_EXTRA_CA_CERTS` to a cert file path, e.g. `NODE_EXTRA_CA_CERTS=/app/data/certs/ca.crt`.
+
+In Kubernetes you can also mount the CA from a ConfigMap (Uptime-Kuma style) — `deploy/kubernetes.yaml` has a ready, commented example (ConfigMap `omnisight-ca` + `NODE_EXTRA_CA_CERTS=/app/certs/ca.crt` + a read-only `/app/certs` mount).
+
 ## Configuration (config.yaml)
 
 The live config is `data/config.yaml` (created automatically on first save). Easiest is to configure everything from the Settings UI; to hand-edit, copy the template — `cp config.example.yaml data/config.yaml` — and edit it. All sections are optional; include only what you use. See `config.example.yaml`.
@@ -139,6 +148,17 @@ The live config is `data/config.yaml` (created automatically on first save). Eas
 - `docker.hosts[]` — `type: socket | tcp | ssh` (for SSH: sshHost/sshUser + privateKey/sshPassword, optional `sudo`)
 - `alerts` — `enabled` + `ntfy` / `telegram` / `smtp` channels
 - `publicStatus: true` and `publicTitle` — expose the `/status` page publicly
+- each platform also takes an optional `icon` (see below)
+
+### Platform icons
+
+Each platform card shows an icon you can customise from the Settings UI (the `icon` field on every platform). Proxmox, Kubernetes, Healthchecks and Docker default to their real logos; Linux and SNMP use a built-in glyph. Three ways to set one:
+
+- **By name** — type an icon name from [dashboard-icons](https://github.com/homarr-labs/dashboard-icons), e.g. `proxmox`, `ubuntu.png`, `unifi.svg`. It's fetched from the jsDelivr CDN (`svg` is assumed when no extension is given).
+- **By URL** — paste any full `https://…` image URL.
+- **Upload** — can't find it on the CDN? Click **Browse…** next to the field and pick an image; it's stored in `data/icons/` and served by the app. Uploaded icons persist in the `data` volume.
+
+If a chosen icon fails to load, the card falls back to the built-in default automatically.
 
 ### Alerts example
 

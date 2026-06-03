@@ -101,8 +101,18 @@ async function getVMs(config, nodeName) {
   }
 }
 
+async function getClusterStatus(config) {
+  try {
+    const data = await proxmoxRequest(config, '/cluster/status');
+    const map = {};
+    (data || []).forEach(e => { if (e.type === 'node' && e.name) map[e.name] = e.ip || null; });
+    return map;
+  } catch { return {}; }
+}
+
 async function getAllProxmoxData(config) {
   const nodeNames = config.nodes || [];
+  const ipMap = await getClusterStatus(config);
 
   const results = await Promise.allSettled(
     nodeNames.map(async (nodeName) => {
@@ -126,6 +136,7 @@ async function getAllProxmoxData(config) {
       ? r.value
       : { node: { name: nodeNames[i], online: false, cpuCores: 0, cpuRaw: 0, ram: { used: 0, total: 0 } }, services: [], vms: [], history: [] }
   );
+  nodes.forEach(n => { n.host = ipMap[n.node.name] || config.host; });
 
   const onlineNodes = nodes.filter(n => n.node.online);
   const clusterSummary = {

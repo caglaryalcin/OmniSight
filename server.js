@@ -37,8 +37,36 @@ console.warn  = (...a) => { try { _warn(...a); } catch {} pushLog('warn',  a); }
 console.error = (...a) => { try { _error(...a); } catch {} pushLog('error', a); };
 const REFRESH_INTERVAL = 15000;
 try { fs.mkdirSync(path.join(__dirname, 'data'), { recursive: true }); } catch {}
+
+/* ── Custom CA certificates ── (drop *.crt/*.pem into data/certs/, or set NODE_EXTRA_CA_CERTS) */
+try {
+  const https = require('https');
+  const tls = require('tls');
+  const certDir = path.join(__dirname, 'data', 'certs');
+  fs.mkdirSync(certDir, { recursive: true });
+  const extra = [];
+  for (const f of fs.readdirSync(certDir)) {
+    if (/\.(crt|pem|cer)$/i.test(f)) { try { extra.push(fs.readFileSync(path.join(certDir, f))); } catch {} }
+  }
+  if (extra.length) {
+    https.globalAgent.options.ca = [...tls.rootCertificates, ...extra];
+    console.log(`Trusting ${extra.length} extra CA certificate(s) from data/certs/`);
+  }
+} catch (e) { console.warn('CA cert load failed:', e.message); }
 const CONFIG_PATH = path.join(__dirname, 'data', 'config.yaml');
 const AUTH_PATH  = path.join(__dirname, 'data', 'auth.yaml');
+
+/* ── Per-entity notification toggles ── */
+const NOTIFY_PATH = path.join(__dirname, 'data', 'notifications.yaml');
+function loadNotify() {
+  try { const a = yaml.load(fs.readFileSync(NOTIFY_PATH, 'utf8')); return new Set(Array.isArray(a) ? a : (a?.disabled || [])); }
+  catch { return new Set(); }
+}
+function saveNotify() {
+  try { fs.writeFileSync(NOTIFY_PATH, yaml.dump(Array.from(notifyDisabled))); }
+  catch (e) { console.warn('notifications save failed:', e.message); }
+}
+let notifyDisabled = loadNotify();
 
 /* ── Auth ── */
 const SESSIONS_PATH = path.join(__dirname, 'data', 'sessions.yaml');
@@ -91,6 +119,7 @@ function genToken() {
 
 function authMiddleware(req, res, next) {
   const auth = loadAuth();
+  if (req.path.startsWith('/api/icons/')) return next();
   const token = req.headers['x-session-token'] || req.cookies?.session;
   if (token && sessions.has(token) && Date.now() < sessions.get(token).expires) return next();
   if (config.publicStatus && (req.path === '/status' || req.path === '/api/public/status')) return next();
@@ -181,6 +210,11 @@ async function fetchAllData() {
     docker:       docker.value       || [],
     publicStatus: !!config.publicStatus,
     configured:   configuredList(),
+    notifyDisabled: Array.from(notifyDisabled),
+    icons: {
+      proxmox: config.proxmox?.icon, linux: config.linux?.icon, kubernetes: config.kubernetes?.icon,
+      snmp: config.snmp?.icon, healthchecks: config.healthchecks?.icon, docker: config.docker?.icon,
+    },
   };
 }
 
@@ -237,6 +271,7 @@ function runAlertChecks(data) {
   const cur = extractChecks(data);
   if (prevChecks === null) { prevChecks = cur; return; }
   for (const [key, c] of cur) {
+    if (notifyDisabled.has(key)) continue;
     const p = prevChecks.get(key);
     if (!p) continue;
     if (p.ok && !c.ok) {
@@ -411,6 +446,38 @@ app.post('/api/upload/kubeconfig', (req, res) => {
   }
 });
 
+app.post('/api/upload/icon', (req, res) => {
+  try {
+    const { name, dataUrl } = req.body || {};
+    if (!dataUrl || typeof dataUrl !== 'string') return res.status(400).json({ error: 'No file content' });
+    const m = dataUrl.match(/^data:[^;]+;base64,(.+)$/);
+    const b64 = m ? m[1] : dataUrl;
+    let base = path.basename(String(name || 'icon')).replace(/[^a-zA-Z0-9._-]/g, '_');
+    if (!/\.(png|svg|webp|jpg|jpeg|gif|ico)$/i.test(base)) base += '.png';
+    const dir = path.join(__dirname, 'data', 'icons');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, base), Buffer.from(b64, 'base64'));
+    res.json({ path: '/api/icons/' + base });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/icons/:file', (req, res) => {
+  const dir = path.join(__dirname, 'data', 'icons');
+  const fp = path.join(dir, path.basename(req.params.file));
+  if (!fp.startsWith(dir) || !fs.existsSync(fp)) return res.status(404).end();
+  res.sendFile(fp);
+});
+
+app.post('/api/notifications', (req, res) => {
+  try {
+    const { key, enabled } = req.body || {};
+    if (!key) return res.status(400).json({ error: 'key required' });
+    if (enabled === false) notifyDisabled.add(key); else notifyDisabled.delete(key);
+    saveNotify();
+    res.json({ ok: true, disabled: Array.from(notifyDisabled) });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 function mergePreservingSecrets(incoming, existing) {
   if (!incoming || typeof incoming !== 'object') return incoming;
   if (Array.isArray(incoming)) {
@@ -500,7 +567,7 @@ function buildPublicSummary(data) {
     const up = data.linux.filter(l => l.online).length;
     const svcTotal = data.linux.reduce((a, l) => a + (l.services || []).length, 0);
     const svcUp = data.linux.reduce((a, l) => a + (l.services || []).filter(x => x.active).length, 0);
-    out.push({ id: 'linux', title: 'Linux Servers', status: (up === data.linux.length && svcUp === svcTotal) ? 'ok' : up > 0 ? 'warn' : 'down', meta: `${up}/${data.linux.length} servers, ${svcUp}/${svcTotal} services` });
+    out.push({ id: 'linux', title: 'Linux Servers', status: up === data.linux.length ? 'ok' : up > 0 ? 'warn' : 'down', meta: `${up}/${data.linux.length} servers, ${svcUp}/${svcTotal} services` });
   }
   const k = data.kubernetes;
   if (k && k.online !== undefined && (k.online || k.summary)) {
@@ -541,7 +608,7 @@ app.get('/api/public/status', (req, res) => {
 app.get('/api/about', (req, res) => {
   let version = '1.0.0', author = 'caglaryalcin';
   try { const pkg = require('./package.json'); version = pkg.version; author = pkg.author || author; } catch {}
-  res.json({ name: 'OmniSight', version, author });
+  res.json({ name: 'OmniSight', version, author, github: 'https://github.com/caglaryalcin/OmniSight' });
 });
 
 app.post('/api/alerts/test', async (req, res) => {

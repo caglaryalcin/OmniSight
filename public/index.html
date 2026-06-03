@@ -58,7 +58,10 @@ header{
 .menu-item.danger{color:var(--red)}
 
 /* ── Layout ── */
-.layout{display:flex;height:calc(100vh - 64px)}
+.layout{display:flex;height:calc(100vh - 92px)}
+.appfoot{height:28px;display:flex;align-items:center;gap:14px;padding:0 16px;border-top:1px solid var(--border);font-size:12px;color:var(--muted);background:var(--panel)}
+.appfoot a{color:var(--muted);text-decoration:none;display:inline-flex;align-items:center;gap:5px}
+.appfoot a:hover{color:var(--text)}
 #sidebar{width:40vw;min-width:200px;max-width:900px;border-right:none;overflow-y:auto;flex-shrink:0;background:var(--bg);position:relative}
 #resizer{width:4px;background:var(--border);cursor:default;flex-shrink:0;position:relative;z-index:10}
 #detail{flex:1;overflow-y:auto;padding:0;background:var(--bg);min-width:0}
@@ -101,6 +104,9 @@ header{
 .md-blue{background:var(--blue)}
 .mon-name{font-size:15px;font-weight:500;width:160px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mon-sub{font-size:13px;color:var(--muted);width:110px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nbell{display:inline-flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);flex-shrink:0;padding:2px;border-radius:5px;opacity:.65;transition:opacity .1s,color .1s}
+.nbell:hover{color:var(--text);opacity:1;background:rgba(255,255,255,.07)}
+.nbell.off{color:var(--red);opacity:1}
 
 .hb{display:flex;gap:2px;align-items:center;flex:1}
 .hb-bar{width:7px;height:22px;border-radius:2px;flex-shrink:0}
@@ -311,6 +317,18 @@ html[data-theme="light"] .menu-drop{box-shadow:0 8px 24px rgba(0,0,0,.15)}
   <div id="resizer"></div>
   <main id="detail"><div class="empty" style="padding:48px">Loading…</div></main>
 </div>
+<footer class="appfoot">
+  <div style="flex:1"></div>
+  <a href="https://github.com/caglaryalcin/OmniSight/issues/new" target="_blank" rel="noopener" title="Help / report an issue">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    Help
+  </a>
+  <a id="foot-gh" href="https://github.com/caglaryalcin/OmniSight" target="_blank" rel="noopener" title="GitHub">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.2.8-.5v-2c-3.2.7-3.9-1.4-3.9-1.4-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.1.1 1.7 1.1 1.7 1.1 1 1.7 2.7 1.2 3.3.9.1-.7.4-1.2.7-1.5-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.3c0 .3.2.6.8.5 4.6-1.5 7.9-5.8 7.9-10.9C23.5 5.7 18.3.5 12 .5z"/></svg>
+    GitHub
+  </a>
+  <span id="foot-ver"></span>
+</footer>
 
 <script>
 const INTERVAL = 15000;
@@ -321,6 +339,20 @@ const hcOpen = {};
 const snmpOpen = {};
 const k8sGrpOpen = {};
 const dockerOpen = {};
+let notifyOff = new Set();
+const BELL_ON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>';
+const BELL_OFF = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13.73 21a2 2 0 0 1-3.46 0"/><path d="M18.63 13A17.89 17.89 0 0 1 18 8"/><path d="M6.26 6.26A5.86 5.86 0 0 0 6 8c0 7-3 9-3 9h14"/><path d="M18 8a6 6 0 0 0-9.33-5"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+function notifyBell(key){
+  const off = notifyOff.has(key);
+  const k = String(key).replace(/'/g,"\\'");
+  return `<span class="nbell${off?' off':''}" onclick="event.stopPropagation();toggleNotify('${k}',this)" title="${off?'Notifications off':'Notifications on'}">${off?BELL_OFF:BELL_ON}</span>`;
+}
+async function toggleNotify(key, el){
+  const off = !notifyOff.has(key);
+  if(off) notifyOff.add(key); else notifyOff.delete(key);
+  if(el){ el.classList.toggle('off', off); el.innerHTML = off?BELL_OFF:BELL_ON; el.title = off?'Notifications off':'Notifications on'; }
+  try{ await fetch('/api/notifications',{method:'POST',headers:{'Content-Type':'application/json',...authHeaders()},body:JSON.stringify({key, enabled:!off})}); }catch(e){}
+}
 
 const UO_KEY = 'os_user_override';
 let userOverride = {};
@@ -407,6 +439,13 @@ function relTime(iso){
   if(s<3600) return `${Math.floor(s/60)}m ago`;
   return `${Math.floor(s/3600)}h ago`;
 }
+function fmtUptime(sec){
+  if(!sec||sec<0) return '';
+  const d=Math.floor(sec/86400), h=Math.floor(sec%86400/3600), m=Math.floor(sec%3600/60);
+  if(d>0) return `${d}d ${h}h`;
+  if(h>0) return `${h}h ${m}m`;
+  return `${m}m`;
+}
 
 function toggleNode(id){
   const body = document.getElementById(`nd-${id}`);
@@ -463,6 +502,8 @@ function buildProxmox(px){
   const failedSvcs = allSvcs.filter(s=>!s.active);
   const svcsFailed = failedSvcs.length;
   const allOk = px.nodes.every(n=>n.node?.online);
+  const allVms = px.nodes.flatMap(n=>n.vms||[]);
+  const vmRunning = allVms.filter(v=>v.running).length;
 
   const summaryHtml = cs.totalCores ? `
     <div class="csum">
@@ -485,16 +526,21 @@ function buildProxmox(px){
 
   const sbSummaryHtml = cs.totalCores ? `<div class="sb-csum">
       <div class="sb-csum-item"><div class="sb-csum-val">${online}/${total}</div><div class="sb-csum-lbl">Nodes</div></div>
-      <div class="sb-csum-item"><div class="sb-csum-val" style="color:${bc(cs.totalCores?Math.round(cs.usedCores/cs.totalCores*100):0)}">${cs.usedCores.toFixed(1)}/${cs.totalCores}</div><div class="sb-csum-lbl">Cores</div></div>
-      <div class="sb-csum-item"><div class="sb-csum-val" style="color:${bc(cs.totalRAM?Math.round(cs.usedRAM/cs.totalRAM*100):0)}">${cs.totalRAM?(cs.usedRAM/1024**3).toFixed(0)+'/'+(cs.totalRAM/1024**3).toFixed(0)+'G':'—'}</div><div class="sb-csum-lbl">RAM</div></div>
+      <div class="sb-csum-item"><div class="sb-csum-val"><span style="color:${bc(cs.totalCores?Math.round(cs.usedCores/cs.totalCores*100):0)}">${cs.usedCores.toFixed(1)}</span>/${cs.totalCores}</div><div class="sb-csum-lbl">Cores</div></div>
+      <div class="sb-csum-item"><div class="sb-csum-val">${cs.totalRAM?`<span style="color:${bc(Math.round(cs.usedRAM/cs.totalRAM*100))}">${(cs.usedRAM/1024**3).toFixed(0)}</span>/${(cs.totalRAM/1024**3).toFixed(0)}G`:'—'}</div><div class="sb-csum-lbl">RAM</div></div>
+      ${allVms.length?`<div class="sb-csum-item"><div class="sb-csum-val">${vmRunning}/${allVms.length}</div><div class="sb-csum-lbl">VMs</div></div>`:''}
+      ${allSvcs.length?`<div class="sb-csum-item"><div class="sb-csum-val">${upSvcs}/${allSvcs.length}</div><div class="sb-csum-lbl">Services up</div></div>`:''}
     </div>` : `<div class="sb-csum">
       <div class="sb-csum-item"><div class="sb-csum-val">${online}/${total}</div><div class="sb-csum-lbl">Nodes</div></div>
+      ${allVms.length?`<div class="sb-csum-item"><div class="sb-csum-val">${vmRunning}/${allVms.length}</div><div class="sb-csum-lbl">VMs</div></div>`:''}
+      ${allSvcs.length?`<div class="sb-csum-item"><div class="sb-csum-val">${upSvcs}/${allSvcs.length}</div><div class="sb-csum-lbl">Services up</div></div>`:''}
     </div>`;
 
-  const nodesHtml = px.nodes.map(({node,vms,history})=>{
+  const nodesHtml = px.nodes.map(({node,services=[],vms,history,host})=>{
     const cpuPct = node.cpu ?? 0;
     const ramPct = node.ram?.percent ?? 0;
-    const hasIssue = !node.online || (node.services||[]).some(s=>!s.active);
+    const svcFailed = services.filter(s=>!s.active).length;
+    const hasIssue = !node.online || svcFailed>0;
     const isOpen = userOverride['node:'+node.name] !== undefined
       ? userOverride['node:'+node.name]
       : hasIssue;
@@ -503,9 +549,10 @@ function buildProxmox(px){
       <div class="mon-dot ${dc(node.online)}"></div>
       <div class="node-name">${node.name}</div>
       ${node.online
-        ? `<div class="node-info">CPU ${cpuPct}% &nbsp;·&nbsp; RAM ${ramPct}% &nbsp;·&nbsp; ${vms.filter(v=>v.running).length}/${vms.length} VMs</div>`
+        ? `<div class="node-info">${host?host+' &nbsp;·&nbsp; ':''}CPU ${cpuPct}% &nbsp;·&nbsp; RAM ${ramPct}% &nbsp;·&nbsp; ${vms.filter(v=>v.running).length}/${vms.length} VMs${node.uptime?' &nbsp;·&nbsp; Uptime - '+fmtUptime(node.uptime):''}</div>`
         : `<div class="node-info" style="color:var(--muted)">Unreachable</div>`}
       ${bdg(node.online?'green':'red', node.online?'online':'offline')}
+      ${notifyBell('px:'+node.name)}
     </div>
     <div class="node-body ${isOpen?'open':''}" id="nd-${node.name}">
       ${node.online ? `
@@ -531,33 +578,18 @@ function buildProxmox(px){
               </div>`).join('')}
             ${vms.length>16?`<div style="font-size:11px;color:var(--muted);padding:3px 6px">+${vms.length-16} more</div>`:''}
           </div>` : ''}
+        ${services.length?`
+          <div class="syn-section" style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">Services ${svcFailed?`<span style="color:var(--red)">(${svcFailed} failed)</span>`:''}</div>
+          ${services.map(s=>`
+            <div class="row" style="padding:6px 0 6px 16px">
+              <div class="mon-dot ${s.active?'md-green':'md-red'}" style="flex-shrink:0"></div>
+              <span class="nb-label" style="flex:1;margin-left:8px">${s.desc||s.name}</span>
+              ${bdg(s.active?'green':'red', s.active?'active':'failed')}
+            </div>`).join('')}
+        ` : ''}
       ` : `<div style="padding:4px 0;color:var(--red);font-size:12px">Node unreachable</div>`}
     </div>`;
   }).join('');
-
-  const svcsHtml = allSvcs.length ? `
-    <div class="node-hdr" onclick="toggleNode('pvesvcs')">
-      <div class="mon-dot ${svcsFailed?'md-red':'md-green'}"></div>
-      <div class="node-name">Services</div>
-      <div class="node-info">${upSvcs}/${allSvcs.length} active</div>
-      ${bdg(svcsFailed?'red':'green', svcsFailed?`${svcsFailed} failed`:'healthy')}
-    </div>
-    ${svcsFailed ? `<div style="padding:6px 16px 2px;border-bottom:1px solid var(--border)">
-      ${failedSvcs.map(s=>`
-        <div class="mon-row" style="padding:7px 0;border-bottom:none">
-          <div class="mon-dot md-red"></div>
-          <div class="mon-name" style="flex:1">${s.desc||s.name}</div>
-          ${bdg('red','failed')}
-        </div>`).join('')}
-    </div>` : ''}
-    <div class="node-body ${nodeOpen['pvesvcs']?'open':''}" id="nd-pvesvcs">
-      ${allSvcs.map(s=>`
-        <div class="row" style="padding:4px 0">
-          <div class="mon-dot ${s.active?'md-green':'md-red'}" style="flex-shrink:0"></div>
-          <span class="nb-label" style="flex:1;margin-left:8px">${s.desc||s.name}</span>
-          ${bdg(s.active?'green':'red', s.active?'active':'failed')}
-        </div>`).join('')}
-    </div>` : '';
 
   return {
     id: 'proxmox',
@@ -565,10 +597,13 @@ function buildProxmox(px){
     iconKey: 'proxmox',
     color: 'var(--blue)',
     meta: `${online}/${total} online`,
-    badge: bdg(allOk?'green':online>0?'yellow':'red', allOk?'healthy':online>0?`${online}/${total} online`:'offline'),
+    badge: bdg(
+      allOk && svcsFailed===0 ? 'green' : (svcsFailed>0 || online===0) ? 'red' : 'yellow',
+      allOk && svcsFailed===0 ? 'healthy' : svcsFailed>0 ? `${svcsFailed} services failed` : online>0 ? `${online}/${total} online` : 'offline'
+    ),
     sbSummary: sbSummaryHtml,
     summary: summaryHtml,
-    body: nodesHtml + svcsHtml,
+    body: nodesHtml,
   };
 }
 
@@ -580,9 +615,20 @@ function buildLinux(linux){
   const totalSvcs = linux.flatMap(s=>s.services||[]).length;
   const upSvcs   = linux.flatMap(s=>s.services||[]).filter(s=>s.active).length;
   const reachable = linux.filter(s=>s.online).length;
+  const cpuVals = linux.filter(s=>s.online&&s.cpu!=null).map(s=>s.cpu);
+  const ramVals = linux.filter(s=>s.online&&s.ram).map(s=>s.ram.percent);
+  const lmetric = (vals, limit) => {
+    if(!vals.length) return null;
+    if(vals.length===1){ const v=vals[0]; return { val:v+'%', color:bc(v) }; }
+    const ok = vals.every(v=>v<limit);
+    return { val: ok?'healthy':'high', color: ok?'var(--green)':'var(--red)' };
+  };
+  const cpuM = lmetric(cpuVals,90), ramM = lmetric(ramVals,90);
 
   const sbSummaryHtml = `<div class="sb-csum">
     <div class="sb-csum-item"><div class="sb-csum-val">${reachable}/${linux.length}</div><div class="sb-csum-lbl">Servers</div></div>
+    ${cpuM?`<div class="sb-csum-item"><div class="sb-csum-val" style="color:${cpuM.color}">${cpuM.val}</div><div class="sb-csum-lbl">CPU</div></div>`:''}
+    ${ramM?`<div class="sb-csum-item"><div class="sb-csum-val" style="color:${ramM.color}">${ramM.val}</div><div class="sb-csum-lbl">RAM</div></div>`:''}
     <div class="sb-csum-item"><div class="sb-csum-val">${upSvcs}/${totalSvcs}</div><div class="sb-csum-lbl">Services up</div></div>
   </div>`;
 
@@ -609,8 +655,9 @@ function buildLinux(linux){
       <div class="node-hdr" onclick="toggleLinux('${lkey}')">
         <div class="mon-dot ${svcFailed?'md-yellow':'md-green'}"></div>
         <div class="node-name">${srv.name}</div>
-        <div class="node-info">${srv.host}${cpuPct!=null?' · CPU '+cpuPct+'%':''}${ramPct!=null?' · RAM '+ramPct+'%':''}</div>
+        <div class="node-info">${srv.host}${cpuPct!=null?' · CPU '+cpuPct+'%':''}${ramPct!=null?' · RAM '+ramPct+'%':''}${srv.uptime?' · Uptime - '+fmtUptime(srv.uptime):''}</div>
         ${bdg(svcFailed?'red':'green', svcFailed?`${svcFailed} failed`:'all ok')}
+        ${notifyBell('lx:'+srv.name)}
         <span class="chevron ${linuxOpen[lkey]?'open':''}" style="margin-left:4px">▼</span>
       </div>
       <div class="node-body ${linuxOpen[lkey]?'open':''}" id="lx-${lkey}">
@@ -677,6 +724,7 @@ function buildKubernetes(k8s){
   const sbSummaryHtml = `<div class="sb-csum">
     <div class="sb-csum-item"><div class="sb-csum-val">${s.total??0}</div><div class="sb-csum-lbl">Pods</div></div>
     <div class="sb-csum-item"><div class="sb-csum-val" style="color:var(--green)">${s.running??0}</div><div class="sb-csum-lbl">Running</div></div>
+    <div class="sb-csum-item"><div class="sb-csum-val" style="color:var(--blue)">${s.succeeded??0}</div><div class="sb-csum-lbl">Succeeded</div></div>
     <div class="sb-csum-item"><div class="sb-csum-val" style="color:var(--yellow)">${s.pending??0}</div><div class="sb-csum-lbl">Pending</div></div>
     <div class="sb-csum-item"><div class="sb-csum-val" style="color:${failed>0?'var(--red)':'var(--muted)'}">${failed}</div><div class="sb-csum-lbl">Failed</div></div>
   </div>`;
@@ -711,6 +759,7 @@ function buildKubernetes(k8s){
         <div class="mon-dot ${failed>0?'md-red':'md-green'}"></div>
         <span style="font-size:14px;font-weight:600;flex:1">Pods</span>
         <span style="font-size:12px;color:var(--muted);margin-right:8px">${pods.length}</span>
+        ${notifyBell('k8s')}
         <span class="chevron">▼</span>
       </div>
       <div class="k8s-grp-body" id="kg-pods">
@@ -848,6 +897,7 @@ function buildSynology(syn){
         <div class="node-name">${dev.name}</div>
         <div class="node-info">${dev.host}${dev.cpu!=null?' · CPU '+dev.cpu+'%':''}${dev.ram?' · RAM '+dev.ram.percent+'%':''}${dev.systemTemp!=null?' · '+dev.systemTemp+'°C':''}</div>
         ${bdg('green','healthy')}
+        ${notifyBell('snmp:'+dev.name)}
       </div>
       <div class="node-body ${snmpOpen[skey]?'open':''}" id="snmp-${skey}">
         ${bars('CPU', dev.cpu)}
@@ -943,6 +993,7 @@ function buildHealthchecks(hc){
             <span style="width:100px;flex-shrink:0;font-size:13px;color:var(--muted)">${c.lastPing?relTime(c.lastPing):'—'}</span>
             <span style="width:130px;flex-shrink:0;font-size:13px;color:var(--muted)">${fmtDur(c.periodSec)} / ${fmtDur(c.graceSec)}</span>
             <span style="width:74px;flex-shrink:0"><span class="badge bg-${bc2}" style="font-size:13px">${c.status}</span></span>
+            ${notifyBell('hc:'+c.name)}
           </div>`;
         }).join('')}
         ${!checks.length?'<div class="empty">No checks found</div>':''}
@@ -969,11 +1020,17 @@ function buildDocker(docker){
   const totalStopped = docker.reduce((a,h)=>a+(h.summary?.stopped||0),0);
   const totalAll     = docker.reduce((a,h)=>a+(h.summary?.total||0),0);
   const totalUnused  = docker.reduce((a,h)=>a+(h.summary?.unused||0),0);
+  const cStates = docker.filter(h=>h.online).flatMap(h=>h.containers||[]).map(c=>c.state);
+  const cStopped = cStates.filter(s=>s==='exited').length;
+  const cPending = cStates.filter(s=>['created','restarting','paused','removing'].includes(s)).length;
+  const cFailed  = cStates.filter(s=>s==='dead').length;
 
   const sbSummaryHtml = `<div class="sb-csum">
     <div class="sb-csum-item"><div class="sb-csum-val">${docker.length}</div><div class="sb-csum-lbl">Hosts</div></div>
     <div class="sb-csum-item"><div class="sb-csum-val" style="color:var(--green)">${totalRunning}</div><div class="sb-csum-lbl">Running</div></div>
-    ${totalStopped>0?`<div class="sb-csum-item"><div class="sb-csum-val" style="color:var(--red)">${totalStopped}</div><div class="sb-csum-lbl">Stopped</div></div>`:''}
+    <div class="sb-csum-item"><div class="sb-csum-val" style="color:${cStopped>0?'var(--red)':'var(--muted)'}">${cStopped}</div><div class="sb-csum-lbl">Stopped</div></div>
+    <div class="sb-csum-item"><div class="sb-csum-val" style="color:${cPending>0?'var(--yellow)':'var(--muted)'}">${cPending}</div><div class="sb-csum-lbl">Pending</div></div>
+    <div class="sb-csum-item"><div class="sb-csum-val" style="color:${cFailed>0?'var(--red)':'var(--muted)'}">${cFailed}</div><div class="sb-csum-lbl">Failed</div></div>
     <div class="sb-csum-item"><div class="sb-csum-val" style="color:var(--muted)">${totalUnused}</div><div class="sb-csum-lbl">Unused img</div></div>
   </div>`;
 
@@ -993,6 +1050,7 @@ function buildDocker(docker){
         <div class="node-name">${host.name}</div>
         <div class="node-info">${host.summary.running} running · ${host.summary.total} total</div>
         ${bdg(stopped?'yellow':'green', stopped?`${stopped} stopped`:'all running')}
+        ${notifyBell('dk:'+host.name)}
       </div>
       <div class="node-body ${dockerOpen[dkey]?'open':''}" id="dk-${dkey}" style="${dockerOpen[dkey]!==undefined?'':''}">
         ${host.containers.map(c=>{
@@ -1072,9 +1130,34 @@ function orderedIds(ids){
   });
 })();
 
+/* ── Platform icons (custom via dashboard-icons CDN, fallback to default) ── */
+function iconUrl(name){
+  if(!name) return null;
+  name = String(name).trim();
+  if(/^https?:\/\//.test(name) || name.startsWith('/')) return name;
+  const m = name.match(/\.(png|svg|webp)$/i);
+  const ext = m ? m[1].toLowerCase() : 'svg';
+  const file = m ? name : name+'.svg';
+  return `https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/${ext}/${file}`;
+}
+function iconFallback(img, iconKey, color){
+  const html = SEC_ICONS[iconKey] ? SEC_ICONS[iconKey](color) : '';
+  const span = document.createElement('span');
+  span.style.cssText = 'display:flex;align-items:center;justify-content:center;width:100%;height:100%';
+  span.innerHTML = html;
+  img.replaceWith(span);
+}
+const DEFAULT_ICON = { proxmox:'proxmox', kubernetes:'kubernetes', healthchecks:'healthchecks', docker:'docker' };
+function platformIcon(panel){
+  const name = (window._lastData?.icons||{})[panel.id] || DEFAULT_ICON[panel.id];
+  const url = iconUrl(name);
+  if(url) return `<img src="${url}" alt="" style="width:100%;height:100%;object-fit:contain" onerror="iconFallback(this,'${panel.iconKey}','${panel.color}')">`;
+  return SEC_ICONS[panel.iconKey] ? SEC_ICONS[panel.iconKey](panel.color) : '';
+}
+
 /* ── Sidebar card ── */
 function sidebarCard(panel, isActive){
-  const iconSvg = SEC_ICONS[panel.iconKey] ? SEC_ICONS[panel.iconKey](panel.color) : '';
+  const iconSvg = platformIcon(panel);
   return `
   <div class="sb-card ${isActive?'active':''}" id="sbcard-${panel.id}" data-id="${panel.id}" draggable="true" onclick="selectPanel('${panel.id}')">
     <div class="sb-hdr">
@@ -1094,7 +1177,7 @@ function selectPanel(id){
   if(card) card.classList.add('active');
   const panel = window._panels?.[id];
   if(!panel) return;
-  const iconSvg = SEC_ICONS[panel.iconKey] ? SEC_ICONS[panel.iconKey](panel.color) : '';
+  const iconSvg = platformIcon(panel);
   document.getElementById('detail').innerHTML = `
     <div class="det-hdr">
       <div class="det-icon">${iconSvg}</div>
@@ -1182,6 +1265,7 @@ function selectPanel(id){
 function render(data){
   window._lastData = data;
   if(Array.isArray(data.configured)) configuredIds = data.configured;
+  if(Array.isArray(data.notifyDisabled)) notifyOff = new Set(data.notifyDisabled);
 
   const platforms = [];
   const px = data.proxmox?.nodes || [];
@@ -1429,6 +1513,7 @@ function scheduleRefresh(){
 async function doRefresh(){
   const btn = document.getElementById('rbtn');
   btn.classList.add('spin'); clearTimeout(timer);
+  resetPbar();
   try{
     const r = await fetch('/api/refresh',{headers:authHeaders()});
     handleUnauth(r);
@@ -1463,6 +1548,15 @@ async function initialLoad(){
     if(!token){ window.location.href='/login'; return; }
   }
   await initialLoad();
+})();
+
+(function(){
+  const RELEASES='https://github.com/caglaryalcin/OmniSight/releases';
+  const v=document.getElementById('foot-ver'); if(!v) return;
+  fetch('https://api.github.com/repos/caglaryalcin/OmniSight/releases/latest')
+    .then(r=>r.ok?r.json():Promise.reject())
+    .then(rel=>{ if(!rel||!rel.tag_name) return Promise.reject(); v.innerHTML='<a href="'+(rel.html_url||RELEASES)+'" target="_blank" rel="noopener">'+rel.tag_name+'</a>'; })
+    .catch(()=>{ fetch('/api/about',{headers:authHeaders()}).then(r=>r.json()).then(a=>{ v.innerHTML='<a href="'+RELEASES+'" target="_blank" rel="noopener">v'+(a.version||'')+'</a>'; }).catch(()=>{}); });
 })();
 </script>
 </body>
