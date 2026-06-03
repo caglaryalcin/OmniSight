@@ -101,6 +101,7 @@ No ConfigMap/Secret to create: the app starts empty and you configure it from th
 | `PORT` | No | `3000` | HTTP port |
 | `OMNISIGHT_ENCRYPT` | No | `true` | Config encryption is **enabled by default**. Set to `false` (or `0`/`off`/`no`) to disable. |
 | `OMNISIGHT_SECRET` | No | auto | Encryption key. If unset, a random key is generated and stored in `data/secret.key` (auto-managed). Set this to use your own key (e.g. shared across instances). |
+| `NODE_EXTRA_CA_CERTS` | No | — | Path to a CA certificate file to trust (Node standard), e.g. `/app/data/certs/ca.crt`. You can also just drop `*.crt`/`*.pem` files into `data/certs/` — they are auto-trusted on startup. See [Custom CA certificates](#custom-ca-certificates). |
 
 ### Encryption
 
