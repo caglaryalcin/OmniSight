@@ -155,6 +155,18 @@ The live config is `data/config.yaml` (created automatically on first save). Eas
 - `publicStatus: true` and `publicTitle` — expose the `/status` page publicly
 - each platform also takes an optional `icon` (see below)
 
+### Service & maintenance actions
+
+Some cards expose actions (no extra setup beyond the access the connection already has):
+
+- **Linux services** — query `status`, `start`, `restart` on inactive/failed units over SSH. The SSH user must be root or have `systemctl` rights.
+- **Proxmox services** — `start`/`stop`/`restart` and live `state` via the Proxmox API. The API token needs `Sys.Modify` (and `Sys.Audit` to read task/backup status) on the node.
+- **Docker** — `Prune` removes dangling images on the host.
+
+### Databases
+
+The `pg`, `mysql2` and `mongodb` drivers are bundled (installed via `npm install` / image build). The monitoring account only needs read access — e.g. PostgreSQL `pg_monitor`, MySQL `PROCESS` + `SELECT` on `information_schema`, MongoDB `clusterMonitor`. If a metric (connections/size) isn't permitted it's simply omitted; up/down still works.
+
 ### Platform icons
 
 Each platform card shows an icon you can customise from the Settings UI (the `icon` field on every platform). Proxmox, Kubernetes, Healthchecks and Docker default to their real logos; Linux and SNMP use a built-in glyph. Three ways to set one:
