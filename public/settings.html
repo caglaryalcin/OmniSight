@@ -307,6 +307,28 @@ html[data-theme="light"]{--bg:#f4f5f7;--panel:#ffffff;--row:#eef1f4;--border:#dc
   </div>
 </div>
 
+<!-- Database -->
+<div class="card">
+  <div class="card-hdr">
+    <div class="card-left">
+      <div class="card-icon" id="dot-database" style="background:var(--muted)"></div>
+      <span class="card-title">Databases</span>
+    </div>
+    <label class="toggle"><input type="checkbox" id="en-database" onchange="toggleCard('database')"><span class="toggle-t"></span></label>
+  </div>
+  <div class="card-body hidden" id="cb-database">
+    <div class="form-group"><label>Icon (optional)</label>
+      <div class="path-row">
+        <input type="text" id="icon-database" placeholder="e.g. postgresql or mysql.png — from dashboard-icons">
+        <button type="button" class="btn-sm" onclick="document.getElementById('icon-database-f').click()">Browse…</button>
+        <input type="file" id="icon-database-f" accept="image/*,.svg" style="display:none" onchange="uploadIcon(this,'icon-database')">
+      </div>
+    </div>
+    <div id="db-list"></div>
+    <button class="btn-sm" type="button" onclick="addDbInstance()" style="margin-top:8px">+ Add Database</button>
+  </div>
+</div>
+
 <!-- Alerts -->
 <div class="card">
   <div class="card-hdr">
@@ -397,7 +419,7 @@ html[data-theme="light"]{--bg:#f4f5f7;--panel:#ffffff;--row:#eef1f4;--border:#dc
 <div id="toast"></div>
 
 <script>
-let lCount = 0, sCount = 0, dCount = 0;
+let lCount = 0, sCount = 0, dCount = 0, dbCount = 0;
 
 function toggleAlertBody(enId, bodyId) {
   document.getElementById(bodyId).classList.toggle('hidden', !document.getElementById(enId).checked);
@@ -594,6 +616,46 @@ function addSynDevice(data = {}) {
 }
 
 /* ── Docker host form ── */
+function addDbInstance(data = {}) {
+  const idx = dbCount++;
+  const id = `dbi-${idx}`;
+  const type = (data.type === 'postgres') ? 'postgresql' : (data.type || 'postgresql');
+  const el = document.createElement('div');
+  el.className = 'arr-item';
+  el.id = id;
+  el.innerHTML = `
+    <div class="arr-hdr" onclick="toggleArr('${id}')">
+      <div class="db-dot" style="width:9px;height:9px;border-radius:50%;background:var(--muted);flex-shrink:0"></div>
+      <span class="arr-hdr-name">${escHtml(data.name || 'New Database')}</span>
+      <button class="btn-rm" type="button" onclick="event.stopPropagation();this.closest('.arr-item').remove()">✕</button>
+    </div>
+    <div class="arr-body hidden" id="ab-${id}">
+      <div class="form-grid">
+        <div class="form-group"><label>Name</label><input type="text" class="db-name" value="${escHtml(data.name||'')}" placeholder="prod-db"
+          oninput="this.closest('.arr-item').querySelector('.arr-hdr-name').textContent=this.value||'New Database'"></div>
+        <div class="form-group"><label>Type</label>
+          <select class="db-type">
+            <option value="postgresql" ${type==='postgresql'?'selected':''}>PostgreSQL</option>
+            <option value="mysql" ${type==='mysql'?'selected':''}>MySQL</option>
+            <option value="mariadb" ${type==='mariadb'?'selected':''}>MariaDB</option>
+            <option value="mongodb" ${type==='mongodb'||type==='mongo'?'selected':''}>MongoDB</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="form-group"><label>Host / IP</label><input type="text" class="db-host" value="${escHtml(data.host||'')}" placeholder="192.168.1.10"></div>
+        <div class="form-group"><label>Port</label><input type="number" class="db-port" value="${data.port||''}" placeholder="5432 / 3306 / 27017"></div>
+      </div>
+      <div class="form-grid">
+        <div class="form-group"><label>User</label><input type="text" class="db-user" value="${escHtml(data.user||'')}" placeholder="monitor"></div>
+        <div class="form-group"><label>Password</label><input type="password" class="db-pass" placeholder=""></div>
+      </div>
+      <div class="form-group"><label>Database (optional)</label><input type="text" class="db-dbname" value="${escHtml(data.database||'')}" placeholder="postgres — empty = server-wide"></div>
+    </div>`;
+  document.getElementById('db-list').appendChild(el);
+  if (data.password) secVal(data.password, el.querySelector('.db-pass'));
+}
+
 function addDockerHost(data = {}) {
   const idx = dCount++;
   const id = `dhost-${idx}`;
@@ -754,6 +816,12 @@ function populate(cfg) {
     document.getElementById('icon-docker').value = cfg.docker.icon || '';
     (cfg.docker.hosts || []).forEach(addDockerHost);
   }
+  if (cfg.database) {
+    document.getElementById('en-database').checked = cfg.database.enabled !== false;
+    document.getElementById('cb-database').classList.remove('hidden');
+    document.getElementById('icon-database').value = cfg.database.icon || '';
+    (cfg.database.instances || []).forEach(addDbInstance);
+  }
   if (cfg.alerts) {
     document.getElementById('en-alerts').checked = cfg.alerts.enabled !== false;
     document.getElementById('cb-alerts').classList.remove('hidden');
@@ -903,6 +971,25 @@ function collect() {
   }
 
   {
+    const on = document.getElementById('en-database').checked;
+    const instances = [];
+    document.querySelectorAll('#db-list .arr-item').forEach(item => {
+      const inst = {
+        name: item.querySelector('.db-name').value.trim(),
+        type: item.querySelector('.db-type').value,
+        host: item.querySelector('.db-host').value.trim(),
+        port: parseInt(item.querySelector('.db-port').value) || undefined,
+        user: item.querySelector('.db-user').value.trim(),
+        database: item.querySelector('.db-dbname').value.trim() || undefined,
+      };
+      const pw = maskedVal(item.querySelector('.db-pass'));
+      if (pw) inst.password = pw;
+      if (inst.name && inst.host) instances.push(inst);
+    });
+    if (on || instances.length) cfg.database = { enabled: on, instances, icon: document.getElementById('icon-database').value.trim() || undefined };
+  }
+
+  {
     const alertsOn = document.getElementById('en-alerts').checked;
     const a = { enabled: alertsOn };
     if (document.getElementById('al-ntfy-en').checked) {
@@ -1040,8 +1127,9 @@ async function saveConfig() {
       if(en(cfg.snmp) && (cfg.snmp.devices||[]).length) ids.push('snmp');
       if(en(cfg.healthchecks) && cfg.healthchecks.url) ids.push('healthchecks');
       if(en(cfg.docker) && (cfg.docker.hosts||[]).length) ids.push('docker');
+      if(en(cfg.database) && (cfg.database.instances||[]).length) ids.push('database');
       const p = window.parent;
-      if(p && p !== window && typeof p.applyConfigured === 'function') p.applyConfigured(ids);
+      if(p && p !== window && typeof p.applyConfigured === 'function') p.applyConfigured(ids, cfg);
     } catch(e){}
   } catch (e) {
     toast('Error: ' + e.message, 'err');
@@ -1093,6 +1181,17 @@ async function refreshDots(cfg){
   setDot('dot-synology', ev(en(cfg.snmp), (d.snmp||[]).length>0 && (d.snmp||[]).every(x=>x.online)));
   setDot('dot-healthchecks', ev(en(cfg.healthchecks), !!(d.healthchecks && d.healthchecks.online) && ((d.healthchecks?.summary?.down)||0)===0));
   setDot('dot-docker', ev(en(cfg.docker), (d.docker||[]).length>0 && (d.docker||[]).every(h=>h.online)));
+  setDot('dot-database', ev(en(cfg.database), (d.database||[]).length>0 && (d.database||[]).every(x=>x.online)));
+  document.querySelectorAll('#db-list .arr-item').forEach(item => {
+    const nm = item.querySelector('.db-name')?.value.trim();
+    const dot = item.querySelector('.db-dot');
+    if(!dot) return;
+    const m = (d.database||[]).find(x => x.name === nm);
+    dot.style.background = !m ? 'var(--muted)'
+      : !m.online ? 'var(--red)'
+      : (m.maxConnections && m.connections!=null && m.connections/m.maxConnections>=0.9) ? 'var(--yellow)'
+      : 'var(--green)';
+  });
   const a=cfg.alerts, hasCh=!!(a && (a.ntfy||a.telegram||a.smtp));
   setDot('dot-alerts', (!a || a.enabled===false || !hasCh) ? 'gray' : 'ok');
   let pubLive=false;

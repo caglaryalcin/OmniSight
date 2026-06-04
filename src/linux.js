@@ -43,6 +43,17 @@ function sshExec(serverConfig, command) {
   });
 }
 
+const SVC_NAME = /^[a-zA-Z0-9@._:\\-]+$/;
+async function runServiceAction(serverConfig, service, action) {
+  if (!SVC_NAME.test(service)) throw new Error('invalid service name');
+  let cmd;
+  if (action === 'status')       cmd = `systemctl status '${service}' --no-pager -l 2>&1 | head -n 60`;
+  else if (action === 'start')   cmd = `systemctl start '${service}' 2>&1; echo "[exit $?]"; echo "state: $(systemctl is-active '${service}' 2>&1)"`;
+  else if (action === 'restart') cmd = `systemctl restart '${service}' 2>&1; echo "[exit $?]"; echo "state: $(systemctl is-active '${service}' 2>&1)"`;
+  else throw new Error('invalid action');
+  return sshExec(serverConfig, cmd);
+}
+
 const linuxHistory = new Map();
 
 async function getServerData(serverConfig) {
@@ -107,4 +118,4 @@ async function getAllLinuxData(config) {
   );
 }
 
-module.exports = { getAllLinuxData };
+module.exports = { getAllLinuxData, runServiceAction };

@@ -2,15 +2,16 @@
 
 ![Status](https://img.shields.io/badge/status-beta-orange) [![Latest Release](https://img.shields.io/github/v/release/caglaryalcin/OmniSight?include_prereleases&color=blue)](https://github.com/caglaryalcin/OmniSight/releases)
 
-A simple, single-glance monitoring dashboard for Proxmox, Linux servers, Kubernetes, SNMP devices, Docker and Healthchecks.
+A simple, single-glance monitoring dashboard for Proxmox, Linux servers, Kubernetes, SNMP devices, Docker, databases and Healthchecks.
 
 ## Features
 
-- **Proxmox** — node CPU/RAM/temperature, VM/LXC and cluster service status (API Token)
-- **Linux servers** — service status via SSH + `systemctl`, plus CPU/RAM (agentless)
+- **Proxmox** — node CPU/RAM/temperature/uptime, VM/LXC, per-node service status with **start/stop/restart** actions, and **last backup** (vzdump) status, all via API Token
+- **Linux servers** — agentless via SSH: CPU/RAM/uptime and **auto-discovered** running/failed services (no manual list) with **status/start/restart** actions
 - **Kubernetes** — pod / deployment / service status and live pod log viewer (kubeconfig)
-- **SNMP** — status of any SNMP v2c/v3 device (Synology, switches, routers, …)
-- **Docker** — container status, ports, unused (dangling) image count, live container log viewer. Local socket, remote TCP, or over SSH (socket-forward, with `docker ps` / `sudo` fallback)
+- **SNMP** — status of any SNMP v2c/v3 device (Synology, UniFi, switches, routers, …) with CPU/RAM/temperature where exposed
+- **Docker** — container status, ports, unused (dangling) image count with a **Prune** action, live container log viewer. Local socket, remote TCP, or over SSH (socket-forward, with `docker ps` / `sudo` fallback)
+- **Databases** — **PostgreSQL**, **MySQL/MariaDB** and **MongoDB**: up/down, active/max connections, total size and version
 
 ![](https://raw.githubusercontent.com/caglaryalcin/OmniSight/refs/heads/main/screenshots/dashboard.png)
 
@@ -18,8 +19,10 @@ A simple, single-glance monitoring dashboard for Proxmox, Linux servers, Kuberne
 
 ![](https://raw.githubusercontent.com/caglaryalcin/OmniSight/refs/heads/main/screenshots/container-logs.png)
 
-- **Healthchecks** — cron monitoring status
-- **Alerts** — notifications on state changes (down/up) via **ntfy**, **Telegram** and **SMTP**
+- **Healthchecks** — cron monitoring status with last-ping and period/grace
+- **Alerts** — notifications on state changes (down/up) via **ntfy**, **Telegram** and **SMTP**, with a **per-device bell** to mute/enable notifications for individual platforms/devices
+- **Custom icons** — set any platform's icon from [dashboard-icons](https://github.com/homarr-labs/dashboard-icons) by name/URL or upload your own (see [Platform icons](#platform-icons))
+- **Custom CA** — trust private/self-signed CAs (see [Custom CA certificates](#custom-ca-certificates))
 - **Public status** — Uptime-Kuma-style, read-only public summary page (`/status`)
 
 ![](https://raw.githubusercontent.com/caglaryalcin/OmniSight/refs/heads/main/screenshots/public-page.png)
@@ -142,11 +145,12 @@ In Kubernetes you can also mount the CA from a ConfigMap (Uptime-Kuma style) —
 The live config is `data/config.yaml` (created automatically on first save). Easiest is to configure everything from the Settings UI; to hand-edit, copy the template — `cp config.example.yaml data/config.yaml` — and edit it. All sections are optional; include only what you use. See `config.example.yaml`.
 
 - `proxmox` — host, port, tokenId, tokenSecret, nodes[]
-- `linux.servers[]` — name, host, port, user, privateKey **or** password, services[]
+- `linux.servers[]` — name, host, port, user, privateKey **or** password (services are auto-discovered — running/failed — no manual list needed)
 - `kubernetes` — kubeconfig, namespaces[] (the Settings UI has a **Browse…** button that uploads a kubeconfig from your machine into `data/` and fills in the container path automatically)
 - `snmp.devices[]` — SNMP v2c (community) or v3 (username, authPassword, privPassword, …)
 - `healthchecks` — url, apiKey
 - `docker.hosts[]` — `type: socket | tcp | ssh` (for SSH: sshHost/sshUser + privateKey/sshPassword, optional `sudo`)
+- `database.instances[]` — `type: postgresql | mysql | mariadb | mongodb`, name, host, port, user, password, optional `database`
 - `alerts` — `enabled` + `ntfy` / `telegram` / `smtp` channels
 - `publicStatus: true` and `publicTitle` — expose the `/status` page publicly
 - each platform also takes an optional `icon` (see below)

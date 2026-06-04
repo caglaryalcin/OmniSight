@@ -1,27 +1,41 @@
 const https = require('https');
 
-async function proxmoxRequest(config, path) {
+async function proxmoxRequest(config, path, method = 'GET') {
   return new Promise((resolve, reject) => {
     const options = {
       hostname: config.host,
       port: config.port || 8006,
       path: `/api2/json${path}`,
-      method: 'GET',
+      method,
       headers: { 'Authorization': `PVEAPIToken=${config.tokenId}=${config.tokenSecret}` },
       rejectUnauthorized: false,
     };
+    if (method === 'POST') options.headers['Content-Length'] = 0;
     const req = https.request(options, (res) => {
       let data = '';
       res.on('data', (chunk) => { data += chunk; });
       res.on('end', () => {
+        if (res.statusCode >= 400) return reject(new Error(`HTTP ${res.statusCode}: ${data.slice(0, 200)}`));
         try { resolve(JSON.parse(data).data); }
-        catch { reject(new Error('Invalid JSON from Proxmox')); }
+        catch { resolve(data); }
       });
     });
     req.on('error', reject);
-    req.setTimeout(10000, () => { req.destroy(); reject(new Error('Timeout')); });
+    req.setTimeout(15000, () => { req.destroy(); reject(new Error('Timeout')); });
     req.end();
   });
+}
+
+async function proxmoxServiceAction(config, node, service, action) {
+  if (!/^[a-zA-Z0-9@._-]+$/.test(node) || !/^[a-zA-Z0-9@._-]+$/.test(service)) throw new Error('invalid name');
+  if (action === 'status') {
+    const s = await proxmoxRequest(config, `/nodes/${node}/services/${service}/state`);
+    return `${service}\nstate: ${s?.state || s?.['active-state'] || 'unknown'}\nsub: ${s?.['sub-state'] || ''}\n${s?.desc || ''}`;
+  }
+  if (!['start', 'stop', 'restart'].includes(action)) throw new Error('invalid action');
+  await proxmoxRequest(config, `/nodes/${node}/services/${service}/${action}`, 'POST');
+  const s = await proxmoxRequest(config, `/nodes/${node}/services/${service}/state`).catch(() => null);
+  return `${action} requested — state: ${s?.state || s?.['active-state'] || 'unknown'}`;
 }
 
 async function getNodeStatus(config, nodeName) {
@@ -101,6 +115,23 @@ async function getVMs(config, nodeName) {
   }
 }
 
+async function getNodeBackup(config, nodeName) {
+  try {
+    const tasks = await proxmoxRequest(config, `/nodes/${nodeName}/tasks?limit=200`);
+    const vz = (tasks || []).filter(t => t.type === 'vzdump' || /vzdump|backup/i.test(t.type || '')).sort((a, b) => (b.starttime || 0) - (a.starttime || 0));
+    if (!vz.length) return null;
+    const last = vz[0];
+    const running = !last.endtime || last.status === undefined;
+    return {
+      status: running ? 'running' : (last.status || 'unknown'),
+      ok: last.status === 'OK',
+      running,
+      starttime: last.starttime || null,
+      endtime: last.endtime || null,
+    };
+  } catch { return null; }
+}
+
 async function getClusterStatus(config) {
   try {
     const data = await proxmoxRequest(config, '/cluster/status');
@@ -116,17 +147,19 @@ async function getAllProxmoxData(config) {
 
   const results = await Promise.allSettled(
     nodeNames.map(async (nodeName) => {
-      const [nodeStatus, services, vms, history] = await Promise.allSettled([
+      const [nodeStatus, services, vms, history, backup] = await Promise.allSettled([
         getNodeStatus(config, nodeName),
         getServices(config, nodeName),
         getVMs(config, nodeName),
         getNodeHistory(config, nodeName),
+        getNodeBackup(config, nodeName),
       ]);
       return {
         node: nodeStatus.value || { name: nodeName, online: false, cpuCores: 0, cpuRaw: 0, ram: { used: 0, total: 0 } },
         services: services.value || [],
         vms: vms.value || [],
         history: history.value || [],
+        backup: backup.value || null,
       };
     })
   );
@@ -151,4 +184,4 @@ async function getAllProxmoxData(config) {
   return { clusterSummary, nodes };
 }
 
-module.exports = { getAllProxmoxData };
+module.exports = { getAllProxmoxData, proxmoxServiceAction };

@@ -61,7 +61,7 @@ function httpBodyBuffer(raw) {
   return body;
 }
 
-function socketRawSSH(conn, host, reqPath) {
+function socketRawSSH(conn, host, reqPath, method = 'GET') {
   return new Promise((resolve, reject) => {
     const socketPath = host.socketPath || '/var/run/docker.sock';
     const timeout = setTimeout(() => reject(new Error('socket forward timeout')), 12000);
@@ -71,7 +71,7 @@ function socketRawSSH(conn, host, reqPath) {
       stream.on('data', d => { chunks.push(d); });
       stream.on('end', () => { clearTimeout(timeout); resolve(httpBodyBuffer(Buffer.concat(chunks))); });
       stream.on('error', e => { clearTimeout(timeout); reject(e); });
-      stream.end(`GET ${reqPath} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n`);
+      stream.end(`${method} ${reqPath} HTTP/1.1\r\nHost: localhost\r\nContent-Length: 0\r\nConnection: close\r\n\r\n`);
     });
   });
 }
@@ -83,11 +83,12 @@ async function socketJsonSSH(conn, host, reqPath) {
   catch { throw new Error('Invalid JSON: ' + text.slice(0, 120)); }
 }
 
-function rawLocal(host, reqPath) {
+function rawLocal(host, reqPath, method = 'GET') {
   return new Promise((resolve, reject) => {
+    const headers = method === 'POST' ? { Host: 'localhost', 'Content-Length': 0 } : { Host: 'localhost' };
     const opts = host.socketPath
-      ? { socketPath: host.socketPath, path: reqPath, method: 'GET', headers: { Host: 'localhost' } }
-      : { hostname: host.host, port: host.port || 2375, path: reqPath, method: 'GET' };
+      ? { socketPath: host.socketPath, path: reqPath, method, headers }
+      : { hostname: host.host, port: host.port || 2375, path: reqPath, method, headers };
     const req = http.request(opts, res => {
       const chunks = [];
       res.on('data', c => chunks.push(c));
@@ -164,6 +165,28 @@ function parsePsJson(out) {
 }
 
 const DANGLING = '/images/json?filters=' + encodeURIComponent('{"dangling":["true"]}');
+const PRUNE_PATH = '/images/prune?filters=' + encodeURIComponent('{"dangling":["true"]}');
+
+async function pruneImages(host) {
+  const parse = txt => { let j = {}; try { j = JSON.parse(txt) || {}; } catch {} return { deleted: (j.ImagesDeleted || []).length, reclaimed: j.SpaceReclaimed || 0 }; };
+  if (host.type !== 'ssh') {
+    return parse((await rawLocal(host, PRUNE_PATH, 'POST')).toString('utf8'));
+  }
+  const conn = await sshConnect(host);
+  try {
+    try {
+      const body = await socketRawSSH(conn, host, PRUNE_PATH, 'POST');
+      return parse(body.toString('utf8'));
+    } catch (e) {
+      if (!e.forwardFailed) throw e;
+      const out = (await execAuto(conn, host, 'image prune -f')).trim();
+      const m = out.match(/Total reclaimed space:\s*(.+)/i);
+      return { deleted: null, reclaimed: m ? m[1] : null, raw: out };
+    }
+  } finally {
+    conn.end();
+  }
+}
 
 async function fetchHostData(host) {
   if (host.type !== 'ssh') {
@@ -290,4 +313,4 @@ async function getAllDockerData(config) {
   );
 }
 
-module.exports = { getAllDockerData, getContainerLogs };
+module.exports = { getAllDockerData, getContainerLogs, pruneImages };

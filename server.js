@@ -3,12 +3,13 @@ const fs = require('fs');
 const path = require('path');
 const yaml = require('js-yaml');
 const crypto = require('crypto');
-const { getAllProxmoxData } = require('./src/proxmox');
-const { getAllLinuxData } = require('./src/linux');
+const { getAllProxmoxData, proxmoxServiceAction } = require('./src/proxmox');
+const { getAllLinuxData, runServiceAction } = require('./src/linux');
 const { getAllKubernetesData, getPodLogs } = require('./src/kubernetes');
 const { getAllSynologyData } = require('./src/snmp');
 const { getAllHealthchecks } = require('./src/healthchecks');
-const { getAllDockerData, getContainerLogs } = require('./src/docker');
+const { getAllDockerData, getContainerLogs, pruneImages } = require('./src/docker');
+const { getAllDatabaseData } = require('./src/database');
 const { dispatchAlert } = require('./src/alerts');
 const { decryptConfig, encryptConfigValue, isEncrypted, SENSITIVE_KEYS, encryptionEnabled } = require('./src/crypto');
 
@@ -189,32 +190,14 @@ let config = loadConfig();
 let cache = { data: null };
 let refreshPromise = null;
 
-async function fetchAllData() {
-  const enabled = c => c && c.enabled !== false;
-  const [proxmox, linux, kubernetes, synology, healthchecks, docker] = await Promise.allSettled([
-    enabled(config.proxmox)     ? getAllProxmoxData(config.proxmox)         : Promise.resolve({ clusterSummary: null, nodes: [] }),
-    enabled(config.linux)       ? getAllLinuxData(config.linux)             : Promise.resolve([]),
-    enabled(config.kubernetes)  ? getAllKubernetesData(config.kubernetes)   : Promise.resolve(null),
-    enabled(config.snmp)        ? getAllSynologyData(config.snmp)           : Promise.resolve([]),
-    enabled(config.healthchecks)? getAllHealthchecks(config.healthchecks)   : Promise.resolve(null),
-    enabled(config.docker)      ? getAllDockerData(config.docker)           : Promise.resolve([]),
-  ]);
-
-  return {
-    timestamp: new Date().toISOString(),
-    proxmox:      proxmox.value      || { clusterSummary: null, nodes: [] },
-    linux:        linux.value        || [],
-    kubernetes:   kubernetes.value   || null,
-    snmp:         synology.value     || [],
-    healthchecks: healthchecks.value || null,
-    docker:       docker.value       || [],
-    publicStatus: !!config.publicStatus,
-    configured:   configuredList(),
-    notifyDisabled: Array.from(notifyDisabled),
-    icons: {
-      proxmox: config.proxmox?.icon, linux: config.linux?.icon, kubernetes: config.kubernetes?.icon,
-      snmp: config.snmp?.icon, healthchecks: config.healthchecks?.icon, docker: config.docker?.icon,
-    },
+function assignStatic(base) {
+  base.publicStatus = !!config.publicStatus;
+  base.configured = configuredList();
+  base.notifyDisabled = Array.from(notifyDisabled);
+  base.icons = {
+    proxmox: config.proxmox?.icon, linux: config.linux?.icon, kubernetes: config.kubernetes?.icon,
+    snmp: config.snmp?.icon, healthchecks: config.healthchecks?.icon, docker: config.docker?.icon,
+    database: config.database?.icon,
   };
 }
 
@@ -227,6 +210,7 @@ function configuredList() {
   if (en(config.snmp)         && (config.snmp.devices || []).length)    ids.push('snmp');
   if (en(config.healthchecks) && config.healthchecks.url)               ids.push('healthchecks');
   if (en(config.docker)       && (config.docker.hosts || []).length)    ids.push('docker');
+  if (en(config.database)     && (config.database.instances || []).length) ids.push('database');
   return ids;
 }
 
@@ -259,6 +243,7 @@ function extractChecks(data) {
     const nm = c.name || c.slug;
     add('hc:' + nm, c.status !== 'down' && c.status !== 'grace', 'Healthcheck ' + nm, c.status);
   });
+  (data.database || []).forEach(d => add('db:' + d.name, !!d.online, 'Database ' + d.name, 'unreachable'));
   return m;
 }
 
@@ -293,8 +278,26 @@ function runAlertChecks(data) {
 
 function backgroundRefresh() {
   if (refreshPromise) return refreshPromise;
-  refreshPromise = fetchAllData()
-    .then(data => { cache.data = data; runAlertChecks(data); })
+  const enabled = c => c && c.enabled !== false;
+  if (!cache.data) cache.data = { timestamp: new Date().toISOString(), proxmox: { clusterSummary: null, nodes: [] }, linux: [], kubernetes: null, snmp: [], healthchecks: null, docker: [], database: [], publicStatus: false };
+  const base = cache.data;
+  base.loading = false;
+  assignStatic(base);
+  const tasks = [
+    ['proxmox',      enabled(config.proxmox)      ? getAllProxmoxData(config.proxmox)        : Promise.resolve({ clusterSummary: null, nodes: [] }), { clusterSummary: null, nodes: [] }],
+    ['linux',        enabled(config.linux)        ? getAllLinuxData(config.linux)            : Promise.resolve([]),   []],
+    ['kubernetes',   enabled(config.kubernetes)   ? getAllKubernetesData(config.kubernetes)  : Promise.resolve(null), null],
+    ['snmp',         enabled(config.snmp)         ? getAllSynologyData(config.snmp)          : Promise.resolve([]),   []],
+    ['healthchecks', enabled(config.healthchecks) ? getAllHealthchecks(config.healthchecks) : Promise.resolve(null), null],
+    ['docker',       enabled(config.docker)       ? getAllDockerData(config.docker)          : Promise.resolve([]),   []],
+    ['database',     enabled(config.database)     ? getAllDatabaseData(config.database)      : Promise.resolve([]),   []],
+  ];
+  const ps = tasks.map(([key, p, fb]) =>
+    p.then(v => { base[key] = (v == null ? fb : v); base.timestamp = new Date().toISOString(); })
+     .catch(() => { base[key] = fb; })
+  );
+  refreshPromise = Promise.allSettled(ps)
+    .then(() => { base.timestamp = new Date().toISOString(); runAlertChecks(base); })
     .catch(err => console.error('Refresh error:', err.message))
     .finally(() => { refreshPromise = null; });
   return refreshPromise;
@@ -308,6 +311,7 @@ const EMPTY = {
   snmp: [],
   healthchecks: null,
   docker: [],
+  database: [],
   publicStatus: false,
 };
 
@@ -592,16 +596,27 @@ function buildPublicSummary(data) {
     const meta = stopped > 0 ? `${running}/${total} running, ${stopped} stopped` : `${running}/${total} containers running`;
     out.push({ id: 'docker', title: 'Docker', status, meta });
   }
+  if ((data.database || []).length) {
+    const up = data.database.filter(d => d.online).length;
+    out.push({ id: 'database', title: 'Databases', status: up === data.database.length ? 'ok' : up > 0 ? 'warn' : 'down', meta: `${up}/${data.database.length} online` });
+  }
   return out;
 }
 
 app.get('/api/public/status', (req, res) => {
   if (!config.publicStatus) return res.status(404).json({ error: 'public status not enabled' });
   const data = cache.data || EMPTY;
+  const services = buildPublicSummary(data);
+  const present = new Set(services.map(s => s.id));
+  const titles = { proxmox: 'Proxmox', linux: 'Linux Servers', kubernetes: 'Kubernetes', snmp: 'SNMP', healthchecks: 'Healthchecks', docker: 'Docker', database: 'Databases' };
+  (data.configured || configuredList()).forEach(id => {
+    if (!present.has(id)) services.push({ id, title: titles[id] || id, status: 'connecting', meta: 'connecting…' });
+  });
   res.json({
     title: config.publicTitle || 'OmniSight Status',
     timestamp: data.timestamp || new Date().toISOString(),
-    services: buildPublicSummary(data),
+    refreshing: !!refreshPromise,
+    services,
   });
 });
 
@@ -626,6 +641,39 @@ app.post('/api/alerts/test', async (req, res) => {
 });
 
 /* \u2500\u2500 Log routes \u2500\u2500 */
+app.post('/api/proxmox/service', async (req, res) => {
+  try {
+    const { node, service, action } = req.query;
+    if (!['status', 'start', 'stop', 'restart'].includes(action)) return res.status(400).json({ error: 'invalid action' });
+    if (!config.proxmox) return res.status(404).json({ error: 'proxmox not configured' });
+    const output = await proxmoxServiceAction(config.proxmox, node, service, action);
+    if (action !== 'status') backgroundRefresh();
+    res.json({ ok: true, output });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/linux/service', async (req, res) => {
+  try {
+    const { host, service, action } = req.query;
+    if (!['status', 'start', 'restart'].includes(action)) return res.status(400).json({ error: 'invalid action' });
+    const srv = (config.linux?.servers || []).find(s => s.host === host || s.name === host);
+    if (!srv) return res.status(404).json({ error: 'server not found' });
+    const output = await runServiceAction(srv, service, action);
+    if (action !== 'status') backgroundRefresh();
+    res.json({ ok: true, output });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/docker/prune', async (req, res) => {
+  try {
+    const host = (config.docker?.hosts || []).find(h => h.name === req.query.host);
+    if (!host) return res.status(404).json({ error: 'host not found' });
+    const result = await pruneImages(host);
+    backgroundRefresh();
+    res.json({ ok: true, ...result });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.get('/api/docker/logs', async (req, res) => {
   try {
     const { host, id } = req.query;

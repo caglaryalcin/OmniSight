@@ -107,6 +107,9 @@ header{
 .nbell{display:inline-flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);flex-shrink:0;padding:2px;border-radius:5px;opacity:.65;transition:opacity .1s,color .1s}
 .nbell:hover{color:var(--text);opacity:1;background:rgba(255,255,255,.07)}
 .nbell.off{color:var(--red);opacity:1}
+.btn-act{background:var(--row);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 12px;font-size:12px;cursor:pointer;flex-shrink:0}
+.btn-act:hover{border-color:var(--blue);color:var(--blue)}
+.btn-act:disabled{opacity:.5;cursor:default}
 
 .hb{display:flex;gap:2px;align-items:center;flex:1}
 .hb-bar{width:7px;height:22px;border-radius:2px;flex-shrink:0}
@@ -364,7 +367,7 @@ function setOverride(key, val) {
 
 let activePanel = null;
 
-const ALL_IDS = ['proxmox','kubernetes','linux','snmp','healthchecks','docker'];
+const ALL_IDS = ['proxmox','kubernetes','linux','snmp','healthchecks','docker','database'];
 
 const SEC_ICONS = {
   proxmox:     () => `<span style="font-size:15px;line-height:1">🖧</span>`,
@@ -373,6 +376,7 @@ const SEC_ICONS = {
   snmp:        (c) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4.03 3 9 3s9-1.34 9-3"/></svg>`,
   healthchecks:(c) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>`,
   docker:      () => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2496ed" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="9" width="4" height="4" rx="1"/><rect x="7" y="9" width="4" height="4" rx="1"/><rect x="12" y="9" width="4" height="4" rx="1"/><rect x="7" y="4" width="4" height="4" rx="1"/><rect x="12" y="4" width="4" height="4" rx="1"/><path d="M22 11c-.5-3-3-4-6-4"/><path d="M2 13c1 4 5 5 9 5h3c4 0 6-2 6-5"/></svg>`,
+  database:    (c) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>`,
 };
 
 function bc(v){ return v>=90?'var(--red)':v>=70?'var(--yellow)':'var(--green)' }
@@ -387,6 +391,7 @@ const PLATFORM_META = {
   snmp:        { title:'SNMP',          iconKey:'snmp',        color:'var(--yellow)' },
   healthchecks:{ title:'Healthchecks',  iconKey:'healthchecks',color:'var(--green)' },
   docker:      { title:'Docker',        iconKey:'docker',      color:'var(--blue)' },
+  database:    { title:'Databases',     iconKey:'database',     color:'var(--blue)' },
 };
 let configuredIds = [];
 function setConfiguredIds(ids){ configuredIds = Array.isArray(ids) ? ids : []; }
@@ -395,9 +400,9 @@ function skeletonPanel(id){
   const connBody = `<div style="display:flex;align-items:center;justify-content:center;gap:10px;padding:60px;color:var(--muted);font-size:14px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>Connecting…</div>`;
   return { id, title:m.title, iconKey:m.iconKey, color:m.color, meta:'', badge:bdg('gray','connecting…'), sbSummary:'', summary:'', body:connBody };
 }
-function applyConfigured(ids){
+function applyConfigured(ids, cfg){
   setConfiguredIds(ids);
-  const d = window._lastData || { timestamp:new Date().toISOString(), proxmox:{nodes:[]}, linux:[], kubernetes:null, snmp:[], healthchecks:null, docker:[] };
+  const d = window._lastData || { timestamp:new Date().toISOString(), proxmox:{nodes:[]}, linux:[], kubernetes:null, snmp:[], healthchecks:null, docker:[], database:[] };
   d.configured = ids;
   if(!ids.includes('proxmox')) d.proxmox = { clusterSummary:null, nodes:[] };
   if(!ids.includes('linux')) d.linux = [];
@@ -405,6 +410,25 @@ function applyConfigured(ids){
   if(!ids.includes('snmp')) d.snmp = [];
   if(!ids.includes('healthchecks')) d.healthchecks = null;
   if(!ids.includes('docker')) d.docker = [];
+  if(!ids.includes('database')) d.database = [];
+  if(cfg){
+    const mergeC = (arr, items, keyFn) => {
+      arr = Array.isArray(arr) ? arr : [];
+      const present = new Set(arr.map(keyFn));
+      (items||[]).forEach(it => { if(!present.has(keyFn(it))) arr.push({ ...it, online:false, _connecting:true }); });
+      return arr;
+    };
+    if(ids.includes('snmp'))     d.snmp     = mergeC(d.snmp,     cfg.snmp?.devices,      x=>x.name);
+    if(ids.includes('linux'))    d.linux    = mergeC(d.linux,    cfg.linux?.servers,     x=>x.name);
+    if(ids.includes('docker'))   d.docker   = mergeC(d.docker,   cfg.docker?.hosts,      x=>x.name);
+    if(ids.includes('database')) d.database = mergeC(d.database, cfg.database?.instances,x=>x.name);
+    if(ids.includes('proxmox')){
+      const nodes = (d.proxmox?.nodes) || [];
+      const present = new Set(nodes.map(n=>n.node?.name));
+      (cfg.proxmox?.nodes||[]).forEach(nm => { if(!present.has(nm)) nodes.push({ node:{ name:nm, online:false }, services:[], vms:[], history:[], _connecting:true }); });
+      d.proxmox = { clusterSummary:(d.proxmox?.clusterSummary)||null, nodes };
+    }
+  }
   render(d);
   doRefresh();
 }
@@ -536,7 +560,14 @@ function buildProxmox(px){
       ${allSvcs.length?`<div class="sb-csum-item"><div class="sb-csum-val">${upSvcs}/${allSvcs.length}</div><div class="sb-csum-lbl">Services up</div></div>`:''}
     </div>`;
 
-  const nodesHtml = px.nodes.map(({node,services=[],vms,history,host})=>{
+  const nodesHtml = px.nodes.map(({node,services=[],vms,history,host,backup,_connecting})=>{
+    if(_connecting) return `
+    <div class="node-hdr" style="cursor:default">
+      <div class="mon-dot md-gray"></div>
+      <div class="node-name">${node.name}</div>
+      <div class="node-info">${host||''}</div>
+      ${bdg('gray','connecting…')}
+    </div>`;
     const cpuPct = node.cpu ?? 0;
     const ramPct = node.ram?.percent ?? 0;
     const svcFailed = services.filter(s=>!s.active).length;
@@ -568,6 +599,11 @@ function buildProxmox(px){
           </div>
           ${histChart(history,'mem',ramPct)}
         </div>
+        ${backup?`<div class="row" style="padding:8px 0;margin-top:6px;border-top:1px solid var(--border)">
+          <span class="nb-label" style="flex:1">Last backup</span>
+          ${backup.endtime?`<span style="font-size:12px;color:var(--muted);margin-right:8px">${relTime(new Date(backup.endtime*1000).toISOString())}</span>`:''}
+          ${bdg(backup.running?'yellow':backup.ok?'green':'red', backup.running?'running':backup.ok?'OK':(backup.status||'error'))}
+        </div>`:''}
         ${vms.length?`
           <div class="vm-chips">
             ${vms.slice(0,16).map(v=>`
@@ -581,10 +617,11 @@ function buildProxmox(px){
         ${services.length?`
           <div class="syn-section" style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">Services ${svcFailed?`<span style="color:var(--red)">(${svcFailed} failed)</span>`:''}</div>
           ${services.map(s=>`
-            <div class="row" style="padding:6px 0 6px 16px">
+            <div class="row" style="padding:8px 0 8px 16px">
               <div class="mon-dot ${s.active?'md-green':'md-red'}" style="flex-shrink:0"></div>
-              <span class="nb-label" style="flex:1;margin-left:8px">${s.desc||s.name}</span>
-              ${bdg(s.active?'green':'red', s.active?'active':'failed')}
+              <span class="nb-label" style="flex:1;margin-left:8px;font-size:14px">${s.desc||s.name}</span>
+              ${!s.active?`<button class="btn-act" style="padding:4px 12px;margin-left:8px;font-size:13px" onclick="pveSvcAction('${node.name}','${s.name.replace(/'/g,"\\'")}','status',this)">Status</button><button class="btn-act" style="padding:4px 12px;margin-left:6px;font-size:13px" onclick="pveSvcAction('${node.name}','${s.name.replace(/'/g,"\\'")}','start',this)">Start</button><button class="btn-act" style="padding:4px 12px;margin-left:6px;font-size:13px" onclick="pveSvcAction('${node.name}','${s.name.replace(/'/g,"\\'")}','restart',this)">Restart</button>`:''}
+              <span class="badge bg-${s.active?'green':'red'}" style="font-size:13px;margin-left:10px;min-width:54px;text-align:center">${s.active?'active':'failed'}</span>
             </div>`).join('')}
         ` : ''}
       ` : `<div style="padding:4px 0;color:var(--red);font-size:12px">Node unreachable</div>`}
@@ -638,6 +675,13 @@ function buildLinux(linux){
   </div>`;
 
   const body = linux.map(srv=>{
+    if(srv._connecting) return `
+      <div class="node-hdr" style="cursor:default">
+        <div class="mon-dot md-gray"></div>
+        <div class="node-name">${srv.name}</div>
+        <div class="node-info">${srv.host||''}</div>
+        ${bdg('gray','connecting…')}
+      </div>`;
     const svcFailed = (srv.services||[]).filter(s=>!s.active&&s.state!=='unknown').length;
     if(!srv.online) return `
       <div class="offline-row">
@@ -677,10 +721,11 @@ function buildLinux(linux){
           </div>` : ''}
         ${(srv.services||[]).length?`<div class="syn-section" style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">Services</div>`:''}
         ${(srv.services||[]).map(s=>`
-          <div class="row" style="padding:6px 0">
+          <div class="row" style="padding:8px 0">
             <div class="mon-dot ${s.active?'md-green':s.state==='unknown'?'md-gray':'md-red'}" style="flex-shrink:0"></div>
-            <span class="nb-label" style="flex:1;margin-left:8px">${s.name}</span>
-            ${bdg(s.active?'green':s.state==='unknown'?'gray':'red', s.active?'active':s.state||'unknown')}
+            <span class="nb-label" style="flex:1;margin-left:8px;font-size:14px">${s.name}</span>
+            ${!s.active?`<button class="btn-act" style="padding:4px 12px;margin-left:8px;font-size:13px" onclick="svcAction('${srv.host}','${s.name.replace(/'/g,"\\'")}','status',this)">Status</button><button class="btn-act" style="padding:4px 12px;margin-left:6px;font-size:13px" onclick="svcAction('${srv.host}','${s.name.replace(/'/g,"\\'")}','start',this)">Start</button><button class="btn-act" style="padding:4px 12px;margin-left:6px;font-size:13px" onclick="svcAction('${srv.host}','${s.name.replace(/'/g,"\\'")}','restart',this)">Restart</button>`:''}
+            <span class="badge bg-${s.active?'green':s.state==='unknown'?'gray':'red'}" style="font-size:13px;margin-left:10px;min-width:54px;text-align:center">${s.active?'active':s.state||'unknown'}</span>
           </div>`).join('')}
       </div>`;
   }).join('');
@@ -874,6 +919,13 @@ function buildSynology(syn){
   </div>`;
 
   const body = syn.map((dev,i)=>{
+    if(dev._connecting) return `
+      <div class="node-hdr" style="cursor:default">
+        <div class="mon-dot md-gray"></div>
+        <div class="node-name">${dev.name}</div>
+        <div class="node-info">${dev.host||''}</div>
+        ${bdg('gray','connecting…')}
+      </div>`;
     if(!dev.online) return `
       <div class="offline-row">
         <div class="mon-dot md-red"></div>
@@ -1035,6 +1087,13 @@ function buildDocker(docker){
   </div>`;
 
   const body = docker.map(host=>{
+    if(host._connecting) return `
+      <div class="node-hdr" style="cursor:default">
+        <div class="mon-dot md-gray"></div>
+        <div class="node-name">${host.name}</div>
+        <div class="node-info">${host.host||''}</div>
+        ${bdg('gray','connecting…')}
+      </div>`;
     if(!host.online) return `
       <div class="offline-row">
         <div class="mon-dot md-red" style="margin-top:2px"></div>
@@ -1053,6 +1112,7 @@ function buildDocker(docker){
         ${notifyBell('dk:'+host.name)}
       </div>
       <div class="node-body ${dockerOpen[dkey]?'open':''}" id="dk-${dkey}" style="${dockerOpen[dkey]!==undefined?'':''}">
+        ${host.summary?.unused>0?`<div class="mon-row" style="justify-content:space-between"><span style="color:var(--muted)">${host.summary.unused} unused image${host.summary.unused>1?'s':''}</span><button class="btn-act" onclick="event.stopPropagation();dockerPrune('${host.name.replace(/'/g,"\\'")}',this)">Prune</button></div>`:''}
         ${host.containers.map(c=>{
           const dotCls = c.color==='green'?'md-green':c.color==='yellow'?'md-yellow':c.color==='red'?'md-red':'md-gray';
           return `<div class="mon-row clickable" onclick="showDockerLogs('${host.name}','${c.id}','${(c.name||'').replace(/'/g,"\\'")}')" title="View logs">
@@ -1082,6 +1142,64 @@ function buildDocker(docker){
   };
 }
 
+/* ── Databases ── */
+function fmtBytes(b){
+  if(b==null) return '';
+  const u=['B','KB','MB','GB','TB']; let i=0,n=Number(b);
+  while(n>=1024 && i<u.length-1){ n/=1024; i++; }
+  return (n<10&&i>0?n.toFixed(1):Math.round(n))+' '+u[i];
+}
+function buildDatabase(dbs){
+  if(!dbs?.length) return null;
+  const onlineDevs = dbs.filter(d=>d.online);
+  const online = onlineDevs.length;
+  const allOk = online===dbs.length;
+  const totalConns = onlineDevs.reduce((a,d)=>a+(d.connections||0),0);
+  const totalSize = onlineDevs.reduce((a,d)=>a+(d.sizeBytes||0),0);
+
+  const sbSummaryHtml = `<div class="sb-csum">
+    <div class="sb-csum-item"><div class="sb-csum-val">${online}/${dbs.length}</div><div class="sb-csum-lbl">Online</div></div>
+    ${totalConns?`<div class="sb-csum-item"><div class="sb-csum-val">${totalConns}</div><div class="sb-csum-lbl">Conns</div></div>`:''}
+    ${totalSize?`<div class="sb-csum-item"><div class="sb-csum-val">${fmtBytes(totalSize)}</div><div class="sb-csum-lbl">Size</div></div>`:''}
+  </div>`;
+
+  const body = dbs.map(d=>{
+    if(d._connecting) return `
+      <div class="node-hdr" style="cursor:default">
+        <div class="mon-dot md-gray"></div>
+        <div class="node-name">${d.name}</div>
+        <div class="node-info">${d.type||''}${d.host?' · '+d.host:''}</div>
+        ${bdg('gray','connecting…')}
+      </div>`;
+    if(!d.online) return `
+      <div class="offline-row">
+        <div class="mon-dot md-red"></div>
+        <div>${d.name} — ${d.type||'db'} unreachable<div class="offline-err">${d.error||''}</div></div>
+      </div>`;
+    const conns = d.connections!=null ? d.connections+(d.maxConnections?'/'+d.maxConnections:'')+' conns' : '';
+    return `
+      <div class="node-hdr" style="cursor:default">
+        <div class="mon-dot md-green"></div>
+        <div class="node-name" style="width:auto;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.name}</div>
+        <div class="node-info" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.type}${d.host?' · '+d.host:''}${conns?' · '+conns:''}${d.sizeBytes!=null?' · '+fmtBytes(d.sizeBytes):''}${d.version?' · v'+d.version:''}</div>
+        ${bdg('green','online')}
+        ${notifyBell('db:'+d.name)}
+      </div>`;
+  }).join('');
+
+  return {
+    id: 'database',
+    title: 'Databases',
+    iconKey: 'database',
+    color: 'var(--blue)',
+    meta: `${online}/${dbs.length} online`,
+    badge: bdg(allOk?'green':online>0?'yellow':'red', allOk?'healthy':online>0?`${online}/${dbs.length} online`:'offline'),
+    sbSummary: sbSummaryHtml,
+    summary: '',
+    body,
+  };
+}
+
 function toggleDocker(key){
   dockerOpen[key] = !dockerOpen[key];
   setOverride('docker:'+key, dockerOpen[key]);
@@ -1089,6 +1207,53 @@ function toggleDocker(key){
   if(el){ el.classList.toggle('open', !!dockerOpen[key]); el.style.display=''; }
   const chev = document.querySelector(`[onclick="toggleDocker('${key}')"] .chevron`);
   if(chev) chev.classList.toggle('open', !!dockerOpen[key]);
+}
+async function pveSvcAction(node, service, action, btn){
+  const orig = btn ? btn.textContent : '';
+  if(btn){ btn.disabled=true; btn.textContent='…'; }
+  try{
+    const r = await fetch('/api/proxmox/service?node='+encodeURIComponent(node)+'&service='+encodeURIComponent(service)+'&action='+action,{method:'POST',headers:authHeaders()});
+    handleUnauth(r);
+    const b = await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(b.error||r.statusText);
+    if(action==='status'){
+      const m=document.getElementById('logmodal'); m.classList.add('open');
+      document.getElementById('logtitle').textContent=service+' — status';
+      document.getElementById('logbody').innerHTML=highlightLog(b.output||'(empty)');
+      _logCtx=null;
+    } else { doRefresh(); }
+  }catch(e){ if(e.message!=='Unauthorized') console.error(e); }
+  finally{ if(btn){ btn.disabled=false; btn.textContent=orig; } }
+}
+async function svcAction(host, service, action, btn){
+  const orig = btn ? btn.textContent : '';
+  if(btn){ btn.disabled=true; btn.textContent='…'; }
+  try{
+    const r = await fetch('/api/linux/service?host='+encodeURIComponent(host)+'&service='+encodeURIComponent(service)+'&action='+action,{method:'POST',headers:authHeaders()});
+    handleUnauth(r);
+    const b = await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(b.error||r.statusText);
+    if(action==='status'){
+      const m=document.getElementById('logmodal'); m.classList.add('open');
+      document.getElementById('logtitle').textContent=service+' — status';
+      document.getElementById('logbody').innerHTML=highlightLog(b.output||'(empty)');
+      _logCtx=null;
+    } else { doRefresh(); }
+  }catch(e){ if(e.message!=='Unauthorized') console.error(e); }
+  finally{ if(btn){ btn.disabled=false; btn.textContent=orig; } }
+}
+async function dockerPrune(name, btn){
+  if(btn){ btn.disabled=true; btn.textContent='Pruning…'; }
+  try{
+    const r = await fetch('/api/docker/prune?host='+encodeURIComponent(name),{method:'POST',headers:authHeaders()});
+    handleUnauth(r);
+    const b = await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(b.error||r.statusText);
+    const h=(window._lastData?.docker||[]).find(x=>x.name===name);
+    if(h&&h.summary) h.summary.unused=0;
+    if(window._lastData) render(window._lastData);
+    doRefresh();
+  }catch(e){ if(btn){ btn.disabled=false; btn.textContent='Prune'; } if(e.message!=='Unauthorized') console.error(e); }
 }
 
 /* ── Sidebar order (drag & drop) ── */
@@ -1284,8 +1449,9 @@ function render(data){
   setFavicon(anyOff);
   setLogoDot(anyOff);
 
-  const dataHas={ proxmox:!!(data.proxmox?.nodes?.length), linux:!!((data.linux||[]).length), kubernetes:!!data.kubernetes, snmp:!!((data.snmp||[]).length), healthchecks:!!data.healthchecks, docker:!!((data.docker||[]).length) };
+  const dataHas={ proxmox:!!(data.proxmox?.nodes?.length), linux:!!((data.linux||[]).length), kubernetes:!!data.kubernetes, snmp:!!((data.snmp||[]).length), healthchecks:!!data.healthchecks, docker:!!((data.docker||[]).length), database:!!((data.database||[]).length) };
   const connectingCount=configuredIds.filter(id=>!dataHas[id]).length;
+  window._connecting = connectingCount;
 
   const gh=document.getElementById('ghealth');
   if(gh){
@@ -1310,6 +1476,7 @@ function render(data){
     snmp:         () => buildSynology(data.snmp),
     healthchecks: () => buildHealthchecks(data.healthchecks),
     docker:       () => buildDocker(data.docker),
+    database:     () => buildDatabase(data.database),
   };
 
   const panels = {};
@@ -1501,6 +1668,7 @@ async function pollOnce(){
     }
     render(data);
   }catch{}
+  if(window._connecting>0){ clearTimeout(timer); timer=setTimeout(pollOnce, 2000); return; }
   resetPbar();
   scheduleRefresh();
 }
@@ -1528,8 +1696,8 @@ async function initialLoad(){
   try {
     const data = await fetchStatus();
     render(data);
+    if(data.loading || window._connecting>0){ setTimeout(initialLoad, 2000); return; }
     startPbar();
-    if(data.loading){ setTimeout(initialLoad, 2000); return; }
     scheduleRefresh();
     if(!document.querySelector('.sb-card')) openEmbed('/settings');
   } catch(e){ if(e.message!=='Unauthorized') console.error(e); }
