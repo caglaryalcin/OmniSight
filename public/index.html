@@ -398,7 +398,19 @@ function setConfiguredIds(ids){ configuredIds = Array.isArray(ids) ? ids : []; }
 function skeletonPanel(id){
   const m = PLATFORM_META[id] || { title:id, iconKey:id, color:'var(--muted)' };
   const connBody = `<div style="display:flex;align-items:center;justify-content:center;gap:10px;padding:60px;color:var(--muted);font-size:14px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>Connecting…</div>`;
-  return { id, title:m.title, iconKey:m.iconKey, color:m.color, meta:'', badge:bdg('gray','connecting…'), sbSummary:'', summary:'', body:connBody };
+  
+  let sbSummary = '';
+  if (id === 'kubernetes') {
+    sbSummary = `<div class="sb-csum">
+      <div class="sb-csum-item"><div class="sb-csum-val" style="color:var(--muted)">…</div><div class="sb-csum-lbl">Pods</div></div>
+      <div class="sb-csum-item"><div class="sb-csum-val" style="color:var(--muted)">…</div><div class="sb-csum-lbl">Running</div></div>
+      <div class="sb-csum-item"><div class="sb-csum-val" style="color:var(--muted)">…</div><div class="sb-csum-lbl">Failed</div></div>
+    </div>`;
+  } else if (id === 'proxmox') {
+    sbSummary = '...';
+  }
+  
+  return { id, title:m.title, iconKey:m.iconKey, color:m.color, meta:'', badge:bdg('gray','connecting…'), sbSummary, summary:'', body:connBody };
 }
 function applyConfigured(ids, cfg){
   setConfiguredIds(ids);
@@ -427,6 +439,11 @@ function applyConfigured(ids, cfg){
       const present = new Set(nodes.map(n=>n.node?.name));
       (cfg.proxmox?.nodes||[]).forEach(nm => { if(!present.has(nm)) nodes.push({ node:{ name:nm, online:false }, services:[], vms:[], history:[], _connecting:true }); });
       d.proxmox = { clusterSummary:(d.proxmox?.clusterSummary)||null, nodes };
+    }
+	if(ids.includes('kubernetes')){
+      if(!d.kubernetes || !d.kubernetes.online) {
+        d.kubernetes = { _connecting: true, online: false };
+      }
     }
   }
   render(d);
@@ -484,6 +501,7 @@ function toggleCeph(){
   const body = document.getElementById('kg-ceph');
   const hdr = document.getElementById('kh-ceph');
   if(!body) return;
+  body.style.display = '';
   const open = body.classList.toggle('open');
   setOverride('pve:ceph', open);
   const chev = hdr?.querySelector('.chevron');
@@ -494,6 +512,7 @@ function toggleGrp(id){
   const body = document.getElementById(`kg-${id}`);
   const hdr  = document.getElementById(`kh-${id}`);
   if(!body) return;
+  body.style.display = '';
   body.classList.toggle('open');
   k8sGrpOpen[id] = body.classList.contains('open');
   setOverride('k8s:'+id, k8sGrpOpen[id]);
@@ -709,8 +728,8 @@ function buildLinux(linux){
 
   const sbSummaryHtml = `<div class="sb-csum">
     <div class="sb-csum-item"><div class="sb-csum-val">${reachable}/${linux.length}</div><div class="sb-csum-lbl">Servers</div></div>
-    ${cpuM?`<div class="sb-csum-item"><div class="sb-csum-val" style="color:${cpuM.color}">${cpuM.val}</div><div class="sb-csum-lbl">CPU</div></div>`:''}
-    ${ramM?`<div class="sb-csum-item"><div class="sb-csum-val" style="color:${ramM.color}">${ramM.val}</div><div class="sb-csum-lbl">RAM</div></div>`:''}
+    ${cpuM?`<div class="sb-csum-item"><div class="sb-csum-val" style="color:${cpuM.color}">${cpuM.val}</div><div class="sb-csum-lbl">CPU usage</div></div>`:''}
+    ${ramM?`<div class="sb-csum-item"><div class="sb-csum-val" style="color:${ramM.color}">${ramM.val}</div><div class="sb-csum-lbl">RAM usage</div></div>`:''}
     <div class="sb-csum-item"><div class="sb-csum-val">${upSvcs}/${totalSvcs}</div><div class="sb-csum-lbl">Services up</div></div>
   </div>`;
 
@@ -791,6 +810,26 @@ function buildLinux(linux){
 /* ── Kubernetes ── */
 function buildKubernetes(k8s){
   if(!k8s) return null;
+  if(k8s._connecting){
+    return {
+      id: 'kubernetes',
+      title: 'Kubernetes',
+      iconKey: 'kubernetes',
+      color: 'var(--purple,#9b59b6)',
+      meta: 'connecting…',
+      badge: bdg('gray','connecting…'),
+      sbSummary: `<div class="sb-csum">
+        <div class="sb-csum-item"><div class="sb-csum-val" style="color:var(--muted)">…</div><div class="sb-csum-lbl">Pods</div></div>
+        <div class="sb-csum-item"><div class="sb-csum-val" style="color:var(--muted)">…</div><div class="sb-csum-lbl">Running</div></div>
+        <div class="sb-csum-item"><div class="sb-csum-val" style="color:var(--muted)">…</div><div class="sb-csum-lbl">Failed</div></div>
+      </div>`,
+      summary: '',
+      body: `<div style="display:flex;align-items:center;justify-content:center;gap:10px;padding:60px;color:var(--muted);font-size:14px">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>Connecting…
+      </div>`,
+    };
+  }
+  
   const {online, summary:s={}, pods=[], services=[], deployments=[]} = k8s;
   const failed = s.failed??0;
 
@@ -949,8 +988,8 @@ function buildSynology(syn){
 
   const sbSummaryHtml = `<div class="sb-csum">
     <div class="sb-csum-item"><div class="sb-csum-val">${onlineDevs.length}/${syn.length}</div><div class="sb-csum-lbl">Devices</div></div>
-    ${cell(cpuM,'CPU',true)}
-    ${cell(ramM,'RAM',true)}
+    ${cell(cpuM,'CPU usage',true)}
+    ${cell(ramM,'RAM usage',true)}
     ${cell(tempM,'Temp',true)}
     ${volCount?`<div class="sb-csum-item"><div class="sb-csum-val">${volCount}</div><div class="sb-csum-lbl">Volumes</div></div>`:''}
   </div>`;
@@ -1634,7 +1673,8 @@ function openEmbed(url){
   embedOpen = true;
   activePanel = null;
   document.querySelectorAll('.sb-card.active').forEach(el => el.classList.remove('active'));
-  document.getElementById('detail').innerHTML = '<iframe src="' + url + '" style="width:100%;height:100%;border:0;display:block;background:var(--bg)"></iframe>';
+  document.getElementById('detail').innerHTML = 
+    '<iframe src="' + url + '" style="width:100%;height:100%;border:0;display:block;background:var(--bg)"></iframe>';
 }
 function toggleMenu(){ document.getElementById('menu-drop').classList.toggle('open'); }
 document.addEventListener('click', e => { if(!e.target.closest('.menu-wrap')) document.getElementById('menu-drop')?.classList.remove('open'); });
@@ -1776,8 +1816,17 @@ async function initialLoad(){
   const v=document.getElementById('foot-ver'); if(!v) return;
   fetch('https://api.github.com/repos/caglaryalcin/OmniSight/releases/latest')
     .then(r=>r.ok?r.json():Promise.reject())
-    .then(rel=>{ if(!rel||!rel.tag_name) return Promise.reject(); v.innerHTML='<a href="'+(rel.html_url||RELEASES)+'" target="_blank" rel="noopener">'+rel.tag_name+'</a>'; })
-    .catch(()=>{ fetch('/api/about',{headers:authHeaders()}).then(r=>r.json()).then(a=>{ v.innerHTML='<a href="'+RELEASES+'" target="_blank" rel="noopener">v'+(a.version||'')+'</a>'; }).catch(()=>{}); });
+    .then(rel=>{ 
+      if(!rel||!rel.tag_name) return Promise.reject(); 
+      window._latestVersion = rel.tag_name;
+      v.innerHTML='<a href="'+(rel.html_url||RELEASES)+'" target="_blank" rel="noopener">'+rel.tag_name+'</a>'; 
+    })
+    .catch(()=>{ 
+      fetch('/api/about',{headers:authHeaders()}).then(r=>r.json()).then(a=>{ 
+        window._latestVersion = 'v'+(a.version||'')
+        v.innerHTML='<a href="'+RELEASES+'" target="_blank" rel="noopener">'+window._latestVersion+'</a>'; 
+      }).catch(()=>{}); 
+    });
 })();
 </script>
 </body>
