@@ -1188,6 +1188,7 @@ async function refreshDots(cfg){
     if(!dot) return;
     const m = (d.database||[]).find(x => x.name === nm);
     dot.style.background = !m ? 'var(--muted)'
+      : m._connecting ? 'var(--muted)'
       : !m.online ? 'var(--red)'
       : (m.maxConnections && m.connections!=null && m.connections/m.maxConnections>=0.9) ? 'var(--yellow)'
       : 'var(--green)';

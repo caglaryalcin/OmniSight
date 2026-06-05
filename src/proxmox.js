@@ -132,6 +132,23 @@ async function getNodeBackup(config, nodeName) {
   } catch { return null; }
 }
 
+async function getNodeStorage(config, nodeName) {
+  try {
+    const res = await proxmoxRequest(config, `/nodes/${nodeName}/storage`);
+    return (res || []).map(s => ({
+      name: s.storage,
+      type: s.type,
+      active: s.active === 1 || s.active === true,
+      total: s.total || 0,
+      used: s.used || 0,
+      avail: s.avail || 0,
+      percent: s.total ? Math.round((s.used / s.total) * 100) : 0
+    }));
+  } catch {
+    return [];
+  }
+}
+
 async function getClusterStatus(config) {
   try {
     const data = await proxmoxRequest(config, '/cluster/status');
@@ -141,18 +158,43 @@ async function getClusterStatus(config) {
   } catch { return {}; }
 }
 
+async function getCephStatus(config) {
+  try {
+    const res = await proxmoxRequest(config, `/nodes/${config.nodes[0]}/ceph/status`);
+    if (res && res.health) {
+      const checks = [];
+      if (res.health.checks) {
+        for (const key in res.health.checks) {
+          const check = res.health.checks[key];
+          if (check && check.summary && check.summary.message) {
+            checks.push(check.summary.message);
+          }
+        }
+      }
+      return {
+        health: res.health.status || 'UNKNOWN',
+        checks
+      };
+    }
+  } catch {
+    return null;
+  }
+}
+
 async function getAllProxmoxData(config) {
   const nodeNames = config.nodes || [];
   const ipMap = await getClusterStatus(config);
 
-  const results = await Promise.allSettled(
-    nodeNames.map(async (nodeName) => {
-      const [nodeStatus, services, vms, history, backup] = await Promise.allSettled([
+  const [cephResult, ...results] = await Promise.allSettled([
+    nodeNames.length ? getCephStatus(config) : Promise.resolve(null),
+    ...nodeNames.map(async (nodeName) => {
+      const [nodeStatus, services, vms, history, backup, storage] = await Promise.allSettled([
         getNodeStatus(config, nodeName),
         getServices(config, nodeName),
         getVMs(config, nodeName),
         getNodeHistory(config, nodeName),
         getNodeBackup(config, nodeName),
+        getNodeStorage(config, nodeName),
       ]);
       return {
         node: nodeStatus.value || { name: nodeName, online: false, cpuCores: 0, cpuRaw: 0, ram: { used: 0, total: 0 } },
@@ -160,14 +202,17 @@ async function getAllProxmoxData(config) {
         vms: vms.value || [],
         history: history.value || [],
         backup: backup.value || null,
+        storage: storage.value || [],
       };
     })
-  );
+  ]);
+
+  const ceph = cephResult.status === 'fulfilled' ? cephResult.value : null;
 
   const nodes = results.map((r, i) =>
     r.status === 'fulfilled'
       ? r.value
-      : { node: { name: nodeNames[i], online: false, cpuCores: 0, cpuRaw: 0, ram: { used: 0, total: 0 } }, services: [], vms: [], history: [] }
+      : { node: { name: nodeNames[i], online: false, cpuCores: 0, cpuRaw: 0, ram: { used: 0, total: 0 } }, services: [], vms: [], history: [], storage: [] }
   );
   nodes.forEach(n => { n.host = ipMap[n.node.name] || config.host; });
 
@@ -181,7 +226,7 @@ async function getAllProxmoxData(config) {
     usedRAM: onlineNodes.reduce((s, n) => s + (n.node.ram?.used || 0), 0),
   };
 
-  return { clusterSummary, nodes };
+  return { clusterSummary, nodes, ceph };
 }
 
 module.exports = { getAllProxmoxData, proxmoxServiceAction };

@@ -480,6 +480,16 @@ function toggleNode(id){
   setOverride('node:'+id, open);
 }
 
+function toggleCeph(){
+  const body = document.getElementById('kg-ceph');
+  const hdr = document.getElementById('kh-ceph');
+  if(!body) return;
+  const open = body.classList.toggle('open');
+  setOverride('pve:ceph', open);
+  const chev = hdr?.querySelector('.chevron');
+  if(chev) chev.classList.toggle('open', open);
+}
+
 function toggleGrp(id){
   const body = document.getElementById(`kg-${id}`);
   const hdr  = document.getElementById(`kh-${id}`);
@@ -528,39 +538,57 @@ function buildProxmox(px){
   const allOk = px.nodes.every(n=>n.node?.online);
   const allVms = px.nodes.flatMap(n=>n.vms||[]);
   const vmRunning = allVms.filter(v=>v.running).length;
-
+  const ceph = px.ceph;
+  
   const summaryHtml = cs.totalCores ? `
-    <div class="csum">
-      <div class="csum-item"><div class="csum-val">${online}/${total}</div><div class="csum-lbl">Nodes</div></div>
-      <div class="csum-item"><div class="csum-val">${cs.totalCores}</div><div class="csum-lbl">Cores</div></div>
-      <div class="csum-item">
-        <div class="csum-val" style="color:${bc(cs.totalCores?Math.round(cs.usedCores/cs.totalCores*100):0)}">${cs.usedCores.toFixed(1)}</div>
-        <div class="csum-lbl">Used cores</div>
+  <div class="csum">
+    <div class="csum-item"><div class="csum-val">${online}/${total}</div><div class="csum-lbl">Nodes</div></div>
+    <div class="csum-item"><div class="csum-val">${cs.totalCores}</div><div class="csum-lbl">Cores</div></div>
+    <div class="csum-item">
+      <div class="csum-val" style="color:${bc(cs.totalCores?Math.round(cs.usedCores/cs.totalCores*100):0)}">${cs.usedCores.toFixed(1)}</div>
+      <div class="csum-lbl">Used</div>
+    </div>
+    <div class="csum-item">
+      <div class="csum-val" style="color:${bc(cs.totalRAM?Math.round(cs.usedRAM/cs.totalRAM*100):0)}">
+        ${cs.totalRAM?(cs.usedRAM/1024**3).toFixed(0)+'/'+(cs.totalRAM/1024**3).toFixed(0)+' GB':'—'}
       </div>
-      <div class="csum-item">
-        <div class="csum-val" style="color:${bc(cs.totalRAM?Math.round(cs.usedRAM/cs.totalRAM*100):0)}">
-          ${cs.totalRAM?(cs.usedRAM/1024**3).toFixed(0)+'/'+(cs.totalRAM/1024**3).toFixed(0)+' GB':'—'}
-        </div>
-        <div class="csum-lbl">RAM</div>
-      </div>
-    </div>` : `<div class="sb-csum">
-      <div class="sb-csum-item"><div class="sb-csum-val">${online}/${total}</div><div class="sb-csum-lbl">Nodes online</div></div>
-      ${allSvcs.length?`<div class="sb-csum-item"><div class="sb-csum-val">${upSvcs}/${allSvcs.length}</div><div class="sb-csum-lbl">Services up</div></div>`:''}
-    </div>`;
+      <div class="csum-lbl">RAM</div>
+    </div>
+    ${ceph ? `<div class="csum-item"><div class="csum-val" style="color:${ceph.health==='HEALTH_ERR'?'var(--red)':ceph.health==='HEALTH_WARN'?'var(--yellow)':'var(--green)'}">${ceph.health==='HEALTH_OK'?'OK':ceph.health.replace('HEALTH_','')}</div><div class="csum-lbl">Ceph</div></div>` : ''}
+  </div>` : `...`;
 
   const sbSummaryHtml = cs.totalCores ? `<div class="sb-csum">
-      <div class="sb-csum-item"><div class="sb-csum-val">${online}/${total}</div><div class="sb-csum-lbl">Nodes</div></div>
-      <div class="sb-csum-item"><div class="sb-csum-val"><span style="color:${bc(cs.totalCores?Math.round(cs.usedCores/cs.totalCores*100):0)}">${cs.usedCores.toFixed(1)}</span>/${cs.totalCores}</div><div class="sb-csum-lbl">Cores</div></div>
-      <div class="sb-csum-item"><div class="sb-csum-val">${cs.totalRAM?`<span style="color:${bc(Math.round(cs.usedRAM/cs.totalRAM*100))}">${(cs.usedRAM/1024**3).toFixed(0)}</span>/${(cs.totalRAM/1024**3).toFixed(0)}G`:'—'}</div><div class="sb-csum-lbl">RAM</div></div>
-      ${allVms.length?`<div class="sb-csum-item"><div class="sb-csum-val">${vmRunning}/${allVms.length}</div><div class="sb-csum-lbl">VMs</div></div>`:''}
-      ${allSvcs.length?`<div class="sb-csum-item"><div class="sb-csum-val">${upSvcs}/${allSvcs.length}</div><div class="sb-csum-lbl">Services up</div></div>`:''}
-    </div>` : `<div class="sb-csum">
-      <div class="sb-csum-item"><div class="sb-csum-val">${online}/${total}</div><div class="sb-csum-lbl">Nodes</div></div>
-      ${allVms.length?`<div class="sb-csum-item"><div class="sb-csum-val">${vmRunning}/${allVms.length}</div><div class="sb-csum-lbl">VMs</div></div>`:''}
-      ${allSvcs.length?`<div class="sb-csum-item"><div class="sb-csum-val">${upSvcs}/${allSvcs.length}</div><div class="sb-csum-lbl">Services up</div></div>`:''}
-    </div>`;
+    <div class="sb-csum-item"><div class="sb-csum-val">${online}/${total}</div><div class="sb-csum-lbl">Nodes</div></div>
+    <div class="sb-csum-item"><div class="sb-csum-val"><span style="color:${bc(cs.totalCores?Math.round(cs.usedCores/cs.totalCores*100):0)}">${cs.usedCores.toFixed(1)}</span>/${cs.totalCores}</div><div class="sb-csum-lbl">Cores</div></div>
+    <div class="sb-csum-item"><div class="sb-csum-val">${cs.totalRAM?`<span style="color:${bc(Math.round(cs.usedRAM/cs.totalRAM*100))}">${(cs.usedRAM/1024**3).toFixed(0)}</span>/${(cs.totalRAM/1024**3).toFixed(0)}G`:'—'}</div><div class="sb-csum-lbl">RAM</div></div>
+    ${allVms.length?`<div class="sb-csum-item"><div class="sb-csum-val">${vmRunning}/${allVms.length}</div><div class="sb-csum-lbl">VMs</div></div>`:''}
+    ${ceph ? `<div class="sb-csum-item"><div class="sb-csum-val" style="color:${ceph.health==='HEALTH_ERR'?'var(--red)':ceph.health==='HEALTH_WARN'?'var(--yellow)':'var(--green)'}">${ceph.health==='HEALTH_OK'?'OK':ceph.health.replace('HEALTH_','')}</div><div class="sb-csum-lbl">Ceph</div></div>` : ''}
+  </div>` : `...`;
 
-  const nodesHtml = px.nodes.map(({node,services=[],vms,history,host,backup,_connecting})=>{
+  let cephHtml = '';
+  if (ceph) {
+    const clr = ceph.health === 'HEALTH_ERR' ? 'var(--red)' : ceph.health === 'HEALTH_WARN' ? 'var(--yellow)' : 'var(--green)';
+    const cls = ceph.health === 'HEALTH_ERR' ? 'red' : ceph.health === 'HEALTH_WARN' ? 'yellow' : 'green';
+    const isCephOpen = userOverride['pve:ceph'] !== undefined ? userOverride['pve:ceph'] : ceph.health !== 'HEALTH_OK';
+    const checksHtml = ceph.checks && ceph.checks.length 
+      ? ceph.checks.map(c => `<div style="font-size:13px;color:var(--text);padding:4px 0 4px 16px;display:flex;align-items:center;gap:6px;"><div class="mon-dot md-yellow" style="width:6px;height:6px"></div>${c}</div>`).join('')
+      : `<div style="font-size:13px;color:var(--muted);padding-left:16px;">No active warnings or errors</div>`;
+      
+    cephHtml = `
+    <div class="k8s-grp" style="margin:12px;">
+      <div class="k8s-grp-hdr" id="kh-ceph" onclick="toggleCeph()" style="cursor:pointer">
+        <div class="mon-dot ${ceph.health==='HEALTH_OK'?'md-green':ceph.health==='HEALTH_WARN'?'md-yellow':'md-red'}"></div>
+        <span style="font-size:14px;font-weight:600;flex:1">Ceph Storage Health</span>
+        ${bdg(cls, ceph.health === 'HEALTH_OK' ? 'OK' : ceph.health.replace('HEALTH_',''))}
+        <span class="chevron ${isCephOpen?'open':''}" style="margin-left:4px">▼</span>
+      </div>
+      <div class="k8s-grp-body ${isCephOpen?'open':''}" id="kg-ceph" style="padding:12px;border-top:1px solid var(--border)">
+        ${checksHtml}
+      </div>
+    </div>`;
+  }
+
+  const nodesHtml = px.nodes.map(({node,services=[],vms,history,host,backup,storage=[],_connecting})=>{
     if(_connecting) return `
     <div class="node-hdr" style="cursor:default">
       <div class="mon-dot md-gray"></div>
@@ -614,6 +642,23 @@ function buildProxmox(px){
               </div>`).join('')}
             ${vms.length>16?`<div style="font-size:11px;color:var(--muted);padding:3px 6px">+${vms.length-16} more</div>`:''}
           </div>` : ''}
+        ${storage && storage.length ? `
+          <div class="syn-section" style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">Storages</div>
+          ${storage.map(s => {
+            const barClr = !s.active ? 'var(--muted)' : s.percent >= 90 ? 'var(--red)' : s.percent >= 70 ? 'var(--yellow)' : 'var(--green)';
+            const sizeInfo = s.active ? `${(s.used / 1024**3).toFixed(1)} / ${(s.total / 1024**3).toFixed(1)} GB` : 'Inactive';
+            return `
+            <div class="row" style="padding:6px 0 6px 16px;display:flex;align-items:center;gap:10px;">
+              <div class="mon-dot ${s.active ? 'md-green' : 'md-red'}" style="flex-shrink:0"></div>
+              <span class="nb-label" style="width:140px;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${s.name}">${s.name} <span style="font-size:11px;color:var(--muted)">(${s.type})</span></span>
+              <div style="flex:1;height:5px;background:var(--row);border-radius:2px;overflow:hidden;">
+                <div style="height:100%;width:${s.active ? s.percent : 0}%;background:${barClr};border-radius:2px;"></div>
+              </div>
+              <span style="font-size:12px;color:var(--muted);width:110px;text-align:right;white-space:nowrap">${sizeInfo}</span>
+              <span class="badge bg-${s.active ? (s.percent >= 90 ? 'red' : s.percent >= 70 ? 'yellow' : 'green') : 'gray'}" style="font-size:12px;min-width:54px;text-align:center">${s.active ? s.percent + '%' : 'offline'}</span>
+            </div>`;
+          }).join('')}
+        ` : ''}
         ${services.length?`
           <div class="syn-section" style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">Services ${svcFailed?`<span style="color:var(--red)">(${svcFailed} failed)</span>`:''}</div>
           ${services.map(s=>`
@@ -640,7 +685,7 @@ function buildProxmox(px){
     ),
     sbSummary: sbSummaryHtml,
     summary: summaryHtml,
-    body: nodesHtml,
+    body: cephHtml + nodesHtml,
   };
 }
 
@@ -1152,8 +1197,13 @@ function fmtBytes(b){
 function buildDatabase(dbs){
   if(!dbs?.length) return null;
   const onlineDevs = dbs.filter(d=>d.online);
+  const connectingDevs = dbs.filter(d=>d._connecting);
   const online = onlineDevs.length;
-  const allOk = online===dbs.length;
+  const connecting = connectingDevs.length;
+  const offline = dbs.length - online - connecting;
+  const allOk = online === dbs.length;
+  const isConnecting = connecting > 0 && offline === 0;
+
   const totalConns = onlineDevs.reduce((a,d)=>a+(d.connections||0),0);
   const totalSize = onlineDevs.reduce((a,d)=>a+(d.sizeBytes||0),0);
 
@@ -1193,7 +1243,8 @@ function buildDatabase(dbs){
     iconKey: 'database',
     color: 'var(--blue)',
     meta: `${online}/${dbs.length} online`,
-    badge: bdg(allOk?'green':online>0?'yellow':'red', allOk?'healthy':online>0?`${online}/${dbs.length} online`:'offline'),
+    badge: bdg(isConnecting ? 'gray' : (allOk ? 'green' : (online > 0 ? 'yellow' : 'red')), 
+               isConnecting ? 'connecting…' : (allOk ? 'healthy' : (online > 0 ? `${online}/${dbs.length} online` : 'offline'))),
     sbSummary: sbSummaryHtml,
     summary: '',
     body,
@@ -1380,6 +1431,8 @@ function selectPanel(id){
     });
     const allSvcs = (data.proxmox?.nodes||[]).flatMap(n=>n.services||[]);
     if(shouldOpen('node:pvesvcs', allSvcs.some(s=>!s.active))){ nodeOpen['pvesvcs'] = true; openEl(document.getElementById('nd-pvesvcs')); }
+    const ceph = data.proxmox?.ceph;
+    if(ceph && shouldOpen('pve:ceph', ceph.health !== 'HEALTH_OK')) openEl(document.getElementById('kg-ceph'));
   }
 
   if(id === 'kubernetes'){

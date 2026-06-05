@@ -6,7 +6,7 @@ A simple, single-glance monitoring dashboard for Proxmox, Linux servers, Kuberne
 
 ## Features
 
-- **Proxmox** — node CPU/RAM/temperature/uptime, VM/LXC, per-node service status with **start/stop/restart** actions, and **last backup** (vzdump) status, all via API Token
+- **Proxmox** — node CPU/RAM/temperature/uptime, VM/LXC, per-node service status with **start/stop/restart** actions, **last backup** (vzdump) status, **Ceph cluster storage health** monitoring with active alert summaries, and **node storage status** (NFS, Local, ZFS, LVM, etc.) with utilization percentages, all via API Token
 - **Linux servers** — agentless via SSH: CPU/RAM/uptime and **auto-discovered** running/failed services (no manual list) with **status/start/restart** actions
 - **Kubernetes** — pod / deployment / service status and live pod log viewer (kubeconfig)
 - **SNMP** — status of any SNMP v2c/v3 device (Synology, UniFi, switches, routers, …) with CPU/RAM/temperature where exposed
