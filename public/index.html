@@ -612,7 +612,7 @@ function buildProxmox(px){
   if (ceph) {
     const clr = ceph.health === 'HEALTH_ERR' ? 'var(--red)' : ceph.health === 'HEALTH_WARN' ? 'var(--yellow)' : 'var(--green)';
     const cls = ceph.health === 'HEALTH_ERR' ? 'red' : ceph.health === 'HEALTH_WARN' ? 'yellow' : 'green';
-    const isCephOpen = userOverride['pve:ceph'] !== undefined ? userOverride['pve:ceph'] : ceph.health !== 'HEALTH_OK';
+    const isCephOpen = userOverride['pve:ceph'] !== undefined ? userOverride['pve:ceph'] : false;
     const checksHtml = ceph.checks && ceph.checks.length 
       ? ceph.checks.map(c => `<div style="font-size:13px;color:var(--text);padding:4px 0 4px 16px;display:flex;align-items:center;gap:6px;"><div class="mon-dot md-yellow" style="width:6px;height:6px"></div>${c}</div>`).join('')
       : `<div style="font-size:13px;color:var(--muted);padding-left:16px;">No active warnings or errors</div>`;
@@ -645,7 +645,7 @@ function buildProxmox(px){
     const hasIssue = !node.online || svcFailed>0;
     const isOpen = userOverride['node:'+node.name] !== undefined
       ? userOverride['node:'+node.name]
-      : hasIssue;
+      : false;
     return `
     <div class="node-hdr" onclick="toggleNode('${node.name}')">
       <div class="mon-dot ${dc(node.online)}"></div>
@@ -1532,7 +1532,7 @@ function selectPanel(id){
 
   function shouldOpen(overrideKey, hasIssue){
     if(userOverride[overrideKey] !== undefined) return userOverride[overrideKey];
-    return hasIssue;
+    return false;
   }
 
   if(id === 'proxmox'){
