@@ -82,11 +82,13 @@ async function getNodeHistory(config, nodeName) {
 async function getServices(config, nodeName) {
   try {
     const services = await proxmoxRequest(config, `/nodes/${nodeName}/services`);
+    const excluded = config.excludedServices?.proxmox?.[nodeName] || [];
     return (services || []).map(s => ({
       name: s.name,
       desc: s.desc,
       state: s.state,
       active: s.state === 'running',
+      excluded: excluded.includes(s.name)
     }));
   } catch {
     return [];

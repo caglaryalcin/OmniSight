@@ -268,6 +268,16 @@ html[data-theme="light"] .menu-drop{box-shadow:0 8px 24px rgba(0,0,0,.15)}
 .lg-ip{color:var(--blue)}
 .lg-str{color:#d9a05b}
 .lg-num{color:var(--blue)}
+
+.btn-act.exclude {
+  border-color: var(--muted);
+  color: var(--muted);
+}
+.btn-act.exclude:hover {
+  border-color: var(--yellow);
+  color: var(--yellow);
+}
+
 </style>
 </head>
 <body>
@@ -566,7 +576,7 @@ function buildProxmox(px){
   const total  = cs.totalNodes  ?? 0;
   const allSvcs = px.nodes.flatMap(n=>n.services||[]);
   const upSvcs  = allSvcs.filter(s=>s.active).length;
-  const failedSvcs = allSvcs.filter(s=>!s.active);
+  const failedSvcs = allSvcs.filter(s=>!s.active && !s.excluded);
   const svcsFailed = failedSvcs.length;
   const allOk = px.nodes.every(n=>n.node?.online);
   const allVms = px.nodes.flatMap(n=>n.vms||[]);
@@ -631,7 +641,7 @@ function buildProxmox(px){
     </div>`;
     const cpuPct = node.cpu ?? 0;
     const ramPct = node.ram?.percent ?? 0;
-    const svcFailed = services.filter(s=>!s.active).length;
+    const svcFailed = services.filter(s=>!s.active && !s.excluded).length;
     const hasIssue = !node.online || svcFailed>0;
     const isOpen = userOverride['node:'+node.name] !== undefined
       ? userOverride['node:'+node.name]
@@ -695,11 +705,14 @@ function buildProxmox(px){
         ${services.length?`
           <div class="syn-section" style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">Services ${svcFailed?`<span style="color:var(--red)">(${svcFailed} failed)</span>`:''}</div>
           ${services.map(s=>`
-            <div class="row" style="padding:8px 0 8px 16px">
-              <div class="mon-dot ${s.active?'md-green':'md-red'}" style="flex-shrink:0"></div>
-              <span class="nb-label" style="flex:1;margin-left:8px;font-size:14px">${s.desc||s.name}</span>
-              ${!s.active?`<button class="btn-act" style="padding:4px 12px;margin-left:8px;font-size:13px" onclick="pveSvcAction('${node.name}','${s.name.replace(/'/g,"\\'")}','status',this)">Status</button><button class="btn-act" style="padding:4px 12px;margin-left:6px;font-size:13px" onclick="pveSvcAction('${node.name}','${s.name.replace(/'/g,"\\'")}','start',this)">Start</button><button class="btn-act" style="padding:4px 12px;margin-left:6px;font-size:13px" onclick="pveSvcAction('${node.name}','${s.name.replace(/'/g,"\\'")}','restart',this)">Restart</button>`:''}
-              <span class="badge bg-${s.active?'green':'red'}" style="font-size:13px;margin-left:10px;min-width:54px;text-align:center">${s.active?'active':'failed'}</span>
+            <div class="row" style="padding:8px 0 8px 16px;${s.excluded?'opacity:0.6':''}">
+              <div class="mon-dot ${s.excluded?'md-gray':(s.active?'md-green':'md-red')}" style="flex-shrink:0"></div>
+              <span class="nb-label" style="flex:1;margin-left:8px;font-size:14px;${s.excluded?'text-decoration:line-through':''}">${s.desc||s.name}</span>
+              ${s.excluded ? 
+                `<button class="btn-act" style="padding:4px 12px;margin-left:8px;font-size:13px" onclick="includeService('proxmox', '${node.name}', '${s.name.replace(/'/g,"\\'")}', this)">Include</button>` :
+                (!s.active ? `<button class="btn-act exclude" style="padding:4px 12px;margin-left:8px;font-size:13px" onclick="excludeService('proxmox', '${node.name}', '${s.name.replace(/'/g,"\\'")}', this)">Exclude</button><button class="btn-act" style="padding:4px 12px;margin-left:6px;font-size:13px" onclick="pveSvcAction('${node.name}','${s.name.replace(/'/g,"\\'")}','status',this)">Status</button><button class="btn-act" style="padding:4px 12px;margin-left:6px;font-size:13px" onclick="pveSvcAction('${node.name}','${s.name.replace(/'/g,"\\'")}','start',this)">Start</button><button class="btn-act" style="padding:4px 12px;margin-left:6px;font-size:13px" onclick="pveSvcAction('${node.name}','${s.name.replace(/'/g,"\\'")}','restart',this)">Restart</button>` : '')
+              }
+              <span class="badge bg-${s.excluded?'gray':(s.active?'green':'red')}" style="font-size:13px;margin-left:10px;min-width:54px;text-align:center">${s.excluded?'excluded':(s.active?'active':'failed')}</span>
             </div>`).join('')}
         ` : ''}
       ` : `<div style="padding:4px 0;color:var(--red);font-size:12px">Node unreachable</div>`}
@@ -722,11 +735,10 @@ function buildProxmox(px){
   };
 }
 
-/* ── Linux ── */
 function buildLinux(linux){
   if(!linux?.length) return null;
-  const allOk = linux.every(s=>s.online && s.services?.every(sv=>sv.active));
-  const failed = linux.flatMap(s=>s.services||[]).filter(s=>!s.active&&s.state!=='unknown').length;
+  const allOk = linux.every(s=>s.online && s.services?.every(sv=>sv.active || sv.excluded));
+  const failed = linux.flatMap(s=>s.services||[]).filter(s=>!s.active&&s.state!=='unknown'&&!s.excluded).length;
   const totalSvcs = linux.flatMap(s=>s.services||[]).length;
   const upSvcs   = linux.flatMap(s=>s.services||[]).filter(s=>s.active).length;
   const reachable = linux.filter(s=>s.online).length;
@@ -760,7 +772,7 @@ function buildLinux(linux){
         <div class="node-info">${srv.host||''}</div>
         ${bdg('gray','connecting…')}
       </div>`;
-    const svcFailed = (srv.services||[]).filter(s=>!s.active&&s.state!=='unknown').length;
+    const svcFailed = (srv.services||[]).filter(s=>!s.active&&s.state!=='unknown'&&!s.excluded).length;
     if(!srv.online) return `
       <div class="offline-row">
         <div class="mon-dot md-red" style="margin-top:2px"></div>
@@ -799,11 +811,14 @@ function buildLinux(linux){
           </div>` : ''}
         ${(srv.services||[]).length?`<div class="syn-section" style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">Services</div>`:''}
         ${(srv.services||[]).map(s=>`
-          <div class="row" style="padding:8px 0">
-            <div class="mon-dot ${s.active?'md-green':s.state==='unknown'?'md-gray':'md-red'}" style="flex-shrink:0"></div>
-            <span class="nb-label" style="flex:1;margin-left:8px;font-size:14px">${s.name}</span>
-            ${!s.active?`<button class="btn-act" style="padding:4px 12px;margin-left:8px;font-size:13px" onclick="svcAction('${srv.host}','${s.name.replace(/'/g,"\\'")}','status',this)">Status</button><button class="btn-act" style="padding:4px 12px;margin-left:6px;font-size:13px" onclick="svcAction('${srv.host}','${s.name.replace(/'/g,"\\'")}','start',this)">Start</button><button class="btn-act" style="padding:4px 12px;margin-left:6px;font-size:13px" onclick="svcAction('${srv.host}','${s.name.replace(/'/g,"\\'")}','restart',this)">Restart</button>`:''}
-            <span class="badge bg-${s.active?'green':s.state==='unknown'?'gray':'red'}" style="font-size:13px;margin-left:10px;min-width:54px;text-align:center">${s.active?'active':s.state||'unknown'}</span>
+          <div class="row" style="padding:8px 0;${s.excluded?'opacity:0.6':''}">
+            <div class="mon-dot ${s.excluded?'md-gray':(s.active?'md-green':s.state==='unknown'?'md-gray':'md-red')}" style="flex-shrink:0"></div>
+            <span class="nb-label" style="flex:1;margin-left:8px;font-size:14px;${s.excluded?'text-decoration:line-through':''}">${s.name}</span>
+            ${s.excluded ?
+              `<button class="btn-act" style="padding:4px 12px;margin-left:8px;font-size:13px" onclick="includeService('linux', '${srv.host}', '${s.name.replace(/'/g,"\\'")}', this)">Include</button>` :
+              (!s.active ? `<button class="btn-act exclude" style="padding:4px 12px;margin-left:8px;font-size:13px" onclick="excludeService('linux', '${srv.host}', '${s.name.replace(/'/g,"\\'")}', this)">Exclude</button><button class="btn-act" style="padding:4px 12px;margin-left:6px;font-size:13px" onclick="svcAction('${srv.host}','${s.name.replace(/'/g,"\\'")}','status',this)">Status</button><button class="btn-act" style="padding:4px 12px;margin-left:6px;font-size:13px" onclick="svcAction('${srv.host}','${s.name.replace(/'/g,"\\'")}','start',this)">Start</button><button class="btn-act" style="padding:4px 12px;margin-left:6px;font-size:13px" onclick="svcAction('${srv.host}','${s.name.replace(/'/g,"\\'")}','restart',this)">Restart</button>` : '')
+            }
+            <span class="badge bg-${s.excluded?'gray':(s.active?'green':s.state==='unknown'?'gray':'red')}" style="font-size:13px;margin-left:10px;min-width:54px;text-align:center">${s.excluded?'excluded':(s.active?'active':s.state||'unknown')}</span>
           </div>`).join('')}
       </div>`;
   }).join('');
@@ -1329,6 +1344,49 @@ async function pveSvcAction(node, service, action, btn){
   }catch(e){ if(e.message!=='Unauthorized') console.error(e); }
   finally{ if(btn){ btn.disabled=false; btn.textContent=orig; } }
 }
+
+async function excludeService(platform, hostOrNode, service, btn){
+  const orig = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '…';
+  try {
+    const r = await fetch('/api/services/exclude', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ platform, host: hostOrNode, service })
+    });
+    handleUnauth(r);
+    const b = await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(b.error || r.statusText);
+    if(b.data) render(b.data); 
+  } catch(e) { 
+    if(e.message !== 'Unauthorized') console.error(e); 
+  } finally {
+    if(btn) { btn.disabled = false; btn.textContent = orig; }
+  }
+}
+
+async function includeService(platform, hostOrNode, service, btn){
+  const orig = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '…';
+  try {
+    const r = await fetch('/api/services/include', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ platform, host: hostOrNode, service })
+    });
+    handleUnauth(r);
+    const b = await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(b.error || r.statusText);
+    if(b.data) render(b.data); 
+  } catch(e) { 
+    if(e.message !== 'Unauthorized') console.error(e); 
+  } finally {
+    if(btn) { btn.disabled = false; btn.textContent = orig; }
+  }
+}
+
 async function svcAction(host, service, action, btn){
   const orig = btn ? btn.textContent : '';
   if(btn){ btn.disabled=true; btn.textContent='…'; }

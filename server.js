@@ -125,7 +125,7 @@ function authMiddleware(req, res, next) {
   if (token && sessions.has(token) && Date.now() < sessions.get(token).expires) return next();
   if (config.publicStatus && (req.path === '/status' || req.path === '/api/public/status')) return next();
   if (!auth) {
-    // first run: only the login/register page and its APIs are reachable
+	// first run: only the login/register page and its APIs are reachable
     if (['/login', '/api/login', '/api/auth-status', '/api/set-password'].includes(req.path)) return next();
     if (req.path.startsWith('/api/')) return res.status(401).json({ error: 'Setup required' });
     return res.redirect('/login');
@@ -284,8 +284,8 @@ function backgroundRefresh() {
   base.loading = false;
   assignStatic(base);
   const tasks = [
-    ['proxmox',      enabled(config.proxmox)      ? getAllProxmoxData(config.proxmox)        : Promise.resolve({ clusterSummary: null, nodes: [] }), { clusterSummary: null, nodes: [] }],
-    ['linux',        enabled(config.linux)        ? getAllLinuxData(config.linux)            : Promise.resolve([]),   []],
+    ['proxmox',      enabled(config.proxmox)      ? getAllProxmoxData({ ...config.proxmox, excludedServices: config.excludedServices })        : Promise.resolve({ clusterSummary: null, nodes: [] }), { clusterSummary: null, nodes: [] }],
+    ['linux',        enabled(config.linux)        ? getAllLinuxData({ ...config.linux, excludedServices: config.excludedServices })            : Promise.resolve([]),   []],
     ['kubernetes',   enabled(config.kubernetes)   ? getAllKubernetesData(config.kubernetes)  : Promise.resolve(null), null],
     ['snmp',         enabled(config.snmp)         ? getAllSynologyData(config.snmp)          : Promise.resolve([]),   []],
     ['healthchecks', enabled(config.healthchecks) ? getAllHealthchecks(config.healthchecks) : Promise.resolve(null), null],
@@ -356,6 +356,7 @@ app.post('/api/logout', (req, res) => {
   res.json({ ok: true });
 });
 
+/* ── Data routes ── */
 app.get('/api/auth-status', (req, res) => {
   const auth = loadAuth();
   res.json({ required: !!auth, username: auth?.username || null });
@@ -385,7 +386,6 @@ app.post('/api/set-password', (req, res) => {
   res.json({ ok: true });
 });
 
-/* ── Data routes ── */
 app.get('/api/status', async (req, res) => {
   try { res.json(await getCachedData()); }
   catch (err) { res.status(500).json({ error: err.message }); }
@@ -430,6 +430,63 @@ app.post('/api/config', (req, res) => {
     config = encryptionEnabled() ? decryptConfig(toSave) : toSave;
     backgroundRefresh();
     res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+function patchCacheExclude(platform, host, service, isExcluded) {
+  if (!cache.data) return;
+  if (platform === 'linux' && cache.data.linux) {
+    const srv = cache.data.linux.find(s => s.host === host || s.name === host);
+    if (srv && srv.services) {
+      const svc = srv.services.find(s => s.name === service);
+      if (svc) svc.excluded = isExcluded;
+    }
+  } else if (platform === 'proxmox' && cache.data.proxmox?.nodes) {
+    const node = cache.data.proxmox.nodes.find(n => n.node?.name === host);
+    if (node && node.services) {
+      const svc = node.services.find(s => s.name === service);
+      if (svc) svc.excluded = isExcluded;
+    }
+  }
+  runAlertChecks(cache.data);
+}
+
+app.post('/api/services/exclude', (req, res) => {
+  try {
+    const { platform, host, service } = req.body;
+    if (!platform || !host || !service) return res.status(400).json({ error: 'Missing fields' });
+    const existing = fs.existsSync(CONFIG_PATH) ? yaml.load(fs.readFileSync(CONFIG_PATH, 'utf8')) || {} : {};
+    existing.excludedServices = existing.excludedServices || {};
+    existing.excludedServices[platform] = existing.excludedServices[platform] || {};
+    existing.excludedServices[platform][host] = existing.excludedServices[platform][host] || [];
+    if (!existing.excludedServices[platform][host].includes(service)) {
+      existing.excludedServices[platform][host].push(service);
+      const toSave = encryptionEnabled() ? encryptConfigObj(existing) : existing;
+      fs.writeFileSync(CONFIG_PATH, yaml.dump(toSave, { lineWidth: -1 }), 'utf8');
+      config = encryptionEnabled() ? decryptConfig(toSave) : toSave;
+    }
+    patchCacheExclude(platform, host, service, true);
+    res.json({ ok: true, data: cache.data });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/services/include', (req, res) => {
+  try {
+    const { platform, host, service } = req.body;
+    if (!platform || !host || !service) return res.status(400).json({ error: 'Missing fields' });
+    const existing = fs.existsSync(CONFIG_PATH) ? yaml.load(fs.readFileSync(CONFIG_PATH, 'utf8')) || {} : {};
+    if (existing.excludedServices?.[platform]?.[host]) {
+      existing.excludedServices[platform][host] = existing.excludedServices[platform][host].filter(s => s !== service);
+      const toSave = encryptionEnabled() ? encryptConfigObj(existing) : existing;
+      fs.writeFileSync(CONFIG_PATH, yaml.dump(toSave, { lineWidth: -1 }), 'utf8');
+      config = encryptionEnabled() ? decryptConfig(toSave) : toSave;
+    }
+    patchCacheExclude(platform, host, service, false);
+    res.json({ ok: true, data: cache.data });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -565,28 +622,39 @@ function buildPublicSummary(data) {
   const nodes = data.proxmox?.nodes || [];
   if (nodes.length) {
     const online = nodes.filter(n => n.node?.online).length;
-    out.push({ id: 'proxmox', title: 'Proxmox', status: online === nodes.length ? 'ok' : online > 0 ? 'warn' : 'down', meta: `${online}/${nodes.length} nodes online` });
+    const failedSvcs = nodes.reduce((a, n) => a + (n.services || []).filter(s => !s.active && !s.excluded).length, 0);
+    const status = online === 0 ? 'down' : (online < nodes.length || failedSvcs > 0 ? 'warn' : 'ok');
+    let meta = `${online}/${nodes.length} nodes online`;
+    if (failedSvcs > 0) meta += `, ${failedSvcs} failed services`;
+    out.push({ id: 'proxmox', title: 'Proxmox', status, meta });
   }
+  
   if ((data.linux || []).length) {
     const up = data.linux.filter(l => l.online).length;
-    const svcTotal = data.linux.reduce((a, l) => a + (l.services || []).length, 0);
-    const svcUp = data.linux.reduce((a, l) => a + (l.services || []).filter(x => x.active).length, 0);
-    out.push({ id: 'linux', title: 'Linux Servers', status: up === data.linux.length ? 'ok' : up > 0 ? 'warn' : 'down', meta: `${up}/${data.linux.length} servers, ${svcUp}/${svcTotal} services` });
+    const svcTotal = data.linux.reduce((a, l) => a + (l.services || []).filter(s => !s.excluded).length, 0);
+    const svcUp = data.linux.reduce((a, l) => a + (l.services || []).filter(x => x.active && !x.excluded).length, 0);
+    const failedSvcs = svcTotal - svcUp;
+    const status = up === 0 ? 'down' : (up < data.linux.length || failedSvcs > 0 ? 'warn' : 'ok');
+    out.push({ id: 'linux', title: 'Linux Servers', status, meta: `${up}/${data.linux.length} servers, ${svcUp}/${svcTotal} services` });
   }
+  
   const k = data.kubernetes;
   if (k && k.online !== undefined && (k.online || k.summary)) {
     const sm = k.summary || {};
     out.push({ id: 'kubernetes', title: 'Kubernetes', status: !k.online ? 'down' : (sm.failed > 0 ? 'warn' : 'ok'), meta: k.online ? `${sm.running || 0}/${sm.total || 0} pods running` : 'unreachable' });
   }
+  
   if ((data.snmp || []).length) {
     const up = data.snmp.filter(d => d.online).length;
     out.push({ id: 'snmp', title: 'SNMP', status: up === data.snmp.length ? 'ok' : up > 0 ? 'warn' : 'down', meta: `${up}/${data.snmp.length} online` });
   }
+  
   const hc = data.healthchecks;
   if (hc && hc.online !== undefined) {
     const sm = hc.summary || {};
     out.push({ id: 'healthchecks', title: 'Healthchecks', status: !hc.online ? 'down' : ((sm.down || 0) > 0 ? 'down' : (sm.grace || 0) > 0 ? 'warn' : 'ok'), meta: hc.online ? `${sm.up || 0}/${sm.total || 0} up` : 'unreachable' });
   }
+  
   if ((data.docker || []).length) {
     const up = data.docker.filter(h => h.online).length;
     const running = data.docker.reduce((a, h) => a + (h.summary?.running || 0), 0);
@@ -596,10 +664,12 @@ function buildPublicSummary(data) {
     const meta = stopped > 0 ? `${running}/${total} running, ${stopped} stopped` : `${running}/${total} containers running`;
     out.push({ id: 'docker', title: 'Docker', status, meta });
   }
+  
   if ((data.database || []).length) {
     const up = data.database.filter(d => d.online).length;
     out.push({ id: 'database', title: 'Databases', status: up === data.database.length ? 'ok' : up > 0 ? 'warn' : 'down', meta: `${up}/${data.database.length} online` });
   }
+  
   return out;
 }
 
@@ -640,7 +710,6 @@ app.post('/api/alerts/test', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-/* \u2500\u2500 Log routes \u2500\u2500 */
 app.post('/api/proxmox/service', async (req, res) => {
   try {
     const { node, service, action } = req.query;

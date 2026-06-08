@@ -71,8 +71,10 @@ async function getServerData(serverConfig) {
       const [unit, act, sub] = line.split('|');
       const name = (unit || '').replace(/\.service$/, '');
       return { name, state: sub || act || 'unknown', active: act === 'active' };
-    }).filter(s => s.name && s.name !== 'UNIT')
-      .sort((a, b) => (a.active === b.active) ? a.name.localeCompare(b.name) : (a.active ? 1 : -1));
+    }).filter(s => s.name && s.name !== 'UNIT').map(s => {
+      s.excluded = (serverConfig.excludedServices || []).includes(s.name);
+      return s;
+    }).sort((a, b) => (a.active === b.active) ? a.name.localeCompare(b.name) : (a.active ? 1 : -1));
 
     const parts = statsPart.trim().split('|');
     const cpu = parts[0] != null && parts[0] !== '' ? Math.min(100, Math.max(0, Math.round(parseFloat(parts[0])))) : null;
@@ -104,7 +106,10 @@ async function getServerData(serverConfig) {
 
 async function getAllLinuxData(config) {
   const servers = config.servers || [];
-  const results = await Promise.allSettled(servers.map(getServerData));
+  const excluded = config.excludedServices?.linux || {};
+  const results = await Promise.allSettled(servers.map(s => 
+    getServerData({ ...s, excludedServices: excluded[s.host] || [] })
+  ));
   return results.map((r, i) =>
     r.status === 'fulfilled'
       ? r.value

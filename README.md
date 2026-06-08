@@ -6,8 +6,8 @@ A simple, single-glance monitoring dashboard for Proxmox, Linux servers, Kuberne
 
 ## Features
 
-- **Proxmox** — node CPU/RAM/temperature/uptime, VM/LXC, per-node service status with **start/stop/restart** actions, **last backup** (vzdump) status, **Ceph cluster storage health** monitoring with active alert summaries, and **node storage status** (NFS, Local, ZFS, LVM, etc.) with utilization percentages, all via API Token
-- **Linux servers** — agentless via SSH: CPU/RAM/uptime and **auto-discovered** running/failed services (no manual list) with **status/start/restart** actions
+- **Proxmox** — node CPU/RAM/temperature/uptime, VM/LXC, per-node service status with **start/stop/restart/exclude** actions, **last backup** (vzdump) status, **Ceph cluster storage health** monitoring with active alert summaries, and **node storage status** (NFS, Local, ZFS, LVM, etc.) with utilization percentages, all via API Token
+- **Linux servers** — agentless via SSH: CPU/RAM/uptime and **auto-discovered** running/failed services (no manual list) with **status/start/restart/exclude** actions
 - **Kubernetes** — pod / deployment / service status and live pod log viewer (kubeconfig)
 - **SNMP** — status of any SNMP v2c/v3 device (Synology, UniFi, switches, routers, …) with CPU/RAM/temperature where exposed
 - **Docker** — container status, ports, unused (dangling) image count with a **Prune** action, live container log viewer. Local socket, remote TCP, or over SSH (socket-forward, with `docker ps` / `sudo` fallback)
@@ -145,7 +145,7 @@ In Kubernetes you can also mount the CA from a ConfigMap (Uptime-Kuma style) —
 The live config is `data/config.yaml` (created automatically on first save). Easiest is to configure everything from the Settings UI; to hand-edit, copy the template — `cp config.example.yaml data/config.yaml` — and edit it. All sections are optional; include only what you use. See `config.example.yaml`.
 
 - `proxmox` — host, port, tokenId, tokenSecret, nodes[]
-- `linux.servers[]` — name, host, port, user, privateKey **or** password (services are auto-discovered — running/failed — no manual list needed)
+- `linux.servers[]` — name, host, port, user, privateKey **or** password (services are auto-discovered — running/failed — no manual list needed, intentionally excluded services are managed automatically via UI)
 - `kubernetes` — kubeconfig, namespaces[] (the Settings UI has a **Browse…** button that uploads a kubeconfig from your machine into `data/` and fills in the container path automatically)
 - `snmp.devices[]` — SNMP v2c (community) or v3 (username, authPassword, privPassword, …)
 - `healthchecks` — url, apiKey
@@ -159,8 +159,8 @@ The live config is `data/config.yaml` (created automatically on first save). Eas
 
 Some cards expose actions (no extra setup beyond the access the connection already has):
 
-- **Linux services** — query `status`, `start`, `restart` on inactive/failed units over SSH. The SSH user must be root or have `systemctl` rights.
-- **Proxmox services** — `start`/`stop`/`restart` and live `state` via the Proxmox API. The API token needs `Sys.Modify` (and `Sys.Audit` to read task/backup status) on the node.
+- **Linux services** — query `status`, `start`, `restart` on inactive/failed units over SSH. The SSH user must be root or have `systemctl` rights. You can also Exclude/Include intentionally stopped services directly from the UI so they don't degrade the dashboard health or trigger alerts.
+- **Proxmox services** — `start`/`stop`/`restart` and live `state` via the Proxmox API. The API token needs `Sys.Modify` (and `Sys.Audit` to read task/backup status) on the node. Like Linux, expected failures can be muted using the Exclude/Include buttons.
 - **Docker** — `Prune` removes dangling images on the host.
 
 ### Databases
