@@ -45,20 +45,18 @@ html[data-theme="light"]{--bg:#f4f5f7;--panel:#ffffff;--row:#eef1f4;--border:#dc
 function authHeaders(){ const t=sessionStorage.getItem('os_token')||localStorage.getItem('os_token'); return t?{'x-session-token':t}:{}; }
 (async()=>{
   try{
-    let version = (window.parent && window.parent._latestVersion) ? window.parent._latestVersion : null;
+    let version = null;
     let author = 'caglaryalcin';
-
     try {
       const r = await fetch('/api/about', { headers: authHeaders() });
       if (r.ok) {
         const d = await r.json();
-        if (!version) version = d.version ? 'v' + d.version : null;
+        version = d.version ? 'v' + d.version : null;
         if (d.author) author = d.author;
       }
     } catch(e) {
-      console.error("The local API could not be queried; attempting to use the GitHub version.", e);
+      console.error(e);
     }
-
     document.getElementById('ver').textContent = 'version ' + (version || '—') + ' \u00b7 by ' + author;
   }catch{}
 })();

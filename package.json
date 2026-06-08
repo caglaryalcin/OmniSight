@@ -1,6 +1,6 @@
 {
   "name": "omnisight",
-  "version": "0.1.0",
+  "version": "0.7.6-beta",
   "description": "Simple monitoring dashboard for Proxmox, Linux services, Kubernetes, Synology, and Healthchecks",
   "main": "server.js",
   "scripts": {

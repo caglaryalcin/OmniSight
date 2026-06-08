@@ -1887,21 +1887,16 @@ async function initialLoad(){
 })();
 
 (function(){
-  const RELEASES='https://github.com/caglaryalcin/OmniSight/releases';
-  const v=document.getElementById('foot-ver'); if(!v) return;
-  fetch('https://api.github.com/repos/caglaryalcin/OmniSight/releases/latest')
-    .then(r=>r.ok?r.json():Promise.reject())
-    .then(rel=>{ 
-      if(!rel||!rel.tag_name) return Promise.reject(); 
-      window._latestVersion = rel.tag_name;
-      v.innerHTML='<a href="'+(rel.html_url||RELEASES)+'" target="_blank" rel="noopener">'+rel.tag_name+'</a>'; 
+  const RELEASES = 'https://github.com/caglaryalcin/OmniSight/releases';
+  const v = document.getElementById('foot-ver');
+  if(!v) return;
+  fetch('/api/about', {headers: authHeaders()})
+    .then(r => r.ok ? r.json() : Promise.reject())
+    .then(a => {
+      window._currentVersion = 'v' + (a.version || '1.0.0');
+      v.innerHTML = '<a href="' + RELEASES + '" target="_blank" rel="noopener">' + window._currentVersion + '</a>';
     })
-    .catch(()=>{ 
-      fetch('/api/about',{headers:authHeaders()}).then(r=>r.json()).then(a=>{ 
-        window._latestVersion = 'v'+(a.version||'')
-        v.innerHTML='<a href="'+RELEASES+'" target="_blank" rel="noopener">'+window._latestVersion+'</a>'; 
-      }).catch(()=>{}); 
-    });
+    .catch(() => {});
 })();
 </script>
 </body>
