@@ -998,8 +998,11 @@ function buildKubernetes(k8s){
 function buildSynology(syn){
   if(!syn?.length) return null;
 
-  const allOk = syn.every(d=>d.online);
   const onlineDevs = syn.filter(d=>d.online);
+  const connectingDevs = syn.filter(d=>d._connecting);
+  const offline = syn.length - onlineDevs.length - connectingDevs.length;
+  const allOk = onlineDevs.length === syn.length;
+  const isConnecting = connectingDevs.length > 0 && offline === 0;
 
   const cpuVals = onlineDevs.filter(d=>d.cpu!=null).map(d=>d.cpu);
   const ramVals = onlineDevs.filter(d=>d.ram).map(d=>d.ram.percent);
@@ -1099,7 +1102,7 @@ function buildSynology(syn){
     iconKey: 'snmp',
     color: 'var(--yellow)',
     meta: `${onlineDevs.length}/${syn.length} online`,
-    badge: bdg(allOk?'green':'red', allOk?'healthy':'offline'),
+    badge: bdg(isConnecting ? 'gray' : (allOk ? 'green' : (onlineDevs.length > 0 ? 'yellow' : 'red')), isConnecting ? 'connecting…' : (allOk ? 'healthy' : 'offline')),
     sbSummary: sbSummaryHtml,
     summary: summaryHtml,
     body,

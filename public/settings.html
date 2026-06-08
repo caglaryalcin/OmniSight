@@ -1107,29 +1107,22 @@ async function saveConfig() {
   }
   btns.forEach(b => b.disabled = true);
   try {
+    const cfgPayload = collect();
     const r = await fetch('/api/config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
-      body: JSON.stringify(collect()),
+      body: JSON.stringify(cfgPayload),
     });
     handleUnauth(r);
     const body = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(body.error || r.statusText);
     toast('Saved and applied!', 'ok');
-    refreshDots();
+    refreshDots(cfgPayload, body.data);
     try {
-      const cfg = collect();
-      const en = c => c && c.enabled !== false;
-      const ids = [];
-      if(en(cfg.proxmox) && (cfg.proxmox.host || (cfg.proxmox.nodes||[]).length)) ids.push('proxmox');
-      if(en(cfg.kubernetes) && cfg.kubernetes.kubeconfig) ids.push('kubernetes');
-      if(en(cfg.linux) && (cfg.linux.servers||[]).length) ids.push('linux');
-      if(en(cfg.snmp) && (cfg.snmp.devices||[]).length) ids.push('snmp');
-      if(en(cfg.healthchecks) && cfg.healthchecks.url) ids.push('healthchecks');
-      if(en(cfg.docker) && (cfg.docker.hosts||[]).length) ids.push('docker');
-      if(en(cfg.database) && (cfg.database.instances||[]).length) ids.push('database');
       const p = window.parent;
-      if(p && p !== window && typeof p.applyConfigured === 'function') p.applyConfigured(ids, cfg);
+      if(p && p !== window && typeof p.render === 'function') {
+        p.render(body.data);
+      }
     } catch(e){}
   } catch (e) {
     toast('Error: ' + e.message, 'err');
@@ -1168,12 +1161,13 @@ function toast(msg, type) {
 
 function dotColor(st){ return st==='ok'?'var(--green)':st==='bad'?'var(--red)':'var(--muted)'; }
 function setDot(id, st){ const el=document.getElementById(id); if(el) el.style.background=dotColor(st); }
-async function refreshDots(cfg){
+async function refreshDots(cfg, newData){
   try { if(!cfg){ const rc=await fetch('/api/config',{headers:authHeaders()}); cfg=await rc.json(); } } catch { cfg={}; }
-  let d={};
-  try { const rs=await fetch('/api/status',{headers:authHeaders()}); d=await rs.json(); } catch {}
-  const loading = d.loading === true;
-  const ev=(configured, ok)=> !configured ? 'gray' : loading ? 'gray' : (ok ? 'ok' : 'bad');
+  let d = newData;
+  if(!d){
+    try { const rs=await fetch('/api/status',{headers:authHeaders()}); d=await rs.json(); } catch {}
+  }
+  const ev=(configured, ok)=> !configured ? 'gray' : (ok ? 'ok' : 'bad');
   const en=c=>!!(c && c.enabled!==false);
   setDot('dot-proxmox', ev(en(cfg.proxmox), (d.proxmox?.nodes||[]).length>0 && (d.proxmox?.nodes||[]).every(n=>n.node?.online)));
   setDot('dot-linux', ev(en(cfg.linux), (d.linux||[]).length>0 && (d.linux||[]).every(l=>l.online)));
