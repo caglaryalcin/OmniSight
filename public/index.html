@@ -475,25 +475,47 @@ function applyConfigured(ids, cfg){
 }
 
 function histChart(data, key, pct) {
-  const W=300, H=50, clr=bchex(pct);
-  const empty = `<svg class="hist-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><rect width="${W}" height="${H}" fill="rgba(255,255,255,.03)" rx="3"/><line x1="0" y1="${H}" x2="${W}" y2="${H}" stroke="${clr}" stroke-width="1" stroke-opacity=".3"/></svg>`;
-  if (!data||data.length<2) return empty;
-  const vals = data.slice(-80).map(d=>Math.min(100,Math.max(0,Number(d[key])||0)));
-  if (vals.length<2) return empty;
-  const n=vals.length;
-  const xStep = W/(n-1);
-  const pts=vals.map((v,i)=>[i*xStep, H - (v/100)*H]);
-  const line=pts.map((p,i)=>`${i?'L':'M'}${p[0].toFixed(2)},${p[1].toFixed(2)}`).join('');
-  const area=`${line}L${W.toFixed(2)},${H}L0,${H}Z`;
-  const gid=`hg${Math.random().toString(36).slice(2,7)}`;
+  const W = 300, H = 50, clr = bchex(pct);
+  const empty = `<svg class="hist-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><rect width="${W}" height="${H}" class="hist-bg" rx="3"/><line x1="0" y1="${H}" x2="${W}" y2="${H}" stroke="${clr}" stroke-width="1.5" stroke-opacity=".3"/></svg>`;
+  
+  if (!data || data.length < 2) return empty;
+  const vals = data.slice(-80).map(d => Math.min(100, Math.max(0, Number(d[key]) || 0)));
+  if (vals.length < 2) return empty;
+  
+  let minV = Math.min(...vals);
+  let maxV = Math.max(...vals);
+  if (maxV - minV < 5) {
+    minV = Math.max(0, minV - 5);
+    maxV = Math.min(100, maxV + 5);
+  } else {
+    const pad = (maxV - minV) * 0.2;
+    minV = Math.max(0, minV - pad);
+    maxV = Math.min(100, maxV + pad);
+  }
+  const range = maxV - minV || 1;
+  
+  const n = vals.length;
+  const xStep = W / (n - 1);
+  const pts = vals.map((v, i) => [i * xStep, H - ((v - minV) / range) * H]);
+  const line = pts.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(2)},${p[1].toFixed(2)}`).join('');
+  const area = `${line}L${W.toFixed(2)},${H}L0,${H}Z`;
+  const gid = 'hg' + Math.random().toString(36).slice(2, 7);
+  
+  let gridPath = '';
+  for (let i = 1; i < 4; i++) gridPath += `M0,${i * 12.5} L${W},${i * 12.5} `;
+  for (let i = 1; i < 10; i++) gridPath += `M${i * 30},0 L${i * 30},${H} `;
+  
   return `<svg class="hist-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
-    <defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="${clr}" stop-opacity=".45"/>
-      <stop offset="100%" stop-color="${clr}" stop-opacity=".03"/>
-    </linearGradient></defs>
+    <defs>
+      <linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="${clr}" stop-opacity="0.35"/>
+        <stop offset="100%" stop-color="${clr}" stop-opacity="0.0"/>
+      </linearGradient>
+    </defs>
     <rect width="${W}" height="${H}" class="hist-bg" rx="3"/>
+    <path d="${gridPath}" stroke="var(--text)" stroke-width="1" opacity="0.07" vector-effect="non-scaling-stroke" />
     <path d="${area}" fill="url(#${gid})"/>
-    <path d="${line}" fill="none" stroke="${clr}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <path d="${line}" fill="none" stroke="${clr}" stroke-width="1" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
   </svg>`;
 }
 

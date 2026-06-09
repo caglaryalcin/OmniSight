@@ -180,6 +180,8 @@ let config = loadConfig();
 let cache = { data: null };
 let refreshPromise = null;
 
+const PLATFORM_HISTORY = {};
+
 function assignStatic(base) {
   base.publicStatus = !!config.publicStatus;
   base.configured = configuredList();
@@ -295,7 +297,20 @@ function backgroundRefresh() {
      .catch(() => { base[key] = fb; })
   );
   refreshPromise = Promise.allSettled(ps)
-    .then(() => { base.loading = false; base.timestamp = new Date().toISOString(); runAlertChecks(base); })
+    .then(() => { 
+      base.loading = false; 
+      base.timestamp = new Date().toISOString(); 
+      runAlertChecks(base); 
+      const svcs = buildPublicSummary(base);
+      svcs.forEach(s => {
+        if (!PLATFORM_HISTORY[s.id]) PLATFORM_HISTORY[s.id] = Array(20).fill(null).map(() => ({ health: 100 }));
+        let score = 100;
+        if (s.status === 'down') score = 0;
+        else if (s.status === 'warn') score = 65;
+        PLATFORM_HISTORY[s.id].push({ health: score });
+        if (PLATFORM_HISTORY[s.id].length > 80) PLATFORM_HISTORY[s.id].shift();
+      });
+    })
     .catch(err => { console.error(err.message); })
     .finally(() => { refreshPromise = null; });
   return refreshPromise;
@@ -737,6 +752,11 @@ app.get('/api/public/status', (req, res) => {
   const titles = { proxmox: 'Proxmox', linux: 'Linux Servers', kubernetes: 'Kubernetes', snmp: 'SNMP', healthchecks: 'Healthchecks', docker: 'Docker', database: 'Databases' };
   (data.configured || configuredList()).forEach(id => {
     if (!present.has(id)) services.push({ id, title: titles[id] || id, status: 'connecting', meta: 'connecting…' });
+  });
+  services.forEach(s => { 
+    s.history = (PLATFORM_HISTORY[s.id] && PLATFORM_HISTORY[s.id].length) 
+      ? PLATFORM_HISTORY[s.id] 
+      : Array(20).fill(null).map(() => ({ health: 100 })); 
   });
   res.json({
     title: config.publicTitle || 'OmniSight Status',
