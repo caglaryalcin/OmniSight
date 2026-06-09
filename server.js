@@ -432,10 +432,15 @@ app.post('/api/config', (req, res) => {
   try {
     const incoming = req.body;
     const existing = fs.existsSync(CONFIG_PATH) ? yaml.load(fs.readFileSync(CONFIG_PATH, 'utf8')) || {} : {};
+
+    if (existing.excludedServices) {
+      incoming.excludedServices = existing.excludedServices;
+    }
+
     const merged = mergePreservingSecrets(incoming, existing);
     const toSave = encryptionEnabled() ? encryptConfigObj(merged) : merged;
     fs.writeFileSync(CONFIG_PATH, yaml.dump(toSave, { lineWidth: -1 }), 'utf8');
-    config = encryptionEnabled() ? decryptConfig(toSave) : toSave;
+    config = loadConfig();
 
     if (cache.data) {
       const en = c => c && c.enabled !== false;
@@ -544,7 +549,7 @@ app.post('/api/services/exclude', (req, res) => {
       existing.excludedServices[platform][host].push(service);
       const toSave = encryptionEnabled() ? encryptConfigObj(existing) : existing;
       fs.writeFileSync(CONFIG_PATH, yaml.dump(toSave, { lineWidth: -1 }), 'utf8');
-      config = encryptionEnabled() ? decryptConfig(toSave) : toSave;
+      config = loadConfig();
     }
     patchCacheExclude(platform, host, service, true);
     res.json({ ok: true, data: cache.data });
@@ -562,7 +567,7 @@ app.post('/api/services/include', (req, res) => {
       existing.excludedServices[platform][host] = existing.excludedServices[platform][host].filter(s => s !== service);
       const toSave = encryptionEnabled() ? encryptConfigObj(existing) : existing;
       fs.writeFileSync(CONFIG_PATH, yaml.dump(toSave, { lineWidth: -1 }), 'utf8');
-      config = encryptionEnabled() ? decryptConfig(toSave) : toSave;
+      config = loadConfig();
     }
     patchCacheExclude(platform, host, service, false);
     res.json({ ok: true, data: cache.data });
