@@ -706,9 +706,18 @@ function buildPublicSummary(data) {
   if (nodes.length) {
     const online = nodes.filter(n => n.node?.online).length;
     const failedSvcs = nodes.reduce((a, n) => a + (n.services || []).filter(s => !s.active && !s.excluded).length, 0);
-    const status = online === 0 ? 'down' : (online < nodes.length || failedSvcs > 0 ? 'warn' : 'ok');
+    const ceph = data.proxmox.ceph;
+    
+    let status = 'ok';
     let meta = `${online}/${nodes.length} nodes online`;
+    
+    if (online === 0) status = 'down';
+    else if (online < nodes.length || failedSvcs > 0 || (ceph && ceph.health !== 'HEALTH_OK')) status = 'warn';
+    if (ceph && ceph.health === 'HEALTH_ERR') status = 'down';
+    
     if (failedSvcs > 0) meta += `, ${failedSvcs} failed services`;
+    if (ceph && ceph.health !== 'HEALTH_OK') meta += `, Ceph ${ceph.health.replace('HEALTH_', '')}`;
+    
     out.push({ id: 'proxmox', title: 'Proxmox', status, meta });
   }
   if ((data.linux || []).length) {

@@ -677,6 +677,14 @@ function buildProxmox(px){
     const isOpen = userOverride['node:'+node.name] !== undefined
       ? userOverride['node:'+node.name]
       : false;
+
+    const sortedVms = [...(vms||[])].sort((a,b) => {
+      if (a.running !== b.running) return a.running ? -1 : 1;
+      return (a.name||'').localeCompare(b.name||'');
+    });
+    const qemu = sortedVms.filter(v => v.type === 'vm');
+    const lxc = sortedVms.filter(v => v.type === 'lxc');
+
     return `
     <div class="node-hdr" onclick="toggleNode('${node.name}')">
       <div class="mon-dot ${dc(node.online)}"></div>
@@ -706,16 +714,29 @@ function buildProxmox(px){
           ${backup.endtime?`<span style="font-size:12px;color:var(--muted);margin-right:8px">${relTime(new Date(backup.endtime*1000).toISOString())}</span>`:''}
           ${bdg(backup.running?'yellow':backup.ok?'green':'red', backup.running?'running':backup.ok?'OK':(backup.status||'error'))}
         </div>`:''}
-        ${vms.length?`
+        
+        ${qemu.length?`
+          <div class="syn-section" style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">Virtual Machines</div>
           <div class="vm-chips">
-            ${vms.slice(0,16).map(v=>`
+            ${qemu.slice(0,24).map(v=>`
               <div class="vm-chip">
                 <div class="mon-dot" style="width:7px;height:7px;border-radius:50%;background:${v.running?'var(--green)':'var(--red)'}"></div>
                 <span>${v.name}</span>
-                <span class="vm-type">${v.type}</span>
               </div>`).join('')}
-            ${vms.length>16?`<div style="font-size:11px;color:var(--muted);padding:3px 6px">+${vms.length-16} more</div>`:''}
+            ${qemu.length>24?`<div style="font-size:11px;color:var(--muted);padding:3px 6px">+${qemu.length-24} more</div>`:''}
           </div>` : ''}
+
+        ${lxc.length?`
+          <div class="syn-section" style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">LXC Containers</div>
+          <div class="vm-chips">
+            ${lxc.slice(0,24).map(v=>`
+              <div class="vm-chip">
+                <div class="mon-dot" style="width:7px;height:7px;border-radius:50%;background:${v.running?'var(--green)':'var(--red)'}"></div>
+                <span>${v.name}</span>
+              </div>`).join('')}
+            ${lxc.length>24?`<div style="font-size:11px;color:var(--muted);padding:3px 6px">+${lxc.length-24} more</div>`:''}
+          </div>` : ''}
+
         ${storage && storage.length ? `
           <div class="syn-section" style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">Storages</div>
           ${storage.map(s => {
@@ -1632,8 +1653,13 @@ function render(data){
 
   const platforms = [];
   const px = data.proxmox?.nodes || [];
-  if(px.length){ const o=px.filter(n=>n.node?.online).length; platforms.push(o===0?'down':o<px.length?'degraded':'ok'); }
-  if((data.linux||[]).length){ const o=data.linux.filter(l=>l.online).length; const svcBad=data.linux.some(l=>l.online&&(l.services||[]).some(s=>!s.active)); platforms.push(o===0?'down':(o<data.linux.length||svcBad)?'degraded':'ok'); }
+  if(px.length){ 
+    const o = px.filter(n=>n.node?.online).length; 
+    const svcBad = px.some(n => n.node?.online && (n.services||[]).some(s => !s.active && !s.excluded));
+    const cephBad = data.proxmox?.ceph && data.proxmox.ceph.health !== 'HEALTH_OK';
+    platforms.push(o === 0 ? 'down' : (o < px.length || svcBad || cephBad) ? 'degraded' : 'ok'); 
+  }
+  if((data.linux||[]).length){ const o=data.linux.filter(l=>l.online).length; const svcBad=data.linux.some(l=>l.online&&(l.services||[]).some(s=>!s.active && !s.excluded)); platforms.push(o===0?'down':(o<data.linux.length||svcBad)?'degraded':'ok'); }
   const k=data.kubernetes;
   if(k && k.online!==undefined && (k.online||k.summary)){ platforms.push(!k.online?'down':((k.summary?.failed||0)>0?'degraded':'ok')); }
   if((data.snmp||[]).length){ const o=data.snmp.filter(d=>d.online).length; platforms.push(o===0?'down':o<data.snmp.length?'degraded':'ok'); }
