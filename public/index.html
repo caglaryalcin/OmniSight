@@ -408,6 +408,15 @@ function bchex(v){ return v>=90?'#e74c3c':v>=70?'#f39c12':'#3dba7e' }
 function dc(ok){ return ok?'md-green':'md-red' }
 function bdg(cls,txt){ return `<span class="badge bg-${cls}">${txt}</span>` }
 
+function sortSvcs(svcs) {
+  if (!svcs) return [];
+  return [...svcs].sort((a, b) => {
+    if (a.excluded !== b.excluded) return a.excluded ? -1 : 1;
+    if (a.active !== b.active) return a.active ? 1 : -1;
+    return (a.name || '').localeCompare(b.name || '');
+  });
+}
+
 const PLATFORM_META = {
   proxmox:     { title:'Proxmox',       iconKey:'proxmox',     color:'var(--blue)' },
   kubernetes:  { title:'Kubernetes',    iconKey:'kubernetes',  color:'var(--purple,#9b59b6)' },
@@ -726,7 +735,7 @@ function buildProxmox(px){
         ` : ''}
         ${services.length?`
           <div class="syn-section" style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">Services ${svcFailed?`<span style="color:var(--red)">(${svcFailed} failed)</span>`:''}</div>
-          ${services.map(s=>`
+          ${sortSvcs(services).map(s=>`
             <div class="row" style="padding:8px 0 8px 16px;${s.excluded?'opacity:0.6':''}">
               <div class="mon-dot ${s.excluded?'md-gray':(s.active?'md-green':'md-red')}" style="flex-shrink:0"></div>
               <span class="nb-label" style="flex:1;margin-left:8px;font-size:14px;${s.excluded?'text-decoration:line-through':''}">${s.desc||s.name}</span>
@@ -832,7 +841,7 @@ function buildLinux(linux){
             ${srv.history?.length>1 ? histChart(srv.history,'ram',ramPct) : ''}
           </div>` : ''}
         ${(srv.services||[]).length?`<div class="syn-section" style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">Services</div>`:''}
-        ${(srv.services||[]).map(s=>`
+        ${sortSvcs(srv.services || []).map(s=>`
           <div class="row" style="padding:8px 0;${s.excluded?'opacity:0.6':''}">
             <div class="mon-dot ${s.excluded?'md-gray':(s.active?'md-green':s.state==='unknown'?'md-gray':'md-red')}" style="flex-shrink:0"></div>
             <span class="nb-label" style="flex:1;margin-left:8px;font-size:14px;${s.excluded?'text-decoration:line-through':''}">${s.name}</span>
