@@ -37,7 +37,7 @@ function saveAgents() {
       for (const [id, a] of agents) {
         out[id] = {
           hostname: a.hostname, ip: a.ip, os: a.os, kernel: a.kernel,
-          platform: a.platform, agentVersion: a.agentVersion,
+          platform: a.platform, role: a.role, agentVersion: a.agentVersion,
           interval: a.interval, lastSeen: a.lastSeen,
           hasDocker: !!a.docker, pveNode: a.pve?.node || null,
         };
@@ -155,6 +155,7 @@ function handleReport(r) {
     os: String(r.os || '').slice(0, 128),
     kernel: String(r.kernel || '').slice(0, 64),
     platform: ['proxmox', 'synology'].includes(r.platform) ? r.platform : 'linux',
+    role: ['linux', 'docker', 'proxmox', 'synology', 'auto'].includes(r.role) ? r.role : 'auto',
     agentVersion: String(r.agentVersion || '').slice(0, 16),
     interval: Math.min(Math.max(num(r.interval) || 15, 5), 300),
     uptime: num(r.uptime),
@@ -176,8 +177,7 @@ function handleReport(r) {
     live: true,
   };
   agents.set(id, a);
-  const reportKinds = (a.pve || a.platform === 'proxmox') ? ['proxmox'] : ['linux'];
-  if (a.docker) reportKinds.unshift('docker');
+  const reportKinds = (a.pve || a.platform === 'proxmox' || a.role === 'proxmox') ? ['proxmox'] : (a.role === 'docker' ? ['docker'] : ['linux']);
   clearPendingForKinds(reportKinds);
 
   if (cpu != null) {
@@ -203,7 +203,7 @@ function isOnline(a, now) {
 function getAllAgentData(config) {
   const excluded = (config && config.excludedServices?.linux) || {};
   const now = Date.now();
-  const rows = [...agents.values()].filter(a => a.platform !== 'proxmox').map(a => {
+  const rows = [...agents.values()].filter(a => a.platform !== 'proxmox' && a.role !== 'docker').map(a => {
     const staleMs = ((a.interval || 15) * 2.5 + 10) * 1000;
     const online = a.live && (now - (a.lastSeen || 0)) < staleMs;
     const exList = excluded[a.hostname] || [];
@@ -234,6 +234,7 @@ function getAllAgentData(config) {
       os: a.os,
       kernel: a.kernel,
       platform: a.platform,
+      role: a.role,
       agentVersion: a.agentVersion,
       online,
       error: online ? undefined : (a.lastSeen ? `no report for ${Math.round((now - a.lastSeen) / 1000)}s` : 'never reported'),
@@ -292,7 +293,7 @@ function parsePorts(raw) {
 
 function getDockerData() {
   const now = Date.now();
-  const rows = [...agents.values()].filter(a => a.docker || a.hasDocker).map(a => {
+  const rows = [...agents.values()].filter(a => a.role === 'docker').map(a => {
     const online = isOnline(a, now) && !!a.docker;
     if (!online) return { name: a.hostname, online: false, error: 'agent offline', containers: [], summary: { total: 0, running: 0, stopped: 0, other: 0, unused: null } };
     const containers = (a.docker.containers || []).map(c => ({
@@ -445,7 +446,7 @@ function hasPve() {
 
 function hasDocker() {
   cleanupPendingInstalls();
-  return [...agents.values()].some(a => a.docker || a.hasDocker) || pendingByKind('docker').length > 0;
+  return [...agents.values()].some(a => a.role === 'docker' && (a.docker || a.hasDocker)) || pendingByKind('docker').length > 0;
 }
 
 function findAgent(hostOrName) {

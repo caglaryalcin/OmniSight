@@ -1,5 +1,6 @@
 const http = require('http');
 const https = require('https');
+const { execFile } = require('child_process');
 
 function reqJson(host, path, opts = {}) {
   return new Promise((resolve, reject) => {
@@ -69,7 +70,99 @@ function ports(ports = []) {
   return ports.map(p => p.PublicPort ? `${p.PublicPort}:${p.PrivatePort}` : `${p.PrivatePort}`).slice(0, 8);
 }
 
+function pct(v) {
+  const n = Number(String(v || '').replace('%', '').trim());
+  return Number.isFinite(n) ? Math.round(n * 10) / 10 : null;
+}
+
+function execSsh(host, command) {
+  return new Promise((resolve, reject) => {
+    const port = Number(host.sshPort) || 22;
+    const user = host.sshUser || 'root';
+    const target = `${user}@${host.sshHost}`;
+    const args = [
+      '-o', 'BatchMode=yes',
+      '-o', 'ConnectTimeout=10',
+      '-o', 'StrictHostKeyChecking=accept-new',
+      '-p', String(port),
+    ];
+    if (host.sshKey) args.push('-i', host.sshKey);
+    args.push(target, command);
+    execFile('ssh', args, { timeout: 20000, maxBuffer: 1024 * 1024 * 3 }, (err, stdout, stderr) => {
+      if (err) return reject(new Error((stderr || err.message || '').trim()));
+      resolve(stdout);
+    });
+  });
+}
+
+function parseJsonLines(txt) {
+  return String(txt || '').split(/\r?\n/).map(x => x.trim()).filter(Boolean).map(line => {
+    try { return JSON.parse(line); } catch { return null; }
+  }).filter(Boolean);
+}
+
+function parsePortsText(raw) {
+  const out = [];
+  const re = /(?:0\.0\.0\.0:|\[::\]:|:)?(\d+)->(\d+)\/\w+/g;
+  let m;
+  while ((m = re.exec(String(raw || ''))) && out.length < 8) out.push(`${m[1]}:${m[2]}`);
+  if (!out.length && raw) out.push(String(raw).slice(0, 80));
+  return out;
+}
+
+async function getDockerSshHost(host) {
+  const name = host.name || host.sshHost || 'docker';
+  try {
+    const [psTxt, statsTxt, danglingTxt] = await Promise.all([
+      execSsh(host, "docker ps -a --no-trunc --format '{{json .}}'"),
+      execSsh(host, "docker stats --no-stream --no-trunc --format '{{json .}}'").catch(() => ''),
+      execSsh(host, "docker images -f dangling=true -q | wc -l").catch(() => '0'),
+    ]);
+    const stats = new Map(parseJsonLines(statsTxt).map(s => [String(s.ID || '').slice(0, 12), s]));
+    const containers = parseJsonLines(psTxt).slice(0, 200).map(c => {
+      const id = String(c.ID || '').slice(0, 12);
+      const st = stats.get(id) || {};
+      const state = String(c.State || '').toLowerCase();
+      return {
+        id,
+        name: String(c.Names || id).split(',')[0].slice(0, 200),
+        image: String(c.Image || ''),
+        imageShort: String(c.Image || '').split('/').pop().slice(0, 40),
+        state,
+        status: String(c.Status || ''),
+        ports: parsePortsText(c.Ports),
+        color: state === 'running' ? 'green' : (state === 'exited' || state === 'dead') ? 'red' : 'yellow',
+        cpu: pct(st.CPUPerc),
+        memPercent: pct(st.MemPerc),
+        netIO: String(st.NetIO || ''),
+        blockIO: String(st.BlockIO || ''),
+      };
+    });
+    const running = containers.filter(c => c.state === 'running').length;
+    const stopped = containers.filter(c => c.state === 'exited' || c.state === 'dead').length;
+    const cpuVals = containers.filter(c => c.cpu != null).map(c => c.cpu);
+    const memVals = containers.filter(c => c.memPercent != null).map(c => c.memPercent);
+    return {
+      name,
+      host: `${host.sshUser || 'root'}@${host.sshHost}:${Number(host.sshPort) || 22}`,
+      online: true,
+      summary: {
+        total: containers.length,
+        running,
+        stopped,
+        unused: Number(String(danglingTxt || '0').trim()) || 0,
+        cpu: cpuVals.length ? Math.round(cpuVals.reduce((a, b) => a + b, 0) * 10) / 10 : 0,
+        memPercent: memVals.length ? Math.round((memVals.reduce((a, b) => a + b, 0) / memVals.length) * 10) / 10 : 0,
+      },
+      containers,
+    };
+  } catch (err) {
+    return { name, host: host.sshHost || '', online: false, error: err.message, summary: { total: 0, running: 0, stopped: 0, unused: 0 }, containers: [] };
+  }
+}
+
 async function getDockerHost(host) {
+  if (host.sshHost) return getDockerSshHost(host);
   const name = host.name || host.url || host.socketPath || 'docker';
   try {
     const [containers, df] = await Promise.all([
@@ -126,12 +219,14 @@ async function getDockerApiData(cfg = {}) {
 async function dockerLogs(cfg = {}, hostName, id) {
   const host = (cfg.hosts || []).find(h => h.name === hostName);
   if (!host) throw new Error('docker host not configured');
+  if (host.sshHost) return execSsh(host, `docker logs --tail 300 ${String(id || '').replace(/[^a-zA-Z0-9_.-]/g, '')} 2>&1 | tail -c 200000`);
   return reqJson(host, `/containers/${encodeURIComponent(id)}/logs?stdout=1&stderr=1&tail=300`, { text: true });
 }
 
 async function dockerPrune(cfg = {}, hostName) {
   const host = (cfg.hosts || []).find(h => h.name === hostName);
   if (!host) throw new Error('docker host not configured');
+  if (host.sshHost) return execSsh(host, 'docker image prune -f 2>&1');
   return reqJson(host, '/images/prune', { method: 'POST' });
 }
 

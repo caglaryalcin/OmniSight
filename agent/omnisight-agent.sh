@@ -8,6 +8,7 @@ URL="${OMNISIGHT_URL:?OMNISIGHT_URL required}"
 URL="${URL%/}"
 TOKEN="${OMNISIGHT_TOKEN:?OMNISIGHT_TOKEN required}"
 INTERVAL="${OMNISIGHT_INTERVAL:-15}"
+AGENT_ROLE="${OMNISIGHT_AGENT_ROLE:-auto}"
 VERSION="1.2.0"
 HOST_ROOT="${OMNISIGHT_HOST_ROOT:-/}"
 INSECURE_TLS="${OMNISIGHT_INSECURE_TLS:-}"
@@ -26,6 +27,11 @@ fi
 json_escape() { printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' | tr -d '\n\r\t'; }
 
 detect_type() {
+  case "$AGENT_ROLE" in
+    proxmox) echo proxmox; return ;;
+    synology) echo synology; return ;;
+    linux|docker) echo linux; return ;;
+  esac
   if command -v pvesh >/dev/null 2>&1; then echo proxmox
   elif [ -f /etc/synoinfo.conf ]; then echo synology
   else echo linux; fi
@@ -194,9 +200,9 @@ EOF
   tmp=$(mktemp)
   {
     printf '{'
-    printf '"id":"%s","hostname":"%s","ip":"%s","os":"%s","kernel":"%s","platform":"%s","agentVersion":"%s","interval":%s,' \
+    printf '"id":"%s","hostname":"%s","ip":"%s","os":"%s","kernel":"%s","platform":"%s","role":"%s","agentVersion":"%s","interval":%s,' \
       "$(json_escape "$AGENT_ID")" "$(json_escape "$HOSTNAME_S")" "$(json_escape "$ip")" "$os" \
-      "$(json_escape "$(uname -r)")" "$(detect_type)" "$VERSION" "$INTERVAL"
+      "$(json_escape "$(uname -r)")" "$(detect_type)" "$(json_escape "$AGENT_ROLE")" "$VERSION" "$INTERVAL"
     printf '"uptime":%s,"cpu":%s,"cores":%s,"load":[%s,%s,%s],' "${up:-0}" "${cpu:-0}" "$(cpu_cores)" "${l1:-0}" "${l5:-0}" "${l15:-0}"
     printf '"mem":{"totalKB":%s,"usedKB":%s},' "${mt:-0}" "${mu:-0}"
     printf '"disk":{"totalKB":%s,"usedKB":%s},' "${dt:-0}" "${du:-0}"
@@ -204,8 +210,12 @@ EOF
       "${disk_read:-0}" "${disk_write:-0}" "${disk_iops:-0}" "${disk_util:-0}" "${net_rx:-0}" "${net_tx:-0}"
     swap_json
     printf '"agent":true},'
-    docker_json
-    pve_json
+    case "$AGENT_ROLE" in
+      linux) ;;
+      proxmox) pve_json ;;
+      docker) docker_json ;;
+      *) docker_json; pve_json ;;
+    esac
     [ -n "$temp" ] && printf '"temp":%s,' "$temp"
     printf '"services":[%s]}' "$(services_json)"
   } > "$tmp"

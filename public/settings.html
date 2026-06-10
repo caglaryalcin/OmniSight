@@ -425,7 +425,7 @@ html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#dd
     </div>
     <div class="form-group">
       <div class="sys-hdr">
-        <label style="margin:0">API hosts (optional)</label>
+        <label style="margin:0">API / SSH hosts (optional)</label>
         <button class="btn-add" type="button" onclick="addDockerApiHost()">+ Add API Host</button>
       </div>
       <div id="docker-api-list"></div>
@@ -715,6 +715,10 @@ function addDockerApiHost(data = {}) {
         <div class="form-group"><label>URL</label><input type="text" class="dkapi-url" value="${escHtml(data.url||'')}" placeholder="tcp: http://host:2375 or https://host:2376"></div>
         <div class="form-group"><label>Unix socket path</label><input type="text" class="dkapi-socket" value="${escHtml(data.socketPath||'')}" placeholder="/var/run/docker.sock"></div>
         <div class="form-group"><label>TLS</label><select class="dkapi-insecure"><option value="false" ${!data.insecureTLS?'selected':''}>Verify certificate</option><option value="true" ${data.insecureTLS?'selected':''}>Allow self-signed</option></select></div>
+        <div class="form-group"><label>SSH host</label><input type="text" class="dkapi-ssh-host" value="${escHtml(data.sshHost||'')}" placeholder="10.0.0.20"></div>
+        <div class="form-group"><label>SSH user</label><input type="text" class="dkapi-ssh-user" value="${escHtml(data.sshUser||'root')}" placeholder="root"></div>
+        <div class="form-group"><label>SSH port</label><input type="number" class="dkapi-ssh-port" value="${escHtml(data.sshPort||'22')}" placeholder="22"></div>
+        <div class="form-group"><label>SSH key path (optional)</label><input type="text" class="dkapi-ssh-key" value="${escHtml(data.sshKey||'')}" placeholder="/data/id_rsa"></div>
       </div>
     </div>`;
   document.getElementById('docker-api-list').appendChild(item);
@@ -756,6 +760,7 @@ const AM_META = {
 };
 
 let amTab = 'binary';
+let amKind = 'linux';
 let amPollTimer = null;
 let amKnownIds = new Map();
 let amOpenedAt = 0;
@@ -763,6 +768,7 @@ let amOpenedAt = 0;
 function agentCmds() {
   const token = document.getElementById('lx-token').value.trim() || '<token>';
   const base = window.location.origin;
+  const role = amKind === 'docker' ? 'docker' : amKind === 'proxmox' ? 'proxmox' : 'linux';
   const insecure = !!document.getElementById('am-insecure')?.checked;
   const curlTLS = insecure ? ' --insecure' : '';
   const envTLS = insecure ? ' OMNISIGHT_INSECURE_TLS=1' : '';
@@ -770,12 +776,13 @@ function agentCmds() {
   const dockerEnvTLS = insecure ? '  -e OMNISIGHT_INSECURE_TLS=1 \\\n' : '';
   const stackEnvTLS = insecure ? '      OMNISIGHT_INSECURE_TLS: "1"\n' : '';
   return {
-    binary: `curl -fsSL${curlTLS} ${base}/agent/install.sh | sudo OMNISIGHT_URL=${base} OMNISIGHT_TOKEN=${token}${envTLS} bash`,
+    binary: `curl -fsSL${curlTLS} ${base}/agent/install.sh | sudo OMNISIGHT_URL=${base} OMNISIGHT_TOKEN=${token} OMNISIGHT_AGENT_ROLE=${role}${envTLS} bash`,
     uninstall: `curl -fsSL${curlTLS} ${base}/agent/install.sh | sudo${sudoTLS} bash -s uninstall`,
     docker: `docker run -d --name omnisight-agent --restart unless-stopped \\
   --network host --pid host \\
   -e OMNISIGHT_URL=${base} \\
   -e OMNISIGHT_TOKEN=${token} \\
+  -e OMNISIGHT_AGENT_ROLE=docker \\
 ${dockerEnvTLS}  -e OMNISIGHT_HOST_ROOT=/host \\
   -v /:/host:ro \\
   -v /var/run/docker.sock:/var/run/docker.sock:ro \\
@@ -789,6 +796,7 @@ services:
     environment:
       OMNISIGHT_URL: ${base}
       OMNISIGHT_TOKEN: ${token}
+      OMNISIGHT_AGENT_ROLE: docker
 ${stackEnvTLS}      OMNISIGHT_HOST_ROOT: /host
     volumes:
       - /:/host:ro
@@ -830,6 +838,7 @@ async function openAddModal(kind) {
     if (!t) return;
   }
   const m = AM_META[kind] || AM_META.linux;
+  amKind = kind;
   document.getElementById('am-title').textContent = m.title;
   document.getElementById('am-desc').textContent = m.desc;
   refreshAgentCmds();
@@ -1277,8 +1286,12 @@ function collect() {
         url: item.querySelector('.dkapi-url').value.trim() || undefined,
         socketPath: item.querySelector('.dkapi-socket').value.trim() || undefined,
         insecureTLS: item.querySelector('.dkapi-insecure').value === 'true' || undefined,
+        sshHost: item.querySelector('.dkapi-ssh-host').value.trim() || undefined,
+        sshUser: item.querySelector('.dkapi-ssh-user').value.trim() || undefined,
+        sshPort: Number(item.querySelector('.dkapi-ssh-port').value) || undefined,
+        sshKey: item.querySelector('.dkapi-ssh-key').value.trim() || undefined,
       };
-      if (h.name && (h.url || h.socketPath)) hosts.push(h);
+      if (h.name && (h.url || h.socketPath || h.sshHost)) hosts.push(h);
     });
     if (on || hosts.length) cfg.docker = { enabled: on, hosts, icon: document.getElementById('icon-docker').value.trim() || undefined };
   }
@@ -1547,7 +1560,7 @@ async function refreshDots(cfg, newData){
   setDot('dot-kubernetes', ev(en(cfg.kubernetes), !!(d.kubernetes && d.kubernetes.online) && !((d.kubernetes?.pods)||[]).some(p=>p.failed)));
   setDot('dot-synology', ev(en(cfg.snmp), (d.snmp||[]).length>0 && (d.snmp||[]).every(x=>x.online)));
   setDot('dot-healthchecks', ev(en(cfg.healthchecks), !!(d.healthchecks && d.healthchecks.online) && ((d.healthchecks?.summary?.down)||0)===0));
-  setDot('dot-uptimekuma', ev(en(cfg.uptimekuma), !!(d.uptimekuma && d.uptimekuma.online) && ((d.uptimekuma?.summary?.down)||0)===0));
+  setDot('dot-uptimekuma', ev(en(cfg.uptimekuma), !!(d.uptimekuma && d.uptimekuma.online)));
   setDot('dot-docker', ev(en(cfg.docker), (d.docker||[]).length>0 && (d.docker||[]).every(h=>h.online)));
   setDot('dot-database', ev(en(cfg.database), (d.database||[]).length>0 && (d.database||[]).every(x=>x.online)));
   document.querySelectorAll('#db-list .arr-item').forEach(item => {
