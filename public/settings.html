@@ -732,6 +732,7 @@ const AM_META = {
 let amTab = 'binary';
 let amPollTimer = null;
 let amKnownIds = new Map();
+let amOpenedAt = 0;
 
 function agentCmds() {
   const token = document.getElementById('lx-token').value.trim() || '<token>';
@@ -795,12 +796,17 @@ async function openAddModal(kind) {
   setAddTab(kind === 'docker' ? 'docker' : 'binary');
   document.getElementById('en-' + (kind === 'proxmox' ? 'proxmox' : kind === 'docker' ? 'docker' : 'linux')).checked = true;
   document.getElementById('agent-modal').classList.add('open');
-  amKnownIds = new Map(window._agentData.map(a => [a.key, !!a.online]));
+  amOpenedAt = Date.now();
+  amKnownIds = new Map(window._agentData.map(a => [a.key, { online: !!a.online, name: a.name || '', lastSeen: Number(a.lastSeen || 0) }]));
   document.getElementById('am-wait').textContent = 'Waiting for the agent to connect — it will appear in the list automatically…';
   clearInterval(amPollTimer);
   amPollTimer = setInterval(async () => {
     await loadAgents();
-    const fresh = window._agentData.find(a => a.online && (!amKnownIds.has(a.key) || amKnownIds.get(a.key) === false));
+    const fresh = window._agentData.find(a => {
+      if (!a.online || Number(a.lastSeen || 0) < amOpenedAt - 3000) return false;
+      const known = amKnownIds.get(a.key);
+      return !known || (known.name && known.name !== a.name);
+    });
     if (fresh) {
       document.getElementById('am-wait').innerHTML = `<span style="color:var(--green);font-weight:600">✓ ${escHtml(fresh.name)} connected!</span> You can close this dialog.`;
       document.querySelector('#agent-modal .await-dot').style.background = 'var(--green)';
@@ -836,7 +842,7 @@ async function loadAgents() {
     if (!r.ok) return;
     const d = await r.json();
     const all = [];
-    (d.linux || []).forEach(a => all.push({ key: 'lx:' + (a.id || a.name), kind: 'linux', id: a.id || a.name, name: a.name, ip: a.ip, os: a.os, platform: a.platform, online: a.online, docker: false }));
+    (d.linux || []).forEach(a => all.push({ key: 'lx:' + (a.id || a.name), kind: 'linux', id: a.id || a.name, name: a.name, ip: a.ip, os: a.os, platform: a.platform, online: a.online, lastSeen: a.lastSeen || 0, docker: false }));
     (d.proxmox?.nodes || []).forEach(n => all.push({ key: 'px:' + n.node.name, kind: 'proxmox', id: n.node.name, name: n.node.name, ip: n.host, os: '', platform: 'proxmox', online: n.node.online }));
     (d.docker || []).forEach(h => all.push({ key: 'dk:' + h.name, kind: 'docker', id: h.name, name: h.name, ip: '', os: '', platform: 'docker', online: h.online, meta: h.online ? `${h.summary.running}/${h.summary.total} containers` : '' }));
     window._agentData = all;

@@ -34,10 +34,21 @@ curl -fsS $CURL_TLS_ARGS "$OMNISIGHT_URL/agent/omnisight-agent.sh" -o "$BIN"
 chmod 755 "$BIN"
 
 mkdir -p "$ENVDIR"
+AGENT_ID="${OMNISIGHT_AGENT_ID:-}"
+if [ -z "$AGENT_ID" ] && [ -f "$ENVDIR/agent.env" ]; then
+  AGENT_ID="$(sed -n 's/^OMNISIGHT_AGENT_ID=//p' "$ENVDIR/agent.env" | head -n1)"
+fi
+if [ -z "$AGENT_ID" ]; then
+  HOST_ID="$(hostname -s 2>/dev/null || hostname)"
+  RAND_ID="$(od -An -N4 -tx1 /dev/urandom 2>/dev/null | tr -d ' \n')"
+  [ -z "$RAND_ID" ] && RAND_ID="$(date +%s)"
+  AGENT_ID="${HOST_ID}-${RAND_ID}"
+fi
 cat > "$ENVDIR/agent.env" <<EOF
 OMNISIGHT_URL=$OMNISIGHT_URL
 OMNISIGHT_TOKEN=$OMNISIGHT_TOKEN
 OMNISIGHT_INTERVAL=$INTERVAL
+OMNISIGHT_AGENT_ID=$AGENT_ID
 EOF
 if [ -n "$CURL_TLS_ARGS" ]; then
   echo "OMNISIGHT_INSECURE_TLS=1" >> "$ENVDIR/agent.env"
@@ -63,5 +74,5 @@ EOF
 
 systemctl daemon-reload
 systemctl enable --now omnisight-agent
-echo "omnisight-agent installed and started (interval: ${INTERVAL}s)"
+echo "omnisight-agent installed and started (id: ${AGENT_ID}, interval: ${INTERVAL}s)"
 echo "logs: journalctl -u omnisight-agent -f"

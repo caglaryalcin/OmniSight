@@ -303,6 +303,21 @@ function runAlertChecks(data) {
   prevChecks = cur;
 }
 
+const STALE_KEEP_MS = 120000;
+function preserveProxmoxOnTransient(next, err) {
+  const prev = cache.data?.proxmox;
+  if (!prev?.nodes?.length) return next;
+  const prevHadOnline = prev.nodes.some(n => n.node?.online);
+  if (!prevHadOnline) return next;
+  const nodes = next?.nodes || [];
+  const looksDropped = !nodes.length || nodes.every(n => !n.node?.online);
+  if (!looksDropped) return { ...next, _stale: false, _staleSince: null, error: undefined };
+  const now = Date.now();
+  const staleSince = prev._staleSince || now;
+  if (now - staleSince > STALE_KEEP_MS) return next;
+  return { ...prev, _stale: true, _staleSince: staleSince, error: err?.message || 'temporary Proxmox refresh failure' };
+}
+
 function backgroundRefresh() {
   if (refreshPromise) return refreshPromise;
   const enabled = c => c && c.enabled !== false;
@@ -319,8 +334,19 @@ function backgroundRefresh() {
     ['database',     enabled(config.database)     ? getAllDatabaseData(config.database)      : Promise.resolve([]),   []],
   ];
   const ps = tasks.map(([key, p, fb]) =>
-    p.then(v => { base[key] = (v == null ? fb : v); base.timestamp = new Date().toISOString(); })
-     .catch(() => { base[key] = fb; })
+    p.then(v => {
+      const next = (v == null ? fb : v);
+      base[key] = key === 'proxmox' ? preserveProxmoxOnTransient(next) : next;
+      base.timestamp = new Date().toISOString();
+    })
+     .catch(err => {
+       if (key === 'proxmox') {
+         base[key] = preserveProxmoxOnTransient(fb, err);
+         if (base[key]?._stale) console.warn(`Proxmox refresh failed; keeping last data: ${err.message}`);
+       } else {
+         base[key] = fb;
+       }
+     })
   );
   refreshPromise = Promise.allSettled(ps)
     .then(() => { 

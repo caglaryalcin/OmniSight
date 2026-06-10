@@ -16,8 +16,12 @@ case "$INSECURE_TLS" in
   1|true|TRUE|yes|YES) CURL_TLS_ARGS="--insecure" ;;
 esac
 
-AGENT_ID="$(cat /etc/machine-id 2>/dev/null || hostname)"
 HOSTNAME_S="$(hostname -s 2>/dev/null || hostname)"
+AGENT_ID="${OMNISIGHT_AGENT_ID:-}"
+if [ -z "$AGENT_ID" ]; then
+  MID="$(cat /etc/machine-id 2>/dev/null || true)"
+  AGENT_ID="${HOSTNAME_S}-${MID:-$(hostname)}"
+fi
 
 json_escape() { printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' | tr -d '\n\r\t'; }
 

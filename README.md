@@ -125,6 +125,7 @@ EOF
 
 - Report interval: 15s by default — `OMNISIGHT_INTERVAL=<seconds>` at install time, or edit `/etc/omnisight-agent/agent.env` and restart.
 - Authentication: one shared token (`X-Agent-Token` header), auto-generated on first add and regenerable from **Settings → Linux Servers**. Regenerating invalidates all installed agents until updated.
+- Agent identity: the installer writes a unique `OMNISIGHT_AGENT_ID` into `/etc/omnisight-agent/agent.env`, so cloned VMs with the same `/etc/machine-id` still appear as separate systems.
 - A system is marked **offline** when no report arrives for ~2.5× its interval.
 - Logs: `journalctl -u omnisight-agent -f` (binary) / `docker logs -f omnisight-agent` (container)
 - Uninstall: `curl -fsSL http://<omnisight-host>:3000/agent/install.sh | sudo bash -s uninstall` / `docker rm -f omnisight-agent` / `docker stack rm omnisight-agent`
