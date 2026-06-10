@@ -239,6 +239,7 @@ function extractChecks(data) {
   const m = new Map();
   const add = (key, ok, label, detail) => m.set(key, { ok, label, detail });
   (data.proxmox?.nodes || []).forEach(n => {
+    if (n._connecting) return;
     const nm = n.node?.name || n.name || 'node';
     add('px:' + nm, !!n.node?.online, 'Proxmox node ' + nm, 'offline');
     if (n.node?.online) {
@@ -248,6 +249,7 @@ function extractChecks(data) {
     }
   });
   (data.linux || []).forEach(l => {
+    if (l._connecting) return;
     add('lx:' + l.name, !!l.online, 'Server ' + l.name, 'unreachable');
     if (l.online) {
       (l.services || []).forEach(s => {
@@ -262,6 +264,7 @@ function extractChecks(data) {
   }
   (data.snmp || []).forEach(s => add('snmp:' + s.name, !!s.online, 'SNMP ' + s.name, 'unreachable'));
   (data.docker || []).forEach(h => {
+    if (h._connecting) return;
     add('dk:' + h.name, !!h.online, 'Docker host ' + h.name, 'unreachable');
     if (h.online) (h.containers || []).forEach(c => {
       const ok = c.state === 'running' || c.state === 'created' || c.state === 'paused' || c.state === 'restarting';
@@ -874,12 +877,39 @@ app.post('/api/agent/token', (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.post('/api/agent/pending', (req, res) => {
+  try {
+    const kind = ['linux', 'proxmox', 'docker'].includes(req.body?.kind) ? req.body.kind : 'linux';
+    const pending = agents.addPendingInstall(kind);
+    if (cache.data) {
+      if (kind === 'linux') {
+        cache.data.linux = agents.getAllAgentData({ ...config.linux, excludedServices: config.excludedServices });
+      }
+      if (kind === 'proxmox') {
+        cache.data.proxmox = preserveProxmoxOnTransient(agents.getProxmoxData({ excludedServices: config.excludedServices }));
+      }
+      if (kind === 'docker') {
+        cache.data.docker = agents.getDockerData();
+      }
+      assignStatic(cache.data);
+    }
+    res.json({ ok: true, pending, data: cache.data });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.post('/api/agent/remove', (req, res) => {
   try {
     const { id } = req.body || {};
     if (!id) return res.status(400).json({ error: 'id required' });
     const ok = agents.removeAgent(id);
-    if (cache.data) cache.data.linux = agents.getAllAgentData({ ...config.linux, excludedServices: config.excludedServices });
+    if (cache.data) {
+      cache.data.linux = agents.getAllAgentData({ ...config.linux, excludedServices: config.excludedServices });
+      cache.data.proxmox = hasProxmoxApi()
+        ? cache.data.proxmox
+        : preserveProxmoxOnTransient(agents.getProxmoxData({ excludedServices: config.excludedServices }));
+      cache.data.docker = agents.getDockerData();
+      assignStatic(cache.data);
+    }
     res.json({ ok, data: cache.data });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -893,15 +923,18 @@ function buildPublicSummary(data) {
   const out = [];
   const nodes = data.proxmox?.nodes || [];
   if (nodes.length) {
-    const online = nodes.filter(n => n.node?.online).length;
-    const failedSvcs = nodes.reduce((a, n) => a + (n.services || []).filter(s => !s.active && !s.excluded).length, 0);
+    const activeNodes = nodes.filter(n => !n._connecting);
+    const connecting = nodes.length - activeNodes.length;
+    const online = activeNodes.filter(n => n.node?.online).length;
+    const failedSvcs = activeNodes.reduce((a, n) => a + (n.services || []).filter(s => !s.active && !s.excluded).length, 0);
     const ceph = data.proxmox.ceph;
     
     let status = 'ok';
-    let meta = `${online}/${nodes.length} nodes online`;
+    let meta = activeNodes.length ? `${online}/${activeNodes.length} nodes online` : 'connecting...';
     
-    if (online === 0) status = 'down';
-    else if (online < nodes.length || failedSvcs > 0 || (ceph && ceph.health !== 'HEALTH_OK')) status = 'warn';
+    if (!activeNodes.length && connecting) status = 'connecting';
+    else if (online === 0) status = 'down';
+    else if (online < activeNodes.length || connecting || failedSvcs > 0 || (ceph && ceph.health !== 'HEALTH_OK')) status = 'warn';
     if (ceph && ceph.health === 'HEALTH_ERR') status = 'down';
     
     if (failedSvcs > 0) meta += `, ${failedSvcs} failed services`;
@@ -910,12 +943,14 @@ function buildPublicSummary(data) {
     out.push({ id: 'proxmox', title: 'Proxmox', status, meta });
   }
   if ((data.linux || []).length) {
-    const up = data.linux.filter(l => l.online).length;
-    const svcTotal = data.linux.reduce((a, l) => a + (l.services || []).filter(s => !s.excluded).length, 0);
-    const svcUp = data.linux.reduce((a, l) => a + (l.services || []).filter(x => x.active && !x.excluded).length, 0);
+    const linuxRows = data.linux.filter(l => !l._connecting);
+    const connecting = data.linux.length - linuxRows.length;
+    const up = linuxRows.filter(l => l.online).length;
+    const svcTotal = linuxRows.reduce((a, l) => a + (l.services || []).filter(s => !s.excluded).length, 0);
+    const svcUp = linuxRows.reduce((a, l) => a + (l.services || []).filter(x => x.active && !x.excluded).length, 0);
     const failedSvcs = svcTotal - svcUp;
-    const status = up === 0 ? 'down' : (up < data.linux.length || failedSvcs > 0 ? 'warn' : 'ok');
-    out.push({ id: 'linux', title: 'Linux Servers', status, meta: `${up}/${data.linux.length} servers, ${svcUp}/${svcTotal} services` });
+    const status = !linuxRows.length && connecting ? 'connecting' : up === 0 ? 'down' : (up < linuxRows.length || connecting || failedSvcs > 0 ? 'warn' : 'ok');
+    out.push({ id: 'linux', title: 'Linux Servers', status, meta: linuxRows.length ? `${up}/${linuxRows.length} servers, ${svcUp}/${svcTotal} services` : 'connecting...' });
   }
   const k = data.kubernetes;
   if (k && k.online !== undefined && (k.online || k.summary)) {
@@ -941,13 +976,15 @@ function buildPublicSummary(data) {
     out.push({ id: 'uptimekuma', title: 'Uptime Kuma', status, meta: uk.online ? `${up}/${sm.total || 0} up` : 'unreachable' });
   }
   if ((data.docker || []).length) {
-    const up = data.docker.filter(h => h.online).length;
-    const running = data.docker.reduce((a, h) => a + (h.summary?.running || 0), 0);
-    const total = data.docker.reduce((a, h) => a + (h.summary?.total || 0), 0);
-    const stopped = data.docker.reduce((a, h) => a + (h.summary?.stopped || 0), 0);
-    const status = up < data.docker.length ? (up > 0 ? 'warn' : 'down') : (stopped > 0 ? 'warn' : 'ok');
+    const dockerRows = data.docker.filter(h => !h._connecting);
+    const connecting = data.docker.length - dockerRows.length;
+    const up = dockerRows.filter(h => h.online).length;
+    const running = dockerRows.reduce((a, h) => a + (h.summary?.running || 0), 0);
+    const total = dockerRows.reduce((a, h) => a + (h.summary?.total || 0), 0);
+    const stopped = dockerRows.reduce((a, h) => a + (h.summary?.stopped || 0), 0);
+    const status = !dockerRows.length && connecting ? 'connecting' : up < dockerRows.length ? (up > 0 ? 'warn' : 'down') : (connecting || stopped > 0 ? 'warn' : 'ok');
     const meta = stopped > 0 ? `${running}/${total} running, ${stopped} stopped` : `${running}/${total} containers running`;
-    out.push({ id: 'docker', title: 'Docker', status, meta });
+    out.push({ id: 'docker', title: 'Docker', status, meta: dockerRows.length ? meta : 'connecting...' });
   }
   if ((data.database || []).length) {
     const up = data.database.filter(d => d.online).length;

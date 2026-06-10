@@ -6,11 +6,13 @@ const crypto = require('crypto');
 const AGENTS_PATH = path.join(__dirname, '..', 'data', 'agents.yaml');
 const HISTORY_MAX = 1440;
 const CMD_TIMEOUT = 60000;
+const INSTALL_PENDING_TTL = 5 * 60 * 1000;
 const SVC_NAME = /^[a-zA-Z0-9@._:-]+$/;
 
 const agents = new Map();
 const history = new Map();
 const pending = new Map();
+const pendingInstalls = new Map();
 const waiters = new Map();
 const pollWaiters = new Map();
 
@@ -61,6 +63,42 @@ function rateObj(o) {
     rxBps: num(o.rxBps),
     txBps: num(o.txBps),
   };
+}
+
+function cleanupPendingInstalls(now = Date.now()) {
+  for (const [id, p] of pendingInstalls) {
+    if (now - p.createdAt > INSTALL_PENDING_TTL) pendingInstalls.delete(id);
+  }
+}
+
+function addPendingInstall(kind = 'linux') {
+  cleanupPendingInstalls();
+  kind = ['linux', 'proxmox', 'docker'].includes(kind) ? kind : 'linux';
+  const id = `${kind}-${crypto.randomBytes(6).toString('hex')}`;
+  const title = kind === 'proxmox' ? 'New Proxmox node' : kind === 'docker' ? 'New Docker host' : 'New system';
+  const p = { id, kind, name: title, createdAt: Date.now(), expiresAt: Date.now() + INSTALL_PENDING_TTL };
+  pendingInstalls.set(id, p);
+  return p;
+}
+
+function removePendingInstall(id) {
+  cleanupPendingInstalls();
+  return pendingInstalls.delete(String(id || ''));
+}
+
+function clearPendingForKinds(kinds) {
+  cleanupPendingInstalls();
+  for (const kind of kinds) {
+    const match = [...pendingInstalls.values()]
+      .filter(p => p.kind === kind)
+      .sort((a, b) => a.createdAt - b.createdAt)[0];
+    if (match) pendingInstalls.delete(match.id);
+  }
+}
+
+function pendingByKind(kind) {
+  cleanupPendingInstalls();
+  return [...pendingInstalls.values()].filter(p => p.kind === kind);
 }
 
 function handleReport(r) {
@@ -138,6 +176,9 @@ function handleReport(r) {
     live: true,
   };
   agents.set(id, a);
+  const reportKinds = (a.pve || a.platform === 'proxmox') ? ['proxmox'] : ['linux'];
+  if (a.docker) reportKinds.unshift('docker');
+  clearPendingForKinds(reportKinds);
 
   if (cpu != null) {
     const hist = history.get(id) || [];
@@ -162,7 +203,7 @@ function isOnline(a, now) {
 function getAllAgentData(config) {
   const excluded = (config && config.excludedServices?.linux) || {};
   const now = Date.now();
-  return [...agents.values()].filter(a => a.platform !== 'proxmox').map(a => {
+  const rows = [...agents.values()].filter(a => a.platform !== 'proxmox').map(a => {
     const staleMs = ((a.interval || 15) * 2.5 + 10) * 1000;
     const online = a.live && (now - (a.lastSeen || 0)) < staleMs;
     const exList = excluded[a.hostname] || [];
@@ -208,7 +249,22 @@ function getAllAgentData(config) {
       services: online ? services : [],
       history: [...(history.get(a.id) || [])],
     };
-  }).sort((x, y) => x.name.localeCompare(y.name));
+  });
+  pendingByKind('linux').forEach(p => rows.push({
+    id: p.id,
+    name: p.name,
+    host: 'waiting for agent',
+    ip: '',
+    os: '',
+    platform: 'linux',
+    online: false,
+    _connecting: true,
+    error: 'waiting for first report',
+    lastSeen: p.createdAt,
+    services: [],
+    history: [],
+  }));
+  return rows.sort((x, y) => (x._connecting === y._connecting ? x.name.localeCompare(y.name) : x._connecting ? -1 : 1));
 }
 
 function stateColor(state) {
@@ -236,7 +292,7 @@ function parsePorts(raw) {
 
 function getDockerData() {
   const now = Date.now();
-  return [...agents.values()].filter(a => a.docker || a.hasDocker).map(a => {
+  const rows = [...agents.values()].filter(a => a.docker || a.hasDocker).map(a => {
     const online = isOnline(a, now) && !!a.docker;
     if (!online) return { name: a.hostname, online: false, error: 'agent offline', containers: [], summary: { total: 0, running: 0, stopped: 0, other: 0, unused: null } };
     const containers = (a.docker.containers || []).map(c => ({
@@ -266,14 +322,36 @@ function getDockerData() {
       metrics: { bandwidth: a.metrics?.bandwidth || null },
       summary: { total: containers.length, running, stopped, other: containers.length - running - stopped, unused: a.docker.unused ?? null, cpu, memPercent },
     };
-  }).sort((x, y) => x.name.localeCompare(y.name));
+  });
+  pendingByKind('docker').forEach(p => rows.push({
+    id: p.id,
+    name: p.name,
+    host: 'waiting for agent',
+    online: false,
+    _connecting: true,
+    error: 'waiting for first report',
+    containers: [],
+    summary: { total: 0, running: 0, stopped: 0, other: 0, unused: null },
+  }));
+  return rows.sort((x, y) => (x._connecting === y._connecting ? x.name.localeCompare(y.name) : x._connecting ? -1 : 1));
 }
 
 function getProxmoxData(config) {
   const excluded = (config && config.excludedServices?.proxmox) || {};
   const now = Date.now();
   const pveAgents = [...agents.values()].filter(a => a.pve || a.pveNode || a.platform === 'proxmox');
-  if (!pveAgents.length) return { clusterSummary: null, nodes: [], ceph: null };
+  const pendingNodes = pendingByKind('proxmox').map(p => ({
+    id: p.id,
+    node: { name: p.name, online: false, cpuCores: 0, cpuRaw: 0, ram: { used: 0, total: 0 } },
+    host: 'waiting for agent',
+    services: [],
+    vms: [],
+    history: [],
+    backup: null,
+    storage: [],
+    _connecting: true,
+  }));
+  if (!pveAgents.length) return { clusterSummary: null, nodes: pendingNodes, ceph: null };
 
   let ceph = null;
   const nodes = pveAgents.map(a => {
@@ -343,7 +421,9 @@ function getProxmoxData(config) {
       backup,
       storage,
     };
-  }).sort((x, y) => String(x.node.name).localeCompare(String(y.node.name)));
+  });
+  nodes.push(...pendingNodes);
+  nodes.sort((x, y) => (x._connecting === y._connecting ? String(x.node.name).localeCompare(String(y.node.name)) : x._connecting ? -1 : 1));
 
   const onlineNodes = nodes.filter(n => n.node.online);
   const clusterSummary = {
@@ -359,11 +439,13 @@ function getProxmoxData(config) {
 }
 
 function hasPve() {
-  return [...agents.values()].some(a => a.pve || a.pveNode || a.platform === 'proxmox');
+  cleanupPendingInstalls();
+  return [...agents.values()].some(a => a.pve || a.pveNode || a.platform === 'proxmox') || pendingByKind('proxmox').length > 0;
 }
 
 function hasDocker() {
-  return [...agents.values()].some(a => a.docker || a.hasDocker);
+  cleanupPendingInstalls();
+  return [...agents.values()].some(a => a.docker || a.hasDocker) || pendingByKind('docker').length > 0;
 }
 
 function findAgent(hostOrName) {
@@ -422,6 +504,7 @@ function handleResult(r) {
 }
 
 function removeAgent(id) {
+  if (removePendingInstall(id)) return true;
   const a = findAgent(id);
   if (!a) return false;
   agents.delete(a.id);
@@ -432,4 +515,4 @@ function removeAgent(id) {
   return true;
 }
 
-module.exports = { handleReport, getAllAgentData, getDockerData, getProxmoxData, hasPve, hasDocker, queueCommand, takeCommands, waitForCommands, handleResult, removeAgent, findAgent, commandLines };
+module.exports = { handleReport, getAllAgentData, getDockerData, getProxmoxData, hasPve, hasDocker, queueCommand, takeCommands, waitForCommands, handleResult, removeAgent, findAgent, commandLines, addPendingInstall };

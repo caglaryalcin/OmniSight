@@ -809,6 +809,21 @@ function refreshAgentCmds() {
   document.getElementById('am-cmd-stack').textContent = cmds.stack;
 }
 
+async function registerPendingAgent(kind) {
+  try {
+    const r = await fetch('/api/agent/pending', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ kind })
+    });
+    const b = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(b.error || r.statusText);
+    await loadAgents();
+  } catch (e) {
+    toast(e.message || 'Could not create pending agent', 'err');
+  }
+}
+
 async function openAddModal(kind) {
   if (!document.getElementById('lx-token').value.trim()) {
     const t = await genAgentToken(null, true);
@@ -822,6 +837,7 @@ async function openAddModal(kind) {
   setAddTab(kind === 'docker' ? 'docker' : 'binary');
   document.getElementById('en-' + (kind === 'proxmox' ? 'proxmox' : kind === 'docker' ? 'docker' : 'linux')).checked = true;
   document.getElementById('agent-modal').classList.add('open');
+  await registerPendingAgent(kind);
   amOpenedAt = Date.now();
   amKnownIds = new Map(window._agentData.map(a => [a.key, { online: !!a.online, name: a.name || '', lastSeen: Number(a.lastSeen || 0) }]));
   document.getElementById('am-wait').textContent = 'Waiting for the agent to connect — it will appear in the list automatically…';
@@ -868,9 +884,9 @@ async function loadAgents() {
     if (!r.ok) return;
     const d = await r.json();
     const all = [];
-    (d.linux || []).forEach(a => all.push({ key: 'lx:' + (a.id || a.name), kind: 'linux', id: a.id || a.name, name: a.name, ip: a.ip, os: a.os, platform: a.platform, online: a.online, lastSeen: a.lastSeen || 0, docker: false }));
-    (d.proxmox?.nodes || []).forEach(n => all.push({ key: 'px:' + n.node.name, kind: 'proxmox', id: n.node.name, name: n.node.name, ip: n.host, os: '', platform: 'proxmox', online: n.node.online }));
-    (d.docker || []).forEach(h => all.push({ key: 'dk:' + h.name, kind: 'docker', id: h.name, name: h.name, ip: '', os: '', platform: 'docker', online: h.online, meta: h.online ? `${h.summary.running}/${h.summary.total} containers` : '' }));
+    (d.linux || []).forEach(a => all.push({ key: 'lx:' + (a.id || a.name), kind: 'linux', id: a.id || a.name, name: a.name, ip: a.ip, os: a.os, platform: a.platform, online: a.online, connecting: !!a._connecting, lastSeen: a.lastSeen || 0, docker: false }));
+    (d.proxmox?.nodes || []).forEach(n => all.push({ key: 'px:' + (n.node.name || n.node.id), kind: 'proxmox', id: n.id || n.node.name, name: n.node.name, ip: n.host, os: '', platform: 'proxmox', online: n.node.online, connecting: !!n._connecting }));
+    (d.docker || []).forEach(h => all.push({ key: 'dk:' + (h.id || h.name), kind: 'docker', id: h.id || h.name, name: h.name, ip: h.host || '', os: '', platform: 'docker', online: h.online, connecting: !!h._connecting, meta: h.online ? `${h.summary.running}/${h.summary.total} containers` : '' }));
     window._agentData = all;
     renderAgentList('lx-agents', all.filter(a => a.kind === 'linux'), 'No systems yet — click “+ Add System”, run the command on a server and it appears here automatically.');
     renderAgentList('px-agents', all.filter(a => a.kind === 'proxmox'), 'No nodes yet — click “+ Add Node”, run the command on a Proxmox node and it appears here automatically.');
@@ -884,11 +900,11 @@ function renderAgentList(elId, list, emptyMsg) {
   if (!list.length) { el.innerHTML = `<div class="sys-empty">${emptyMsg}</div>`; return; }
   el.innerHTML = list.map(a => `
     <div class="agent-row">
-      <div style="width:9px;height:9px;border-radius:50%;background:${a.online ? 'var(--green)' : 'var(--red)'};flex-shrink:0;${a.online ? 'box-shadow:0 0 8px rgba(52,211,153,.6)' : ''}"></div>
+      <div style="width:9px;height:9px;border-radius:50%;background:${a.connecting ? 'var(--yellow)' : a.online ? 'var(--green)' : 'var(--red)'};flex-shrink:0;${a.online ? 'box-shadow:0 0 8px rgba(52,211,153,.6)' : ''}"></div>
       <span style="font-weight:600">${escHtml(a.name || '')}</span>
       <span style="color:var(--muted);font-size:12px">${escHtml(a.ip || '')}${a.os ? ' · ' + escHtml(a.os) : ''}${a.meta ? ' · ' + escHtml(a.meta) : ''}${a.platform === 'synology' ? ' · synology' : ''}</span>
       <span style="flex:1"></span>
-      <span style="font-size:12px;font-weight:600;color:${a.online ? 'var(--green)' : 'var(--red)'}">${a.online ? 'online' : 'offline'}</span>
+      <span style="font-size:12px;font-weight:600;color:${a.connecting ? 'var(--yellow)' : a.online ? 'var(--green)' : 'var(--red)'}">${a.connecting ? 'connecting...' : a.online ? 'online' : 'offline'}</span>
       <button class="btn-rm" type="button" title="Remove" onclick="removeAgent('${escHtml(a.id || '')}',this)">✕</button>
     </div>`).join('');
 }

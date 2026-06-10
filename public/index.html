@@ -1262,7 +1262,9 @@ function buildProxmox(px){
 
 function buildLinux(linux){
   if(!linux?.length) return null;
-  const allOk = linux.every(s=>s.online && s.services?.every(sv=>sv.active || sv.excluded));
+  const connecting = linux.filter(s=>s._connecting).length;
+  const realLinux = linux.filter(s=>!s._connecting);
+  const allOk = realLinux.length > 0 && realLinux.every(s=>s.online && s.services?.every(sv=>sv.active || sv.excluded));
   const failed = linux.flatMap(s=>s.services||[]).filter(s=>!s.active&&s.state!=='unknown'&&!s.excluded).length;
   const totalSvcs = linux.flatMap(s=>s.services||[]).length;
   const upSvcs   = linux.flatMap(s=>s.services||[]).filter(s=>s.active).length;
@@ -1390,7 +1392,7 @@ function buildLinux(linux){
     iconKey: 'linux',
     color: 'var(--green)',
     meta: `${reachable}/${linux.length} reachable`,
-    badge: bdg(allOk?'green':failed?'red':'yellow', allOk?'healthy':failed?`${failed} services failed`:'offline'),
+    badge: bdg(connecting && !realLinux.length ? 'gray' : allOk && !connecting ? 'green' : failed ? 'red' : 'yellow', connecting ? 'connecting…' : allOk ? 'healthy' : failed ? `${failed} services failed` : 'offline'),
     sbSummary: sbSummaryHtml,
     summary: summaryHtml,
     body,
@@ -2501,7 +2503,8 @@ function overviewRows(id, data){
   if(id === 'proxmox'){
     return (data.proxmox?.nodes||[]).slice(0,6).map(({node, services=[]}) => {
       const failed = services.filter(s=>!s.active&&!s.excluded).length;
-      const sub = node.online ? [node.ip, node.cpu!=null?`CPU ${node.cpu}%`:'', node.memPct!=null?`RAM ${node.memPct}%`:'' ].filter(Boolean).join(' · ') : 'Node offline';
+      const ramPct = node.ram?.percent ?? node.memPct;
+      const sub = node.online ? [node.ip, node.cpu!=null?`CPU ${node.cpu}%`:'', ramPct!=null?`RAM ${ramPct}%`:'' ].filter(Boolean).join(' · ') : 'Node offline';
       return overviewRow('proxmox', node.name, sub, node.online?(failed?'yellow':'green'):'red', node.online?(failed?`${failed} failed`:'healthy'):'offline', node.online?(failed?'md-yellow':'md-green'):'md-red');
     }).join('');
   }
