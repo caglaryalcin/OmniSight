@@ -7,7 +7,7 @@ A simple, single-glance monitoring dashboard for Proxmox, Linux servers, Kuberne
 ## Features
 
 - **Modern UI** — fully redesigned interface: glass header, soft-glow status indicators, card-grid summaries, Inter typography, refined dark & light themes and subtle micro-animations
-- **One agent, one command (Beszel-style)** — Linux servers, Proxmox nodes and Docker hosts are all monitored by a single tiny push agent (one bash script + systemd, nothing beyond `curl`). In Settings just click **+ Add System / Node / Host**, pick **Binary**, **Docker** or **Stack**, copy the pre-filled command, run it on the server — the system self-registers and pops up online within seconds. No SSH keys, no API tokens, no inbound firewall rules, NAT-friendly (see [The agent](#the-agent))
+- **One agent, one command** — Linux servers, Proxmox nodes and Docker hosts are all monitored by a single tiny push agent (one bash script + systemd, nothing beyond `curl`). In Settings just click **+ Add System / Node / Host**, pick **Binary**, **Docker** or **Stack**, copy the pre-filled command, run it on the server — the system self-registers and pops up online within seconds. No SSH keys, no API tokens, no inbound firewall rules, NAT-friendly (see [The agent](#the-agent))
 - **Proxmox** — node CPU/RAM/temperature/uptime, VM/LXC, per-node service status with **start/stop/restart/exclude** actions, **last backup** (vzdump) status, **Ceph cluster storage health** with active alert summaries, and **node storage status** (NFS, Local, ZFS, LVM, etc.) with utilization — collected locally by the agent via `pvesh`, **no API token required**
 - **Linux servers** — CPU/RAM/disk/swap/load/temperature/uptime/OS plus disk I/O and bandwidth, with **auto-discovered** running/failed services and near-instant **status/start/stop/restart/exclude** actions over the agent's command long-poll. Works on any systemd Linux incl. NAS devices (e.g. Synology)
 - **Kubernetes** — pod / deployment / service status and live pod log viewer (kubeconfig)
@@ -26,7 +26,7 @@ A simple, single-glance monitoring dashboard for Proxmox, Linux servers, Kuberne
 - **Alerts** — notifications on state changes (down/up) via **ntfy**, **Telegram** and **SMTP**, with a **per-device bell** to mute/enable notifications for individual platforms/devices
 - **Custom icons** — set any platform's icon from [dashboard-icons](https://github.com/homarr-labs/dashboard-icons) by name/URL or upload your own (see [Platform icons](#platform-icons))
 - **Custom CA** — trust private/self-signed CAs (see [Custom CA certificates](#custom-ca-certificates))
-- **Public status** — Uptime-Kuma-style, read-only public summary page (`/status`)
+- **Public status** — Read-only public summary page (`/status`)
 
 ![](https://raw.githubusercontent.com/caglaryalcin/OmniSight/refs/heads/main/screenshots/public-page.png)
 
@@ -57,7 +57,7 @@ Dashboard: `http://localhost:3000` — the app starts with no config; set up you
 
 Linux servers, Proxmox nodes and Docker hosts are all monitored by the **OmniSight agent** — a single bash script that **pushes** metrics to OmniSight over HTTP(S). Nothing to expose on the servers, no credentials stored in OmniSight, works behind NAT/firewalls as long as the server can reach the dashboard.
 
-**Setup (Beszel-style):**
+**Setup :**
 
 1. Open **Settings** and click **+ Add System** (Linux Servers), **+ Add Node** (Proxmox) or **+ Add Host** (Docker). The shared agent token is generated automatically.
 2. Pick an install method in the dialog and copy the pre-filled command:
@@ -224,7 +224,7 @@ To make OmniSight trust a private/self-signed CA (e.g. a corporate root for your
 - **Drop-in (recommended):** place one or more `*.crt` / `*.pem` files into `data/certs/`. They are auto-trusted on startup — no env needed. In Docker/Kubernetes this directory lives inside the mounted `data` volume.
 - **Env var (Node standard):** set `NODE_EXTRA_CA_CERTS` to a cert file path, e.g. `NODE_EXTRA_CA_CERTS=/app/data/certs/ca.crt`.
 
-In Kubernetes you can also mount the CA from a ConfigMap (Uptime-Kuma style) — `deploy/kubernetes.yaml` has a ready, commented example (ConfigMap `omnisight-ca` + `NODE_EXTRA_CA_CERTS=/app/certs/ca.crt` + a read-only `/app/certs` mount).
+In Kubernetes you can also mount the CA from a ConfigMap — `deploy/kubernetes.yaml` has a ready, commented example (ConfigMap `omnisight-ca` + `NODE_EXTRA_CA_CERTS=/app/certs/ca.crt` + a read-only `/app/certs` mount).
 
 ## Configuration (config.yaml)
 

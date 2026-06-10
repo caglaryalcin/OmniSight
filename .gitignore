@@ -7,6 +7,9 @@ config.yaml
 data/*
 !data/.gitkeep
 
+# local/generated UI assets
+public/assets/
+
 .env
 .env.local
 
