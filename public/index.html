@@ -1757,6 +1757,20 @@ function uptimeBars(history, currentStatus){
     return `<span class="uk-bar ${cls}" title="${escAttr(title)}"></span>`;
   }).join('')}</div>`;
 }
+function uptimeKumaHealth(uk){
+  if(!uk) return { state:'unknown', badgeCls:'gray', label:'unknown' };
+  if(uk._connecting) return { state:'connecting', badgeCls:'gray', label:'connecting...' };
+  if(!uk.online) return { state:'down', badgeCls:'red', label:'unreachable' };
+  const s = uk.summary || {};
+  const up = Number(s.up || 0);
+  const down = Number(s.down || 0);
+  const warn = Number(s.pending || 0) + Number(s.unknown || 0);
+  if(down > 0) return up > 0
+    ? { state:'degraded', badgeCls:'yellow', label:'degraded' }
+    : { state:'down', badgeCls:'red', label:`${down} down` };
+  if(warn > 0) return { state:'degraded', badgeCls:'yellow', label:'degraded' };
+  return { state:'ok', badgeCls:'green', label:'healthy' };
+}
 function buildUptimeKuma(uk){
   if(!uk) return null;
   if(uk._connecting) return null;
@@ -1764,6 +1778,7 @@ function buildUptimeKuma(uk){
   const down = s.down??0;
   const warn = (s.pending??0) + (s.unknown??0);
   const maint = s.maintenance??0;
+  const health = uptimeKumaHealth(uk);
 
   const sbSummaryHtml = online ? `<div class="sb-csum">
     <div class="sb-csum-item"><div class="sb-csum-val">${s.total??0}</div><div class="sb-csum-lbl">Total</div></div>
@@ -1817,7 +1832,7 @@ function buildUptimeKuma(uk){
     iconKey: 'uptimekuma',
     color: 'var(--green)',
     meta: online?`${s.up??0}/${s.total??0} up`:'',
-    badge: bdg(online?(down>0?'red':warn>0?'yellow':'green'):'red', online?(down>0?`${down} down`:warn>0?`${warn} pending`:'healthy'):'unreachable'),
+    badge: bdg(health.badgeCls, health.label),
     sbSummary: sbSummaryHtml,
     summary: '',
     body,
@@ -2864,7 +2879,7 @@ function render(data){
   const hc=data.healthchecks;
   if(hc && (hc._connecting || hc.online!==undefined)){ platforms.push(hc._connecting?'connecting':(!hc.online?'down':((hc.summary?.down||0)>0||(hc.summary?.grace||0)>0?'degraded':'ok'))); }
   const uk=data.uptimekuma;
-  if(uk && (uk._connecting || uk.online!==undefined)){ platforms.push(uk._connecting?'connecting':(!uk.online?'down':((uk.summary?.down||0)>0?'down':((uk.summary?.pending||0)>0||(uk.summary?.unknown||0)>0?'degraded':'ok')))); }
+  if(uk && (uk._connecting || uk.online!==undefined)){ platforms.push(uptimeKumaHealth(uk).state); }
   if((data.docker||[]).length){ if(data.docker.some(h=>h._connecting)) platforms.push('connecting'); else { const o=data.docker.filter(h=>h.online).length; const stopped=data.docker.some(h=>h.online&&(h.summary?.stopped||0)>0); platforms.push(o===0?'down':(o<data.docker.length||stopped)?'degraded':'ok'); } }
   if((data.database||[]).length){ if(data.database.some(d=>d._connecting)) platforms.push('connecting'); }
 
