@@ -54,7 +54,7 @@ jobs:
         with:
           images: |
             ${{ steps.img.outputs.name }}
-            docker.io/${{ secrets.DOCKERHUB_USERNAME }}/OmniSight
+            docker.io/${{ secrets.DOCKERHUB_USERNAME }}/omnisight
           tags: |
             type=ref,event=branch
             type=ref,event=tag
