@@ -169,7 +169,7 @@ html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#dd
     <div class="form-grid" style="grid-template-columns: 2fr 1fr; max-width: 450px;">
       <div class="form-group" style="margin-bottom:0;">
         <label>Timezone</label>
-        <input type="text" id="cfg-timezone" placeholder="e.g. Europe/Istanbul (leave blank for UTC)">
+        <select id="cfg-timezone"></select>
       </div>
       <div class="form-group" style="margin-bottom:0;">
         <label>Time Format</label>
@@ -494,6 +494,10 @@ html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#dd
         <button class="atab" id="atab-docker" type="button" onclick="setAddTab('docker')">Docker</button>
         <button class="atab" id="atab-stack" type="button" onclick="setAddTab('stack')">Stack</button>
       </div>
+      <label style="display:flex;align-items:center;gap:8px;margin:-4px 0 14px;font-size:12px;color:var(--muted)">
+        <input type="checkbox" id="am-insecure" onchange="refreshAgentCmds()">
+        Allow self-signed TLS certificates (--insecure)
+      </label>
       <div id="am-binary">
         <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Run as root on the target system — installs a systemd service, token included:</div>
         <div class="code-snip-wrap">
@@ -579,6 +583,46 @@ function escHtml(s) {
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+const TZ_FALLBACK = [
+  'UTC',
+  'Europe/Istanbul',
+  'Europe/London',
+  'Europe/Berlin',
+  'Europe/Paris',
+  'America/New_York',
+  'America/Chicago',
+  'America/Denver',
+  'America/Los_Angeles',
+  'Asia/Dubai',
+  'Asia/Tokyo',
+  'Asia/Shanghai',
+  'Australia/Sydney',
+];
+
+function timezoneOptions() {
+  try {
+    if (Intl.supportedValuesOf) return ['UTC', ...Intl.supportedValuesOf('timeZone')];
+  } catch {}
+  return TZ_FALLBACK;
+}
+
+function setTimezoneValue(value) {
+  const sel = document.getElementById('cfg-timezone');
+  if (!sel) return;
+  const val = value || 'UTC';
+  if (![...sel.options].some(o => o.value === val)) {
+    sel.add(new Option(val, val));
+  }
+  sel.value = val;
+}
+
+function initTimezoneSelect() {
+  const sel = document.getElementById('cfg-timezone');
+  if (!sel) return;
+  sel.innerHTML = timezoneOptions().map(tz => `<option value="${escHtml(tz)}">${escHtml(tz)}</option>`).join('');
+  setTimezoneValue('UTC');
+}
+
 function toggleArr(id) {
   document.getElementById(`ab-${id}`)?.classList.toggle('hidden');
 }
@@ -625,26 +669,31 @@ let amKnownIds = new Set();
 function agentCmds() {
   const token = document.getElementById('lx-token').value.trim() || '<token>';
   const base = window.location.origin;
+  const insecure = !!document.getElementById('am-insecure')?.checked;
+  const curlTLS = insecure ? ' --insecure' : '';
+  const envTLS = insecure ? ' OMNISIGHT_INSECURE_TLS=1' : '';
+  const dockerEnvTLS = insecure ? '  -e OMNISIGHT_INSECURE_TLS=1 \\\n' : '';
+  const stackEnvTLS = insecure ? '      OMNISIGHT_INSECURE_TLS: "1"\n' : '';
   return {
-    binary: `curl -fsSL ${base}/agent/install.sh | sudo OMNISIGHT_URL=${base} OMNISIGHT_TOKEN=${token} bash`,
+    binary: `curl -fsSL${curlTLS} ${base}/agent/install.sh | sudo OMNISIGHT_URL=${base} OMNISIGHT_TOKEN=${token}${envTLS} bash`,
     docker: `docker run -d --name omnisight-agent --restart unless-stopped \\
   --network host --pid host \\
   -e OMNISIGHT_URL=${base} \\
   -e OMNISIGHT_TOKEN=${token} \\
-  -e OMNISIGHT_HOST_ROOT=/host \\
+${dockerEnvTLS}  -e OMNISIGHT_HOST_ROOT=/host \\
   -v /:/host:ro \\
   -v /var/run/docker.sock:/var/run/docker.sock:ro \\
-  docker:cli sh -c "apk add --no-cache bash curl coreutils >/dev/null && curl -fsSL ${base}/agent/omnisight-agent.sh -o /usr/local/bin/omnisight-agent && exec bash /usr/local/bin/omnisight-agent"`,
+  docker:cli sh -c "apk add --no-cache bash curl coreutils >/dev/null && curl -fsSL${curlTLS} ${base}/agent/omnisight-agent.sh -o /usr/local/bin/omnisight-agent && exec bash /usr/local/bin/omnisight-agent"`,
     stack: `docker stack deploy -c - omnisight-agent <<'EOF'
 version: "3.8"
 services:
   agent:
     image: docker:cli
-    command: sh -c "apk add --no-cache bash curl coreutils >/dev/null && curl -fsSL ${base}/agent/omnisight-agent.sh -o /usr/local/bin/omnisight-agent && exec bash /usr/local/bin/omnisight-agent"
+    command: sh -c "apk add --no-cache bash curl coreutils >/dev/null && curl -fsSL${curlTLS} ${base}/agent/omnisight-agent.sh -o /usr/local/bin/omnisight-agent && exec bash /usr/local/bin/omnisight-agent"
     environment:
       OMNISIGHT_URL: ${base}
       OMNISIGHT_TOKEN: ${token}
-      OMNISIGHT_HOST_ROOT: /host
+${stackEnvTLS}      OMNISIGHT_HOST_ROOT: /host
     volumes:
       - /:/host:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
@@ -656,6 +705,13 @@ EOF`,
   };
 }
 
+function refreshAgentCmds() {
+  const cmds = agentCmds();
+  document.getElementById('am-cmd-binary').textContent = cmds.binary;
+  document.getElementById('am-cmd-docker').textContent = cmds.docker;
+  document.getElementById('am-cmd-stack').textContent = cmds.stack;
+}
+
 async function openAddModal(kind) {
   if (!document.getElementById('lx-token').value.trim()) {
     const t = await genAgentToken(null, true);
@@ -664,10 +720,7 @@ async function openAddModal(kind) {
   const m = AM_META[kind] || AM_META.linux;
   document.getElementById('am-title').textContent = m.title;
   document.getElementById('am-desc').textContent = m.desc;
-  const cmds = agentCmds();
-  document.getElementById('am-cmd-binary').textContent = cmds.binary;
-  document.getElementById('am-cmd-docker').textContent = cmds.docker;
-  document.getElementById('am-cmd-stack').textContent = cmds.stack;
+  refreshAgentCmds();
   document.querySelectorAll('.am-base').forEach(el => el.textContent = window.location.origin);
   setAddTab(kind === 'docker' ? 'docker' : 'binary');
   document.getElementById('en-' + (kind === 'proxmox' ? 'proxmox' : kind === 'docker' ? 'docker' : 'linux')).checked = true;
@@ -904,7 +957,7 @@ function maskedVal(el) {
 
 function populate(cfg) {
   if (document.getElementById('cfg-timezone')) {
-    document.getElementById('cfg-timezone').value = cfg.timezone || '';
+    setTimezoneValue(cfg.timezone || 'UTC');
   }
   if (document.getElementById('cfg-timeformat')) {
     document.getElementById('cfg-timeformat').value = cfg.timeFormat || '24h';
@@ -993,8 +1046,8 @@ function collect() {
   const cfg = {};
   
   const tzEl = document.getElementById('cfg-timezone');
-  if (tzEl && tzEl.value.trim()) {
-    cfg.timezone = tzEl.value.trim();
+  if (tzEl && tzEl.value && tzEl.value !== 'UTC') {
+    cfg.timezone = tzEl.value;
   }
 
   const tfEl = document.getElementById('cfg-timeformat');
@@ -1307,6 +1360,7 @@ async function refreshDots(cfg, newData){
 /* ── Init ── */
 (async () => {
   try {
+    initTimezoneSelect();
     const r = await fetch('/api/config', { headers: authHeaders() });
     handleUnauth(r);
     const cfg = await r.json();

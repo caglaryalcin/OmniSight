@@ -19,13 +19,18 @@ fi
 : "${OMNISIGHT_URL:?error: OMNISIGHT_URL is required}"
 : "${OMNISIGHT_TOKEN:?error: OMNISIGHT_TOKEN is required}"
 INTERVAL="${OMNISIGHT_INTERVAL:-15}"
+INSECURE_TLS="${OMNISIGHT_INSECURE_TLS:-}"
 OMNISIGHT_URL="${OMNISIGHT_URL%/}"
+CURL_TLS_ARGS=""
+case "$INSECURE_TLS" in
+  1|true|TRUE|yes|YES) CURL_TLS_ARGS="--insecure" ;;
+esac
 
 command -v curl >/dev/null 2>&1 || { echo "error: curl is required"; exit 1; }
 command -v systemctl >/dev/null 2>&1 || { echo "error: systemd is required"; exit 1; }
 
 echo "downloading agent from $OMNISIGHT_URL ..."
-curl -fsS "$OMNISIGHT_URL/agent/omnisight-agent.sh" -o "$BIN"
+curl -fsS $CURL_TLS_ARGS "$OMNISIGHT_URL/agent/omnisight-agent.sh" -o "$BIN"
 chmod 755 "$BIN"
 
 mkdir -p "$ENVDIR"
@@ -34,6 +39,9 @@ OMNISIGHT_URL=$OMNISIGHT_URL
 OMNISIGHT_TOKEN=$OMNISIGHT_TOKEN
 OMNISIGHT_INTERVAL=$INTERVAL
 EOF
+if [ -n "$CURL_TLS_ARGS" ]; then
+  echo "OMNISIGHT_INSECURE_TLS=1" >> "$ENVDIR/agent.env"
+fi
 chmod 600 "$ENVDIR/agent.env"
 
 cat > "$SVC" <<EOF

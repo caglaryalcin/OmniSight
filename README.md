@@ -68,6 +68,13 @@ curl -fsSL http://<omnisight-host>:3000/agent/install.sh | \
   sudo OMNISIGHT_URL=http://<omnisight-host>:3000 OMNISIGHT_TOKEN=<token> bash
 ```
 
+For a private/self-signed HTTPS endpoint, either install the CA certificate on the target host, or use the temporary insecure TLS option:
+
+```bash
+curl -fsSL --insecure https://<omnisight-host>/agent/install.sh | \
+  sudo OMNISIGHT_URL=https://<omnisight-host> OMNISIGHT_TOKEN=<token> OMNISIGHT_INSECURE_TLS=1 bash
+```
+
 **Docker (agent in a container):**
 
 ```bash

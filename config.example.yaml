@@ -14,6 +14,7 @@ timezone: "${TZ:-UTC}"
 # pre-filled. Agents self-register; no per-server config is needed here.
 #   Binary:  curl -fsSL http://<host>:3000/agent/install.sh | \
 #              sudo OMNISIGHT_URL=http://<host>:3000 OMNISIGHT_TOKEN=<token> bash
+#   Self-signed HTTPS: add curl --insecure and OMNISIGHT_INSECURE_TLS=1.
 # The same shared token is used by every agent (linux.agentToken).
 linux:
   enabled: true

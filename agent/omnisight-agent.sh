@@ -10,6 +10,11 @@ TOKEN="${OMNISIGHT_TOKEN:?OMNISIGHT_TOKEN required}"
 INTERVAL="${OMNISIGHT_INTERVAL:-15}"
 VERSION="1.2.0"
 HOST_ROOT="${OMNISIGHT_HOST_ROOT:-/}"
+INSECURE_TLS="${OMNISIGHT_INSECURE_TLS:-}"
+CURL_TLS_ARGS=""
+case "$INSECURE_TLS" in
+  1|true|TRUE|yes|YES) CURL_TLS_ARGS="--insecure" ;;
+esac
 
 AGENT_ID="$(cat /etc/machine-id 2>/dev/null || hostname)"
 HOSTNAME_S="$(hostname -s 2>/dev/null || hostname)"
@@ -200,7 +205,7 @@ EOF
     [ -n "$temp" ] && printf '"temp":%s,' "$temp"
     printf '"services":[%s]}' "$(services_json)"
   } > "$tmp"
-  curl -fsS -m 20 -X POST -H "X-Agent-Token: $TOKEN" -H "Content-Type: application/json" \
+  curl -fsS $CURL_TLS_ARGS -m 20 -X POST -H "X-Agent-Token: $TOKEN" -H "Content-Type: application/json" \
     --data-binary @"$tmp" "$URL/api/agent/report" 2>/dev/null
   rc=$?
   rm -f "$tmp"
@@ -222,7 +227,7 @@ run_command() {
     *) return ;;
   esac
   b64=$(printf '%s' "$out" | base64 2>/dev/null | tr -d '\n')
-  curl -fsS -m 10 -X POST -H "X-Agent-Token: $TOKEN" -H "Content-Type: application/json" \
+  curl -fsS $CURL_TLS_ARGS -m 10 -X POST -H "X-Agent-Token: $TOKEN" -H "Content-Type: application/json" \
     -d "{\"id\":\"$cid\",\"output\":\"$b64\"}" "$URL/api/agent/result" >/dev/null 2>&1
 }
 
@@ -245,7 +250,7 @@ while true; do
     continue
   fi
   process_commands "$resp"
-  resp=$(curl -fsS -m $((INTERVAL+5)) -H "X-Agent-Token: $TOKEN" \
+  resp=$(curl -fsS $CURL_TLS_ARGS -m $((INTERVAL+5)) -H "X-Agent-Token: $TOKEN" \
     "$URL/api/agent/commands?id=$AGENT_ID&wait=$INTERVAL" 2>/dev/null) || sleep 2
   process_commands "$resp"
 done
