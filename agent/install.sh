@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+set -e
+
+BIN=/usr/local/bin/omnisight-agent
+SVC=/etc/systemd/system/omnisight-agent.service
+ENVDIR=/etc/omnisight-agent
+
+[ "$(id -u)" = 0 ] || { echo "error: run as root (sudo)"; exit 1; }
+
+if [ "${1:-}" = "uninstall" ]; then
+  systemctl disable --now omnisight-agent 2>/dev/null || true
+  rm -f "$BIN" "$SVC"
+  rm -rf "$ENVDIR"
+  systemctl daemon-reload
+  echo "omnisight-agent removed"
+  exit 0
+fi
+
+: "${OMNISIGHT_URL:?error: OMNISIGHT_URL is required}"
+: "${OMNISIGHT_TOKEN:?error: OMNISIGHT_TOKEN is required}"
+INTERVAL="${OMNISIGHT_INTERVAL:-15}"
+OMNISIGHT_URL="${OMNISIGHT_URL%/}"
+
+command -v curl >/dev/null 2>&1 || { echo "error: curl is required"; exit 1; }
+command -v systemctl >/dev/null 2>&1 || { echo "error: systemd is required"; exit 1; }
+
+echo "downloading agent from $OMNISIGHT_URL ..."
+curl -fsS "$OMNISIGHT_URL/agent/omnisight-agent.sh" -o "$BIN"
+chmod 755 "$BIN"
+
+mkdir -p "$ENVDIR"
+cat > "$ENVDIR/agent.env" <<EOF
+OMNISIGHT_URL=$OMNISIGHT_URL
+OMNISIGHT_TOKEN=$OMNISIGHT_TOKEN
+OMNISIGHT_INTERVAL=$INTERVAL
+EOF
+chmod 600 "$ENVDIR/agent.env"
+
+cat > "$SVC" <<EOF
+[Unit]
+Description=OmniSight monitoring agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=$BIN
+Restart=always
+RestartSec=5
+NoNewPrivileges=no
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable --now omnisight-agent
+echo "omnisight-agent installed and started (interval: ${INTERVAL}s)"
+echo "logs: journalctl -u omnisight-agent -f"

@@ -5,15 +5,18 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>OmniSight — Settings</title>
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%231E2021' stroke='%233dba7e' stroke-width='2'/><circle cx='16' cy='16' r='6' fill='%233dba7e'/><circle cx='16' cy='16' r='10' fill='none' stroke='%233dba7e' stroke-width='1.5' stroke-opacity='.4'/></svg>">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%230B0E14' stroke='%2334D399' stroke-width='2'/><circle cx='16' cy='16' r='6' fill='%2334D399'/><circle cx='16' cy='16' r='10' fill='none' stroke='%2334D399' stroke-width='1.5' stroke-opacity='.4'/></svg>">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
-  --bg:#181A1B;--panel:#1E2021;--row:#242627;--border:#2E3234;
-  --text:#C9D1D9;--muted:#6E7681;--green:#3dba7e;--red:#e74c3c;
-  --yellow:#f39c12;--blue:#5086d4;
+  --bg:#0B0E14;--panel:#12161F;--row:#1A202C;--border:#242C3B;
+  --text:#E2E8F2;--muted:#7D8AA3;--green:#34D399;--red:#F87171;
+  --yellow:#FBBF24;--blue:#60A5FA;--accent:#6366F1;
 }
-body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px}
+body{background:var(--bg);color:var(--text);font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px}
+body::before{content:'';position:fixed;inset:0;z-index:-1;background:
+  radial-gradient(900px 500px at 85% -10%, rgba(99,102,241,.10), transparent 60%),
+  radial-gradient(800px 500px at -10% 110%, rgba(34,211,238,.06), transparent 60%)}
 
 header{
   background:var(--panel);border-bottom:1px solid var(--border);
@@ -41,7 +44,8 @@ header{
 
 main{padding:20px;max-width:1100px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
 
-.card{background:var(--panel);border:1px solid var(--border);border-radius:10px;overflow:hidden;transition:opacity .15s}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:14px;overflow:hidden;transition:opacity .15s,border-color .15s,box-shadow .15s;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.card:hover{border-color:#2E3850}
 .card.card-off{opacity:.5}
 .card-hdr{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;cursor:pointer;user-select:none}
 .card-left{display:flex;align-items:center;gap:10px}
@@ -98,10 +102,36 @@ main{padding:20px;max-width:1100px;margin:0 auto;display:flex;flex-direction:col
 #toast.ok{border-color:var(--green);color:var(--green)}
 #toast.err{border-color:var(--red);color:var(--red)}
 
+.code-snip-wrap{position:relative}
+.code-snip{background:var(--row);border:1px solid var(--border);border-radius:8px;padding:12px 90px 12px 14px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;line-height:1.5;white-space:pre-wrap;word-break:break-all;color:var(--text)}
+.code-copy{position:absolute;top:8px;right:8px}
+.agent-row{display:flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid var(--border);border-radius:10px;margin-bottom:6px;font-size:13px;background:var(--row);transition:border-color .15s}
+.agent-row:hover{border-color:#2E3850}
+.agent-row:last-child{margin-bottom:0}
+.sys-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.sys-empty{font-size:13px;color:var(--muted);padding:14px;border:1px dashed var(--border);border-radius:10px;text-align:center}
+.btn-add{background:linear-gradient(135deg,var(--accent),#4f8ef7);border:none;color:#fff;padding:7px 16px;border-radius:9px;cursor:pointer;font-size:13px;font-weight:600;box-shadow:0 2px 10px rgba(99,102,241,.35);transition:filter .15s,transform .1s}
+.btn-add:hover{filter:brightness(1.1)}
+.btn-add:active{transform:scale(.97)}
+.amodal{display:none;position:fixed;inset:0;background:rgba(4,6,10,.66);backdrop-filter:blur(4px);z-index:1000;align-items:center;justify-content:center}
+.amodal.open{display:flex}
+.amodal-box{background:var(--panel);border:1px solid var(--border);border-radius:16px;width:min(680px,94vw);max-height:88vh;overflow:auto;box-shadow:0 24px 64px rgba(0,0,0,.5);animation:ain .18s ease}
+@keyframes ain{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.amodal-hdr{display:flex;align-items:center;gap:10px;padding:16px 20px;border-bottom:1px solid var(--border)}
+.amodal-title{font-size:16px;font-weight:700;flex:1}
+.amodal-x{background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;padding:4px 8px;border-radius:6px}
+.amodal-x:hover{color:var(--text);background:rgba(255,255,255,.06)}
+.amodal-body{padding:18px 20px}
+.atabs{display:flex;gap:6px;background:var(--row);border:1px solid var(--border);border-radius:10px;padding:4px;margin-bottom:14px;width:fit-content}
+.atab{background:none;border:none;color:var(--muted);padding:7px 18px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:600;transition:background .15s,color .15s}
+.atab.active{background:var(--panel);color:var(--text);box-shadow:0 1px 4px rgba(0,0,0,.3)}
+.await-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--yellow);margin-right:7px;animation:awp 1.4s infinite}
+@keyframes awp{0%,100%{opacity:1}50%{opacity:.25}}
+
 ::-webkit-scrollbar{width:5px}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
-html[data-theme="light"]{--bg:#f4f5f7;--panel:#ffffff;--row:#eef1f4;--border:#dce0e5;--text:#1f2933;--muted:#69707a;--green:#1f9d63;--red:#d63b2f;--yellow:#c9820a;--blue:#3b6fc4;}
+html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#dde3ec;--text:#1c2433;--muted:#64748b;--green:#0e9f6e;--red:#dc2f2f;--yellow:#b7791f;--blue:#3b82f6;}
 </style>
 <style>html.embed header{display:none}</style>
 <script>if(window.self!==window.top)document.documentElement.classList.add('embed');</script>
@@ -187,21 +217,12 @@ html[data-theme="light"]{--bg:#f4f5f7;--panel:#ffffff;--row:#eef1f4;--border:#dc
         <input type="file" id="icon-proxmox-f" accept="image/*,.svg" style="display:none" onchange="uploadIcon(this,'icon-proxmox')">
       </div>
     </div>
-    <div class="form-grid">
-      <div class="form-group"><label>Host</label><input type="text" id="pve-host" placeholder="192.168.1.10"></div>
-      <div class="form-group"><label>Port</label><input type="number" id="pve-port" value="8006"></div>
-    </div>
-    <div class="form-grid">
-      <div class="form-group"><label>Token ID</label><input type="text" id="pve-tokenid" placeholder="root@pam!token"></div>
-      <div class="form-group"><label>Token Secret</label><input type="password" id="pve-secret" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"></div>
-    </div>
-    <div class="form-group">
-      <label>Nodes</label>
-      <div id="pve-nodes" class="tag-list"></div>
-      <div class="tag-add">
-        <input type="text" id="pve-node-in" placeholder="node name" onkeydown="if(event.key==='Enter'){addTag('pve-nodes','pve-node-in');event.preventDefault()}">
-        <button class="btn-sm" onclick="addTag('pve-nodes','pve-node-in')">+ Add Node</button>
+    <div class="form-group" style="margin-bottom:0">
+      <div class="sys-hdr">
+        <label style="margin:0">Nodes</label>
+        <button class="btn-add" type="button" onclick="openAddModal('proxmox')">+ Add Node</button>
       </div>
+      <div class="sys-list" id="px-agents"><div class="sys-empty">No nodes yet — click “+ Add Node”, run the command on a Proxmox node and it appears here automatically.</div></div>
     </div>
   </div>
 </div>
@@ -223,8 +244,22 @@ html[data-theme="light"]{--bg:#f4f5f7;--panel:#ffffff;--row:#eef1f4;--border:#dc
         <input type="file" id="icon-linux-f" accept="image/*,.svg" style="display:none" onchange="uploadIcon(this,'icon-linux')">
       </div>
     </div>
-    <div id="linux-list"></div>
-    <button class="btn-sm" style="margin-top:4px" onclick="addLinuxServer()">+ Add Server</button>
+    <div class="form-group">
+      <label>Agent Token</label>
+      <div class="path-row">
+        <input type="text" id="lx-token" readonly placeholder="Auto-generated when you add your first system">
+        <button type="button" class="btn-sm" onclick="genAgentToken(this)">Regenerate</button>
+        <button type="button" class="btn-sm" onclick="copyToClip(document.getElementById('lx-token').value,this)">Copy</button>
+      </div>
+      <div style="font-size:12px;color:var(--muted)">One shared token for all agents (Linux, Proxmox, Docker). Regenerating invalidates installed agents.</div>
+    </div>
+    <div class="form-group" style="margin-bottom:0">
+      <div class="sys-hdr">
+        <label style="margin:0">Systems</label>
+        <button class="btn-add" type="button" onclick="openAddModal('linux')">+ Add System</button>
+      </div>
+      <div class="sys-list" id="lx-agents"><div class="sys-empty">No systems yet — click “+ Add System”, run the command on a server and it appears here automatically.</div></div>
+    </div>
   </div>
 </div>
 
@@ -327,8 +362,13 @@ html[data-theme="light"]{--bg:#f4f5f7;--panel:#ffffff;--row:#eef1f4;--border:#dc
         <input type="file" id="icon-docker-f" accept="image/*,.svg" style="display:none" onchange="uploadIcon(this,'icon-docker')">
       </div>
     </div>
-    <div id="docker-list"></div>
-    <button class="btn-sm" type="button" onclick="addDockerHost()" style="margin-top:8px">+ Add Host</button>
+    <div class="form-group" style="margin-bottom:0">
+      <div class="sys-hdr">
+        <label style="margin:0">Hosts</label>
+        <button class="btn-add" type="button" onclick="openAddModal('docker')">+ Add Host</button>
+      </div>
+      <div class="sys-list" id="dk-agents"><div class="sys-empty">No hosts yet — click “+ Add Host”, run the command on a Docker host and it appears here automatically.</div></div>
+    </div>
   </div>
 </div>
 
@@ -441,6 +481,50 @@ html[data-theme="light"]{--bg:#f4f5f7;--panel:#ffffff;--row:#eef1f4;--border:#dc
 
 </main>
 
+<div class="amodal" id="agent-modal" onclick="if(event.target===this)closeAddModal()">
+  <div class="amodal-box">
+    <div class="amodal-hdr">
+      <span class="amodal-title" id="am-title">Add System</span>
+      <button class="amodal-x" type="button" onclick="closeAddModal()">✕</button>
+    </div>
+    <div class="amodal-body">
+      <div id="am-desc" style="font-size:13px;color:var(--muted);margin-bottom:14px"></div>
+      <div class="atabs">
+        <button class="atab active" id="atab-binary" type="button" onclick="setAddTab('binary')">Binary (systemd)</button>
+        <button class="atab" id="atab-docker" type="button" onclick="setAddTab('docker')">Docker</button>
+        <button class="atab" id="atab-stack" type="button" onclick="setAddTab('stack')">Stack</button>
+      </div>
+      <div id="am-binary">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Run as root on the target system — installs a systemd service, token included:</div>
+        <div class="code-snip-wrap">
+          <pre class="code-snip" id="am-cmd-binary"></pre>
+          <button type="button" class="btn-sm code-copy" onclick="copyToClip(document.getElementById('am-cmd-binary').textContent,this)">Copy</button>
+        </div>
+        <div style="font-size:12px;color:var(--muted);margin-top:8px">Uninstall: <code style="color:var(--text);font-size:11px">curl -fsSL <span class="am-base"></span>/agent/install.sh | sudo bash -s uninstall</code></div>
+      </div>
+      <div id="am-docker" style="display:none">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Run on the Docker host — agent runs in a container, token included:</div>
+        <div class="code-snip-wrap">
+          <pre class="code-snip" id="am-cmd-docker"></pre>
+          <button type="button" class="btn-sm code-copy" onclick="copyToClip(document.getElementById('am-cmd-docker').textContent,this)">Copy</button>
+        </div>
+        <div style="font-size:12px;color:var(--muted);margin-top:8px">Uninstall: <code style="color:var(--text);font-size:11px">docker rm -f omnisight-agent</code></div>
+      </div>
+      <div id="am-stack" style="display:none">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Deploy as a Docker Swarm stack — token included:</div>
+        <div class="code-snip-wrap">
+          <pre class="code-snip" id="am-cmd-stack"></pre>
+          <button type="button" class="btn-sm code-copy" onclick="copyToClip(document.getElementById('am-cmd-stack').textContent,this)">Copy</button>
+        </div>
+        <div style="font-size:12px;color:var(--muted);margin-top:8px">Uninstall: <code style="color:var(--text);font-size:11px">docker stack rm omnisight-agent</code></div>
+      </div>
+      <div style="margin-top:16px;padding:12px 14px;background:var(--row);border:1px solid var(--border);border-radius:10px;font-size:13px">
+        <span class="await-dot"></span><span id="am-wait">Waiting for the agent to connect — it will appear in the list automatically…</span>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
@@ -505,62 +589,170 @@ document.addEventListener('click', e => {
   hdr.parentElement.querySelector('.arr-body')?.classList.toggle('hidden');
 });
 
-/* ── Linux server form ── */
-function addLinuxServer(data = {}) {
-  const idx = lCount++;
-  const id = `lsrv-${idx}`;
-  const el = document.createElement('div');
-  el.className = 'arr-item';
-  el.id = id;
-  el.innerHTML = `
-    <div class="arr-hdr" onclick="toggleArr('${id}')">
-      <div style="width:9px;height:9px;border-radius:50%;background:var(--green);flex-shrink:0"></div>
-      <span class="arr-hdr-name">${escHtml(data.name || 'New Server')}</span>
-      <button class="btn-rm" type="button" onclick="event.stopPropagation();this.closest('.arr-item').remove()">✕</button>
-    </div>
-    <div class="arr-body hidden" id="ab-${id}">
-      <div class="form-grid">
-        <div class="form-group">
-          <label>Name</label>
-          <input type="text" class="l-name" value="${escHtml(data.name||'')}" placeholder="web-server"
-            oninput="this.closest('.arr-item').querySelector('.arr-hdr-name').textContent=this.value||'New Server'">
-        </div>
-        <div class="form-group">
-          <label>Host / IP</label>
-          <input type="text" class="l-host" value="${escHtml(data.host||'')}" placeholder="192.168.1.1">
-        </div>
-      </div>
-      <div class="form-grid">
-        <div class="form-group">
-          <label>SSH Port</label>
-          <input type="number" class="l-port" value="${data.port||22}">
-        </div>
-        <div class="form-group">
-          <label>User</label>
-          <input type="text" class="l-user" value="${escHtml(data.user||'')}" placeholder="root">
-        </div>
-      </div>
-      <div class="form-group">
-        <label>Private Key Path (leave empty to use password)</label>
-        <input type="text" class="l-key" value="${escHtml(data.privateKey==='__set__'||data.privateKey==='__encrypted__'?'':data.privateKey||'')}" placeholder="${data.privateKey==='__set__'||data.privateKey==='__encrypted__'?'••••••••  (set — leave blank to keep)':'C:\\\\Users\\\\you\\\\.ssh\\\\id_ed25519'}" data-masked="${(data.privateKey==='__set__'||data.privateKey==='__encrypted__')?'1':''}">
-      </div>
-      <div class="form-group">
-        <label>Password (if no private key)</label>
-        <input type="password" class="l-pw" value="" placeholder="${data.password==='__set__'||data.password==='__encrypted__'?'••••••••  (set — leave blank to keep)':''}" data-masked="${(data.password==='__set__'||data.password==='__encrypted__')?'1':''}">
-      </div>
-      <div class="form-group">
-        <label>Services</label>
-        <div id="l-svc-${idx}" class="tag-list"></div>
-        <div class="tag-add">
-          <input type="text" id="l-svc-in-${idx}" placeholder="ex: cron.service"
-            onkeydown="if(event.key==='Enter'){addTag('l-svc-${idx}','l-svc-in-${idx}');event.preventDefault()}">
-          <button class="btn-sm" type="button" onclick="addTag('l-svc-${idx}','l-svc-in-${idx}')">+ Add</button>
-        </div>
-      </div>
-    </div>`;
-  document.getElementById('linux-list').appendChild(el);
-  (data.services || []).forEach(s => appendTag(`l-svc-${idx}`, s));
+/* ── Agents (Beszel-style add) ── */
+function copyToClip(text, btn) {
+  navigator.clipboard?.writeText(text).then(() => {
+    if (btn) { const o = btn.textContent; btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = o, 1200); }
+  }).catch(() => toast('Copy failed', 'err'));
 }
+
+async function genAgentToken(btn, silent) {
+  const cur = document.getElementById('lx-token').value.trim();
+  if (cur && !silent && !confirm('Regenerating invalidates the current token. Existing agents will stop reporting until reinstalled or updated. Continue?')) return null;
+  if (btn) btn.disabled = true;
+  try {
+    const r = await fetch('/api/agent/token', { method: 'POST', headers: authHeaders() });
+    const b = await r.json();
+    if (!r.ok) throw new Error(b.error || r.statusText);
+    document.getElementById('lx-token').value = b.token;
+    document.getElementById('en-linux').checked = true;
+    if (!silent) toast('Agent token generated', 'ok');
+    return b.token;
+  } catch (e) { toast(e.message, 'err'); return null; }
+  finally { if (btn) btn.disabled = false; }
+}
+
+const AM_META = {
+  linux:   { title: 'Add System',  desc: 'Works on any systemd Linux: bare-metal/VM servers, NAS and other Linux devices. The agent pushes metrics + services; no inbound access to the server is needed.' },
+  proxmox: { title: 'Add Proxmox Node', desc: 'Run the command on a Proxmox VE node (as root). The agent uses pvesh locally to report VMs/LXC, storage, backups and Ceph — no API token needed. Repeat on every node of the cluster.' },
+  docker:  { title: 'Add Docker Host', desc: 'The agent reports containers, dangling images and host metrics, and runs logs/prune commands locally. Pick Binary for a normal install or Docker to run the agent itself in a container.' },
+};
+
+let amTab = 'binary';
+let amPollTimer = null;
+let amKnownIds = new Set();
+
+function agentCmds() {
+  const token = document.getElementById('lx-token').value.trim() || '<token>';
+  const base = window.location.origin;
+  return {
+    binary: `curl -fsSL ${base}/agent/install.sh | sudo OMNISIGHT_URL=${base} OMNISIGHT_TOKEN=${token} bash`,
+    docker: `docker run -d --name omnisight-agent --restart unless-stopped \\
+  --network host --pid host \\
+  -e OMNISIGHT_URL=${base} \\
+  -e OMNISIGHT_TOKEN=${token} \\
+  -e OMNISIGHT_HOST_ROOT=/host \\
+  -v /:/host:ro \\
+  -v /var/run/docker.sock:/var/run/docker.sock:ro \\
+  docker:cli sh -c "apk add --no-cache bash curl coreutils >/dev/null && curl -fsSL ${base}/agent/omnisight-agent.sh -o /usr/local/bin/omnisight-agent && exec bash /usr/local/bin/omnisight-agent"`,
+    stack: `docker stack deploy -c - omnisight-agent <<'EOF'
+version: "3.8"
+services:
+  agent:
+    image: docker:cli
+    command: sh -c "apk add --no-cache bash curl coreutils >/dev/null && curl -fsSL ${base}/agent/omnisight-agent.sh -o /usr/local/bin/omnisight-agent && exec bash /usr/local/bin/omnisight-agent"
+    environment:
+      OMNISIGHT_URL: ${base}
+      OMNISIGHT_TOKEN: ${token}
+      OMNISIGHT_HOST_ROOT: /host
+    volumes:
+      - /:/host:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    deploy:
+      mode: global
+      restart_policy:
+        condition: any
+EOF`,
+  };
+}
+
+async function openAddModal(kind) {
+  if (!document.getElementById('lx-token').value.trim()) {
+    const t = await genAgentToken(null, true);
+    if (!t) return;
+  }
+  const m = AM_META[kind] || AM_META.linux;
+  document.getElementById('am-title').textContent = m.title;
+  document.getElementById('am-desc').textContent = m.desc;
+  const cmds = agentCmds();
+  document.getElementById('am-cmd-binary').textContent = cmds.binary;
+  document.getElementById('am-cmd-docker').textContent = cmds.docker;
+  document.getElementById('am-cmd-stack').textContent = cmds.stack;
+  document.querySelectorAll('.am-base').forEach(el => el.textContent = window.location.origin);
+  setAddTab(kind === 'docker' ? 'docker' : 'binary');
+  document.getElementById('en-' + (kind === 'proxmox' ? 'proxmox' : kind === 'docker' ? 'docker' : 'linux')).checked = true;
+  document.getElementById('agent-modal').classList.add('open');
+  amKnownIds = new Set(window._agentData.map(a => a.key));
+  document.getElementById('am-wait').textContent = 'Waiting for the agent to connect — it will appear in the list automatically…';
+  clearInterval(amPollTimer);
+  amPollTimer = setInterval(async () => {
+    await loadAgents();
+    const fresh = window._agentData.find(a => !amKnownIds.has(a.key) && a.online);
+    if (fresh) {
+      document.getElementById('am-wait').innerHTML = `<span style="color:var(--green);font-weight:600">✓ ${escHtml(fresh.name)} connected!</span> You can close this dialog.`;
+      document.querySelector('#agent-modal .await-dot').style.background = 'var(--green)';
+    }
+  }, 4000);
+}
+
+function closeAddModal() {
+  const m = document.getElementById('agent-modal');
+  if (!m.classList.contains('open')) return;
+  m.classList.remove('open');
+  clearInterval(amPollTimer);
+  const dot = document.querySelector('#agent-modal .await-dot');
+  if (dot) dot.style.background = 'var(--yellow)';
+  saveConfig();
+}
+
+function setAddTab(t) {
+  amTab = t;
+  document.getElementById('atab-binary').classList.toggle('active', t === 'binary');
+  document.getElementById('atab-docker').classList.toggle('active', t === 'docker');
+  document.getElementById('atab-stack').classList.toggle('active', t === 'stack');
+  document.getElementById('am-binary').style.display = t === 'binary' ? '' : 'none';
+  document.getElementById('am-docker').style.display = t === 'docker' ? '' : 'none';
+  document.getElementById('am-stack').style.display = t === 'stack' ? '' : 'none';
+}
+
+window._agentData = [];
+
+async function loadAgents() {
+  try {
+    const r = await fetch('/api/status', { headers: authHeaders() });
+    if (!r.ok) return;
+    const d = await r.json();
+    const all = [];
+    (d.linux || []).forEach(a => all.push({ key: 'lx:' + (a.id || a.name), kind: 'linux', id: a.id || a.name, name: a.name, ip: a.ip, os: a.os, platform: a.platform, online: a.online, docker: false }));
+    (d.proxmox?.nodes || []).forEach(n => all.push({ key: 'px:' + n.node.name, kind: 'proxmox', id: n.node.name, name: n.node.name, ip: n.host, os: '', platform: 'proxmox', online: n.node.online }));
+    (d.docker || []).forEach(h => all.push({ key: 'dk:' + h.name, kind: 'docker', id: h.name, name: h.name, ip: '', os: '', platform: 'docker', online: h.online, meta: h.online ? `${h.summary.running}/${h.summary.total} containers` : '' }));
+    window._agentData = all;
+    renderAgentList('lx-agents', all.filter(a => a.kind === 'linux'), 'No systems yet — click “+ Add System”, run the command on a server and it appears here automatically.');
+    renderAgentList('px-agents', all.filter(a => a.kind === 'proxmox'), 'No nodes yet — click “+ Add Node”, run the command on a Proxmox node and it appears here automatically.');
+    renderAgentList('dk-agents', all.filter(a => a.kind === 'docker'), 'No hosts yet — click “+ Add Host”, run the command on a Docker host and it appears here automatically.');
+  } catch {}
+}
+
+function renderAgentList(elId, list, emptyMsg) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  if (!list.length) { el.innerHTML = `<div class="sys-empty">${emptyMsg}</div>`; return; }
+  el.innerHTML = list.map(a => `
+    <div class="agent-row">
+      <div style="width:9px;height:9px;border-radius:50%;background:${a.online ? 'var(--green)' : 'var(--red)'};flex-shrink:0;${a.online ? 'box-shadow:0 0 8px rgba(52,211,153,.6)' : ''}"></div>
+      <span style="font-weight:600">${escHtml(a.name || '')}</span>
+      <span style="color:var(--muted);font-size:12px">${escHtml(a.ip || '')}${a.os ? ' · ' + escHtml(a.os) : ''}${a.meta ? ' · ' + escHtml(a.meta) : ''}${a.platform === 'synology' ? ' · synology' : ''}</span>
+      <span style="flex:1"></span>
+      <span style="font-size:12px;font-weight:600;color:${a.online ? 'var(--green)' : 'var(--red)'}">${a.online ? 'online' : 'offline'}</span>
+      <button class="btn-rm" type="button" title="Remove" onclick="removeAgent('${escHtml(a.id || '')}',this)">✕</button>
+    </div>`).join('');
+}
+
+async function removeAgent(id, btn) {
+  if (!confirm('Remove this system from the dashboard? (Run the uninstall command on the server to stop the agent.)')) return;
+  if (btn) btn.disabled = true;
+  try {
+    const r = await fetch('/api/agent/remove', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ id }) });
+    const b = await r.json();
+    if (!r.ok) throw new Error(b.error || r.statusText);
+    await loadAgents();
+    toast('System removed', 'ok');
+  } catch (e) { toast(e.message, 'err'); }
+  if (btn) btn.disabled = false;
+}
+
+setInterval(loadAgents, 10000);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAddModal(); });
 
 /* ── Synology device form ── */
 function addSynDevice(data = {}) {
@@ -681,92 +873,6 @@ function addDbInstance(data = {}) {
   if (data.password) secVal(data.password, el.querySelector('.db-pass'));
 }
 
-function addDockerHost(data = {}) {
-  const idx = dCount++;
-  const id = `dhost-${idx}`;
-  const type = data.type || (data.host ? 'tcp' : 'socket');
-  const el = document.createElement('div');
-  el.className = 'arr-item';
-  el.id = id;
-  el.innerHTML = `
-    <div class="arr-hdr" onclick="toggleArr('${id}')">
-      <div style="width:9px;height:9px;border-radius:50%;background:#2496ed;flex-shrink:0"></div>
-      <span class="arr-hdr-name">${escHtml(data.name || 'New Host')}</span>
-      <button class="btn-rm" type="button" onclick="event.stopPropagation();this.closest('.arr-item').remove()">✕</button>
-    </div>
-    <div class="arr-body hidden" id="ab-${id}">
-      <div class="form-group">
-        <label>Name</label>
-        <input type="text" class="d-name" value="${escHtml(data.name||'')}" placeholder="NAS / prod-server"
-          oninput="this.closest('.arr-item').querySelector('.arr-hdr-name').textContent=this.value||'New Host'">
-      </div>
-      <div class="form-group">
-        <label>Connection Type</label>
-        <select class="d-type" onchange="onDockerType(this,'${id}')">
-          <option value="socket" ${type==='socket'?'selected':''}>Unix Socket (local)</option>
-          <option value="tcp"    ${type==='tcp'?'selected':''}>TCP (remote)</option>
-          <option value="ssh"    ${type==='ssh'?'selected':''}>SSH (remote, user/pass or key)</option>
-        </select>
-      </div>
-      <div id="d-socket-${id}" style="${type!=='socket'?'display:none':''}">
-        <div class="form-group">
-          <label>Socket Path</label>
-          <input type="text" class="d-socket" value="${escHtml(data.socketPath||'/var/run/docker.sock')}" placeholder="/var/run/docker.sock">
-        </div>
-      </div>
-      <div id="d-tcp-${id}" style="${type!=='tcp'?'display:none':''}">
-        <div class="form-grid">
-          <div class="form-group">
-            <label>Host / IP</label>
-            <input type="text" class="d-host" value="${escHtml(data.host||'')}" placeholder="192.168.1.10">
-          </div>
-          <div class="form-group">
-            <label>Port</label>
-            <input type="number" class="d-port" value="${data.port||2375}" placeholder="2375">
-          </div>
-        </div>
-      </div>
-      <div id="d-ssh-${id}" style="${type!=='ssh'?'display:none':''}">
-        <div class="form-grid">
-          <div class="form-group">
-            <label>SSH Host / IP</label>
-            <input type="text" class="d-sshHost" value="${escHtml(data.sshHost||'')}" placeholder="192.168.1.10">
-          </div>
-          <div class="form-group">
-            <label>SSH Port</label>
-            <input type="number" class="d-sshPort" value="${data.sshPort||22}" placeholder="22">
-          </div>
-        </div>
-        <div class="form-grid">
-          <div class="form-group">
-            <label>SSH User</label>
-            <input type="text" class="d-sshUser" value="${escHtml(data.sshUser||'')}" placeholder="root">
-          </div>
-          <div class="form-group">
-            <label>SSH Password</label>
-            <input type="password" class="d-sshPassword" value="${escHtml(data.sshPassword&&data.sshPassword!=='__set__'?data.sshPassword:'')}" placeholder="${data.sshPassword==='__set__'?'(set — leave blank to keep)':'optional if using key'}">
-          </div>
-        </div>
-        <div class="form-group">
-          <label>Private Key (PEM, optional)</label>
-          <textarea class="d-sshKey" rows="3" style="width:100%;resize:vertical" placeholder="-----BEGIN OPENSSH PRIVATE KEY-----&#10;...&#10;-----END OPENSSH PRIVATE KEY-----">${escHtml(data.sshKey&&data.sshKey!=='__set__'?data.sshKey:'')}</textarea>
-          ${data.sshKey==='__set__'?'<div style="font-size:11px;color:var(--muted);margin-top:4px">Key is set — leave blank to keep</div>':''}
-        </div>
-        <div class="form-group">
-          <label>Docker Socket Path (on remote)</label>
-          <input type="text" class="d-sshSocket" value="${escHtml(data.socketPath||'/var/run/docker.sock')}" placeholder="/var/run/docker.sock">
-        </div>
-      </div>
-    </div>`;
-  document.getElementById('docker-list').appendChild(el);
-}
-
-function onDockerType(sel, id) {
-  document.getElementById(`d-socket-${id}`).style.display = sel.value === 'socket' ? '' : 'none';
-  document.getElementById(`d-tcp-${id}`).style.display    = sel.value === 'tcp'    ? '' : 'none';
-  document.getElementById(`d-ssh-${id}`).style.display    = sel.value === 'ssh'    ? '' : 'none';
-}
-
 function onSynVer(sel, id) {
   const v3 = sel.value === '3';
   document.getElementById(`sv2-${id}`).style.display = v3 ? 'none' : '';
@@ -809,17 +915,12 @@ function populate(cfg) {
     document.getElementById('en-proxmox').checked = cfg.proxmox.enabled !== false;
     document.getElementById('cb-proxmox').classList.remove('hidden');
     document.getElementById('icon-proxmox').value = cfg.proxmox.icon || '';
-    document.getElementById('pve-host').value = cfg.proxmox.host || '';
-    document.getElementById('pve-port').value = cfg.proxmox.port || 8006;
-    document.getElementById('pve-tokenid').value = cfg.proxmox.tokenId || '';
-    secVal(cfg.proxmox.tokenSecret, document.getElementById('pve-secret'));
-    (cfg.proxmox.nodes || []).forEach(n => appendTag('pve-nodes', n));
   }
   if (cfg.linux) {
     document.getElementById('en-linux').checked = cfg.linux.enabled !== false;
     document.getElementById('cb-linux').classList.remove('hidden');
     document.getElementById('icon-linux').value = cfg.linux.icon || '';
-    (cfg.linux.servers || []).forEach(addLinuxServer);
+    if (cfg.linux.agentToken) document.getElementById('lx-token').value = cfg.linux.agentToken;
   }
   if (cfg.kubernetes) {
     document.getElementById('en-kubernetes').checked = cfg.kubernetes.enabled !== false;
@@ -845,8 +946,8 @@ function populate(cfg) {
     document.getElementById('en-docker').checked = cfg.docker.enabled !== false;
     document.getElementById('cb-docker').classList.remove('hidden');
     document.getElementById('icon-docker').value = cfg.docker.icon || '';
-    (cfg.docker.hosts || []).forEach(addDockerHost);
   }
+  loadAgents();
   if (cfg.database) {
     document.getElementById('en-database').checked = cfg.database.enabled !== false;
     document.getElementById('cb-database').classList.remove('hidden');
@@ -903,38 +1004,16 @@ function collect() {
 
   {
     const on = document.getElementById('en-proxmox').checked;
-    const host = document.getElementById('pve-host').value.trim();
-    const nodes = getTagVals('pve-nodes');
-    if (on || host || nodes.length) cfg.proxmox = {
+    if (on) cfg.proxmox = {
       enabled: on,
-      host,
-      port: parseInt(document.getElementById('pve-port').value) || 8006,
-      tokenId: document.getElementById('pve-tokenid').value.trim(),
-      tokenSecret: maskedVal(document.getElementById('pve-secret')),
-      nodes,
       icon: document.getElementById('icon-proxmox').value.trim() || undefined,
     };
   }
 
   {
     const on = document.getElementById('en-linux').checked;
-    const servers = [];
-    document.querySelectorAll('#linux-list .arr-item').forEach(item => {
-      const idx = item.id.replace('lsrv-', '');
-      const srv = {
-        name: item.querySelector('.l-name').value.trim(),
-        host: item.querySelector('.l-host').value.trim(),
-        port: parseInt(item.querySelector('.l-port').value) || 22,
-        user: item.querySelector('.l-user').value.trim(),
-        services: getTagVals(`l-svc-${idx}`),
-      };
-      const key = maskedVal(item.querySelector('.l-key'));
-      const pw  = maskedVal(item.querySelector('.l-pw'));
-      if (key) srv.privateKey = key;
-      else if (pw) srv.password = pw;
-      if (srv.name && srv.host) servers.push(srv);
-    });
-    if (on || servers.length) cfg.linux = { enabled: on, servers, icon: document.getElementById('icon-linux').value.trim() || undefined };
+    const agentToken = document.getElementById('lx-token').value.trim();
+    if (on || agentToken) cfg.linux = { enabled: on, agentToken: agentToken || undefined, icon: document.getElementById('icon-linux').value.trim() || undefined };
   }
 
   {
@@ -986,29 +1065,7 @@ function collect() {
 
   {
     const on = document.getElementById('en-docker').checked;
-    const hosts = [];
-    document.querySelectorAll('#docker-list .arr-item').forEach(item => {
-      const type = item.querySelector('.d-type').value;
-      const h = { name: item.querySelector('.d-name').value.trim() };
-      if (type === 'socket') {
-        h.socketPath = item.querySelector('.d-socket').value.trim() || '/var/run/docker.sock';
-      } else if (type === 'tcp') {
-        h.host = item.querySelector('.d-host').value.trim();
-        h.port = parseInt(item.querySelector('.d-port').value) || 2375;
-      } else if (type === 'ssh') {
-        h.type = 'ssh';
-        h.sshHost = item.querySelector('.d-sshHost').value.trim();
-        h.sshPort = parseInt(item.querySelector('.d-sshPort').value) || 22;
-        h.sshUser = item.querySelector('.d-sshUser').value.trim();
-        const pw = item.querySelector('.d-sshPassword').value;
-        if (pw) h.sshPassword = pw;
-        const key = item.querySelector('.d-sshKey').value.trim();
-        if (key) h.sshKey = key;
-        h.socketPath = item.querySelector('.d-sshSocket').value.trim() || '/var/run/docker.sock';
-      }
-      if (h.name) hosts.push(h);
-    });
-    if (on || hosts.length) cfg.docker = { enabled: on, hosts, icon: document.getElementById('icon-docker').value.trim() || undefined };
+    if (on) cfg.docker = { enabled: on, icon: document.getElementById('icon-docker').value.trim() || undefined };
   }
 
   {
@@ -1147,11 +1204,6 @@ function uploadIcon(input, targetId) {
 async function saveConfig() {
   const btns = document.querySelectorAll('.btn-save');
   flushPendingTags();
-  if (document.getElementById('en-proxmox').checked && getTagVals('pve-nodes').length === 0) {
-    toast('Proxmox: at least one node name is required', 'err');
-    document.getElementById('pve-node-in').focus();
-    return;
-  }
   btns.forEach(b => b.disabled = true);
   try {
     const cfgPayload = collect();

@@ -1,7 +1,7 @@
 {
   "name": "omnisight",
-  "version": "0.7.10-beta",
-  "description": "Simple monitoring dashboard for Proxmox, Linux services, Kubernetes, Synology, and Healthchecks",
+  "version": "1.0.0",
+  "description": "Agent-based monitoring dashboard for Proxmox, Linux servers, Docker, Kubernetes, SNMP devices, databases and Healthchecks",
   "main": "server.js",
   "scripts": {
     "start": "node --openssl-legacy-provider server.js",
@@ -12,7 +12,6 @@
     "express": "^4.18.2",
     "js-yaml": "^4.1.0",
     "net-snmp": "^3.11.3",
-    "ssh2": "^1.15.0",
     "@kubernetes/client-node": "^0.20.0",
     "nodemailer": "^6.9.14",
     "pg": "^8.11.5",

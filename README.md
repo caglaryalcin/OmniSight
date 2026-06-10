@@ -1,16 +1,18 @@
 # OmniSight
 
-![Status](https://img.shields.io/badge/status-beta-orange) [![Latest Release](https://img.shields.io/github/v/release/caglaryalcin/OmniSight?include_prereleases&color=blue)](https://github.com/caglaryalcin/OmniSight/releases)
+![Status](https://img.shields.io/badge/status-stable-brightgreen) [![Version](https://img.shields.io/badge/version-1.0.0-blue)](https://github.com/caglaryalcin/OmniSight/releases) [![Latest Release](https://img.shields.io/github/v/release/caglaryalcin/OmniSight?include_prereleases&color=blue)](https://github.com/caglaryalcin/OmniSight/releases)
 
 A simple, single-glance monitoring dashboard for Proxmox, Linux servers, Kubernetes, SNMP devices, Docker, databases and Healthchecks.
 
 ## Features
 
-- **Proxmox** — node CPU/RAM/temperature/uptime, VM/LXC, per-node service status with **start/stop/restart/exclude** actions, **last backup** (vzdump) status, **Ceph cluster storage health** monitoring with active alert summaries, and **node storage status** (NFS, Local, ZFS, LVM, etc.) with utilization percentages, all via API Token
-- **Linux servers** — agentless via SSH: CPU/RAM/uptime and **auto-discovered** running/failed services (no manual list) with **status/start/restart/exclude** actions
+- **Modern UI** — fully redesigned interface: glass header, soft-glow status indicators, card-grid summaries, Inter typography, refined dark & light themes and subtle micro-animations
+- **One agent, one command (Beszel-style)** — Linux servers, Proxmox nodes and Docker hosts are all monitored by a single tiny push agent (one bash script + systemd, nothing beyond `curl`). In Settings just click **+ Add System / Node / Host**, pick **Binary**, **Docker** or **Stack**, copy the pre-filled command, run it on the server — the system self-registers and pops up online within seconds. No SSH keys, no API tokens, no inbound firewall rules, NAT-friendly (see [The agent](#the-agent))
+- **Proxmox** — node CPU/RAM/temperature/uptime, VM/LXC, per-node service status with **start/stop/restart/exclude** actions, **last backup** (vzdump) status, **Ceph cluster storage health** with active alert summaries, and **node storage status** (NFS, Local, ZFS, LVM, etc.) with utilization — collected locally by the agent via `pvesh`, **no API token required**
+- **Linux servers** — CPU/RAM/disk/swap/load/temperature/uptime/OS plus disk I/O and bandwidth, with **auto-discovered** running/failed services and near-instant **status/start/stop/restart/exclude** actions over the agent's command long-poll. Works on any systemd Linux incl. NAS devices (e.g. Synology)
 - **Kubernetes** — pod / deployment / service status and live pod log viewer (kubeconfig)
 - **SNMP** — status of any SNMP v2c/v3 device (Synology, UniFi, switches, routers, …) with CPU/RAM/temperature where exposed
-- **Docker** — container status, ports, unused (dangling) image count with a **Prune** action, live container log viewer. Local socket, remote TCP, or over SSH (socket-forward, with `docker ps` / `sudo` fallback)
+- **Docker** — container status, ports, CPU/memory, network I/O, block I/O, unused (dangling) image count with a **Prune** action and live container log viewer — all through the agent (run it on the host or as a container with the docker socket mounted)
 - **Databases** — **PostgreSQL**, **MySQL/MariaDB** and **MongoDB**: up/down, active/max connections, total size and version
 
 ![](https://raw.githubusercontent.com/caglaryalcin/OmniSight/refs/heads/main/screenshots/dashboard.png)
@@ -50,13 +52,86 @@ npm start
 
 Dashboard: `http://localhost:3000` — the app starts with no config; set up your account and configure platforms from the Settings UI.
 
+## The agent
+
+Linux servers, Proxmox nodes and Docker hosts are all monitored by the **OmniSight agent** — a single bash script that **pushes** metrics to OmniSight over HTTP(S). Nothing to expose on the servers, no credentials stored in OmniSight, works behind NAT/firewalls as long as the server can reach the dashboard.
+
+**Setup (Beszel-style):**
+
+1. Open **Settings** and click **+ Add System** (Linux Servers), **+ Add Node** (Proxmox) or **+ Add Host** (Docker). The shared agent token is generated automatically.
+2. Pick an install method in the dialog and copy the pre-filled command:
+
+**Binary (systemd):**
+
+```bash
+curl -fsSL http://<omnisight-host>:3000/agent/install.sh | \
+  sudo OMNISIGHT_URL=http://<omnisight-host>:3000 OMNISIGHT_TOKEN=<token> bash
+```
+
+**Docker (agent in a container):**
+
+```bash
+docker run -d --name omnisight-agent --restart unless-stopped \
+  --network host --pid host \
+  -e OMNISIGHT_URL=http://<omnisight-host>:3000 \
+  -e OMNISIGHT_TOKEN=<token> \
+  -e OMNISIGHT_HOST_ROOT=/host \
+  -v /:/host:ro \
+  -v /var/run/docker.sock:/var/run/docker.sock:ro \
+  docker:cli sh -c "apk add --no-cache bash curl coreutils >/dev/null && curl -fsSL http://<omnisight-host>:3000/agent/omnisight-agent.sh -o /usr/local/bin/omnisight-agent && exec bash /usr/local/bin/omnisight-agent"
+```
+
+**Docker Stack (Swarm):**
+
+```bash
+docker stack deploy -c - omnisight-agent <<'EOF'
+version: "3.8"
+services:
+  agent:
+    image: docker:cli
+    command: sh -c "apk add --no-cache bash curl coreutils >/dev/null && curl -fsSL http://<omnisight-host>:3000/agent/omnisight-agent.sh -o /usr/local/bin/omnisight-agent && exec bash /usr/local/bin/omnisight-agent"
+    environment:
+      OMNISIGHT_URL: http://<omnisight-host>:3000
+      OMNISIGHT_TOKEN: <token>
+      OMNISIGHT_HOST_ROOT: /host
+    volumes:
+      - /:/host:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    deploy:
+      mode: global
+      restart_policy:
+        condition: any
+EOF
+```
+
+3. Run it on the server — the dialog shows a live "✓ connected" confirmation and the system appears on the dashboard within seconds.
+
+**What one agent covers, automatically:**
+
+- **System** — hostname, IP, OS, kernel, CPU %, load, RAM, swap, root disk, disk I/O, bandwidth, temperature, uptime and all running/failed **systemd services** → *Linux Servers* card
+- **Docker** (when `docker` is present, or the socket is mounted) — containers, states, ports, CPU/memory, network I/O, block I/O, dangling-image count → *Docker* card; `logs` and `Prune` run locally on the host and stream back over the command channel
+- **Proxmox** (when `pvesh` is present) — VM/LXC list, node storage, last vzdump backup, Ceph health → *Proxmox* card; the node moves from *Linux Servers* to *Proxmox* automatically
+
+**How actions work:** between reports the agent holds a long-poll against `/api/agent/commands`, so service `start/stop/restart`, container logs and prune clicked in the UI reach the server near-instantly and execute locally (`systemctl` / `docker`).
+
+**Details:**
+
+- Report interval: 15s by default — `OMNISIGHT_INTERVAL=<seconds>` at install time, or edit `/etc/omnisight-agent/agent.env` and restart.
+- Authentication: one shared token (`X-Agent-Token` header), auto-generated on first add and regenerable from **Settings → Linux Servers**. Regenerating invalidates all installed agents until updated.
+- A system is marked **offline** when no report arrives for ~2.5× its interval.
+- Logs: `journalctl -u omnisight-agent -f` (binary) / `docker logs -f omnisight-agent` (container)
+- Uninstall: `curl -fsSL http://<omnisight-host>:3000/agent/install.sh | sudo bash -s uninstall` / `docker rm -f omnisight-agent` / `docker stack rm omnisight-agent`
+- Remove from dashboard: the ✕ button next to the system in Settings.
+
+> Upgrading from ≤0.7.x: SSH-based `linux.servers[]`, Proxmox API (`tokenId`/`tokenSecret`/`nodes`) and `docker.hosts[]` configs are no longer used. Install the agent on each system instead; service exclude lists are preserved per hostname.
+
 ## Quick start (Docker)
 
 ```bash
 docker compose up -d --build
 ```
 
-Nothing to pre-create. The single `data/` directory holds all state (`config.yaml`, `secret.key`, `auth.yaml`, `sessions.yaml`, `kube.bin`, SSH keys); Docker auto-creates it and it persists across restarts. The app starts empty — set up your account and configure platforms from the Settings UI. Standalone Docker using the published image:
+Nothing to pre-create. The single `data/` directory holds all state (`config.yaml`, `secret.key`, `auth.yaml`, `sessions.yaml`, `agents.yaml`, `kube.bin`); Docker auto-creates it and it persists across restarts. The app starts empty — set up your account and configure platforms from the Settings UI. Standalone Docker using the published image:
 
 ```bash
 docker run -d --name omnisight -p 3000:3000 \
@@ -95,7 +170,7 @@ kubectl apply -f deploy/kubernetes.yaml
 
 No ConfigMap/Secret to create: the app starts empty and you configure it from the Settings UI, which writes `config.yaml` to the persistent volume (`config.yaml`, `secret.key`, `auth.yaml`, `sessions.yaml` all persist on the PVC).
 
-> **Docker path note:** Windows paths don't work inside the container. Put `kube.bin` and SSH keys in `./data/` and reference them with container paths, e.g. `kubeconfig: /app/data/kube.bin` and `privateKey: /app/data/id_ed25519`.
+> **Docker path note:** Windows paths don't work inside the container. Put `kube.bin` in `./data/` and reference it with a container path, e.g. `kubeconfig: /app/data/kube.bin`.
 
 ## Environment variables
 
@@ -144,12 +219,12 @@ In Kubernetes you can also mount the CA from a ConfigMap (Uptime-Kuma style) —
 
 The live config is `data/config.yaml` (created automatically on first save). Easiest is to configure everything from the Settings UI; to hand-edit, copy the template — `cp config.example.yaml data/config.yaml` — and edit it. All sections are optional; include only what you use. See `config.example.yaml`.
 
-- `proxmox` — host, port, tokenId, tokenSecret, nodes[]
-- `linux.servers[]` — name, host, port, user, privateKey **or** password (services are auto-discovered — running/failed — no manual list needed, intentionally excluded services are managed automatically via UI)
+- `linux` — `enabled` + `agentToken` (auto-generated from the Settings UI). Systems self-register via the [agent](#the-agent); no per-server entries needed. Services are auto-discovered and Exclude/Include is managed from the UI
+- `proxmox` — just `enabled` (+ optional `icon`). Data comes from agents running on the nodes (`pvesh`)
+- `docker` — just `enabled` (+ optional `icon`). Data comes from agents on the hosts
 - `kubernetes` — kubeconfig, namespaces[] (the Settings UI has a **Browse…** button that uploads a kubeconfig from your machine into `data/` and fills in the container path automatically)
 - `snmp.devices[]` — SNMP v2c (community) or v3 (username, authPassword, privPassword, …)
 - `healthchecks` — url, apiKey
-- `docker.hosts[]` — `type: socket | tcp | ssh` (for SSH: sshHost/sshUser + privateKey/sshPassword, optional `sudo`)
 - `database.instances[]` — `type: postgresql | mysql | mariadb | mongodb`, name, host, port, user, password, optional `database`
 - `alerts` — `enabled` + `ntfy` / `telegram` / `smtp` channels
 - `publicStatus: true` and `publicTitle` — expose the `/status` page publicly
@@ -159,9 +234,8 @@ The live config is `data/config.yaml` (created automatically on first save). Eas
 
 Some cards expose actions (no extra setup beyond the access the connection already has):
 
-- **Linux services** — query `status`, `start`, `restart` on inactive/failed units over SSH. The SSH user must be root or have `systemctl` rights. You can also Exclude/Include intentionally stopped services directly from the UI so they don't degrade the dashboard health or trigger alerts.
-- **Proxmox services** — `start`/`stop`/`restart` and live `state` via the Proxmox API. The API token needs `Sys.Modify` (and `Sys.Audit` to read task/backup status) on the node. Like Linux, expected failures can be muted using the Exclude/Include buttons.
-- **Docker** — `Prune` removes dangling images on the host.
+- **Linux & Proxmox services** — query `status`, `start`, `stop`, `restart` on inactive/failed units via the agent (executed locally with `systemctl`, delivered near-instantly over the command long-poll). You can also Exclude/Include intentionally stopped services directly from the UI so they don't degrade the dashboard health or trigger alerts.
+- **Docker** — `Prune` removes dangling images and the live log viewer streams `docker logs`, both executed locally by the agent on the host.
 
 ### Databases
 

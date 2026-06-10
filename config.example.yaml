@@ -4,36 +4,21 @@
 # Useful for Docker / secrets — set the env var and reference it here.
 # Keep key files (kubeconfig, SSH keys) in the ./data/ folder (git-ignored).
 
-proxmox:
-  host: "192.168.1.10"
-  port: 8006
-  tokenId: "root@pam!omnisight"
-  tokenSecret: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-  nodes:
-    - pve1
-    - pve2
-
+# Linux servers, Proxmox nodes and Docker hosts are all monitored by the
+# OmniSight agent (push). Use Settings -> "+ Add System / Node / Host" to get
+# a copy-paste install command (Binary/systemd or Docker) with the token
+# pre-filled. Agents self-register; no per-server config is needed here.
+#   Binary:  curl -fsSL http://<host>:3000/agent/install.sh | \
+#              sudo OMNISIGHT_URL=http://<host>:3000 OMNISIGHT_TOKEN=<token> bash
+# The same shared token is used by every agent (linux.agentToken).
 linux:
-  servers:
-    - name: "web-server"
-      host: "192.168.1.20"
-      port: 22
-      user: "youruser"
-      privateKey: '~/.ssh/id_ed25519'
-      services:
-        - nginx
-        - postgresql
-        - redis
-    - name: "db-server"
-      host: "192.168.1.21"
-      port: 22
-      user: "root"
-      # password auth instead of a key:
-      # password: "your-password"
-      privateKey: '~/.ssh/id_ed25519'
-      services:
-        - mysql
-        - backup-agent
+  enabled: true
+  agentToken: "generate-from-settings-ui"
+
+# Proxmox data (VM/LXC, storage, backups, Ceph) is collected by the agent via
+# pvesh on each node - no API token needed. Just install the agent on the node.
+proxmox:
+  enabled: true
 
 kubernetes:
   kubeconfig: './data/kube.bin'   # put your kubeconfig in data/
@@ -51,39 +36,10 @@ healthchecks:
   url: "https://healthchecks.yourdomain.com"
   apiKey: "your-api-key-here"
 
+# Docker containers are reported by the same agent when docker is present on
+# the host (or run the agent itself as a container - see Settings -> Docker).
 docker:
-  hosts:
-    # 1) Local Docker (same machine as OmniSight)
-    - name: "local"
-      type: socket
-      socketPath: /var/run/docker.sock
-
-    # 2) Remote Docker TCP daemon (2375/2376 exposed)
-    - name: "build-server"
-      type: tcp
-      host: "192.168.1.30"
-      port: 2375
-
-    # 3) Remote host over SSH (without exposing the daemon)
-    #    Tries socket-forward first; falls back to 'docker ps' if disabled.
-    #    'sudo' omitted = auto: tries without sudo first, then with sudo.
-    - name: "app-server"
-      type: ssh
-      sshHost: "192.168.1.31"
-      sshPort: 22
-      sshUser: "deploy"
-      privateKey: '~/.ssh/id_ed25519'
-      socketPath: /var/run/docker.sock
-
-    # SSH + password + sudo required (e.g. Synology, socket owned by root)
-    - name: "nas"
-      type: ssh
-      sshHost: "192.168.1.5"
-      sshPort: 22
-      sshUser: "admin"
-      sshPassword: "your-password"
-      sudo: true
-      socketPath: /var/run/docker.sock
+  enabled: true
 
 alerts:
   enabled: true

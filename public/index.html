@@ -4,24 +4,29 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>OmniSight</title>
-<link rel="icon" type="image/svg+xml" id="favicon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%231E2021' stroke='%233dba7e' stroke-width='2'/><circle cx='16' cy='16' r='6' fill='%233dba7e'/><circle cx='16' cy='16' r='10' fill='none' stroke='%233dba7e' stroke-width='1.5' stroke-opacity='.4'/></svg>">
+<link rel="icon" type="image/svg+xml" id="favicon" href="/assets/omnisight-logo.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 
 :root{
-  --bg:      #181A1B;
-  --panel:   #1E2021;
-  --row:     #242627;
-  --border:  #2E3234;
-  --text:    #C9D1D9;
-  --muted:   #6E7681;
-  --green:   #3dba7e;
-  --red:     #e74c3c;
-  --yellow:  #f39c12;
-  --blue:    #5086d4;
+  --bg:#0B0E14; --panel:#12161F; --panel2:#161C29; --row:#1A202C;
+  --border:#242C3B; --border2:#2E3850;
+  --text:#E2E8F2; --muted:#7D8AA3;
+  --green:#34D399; --red:#F87171; --yellow:#FBBF24; --blue:#60A5FA;
+  --purple:#A78BFA; --cyan:#22D3EE; --accent:#6366F1;
+  --radius:8px;
+  --shadow:0 1px 2px rgba(0,0,0,.25),0 10px 28px -14px rgba(0,0,0,.45);
 }
 
-body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;overflow:hidden}
+html{color-scheme:dark}
+html[data-theme="light"]{color-scheme:light}
+
+body{background:var(--bg);color:var(--text);font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;overflow:hidden;-webkit-font-smoothing:antialiased}
+body::before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;background:
+  linear-gradient(180deg,rgba(79,156,249,.08),transparent 34%),
+  linear-gradient(90deg,rgba(41,199,217,.05),transparent 42%)}
 
 body {
   -webkit-user-select: none;
@@ -37,92 +42,98 @@ body {
   user-select: text;
 }
 
-#pbar{position:fixed;top:0;left:0;height:2px;background:var(--green);z-index:999;transition:width 1s linear}
+#pbar{position:fixed;top:0;left:0;height:2px;background:linear-gradient(90deg,var(--accent),var(--cyan));z-index:999;transition:width 1s linear;box-shadow:0 0 8px rgba(99,102,241,.6)}
 
 header{
-  background:var(--panel);border-bottom:1px solid var(--border);
-  height:64px;padding:0 24px;
+  background:rgba(18,22,31,.82);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--border);
+  height:60px;padding:0 22px;
   display:flex;align-items:center;justify-content:space-between;
   position:sticky;top:0;z-index:100;
 }
-.logo{font-size:19px;font-weight:700;display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit}
-.ldot{width:12px;height:12px;border-radius:50%;background:var(--green);animation:pg 2.5s infinite}
-.hdr-r{display:flex;align-items:center;gap:12px}
-#lupd{font-size:13px;color:var(--muted)}
+.logo{font-size:18px;font-weight:800;letter-spacing:-.02em;display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit;
+  background:linear-gradient(90deg,var(--text),#aab6cc);-webkit-background-clip:text;background-clip:text}
+.ldot{width:11px;height:11px;border-radius:50%;background:var(--green);animation:pg 2.5s infinite;box-shadow:0 0 10px rgba(52,211,153,.7)}
+.hdr-r{display:flex;align-items:center;gap:10px}
+#lupd{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
 #rbtn,#pbtn{
   background:var(--row);border:1px solid var(--border);color:var(--text);
-  padding:8px 15px;border-radius:7px;cursor:pointer;font-size:14px;
-  display:flex;align-items:center;gap:7px
+  padding:7px 14px;border-radius:9px;cursor:pointer;font-size:13px;font-weight:500;
+  display:flex;align-items:center;gap:7px;transition:border-color .15s,background .15s,transform .1s
 }
-#rbtn:hover,#pbtn:hover{border-color:#4a5568}
+#rbtn:hover,#pbtn:hover{border-color:var(--border2);background:var(--panel2)}
+#rbtn:active,#pbtn:active{transform:scale(.97)}
 #rbtn.spin svg{animation:rot 1s linear infinite}
 #pbtn.paused{border-color:var(--yellow);color:var(--yellow)}
 
-@keyframes pg{0%,100%{box-shadow:0 0 0 0 rgba(61,186,126,.5)}50%{box-shadow:0 0 0 6px rgba(61,186,126,0)}}
+@keyframes pg{0%,100%{box-shadow:0 0 0 0 rgba(52,211,153,.5)}50%{box-shadow:0 0 0 6px rgba(52,211,153,0)}}
 @keyframes rot{to{transform:rotate(360deg)}}
 @keyframes spin{to{transform:rotate(360deg)}}
+@keyframes cardin{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
 
 .menu-wrap{position:relative}
-.menu-btn{background:var(--row);border:1px solid var(--border);color:var(--text);padding:8px 13px;border-radius:7px;cursor:pointer;font-size:14px;display:flex;align-items:center;gap:6px}
-.menu-btn:hover{border-color:#4a5568}
-.menu-drop{display:none;position:absolute;right:0;top:calc(100% + 6px);background:var(--panel);border:1px solid var(--border);border-radius:8px;min-width:190px;overflow:hidden;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,.4)}
-.menu-drop.open{display:block}
-.menu-item{display:block;padding:13px 20px;font-size:14px;color:var(--text);text-decoration:none;cursor:pointer;border:none;background:none;width:100%;text-align:left}
-.menu-item:hover{background:rgba(255,255,255,.05)}
+.menu-btn{background:var(--row);border:1px solid var(--border);color:var(--text);padding:7px 12px;border-radius:9px;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:6px;transition:border-color .15s,background .15s}
+.menu-btn:hover{border-color:var(--border2);background:var(--panel2)}
+.menu-drop{display:none;position:absolute;right:0;top:calc(100% + 8px);background:var(--panel);border:1px solid var(--border);border-radius:12px;min-width:190px;overflow:hidden;z-index:200;box-shadow:var(--shadow);padding:5px}
+.menu-drop.open{display:block;animation:cardin .15s ease}
+.menu-item{display:block;padding:10px 14px;font-size:13px;font-weight:500;color:var(--text);text-decoration:none;cursor:pointer;border:none;background:none;width:100%;text-align:left;border-radius:8px}
+.menu-item:hover{background:rgba(255,255,255,.06)}
 .menu-item.danger{color:var(--red)}
 
-/* ── Layout ── */
-.layout{display:flex;height:calc(100vh - 92px)}
-.appfoot{height:28px;display:flex;align-items:center;gap:14px;padding:0 16px;border-top:1px solid var(--border);font-size:12px;color:var(--muted);background:var(--panel)}
-.appfoot a{color:var(--muted);text-decoration:none;display:inline-flex;align-items:center;gap:5px}
+/* Layout */
+.layout{display:flex;height:calc(100vh - 88px)}
+.appfoot{height:28px;display:flex;align-items:center;gap:14px;padding:0 16px;border-top:1px solid var(--border);font-size:12px;color:var(--muted);background:rgba(18,22,31,.82);backdrop-filter:blur(14px)}
+.appfoot a{color:var(--muted);text-decoration:none;display:inline-flex;align-items:center;gap:5px;transition:color .15s}
 .appfoot a:hover{color:var(--text)}
-#sidebar{width:40vw;min-width:200px;max-width:900px;border-right:none;overflow-y:auto;flex-shrink:0;background:var(--bg);position:relative}
-#resizer{width:4px;background:var(--border);cursor:default;flex-shrink:0;position:relative;z-index:10}
-#detail{flex:1;overflow-y:auto;padding:0;background:var(--bg);min-width:0}
+#sidebar{width:312px;min-width:260px;max-width:380px;border-right:1px solid var(--border);overflow-y:auto;flex-shrink:0;background:rgba(13,17,23,.58);backdrop-filter:blur(18px);position:relative;padding:6px}
+#resizer{width:1px;background:var(--border);cursor:default;flex-shrink:0;position:relative;z-index:10}
+#detail{flex:1;overflow-y:auto;padding:0;background:transparent;min-width:0}
 
-/* ── Sidebar cards ── */
-.sb-card{margin:10px 10px 0;border-radius:10px;border:1px solid var(--border);cursor:pointer;transition:background .15s,border-color .15s,border-left-color .15s;border-left:3px solid var(--muted);overflow:hidden}
-.sb-card.dragging{opacity:.9;border:2px dashed var(--blue);border-left:3px solid var(--blue);background:rgba(80,134,212,.10);box-shadow:0 4px 14px rgba(0,0,0,.25)}
-.sb-card:last-child{margin-bottom:10px}
-.sb-card:hover{background:rgba(255,255,255,.03);border-color:#4a5568}
-.sb-card.active{background:var(--row);border-color:var(--green);border-left-color:var(--green)}
-.sb-hdr{display:flex;align-items:center;gap:10px;padding:12px 14px 10px}
-.sb-icon{width:16px;height:16px;flex-shrink:0;display:flex;align-items:center;justify-content:center}
-.sb-title{font-size:17px;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.sb-summary{border-top:1px solid var(--border);border-radius:0 0 10px 10px;overflow:hidden}
+/* Sidebar cards */
+.sb-card{margin:10px 8px 0;border-radius:var(--radius);border:1px solid var(--border);cursor:pointer;
+  background:var(--panel);box-shadow:0 1px 2px rgba(0,0,0,.2);
+  transition:background .15s,border-color .15s,transform .15s,box-shadow .15s;overflow:hidden;animation:cardin .25s ease}
+.sb-card.dragging{opacity:.9;border:1px dashed var(--blue);background:rgba(96,165,250,.08);box-shadow:0 8px 20px rgba(0,0,0,.35)}
+.sb-card:last-child{margin-bottom:12px}
+.sb-card:hover{border-color:var(--border2);transform:translateY(-1px);box-shadow:var(--shadow)}
+.sb-card.active{border-color:rgba(99,102,241,.55);background:linear-gradient(180deg,rgba(99,102,241,.07),var(--panel) 55%);box-shadow:0 0 0 1px rgba(99,102,241,.25),var(--shadow)}
+.sb-hdr{display:flex;align-items:center;gap:10px;padding:13px 15px 11px}
+.sb-icon{width:26px;height:26px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--row);border:1px solid var(--border);border-radius:8px;padding:4px}
+.sb-title{font-size:15px;font-weight:650;letter-spacing:-.01em;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sb-summary{border-top:1px solid var(--border);overflow:hidden;background:rgba(0,0,0,.12)}
 
-/* ── Detail header ── */
+/* Detail header */
 .det-hdr{
   display:flex;align-items:center;gap:12px;
-  padding:14px 20px;background:var(--panel);
+  padding:16px 22px;background:rgba(18,22,31,.85);backdrop-filter:blur(14px);
   border-bottom:1px solid var(--border);position:sticky;top:0;z-index:10;
 }
-.det-icon{width:18px;height:18px;flex-shrink:0;display:flex;align-items:center;justify-content:center}
-.det-title{font-size:17px;font-weight:700;flex:1}
+.det-icon{width:34px;height:34px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--row);border:1px solid var(--border);border-radius:10px;padding:6px}
+.det-title{font-size:18px;font-weight:750;letter-spacing:-.02em;flex:1}
 .det-meta{font-size:12px;color:var(--muted)}
-.det-body{padding:0}
+.det-body{padding:0 0 24px}
 
-/* ── Monitor rows ── */
+/* Monitor rows */
 .mon-row{
   display:flex;align-items:center;gap:10px;
   padding:11px 16px;border-bottom:1px solid var(--border);
   transition:background .1s;
 }
 .mon-row:last-child{border-bottom:none}
-.mon-row:hover{background:rgba(255,255,255,.02)}
-.mon-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.mon-row:hover{background:rgba(255,255,255,.025)}
+.mon-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
 .md-green{background:var(--green);animation:pg 2.5s infinite}
-.md-red{background:var(--red)}
-.md-yellow{background:var(--yellow)}
+.md-red{background:var(--red);box-shadow:0 0 8px rgba(248,113,113,.5)}
+.md-yellow{background:var(--yellow);box-shadow:0 0 8px rgba(251,191,36,.4)}
 .md-gray{background:var(--muted)}
 .md-blue{background:var(--blue)}
-.mon-name{font-size:15px;font-weight:500;width:160px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mon-name{font-size:14px;font-weight:550;width:160px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mon-sub{font-size:13px;color:var(--muted);width:110px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.nbell{display:inline-flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);flex-shrink:0;padding:2px;border-radius:5px;opacity:.65;transition:opacity .1s,color .1s}
+.nbell{display:inline-flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);flex-shrink:0;padding:3px;border-radius:7px;opacity:.65;transition:opacity .1s,color .1s,background .1s}
 .nbell:hover{color:var(--text);opacity:1;background:rgba(255,255,255,.07)}
 .nbell.off{color:var(--red);opacity:1}
-.btn-act{background:var(--row);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 12px;font-size:12px;cursor:pointer;flex-shrink:0}
-.btn-act:hover{border-color:var(--blue);color:var(--blue)}
+.btn-act{background:var(--row);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:4px 12px;font-size:12px;font-weight:500;cursor:pointer;flex-shrink:0;transition:border-color .15s,color .15s,background .15s}
+.btn-act:hover{border-color:var(--blue);color:var(--blue);background:rgba(96,165,250,.08)}
 .btn-act:disabled{opacity:.5;cursor:default}
 
 .hb{display:flex;gap:2px;align-items:center;flex:1}
@@ -131,160 +142,189 @@ header{
 .hst-bar{flex:1;min-width:2px;border-radius:1px 1px 0 0}
 
 .mon-badge{flex-shrink:0}
-.badge{font-size:12px;padding:3px 10px;border-radius:20px;font-weight:600;white-space:nowrap}
-.bg-green{background:rgba(61,186,126,.15);color:var(--green)}
-.bg-red  {background:rgba(231,76,60,.15); color:var(--red)}
-.bg-yellow{background:rgba(243,156,18,.15);color:var(--yellow)}
-.bg-gray {background:rgba(110,118,129,.15);color:var(--muted)}
-.bg-blue {background:rgba(80,134,212,.15); color:var(--blue)}
+.badge{font-size:11.5px;padding:3px 10px;border-radius:20px;font-weight:600;white-space:nowrap;letter-spacing:.01em}
+.bg-green{background:rgba(52,211,153,.13);color:var(--green);box-shadow:inset 0 0 0 1px rgba(52,211,153,.25)}
+.bg-red  {background:rgba(248,113,113,.13);color:var(--red);box-shadow:inset 0 0 0 1px rgba(248,113,113,.25)}
+.bg-yellow{background:rgba(251,191,36,.12);color:var(--yellow);box-shadow:inset 0 0 0 1px rgba(251,191,36,.25)}
+.bg-gray {background:rgba(125,138,163,.13);color:var(--muted);box-shadow:inset 0 0 0 1px rgba(125,138,163,.2)}
+.bg-blue {background:rgba(96,165,250,.13);color:var(--blue);box-shadow:inset 0 0 0 1px rgba(96,165,250,.25)}
 
-.hist-svg{width:100%;height:48px;display:block;border-radius:3px}
+.hist-svg{width:100%;height:48px;display:block;border-radius:6px}
 .hist-bg{fill:rgba(0,0,0,.25)}
-html[data-theme="light"] .hist-bg{fill:var(--bg)}
+html[data-theme="light"] .hist-bg{fill:rgba(0,0,0,.04)}
 .chart-row{margin-bottom:18px}
 .chart-row:last-child{margin-bottom:0}
 .chart-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;padding:0 1px}
 
 #os-tooltip {
-  position: fixed; background: var(--panel); border: 1px solid var(--border);
-  padding: 8px 12px; border-radius: 8px; pointer-events: none; opacity: 0;
-  transition: opacity 0.1s; z-index: 9999; box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  position: fixed; background: var(--panel); border: 1px solid var(--border2);
+  padding: 8px 12px; border-radius: 10px; pointer-events: none; opacity: 0;
+  transition: opacity 0.1s; z-index: 9999; box-shadow: var(--shadow);
   font-size: 13px; color: var(--text); min-width: 130px;
 }
 .tt-time { font-size: 12px; color: var(--muted); margin-bottom: 6px; font-weight: 600; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
-.tt-val { font-weight: 700; }
+.tt-val { font-weight: 700; font-variant-numeric:tabular-nums; }
 
-.csum{display:flex;gap:0;border-bottom:1px solid var(--border)}
-.csum-item{flex:1;padding:10px 16px;text-align:center;border-right:1px solid var(--border)}
-.csum-item:last-child{border-right:none}
-.csum-val{font-size:20px;font-weight:700;line-height:1}
-.csum-lbl{font-size:10px;color:var(--muted);margin-top:2px}
-.hc-csum .csum-val{font-size:26px}
-.hc-csum .csum-lbl{font-size:12px}
+.csum{display:flex;gap:8px;border-bottom:1px solid var(--border);padding:10px 12px;background:rgba(0,0,0,.1)}
+.csum-item{flex:1;padding:9px 10px;text-align:center;background:var(--row);border:1px solid var(--border);border-radius:10px}
+.csum-val{font-size:19px;font-weight:750;line-height:1.1;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.csum-lbl{font-size:10px;color:var(--muted);margin-top:3px;text-transform:uppercase;letter-spacing:.06em}
+.hc-csum .csum-val{font-size:24px}
+.hc-csum .csum-lbl{font-size:11px}
 
-.sb-csum{display:flex;gap:0}
-.sb-csum-item{flex:1;padding:8px 10px;text-align:center;border-right:1px solid var(--border)}
-.sb-csum-item:last-child{border-right:none}
-.sb-csum-val{font-size:24px;font-weight:700;line-height:1}
-.sb-csum-lbl{font-size:13px;color:var(--muted);margin-top:3px}
+.sb-csum{display:flex;gap:6px;padding:9px 10px}
+.sb-csum-item{flex:1;padding:8px 6px;text-align:center;background:var(--row);border:1px solid var(--border);border-radius:9px}
+.sb-csum-val{font-size:19px;font-weight:750;line-height:1.1;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.sb-csum-lbl{font-size:10.5px;color:var(--muted);margin-top:3px;text-transform:uppercase;letter-spacing:.05em}
 
 .node-hdr{
   display:flex;align-items:center;gap:10px;
-  padding:9px 16px;cursor:pointer;border-bottom:1px solid var(--border);
+  padding:11px 18px;cursor:pointer;border-bottom:1px solid var(--border);
   transition:background .1s;
 }
-.node-hdr:hover{background:rgba(255,255,255,.02)}
+.node-hdr:hover{background:rgba(255,255,255,.025)}
 .node-hdr:last-of-type{border-bottom:none}
-.node-name{font-size:15px;font-weight:600;width:90px;flex-shrink:0}
-.node-info{font-size:13px;color:var(--muted);flex:1}
-.node-body{display:none;border-bottom:1px solid var(--border);background:rgba(0,0,0,.15);padding:12px 16px}
+.node-name{font-size:14.5px;font-weight:650;width:110px;flex-shrink:0;letter-spacing:-.01em}
+.node-info{font-size:12.5px;color:var(--muted);flex:1;font-variant-numeric:tabular-nums}
+.node-body{display:none;border-bottom:1px solid var(--border);background:rgba(0,0,0,.16);padding:14px 18px}
 .node-body.open{display:block}
 .node-body .row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
 .node-body .row:last-child{margin-bottom:0}
-.nb-label{font-size:12px;color:var(--muted);font-weight:500}
-.nb-pct{font-size:13px;font-weight:700;flex-shrink:0}
+.nb-label{font-size:12px;color:var(--muted);font-weight:550}
+.nb-pct{font-size:13px;font-weight:700;flex-shrink:0;font-variant-numeric:tabular-nums}
 
-.vm-chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}
+.vm-chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
 .vm-chip{
-  display:flex;align-items:center;gap:5px;
+  display:flex;align-items:center;gap:6px;
   background:var(--row);border:1px solid var(--border);
-  border-radius:5px;padding:4px 10px;font-size:13px;
+  border-radius:8px;padding:4px 10px;font-size:12.5px;transition:border-color .15s;
 }
-.vm-type{font-size:11px;color:var(--muted);background:var(--border);padding:1px 5px;border-radius:2px}
+.vm-chip:hover{border-color:var(--border2)}
+.vm-type{font-size:11px;color:var(--muted);background:var(--border);padding:1px 5px;border-radius:3px}
 
-.k8s-sum{display:flex;border-bottom:1px solid var(--border)}
-.k8s-stat{flex:1;padding:10px;text-align:center;border-right:1px solid var(--border)}
-.k8s-stat:last-child{border-right:none}
-.k8s-n{font-size:24px;font-weight:700;line-height:1}
-.k8s-l{font-size:12px;color:var(--muted);margin-top:2px}
+.k8s-sum{display:flex;gap:8px;border-bottom:1px solid var(--border);padding:10px 12px;background:rgba(0,0,0,.1)}
+.k8s-stat{flex:1;padding:9px;text-align:center;background:var(--row);border:1px solid var(--border);border-radius:10px}
+.k8s-n{font-size:22px;font-weight:750;line-height:1.1;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.k8s-l{font-size:10.5px;color:var(--muted);margin-top:3px;text-transform:uppercase;letter-spacing:.06em}
 
-.k8s-grp{margin:12px;border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.k8s-grp{margin:12px;border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--panel)}
 .k8s-grp-hdr{
   display:flex;align-items:center;gap:10px;
   padding:12px 16px;cursor:pointer;
   transition:background .1s;
 }
-.k8s-grp-hdr:hover{background:rgba(255,255,255,.02)}
-.k8s-grp-body{display:none;background:rgba(0,0,0,.18)}
+.k8s-grp-hdr:hover{background:rgba(255,255,255,.025)}
+.k8s-grp-body{display:none;background:rgba(0,0,0,.16)}
 .k8s-grp-body.open{display:block;border-top:1px solid var(--border)}
 .k8s-grp-body .mon-row{padding-left:34px}
-.k8s-colhdr{display:flex;align-items:center;gap:10px;padding:7px 16px 7px 34px;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);border-bottom:1px solid var(--border)}
+.k8s-colhdr{display:flex;align-items:center;gap:10px;padding:7px 16px 7px 34px;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);border-bottom:1px solid var(--border)}
 
 .syn-bar{display:flex;align-items:center;gap:8px;margin-bottom:6px}
 .syn-bl{font-size:13px;color:var(--muted);width:44px;flex-shrink:0}
-.syn-bt{flex:1;height:5px;background:var(--row);border-radius:2px;overflow:hidden}
-.syn-bf{height:100%;border-radius:2px}
-.syn-bv{font-size:13px;font-weight:600;width:38px;text-align:right}
-.syn-section{font-size:12px;color:var(--muted);margin:8px 0 4px;text-transform:uppercase;letter-spacing:.5px}
+.syn-bt{flex:1;height:6px;background:var(--row);border-radius:3px;overflow:hidden}
+.syn-bf{height:100%;border-radius:3px;transition:width .4s ease}
+.syn-bv{font-size:13px;font-weight:650;width:38px;text-align:right;font-variant-numeric:tabular-nums}
+.syn-section{font-size:11px;color:var(--muted);margin:8px 0 4px;text-transform:uppercase;letter-spacing:.08em;font-weight:650}
 .disk-chips{display:flex;flex-wrap:wrap;gap:4px}
 .disk-chip{
   display:flex;flex-direction:column;align-items:center;
   background:var(--row);border:1px solid var(--border);
-  border-radius:5px;padding:6px 10px;font-size:12px;gap:3px;min-width:60px;
+  border-radius:8px;padding:6px 10px;font-size:12px;gap:3px;min-width:60px;
 }
 
 .offline-row{
-  display:flex;align-items:flex-start;gap:8px;
-  padding:12px 16px;color:var(--red);font-size:14px;
-  background:rgba(231,76,60,.05);
+  display:flex;align-items:flex-start;gap:10px;
+  padding:13px 18px;color:var(--red);font-size:14px;
+  background:rgba(248,113,113,.06);border-bottom:1px solid var(--border);
 }
 .offline-err{font-size:12px;color:var(--muted);margin-top:2px;word-break:break-all}
 
-.empty{color:var(--muted);font-size:13px;text-align:center;padding:16px}
+.empty{color:var(--muted);font-size:13px;text-align:center;padding:18px}
 .chevron{color:var(--muted);font-size:11px;transition:transform .2s;flex-shrink:0}
 .chevron.open{transform:rotate(180deg)}
 
-::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar{width:6px;height:6px}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--border2)}
 
 html[data-theme="light"]{
-  --bg:#f4f5f7; --panel:#ffffff; --row:#eef1f4; --border:#dce0e5;
-  --text:#1f2933; --muted:#69707a;
-  --green:#1f9d63; --red:#d63b2f; --yellow:#c9820a; --blue:#3b6fc4;
+  --bg:#f3f5f9; --panel:#ffffff; --panel2:#f7f9fc; --row:#eef1f6; --border:#dde3ec; --border2:#c7d0de;
+  --text:#1c2433; --muted:#64748b;
+  --green:#0e9f6e; --red:#dc2f2f; --yellow:#b7791f; --blue:#3b82f6;
+  --purple:#7c5cd6; --cyan:#0891b2; --accent:#5a5fe0;
+  --shadow:0 1px 2px rgba(16,24,40,.06),0 10px 28px -14px rgba(16,24,40,.16);
 }
+html[data-theme="light"] body::before{background:
+  linear-gradient(180deg,rgba(90,95,224,.06),transparent 34%),
+  linear-gradient(90deg,rgba(8,145,178,.04),transparent 42%)}
+html[data-theme="light"] header,
+html[data-theme="light"] .appfoot{background:rgba(255,255,255,.85)}
+html[data-theme="light"] .det-hdr{background:rgba(255,255,255,.88)}
 html[data-theme="light"] .sb-card:hover,
 html[data-theme="light"] .mon-row:hover,
-html[data-theme="light"] .menu-item:hover{background:rgba(0,0,0,.04)}
-html[data-theme="light"] .menu-drop{box-shadow:0 8px 24px rgba(0,0,0,.15)}
+html[data-theme="light"] .node-hdr:hover,
+html[data-theme="light"] .k8s-grp-hdr:hover,
+html[data-theme="light"] .menu-item:hover{background:rgba(16,24,40,.045)}
+html[data-theme="light"] .sb-summary,
+html[data-theme="light"] .csum,
+html[data-theme="light"] .k8s-sum{background:rgba(16,24,40,.025)}
+html[data-theme="light"] .node-body,
+html[data-theme="light"] .k8s-grp-body{background:rgba(16,24,40,.035)}
+html[data-theme="light"] .menu-drop{box-shadow:0 8px 24px rgba(16,24,40,.14)}
+html[data-theme="light"] .rail{
+  background:linear-gradient(180deg,#ffffff 0%,#f8fbff 100%);
+  border-right-color:#d9e2ef;
+  box-shadow:8px 0 28px rgba(16,24,40,.05);
+}
+html[data-theme="light"] .brand,
+html[data-theme="light"] .rail-foot{background:rgba(255,255,255,.64)}
+html[data-theme="light"] .nav button.active{background:#edf4ff;box-shadow:inset 0 0 0 1px rgba(59,130,246,.13)}
+html[data-theme="light"] .shell .sb-card{background:#ffffff;border-color:#dfe7f2;box-shadow:0 1px 2px rgba(16,24,40,.04)}
+html[data-theme="light"] .shell .sb-card.active{background:linear-gradient(180deg,#f8fbff,#ffffff 58%);border-color:rgba(59,130,246,.42);box-shadow:0 0 0 1px rgba(59,130,246,.10),0 8px 22px rgba(16,24,40,.07)}
+html[data-theme="light"] .shell .sb-summary{background:#f7faff}
+html[data-theme="light"] .shell .sb-csum-item{background:#ffffff;border-color:#dde7f3}
+html[data-theme="light"] .topbar{background:rgba(255,255,255,.78)}
 
-.ghealth{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:600;padding:6px 13px;border-radius:20px;border:1px solid var(--border)}
-#rbtn svg,#pbtn svg,.menu-btn svg,#thbtn svg{width:16px;height:16px}
+.ghealth{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:650;padding:6px 13px;border-radius:20px;border:1px solid var(--border);background:var(--row)}
+#rbtn svg,#pbtn svg,.menu-btn svg,#thbtn svg{width:15px;height:15px}
 .ghealth .gh-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
-.gh-green{color:var(--green)} .gh-green .gh-dot{background:var(--green);animation:pg 2.5s infinite}
-.gh-yellow{color:var(--yellow)} .gh-yellow .gh-dot{background:var(--yellow)}
-.gh-red{color:var(--red)} .gh-red .gh-dot{background:var(--red);animation:pg 2.5s infinite}
+.gh-green{color:var(--green);border-color:rgba(52,211,153,.3)} .gh-green .gh-dot{background:var(--green);animation:pg 2.5s infinite}
+.gh-yellow{color:var(--yellow);border-color:rgba(251,191,36,.3)} .gh-yellow .gh-dot{background:var(--yellow)}
+.gh-red{color:var(--red);border-color:rgba(248,113,113,.35)} .gh-red .gh-dot{background:var(--red);animation:pg 2.5s infinite}
 .gh-gray{color:var(--muted)} .gh-gray .gh-dot{background:var(--muted)}
-.pubstatus{display:none;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--green);text-decoration:none;border:1px solid var(--green);background:rgba(61,186,126,.12);padding:6px 12px;border-radius:20px}
-.pubstatus.on{display:inline-flex}
-.pubstatus:hover{background:rgba(61,186,126,.22)}
-#thbtn{background:var(--row);border:1px solid var(--border);color:var(--text);width:36px;height:34px;border-radius:7px;cursor:pointer;display:flex;align-items:center;justify-content:center}
-#thbtn:hover{border-color:#4a5568}
-.logmodal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1000;align-items:center;justify-content:center}
+.pubstatus{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:650;color:var(--muted);text-decoration:none;border:1px solid var(--border);background:var(--row);padding:6px 12px;border-radius:20px;transition:background .15s,border-color .15s,color .15s;white-space:nowrap}
+.pubstatus.on{color:var(--green);border-color:rgba(52,211,153,.35);background:rgba(52,211,153,.1)}
+.pubstatus:hover{border-color:var(--border2);color:var(--text);background:var(--panel2)}
+.pubstatus.on:hover{color:var(--green);background:rgba(52,211,153,.18)}
+#thbtn{background:var(--row);border:1px solid var(--border);color:var(--text);width:34px;height:33px;border-radius:9px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:border-color .15s,background .15s}
+#thbtn:hover{border-color:var(--border2);background:var(--panel2)}
+.logmodal{display:none;position:fixed;inset:0;background:rgba(4,6,10,.66);backdrop-filter:blur(4px);z-index:1000;align-items:center;justify-content:center}
 .logmodal.open{display:flex}
-.logbox{background:var(--panel);border:1px solid var(--border);border-radius:10px;width:min(900px,92vw);height:80vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.5)}
-.loghdr{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--border);font-size:14px;font-weight:600}
-.loghdr button{background:var(--row);border:1px solid var(--border);color:var(--text);padding:4px 10px;border-radius:6px;cursor:pointer;font-size:12px}
-.loghdr button:hover{border-color:#4a5568}
-.logbody{margin:0;padding:14px 16px;overflow:auto;flex:1;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;line-height:1.5;white-space:pre-wrap;word-break:break-word;color:var(--text)}
+.logbox{background:var(--panel);border:1px solid var(--border2);border-radius:16px;width:min(900px,92vw);height:80vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,.5);animation:cardin .18s ease}
+.loghdr{display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid var(--border);font-size:14px;font-weight:650}
+.loghdr button{background:var(--row);border:1px solid var(--border);color:var(--text);padding:5px 12px;border-radius:8px;cursor:pointer;font-size:12px}
+.loghdr button:hover{border-color:var(--border2)}
+.logbody{margin:0;padding:14px 16px;overflow:auto;flex:1;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;line-height:1.55;white-space:pre-wrap;word-break:break-word;color:var(--text)}
 .mon-row.clickable{cursor:pointer}
-.mon-row.clickable:hover{background:rgba(255,255,255,.05)}
+.mon-row.clickable:hover{background:rgba(255,255,255,.045)}
 .lg-ts{color:var(--muted)}
 .lg-err{color:var(--red);font-weight:600}
 .lg-warn{color:var(--yellow);font-weight:600}
 .lg-info{color:var(--green)}
 .lg-dbg{color:var(--muted)}
-.lg-ip{color:var(--blue)}
+.lg-ip{color:var(--cyan)}
 .lg-str{color:#d9a05b}
 .lg-num{color:var(--blue)}
 
 .btn-act.exclude {
-  border-color: var(--muted);
+  border-color: var(--border);
   color: var(--muted);
 }
 .btn-act.exclude:hover {
   border-color: var(--yellow);
   color: var(--yellow);
+  background: rgba(251,191,36,.08);
 }
 
 #os-hover-dot {
@@ -295,16 +335,101 @@ html[data-theme="light"] .menu-drop{box-shadow:0 8px 24px rgba(0,0,0,.15)}
 }
 
 .os-sel { position: relative; display: inline-block; font-size: 13px; font-weight: 500; cursor: pointer; }
-.os-sel-btn { background: var(--row); border: 1px solid var(--border); color: var(--text); padding: 4px 10px; border-radius: 6px; display: flex; align-items: center; gap: 6px; transition: border-color 0.15s, background-color 0.15s; }
-.os-sel-btn:hover { border-color: #4a5568; background: rgba(255,255,255,.03); }
-.os-sel-menu { display: none; position: absolute; right: 0; top: 100%; margin-top: 4px; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.4); z-index: 100; min-width: 110px; overflow: hidden; }
+.os-sel-btn { background: var(--row); border: 1px solid var(--border); color: var(--text); padding: 4px 10px; border-radius: 8px; display: flex; align-items: center; gap: 6px; transition: border-color 0.15s, background-color 0.15s; }
+.os-sel-btn:hover { border-color: var(--border2); background: var(--panel2); }
+.os-sel-menu { display: none; position: absolute; right: 0; top: 100%; margin-top: 4px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow); z-index: 100; min-width: 110px; overflow: hidden; padding:4px; }
 .os-sel.open .os-sel-menu { display: block; }
-.os-sel-opt { padding: 8px 12px; color: var(--text); transition: background 0.1s; }
-.os-sel-opt:hover { background: rgba(255,255,255,.05); }
+.os-sel-opt { padding: 7px 12px; color: var(--text); transition: background 0.1s; border-radius:6px; }
+.os-sel-opt:hover { background: rgba(255,255,255,.06); }
 .os-sel-opt.active { color: var(--green); font-weight: 600; }
 
 .os-crosshair {
   cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='M8 0v5m0 6v5M0 8h5m6 0h5' stroke='%23888888' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E") 8 8, crosshair !important;
+}
+
+.shell{height:100vh;display:grid;grid-template-columns:var(--rail-w,264px) 1fr;background:var(--bg)}
+.rail{border-right:1px solid var(--border);background:rgba(13,17,23,.72);backdrop-filter:blur(18px);display:flex;flex-direction:column;min-width:0;position:relative}
+.brand{height:68px;display:flex;align-items:center;gap:12px;padding:0 20px;border-bottom:1px solid var(--border);text-decoration:none;color:inherit}
+.mark{width:34px;height:34px;border-radius:10px;background:transparent;display:grid;place-items:center;flex-shrink:0;overflow:visible}
+.mark svg{width:19px;height:19px;color:#061015}
+.mark img{width:100%;height:100%;display:block}
+.brand-name{font-weight:800;letter-spacing:0;font-size:18px}
+.brand-sub{font-size:11px;color:var(--muted);margin-top:1px}
+.nav{padding:14px 12px;display:flex;flex-direction:column;gap:4px}
+.nav button{height:38px;border:0;background:transparent;color:var(--muted);border-radius:8px;padding:0 10px;display:flex;align-items:center;gap:10px;cursor:pointer;text-align:left;font-size:13px;font-weight:650}
+.nav button.active{background:var(--panel2);color:var(--text);box-shadow:0 0 0 1px rgba(255,255,255,.04) inset}
+.nav svg,.topbar .icon{width:17px;height:17px;flex:0 0 auto}
+.rail-section{padding:10px 16px 8px;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.08em}
+.rail-foot{margin-top:auto;padding:14px 16px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;color:var(--muted);font-size:12px;gap:10px}
+.rail-resizer{position:absolute;top:0;right:-4px;width:8px;height:100%;cursor:col-resize;z-index:40;touch-action:none}
+.rail-resizer::after{content:'';position:absolute;top:68px;bottom:0;left:3px;width:1px;background:transparent;transition:background .15s,box-shadow .15s}
+.rail-resizer:hover::after,body.os-resizing .rail-resizer::after{background:var(--blue);box-shadow:0 0 10px rgba(96,165,250,.45)}
+.main-shell{display:grid;grid-template-rows:68px 1fr;min-width:0;min-height:0}
+.topbar{border-bottom:1px solid var(--border);background:rgba(13,17,23,.58);backdrop-filter:blur(18px);display:flex;align-items:center;gap:14px;padding:0 22px;min-width:0}
+.search{width:min(440px,42vw);height:38px;background:var(--panel);border:1px solid var(--border);border-radius:8px;display:flex;align-items:center;gap:10px;padding:0 12px;color:var(--muted);flex-shrink:1}
+.search input{background:transparent;border:0;outline:0;color:var(--text);width:100%;font-size:13px}
+.top-spacer{flex:1}
+.icon-btn{width:36px;height:36px;border-radius:8px;border:1px solid var(--border);background:var(--panel);color:var(--text);display:grid;place-items:center;cursor:pointer;transition:border-color .15s,background .15s,color .15s;flex-shrink:0}
+.icon-btn:hover{border-color:var(--border2);background:var(--panel2)}
+.top-action{height:36px;border-radius:8px;border:1px solid var(--border);background:var(--panel);color:var(--text);display:inline-flex;align-items:center;gap:8px;padding:0 12px;cursor:pointer;transition:border-color .15s,background .15s,color .15s;font-size:13px;font-weight:650;white-space:nowrap}
+.top-action:hover{border-color:var(--border2);background:var(--panel2)}
+.top-action svg,.icon-btn svg{width:16px;height:16px}
+.topbar{height:68px;position:static;top:auto;z-index:20;justify-content:flex-start}
+.topbar .pubstatus{height:36px;border-radius:8px;background:var(--panel);padding:0 12px}
+.topbar #pbtn,.topbar #rbtn{height:36px;border-radius:8px;background:var(--panel);padding:0 12px;font-weight:650;display:inline-flex;align-items:center;gap:8px}
+.topbar #thbtn{width:36px;height:36px;border-radius:8px;background:var(--panel);display:grid;place-items:center;flex-shrink:0}
+.topbar .menu-btn{width:36px;height:36px;border-radius:8px;background:var(--panel);display:grid;place-items:center;padding:0}
+.shell #sidebar{width:auto;min-width:0;max-width:none;border-right:0;background:transparent;backdrop-filter:none;position:relative;padding:0 6px 12px;overflow-y:auto;flex:1}
+.shell #detail{overflow-y:auto;padding:0;background:transparent;min-width:0;min-height:0;flex:none}
+.shell .sb-card{margin:0 0 8px}
+.shell .menu-btn{width:36px;height:36px;border-radius:8px}
+.shell .sb-csum{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;padding:8px}
+.shell .sb-csum-item{min-width:0;padding:7px 3px;border-radius:8px}
+.shell .sb-csum-val{font-size:18px;white-space:nowrap;overflow:hidden;text-overflow:clip}
+.shell .sb-csum-lbl{font-size:9px;line-height:1.05;letter-spacing:.035em;min-height:19px;display:flex;align-items:flex-start;justify-content:center}
+
+.overview{padding:22px;min-height:100%;background:transparent}
+.overview-head{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:18px}
+.overview h1{font-size:26px;line-height:1.15;letter-spacing:0;font-weight:800;margin:0}
+.overview .hint{color:var(--muted);font-size:13px;margin-top:6px}
+.overview-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:14px}
+.overview-kpi{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:14px;min-width:0;box-shadow:var(--shadow)}
+.overview-kpi-head{display:flex;align-items:center;justify-content:space-between;gap:8px;color:var(--muted);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.045em}
+.overview-kpi-value{font-size:28px;font-weight:800;letter-spacing:0;margin-top:12px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.overview-kpi-sub{font-size:12px;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.overview-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px}
+.overview-card{background:var(--panel);border:1px solid var(--border);border-radius:8px;overflow:hidden;min-width:0;box-shadow:var(--shadow)}
+.overview-card-h{height:54px;display:flex;align-items:center;gap:10px;padding:0 14px;border-bottom:1px solid var(--border)}
+.overview-icon{width:28px;height:28px;display:grid;place-items:center;background:var(--row);border:1px solid var(--border);border-radius:8px;padding:5px;flex-shrink:0}
+.overview-title{font-size:15px;font-weight:750;letter-spacing:0;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.overview-meta{font-size:12px;color:var(--muted);flex-shrink:0}
+.overview-card .csum{border-bottom:1px solid var(--border);padding:10px;background:rgba(0,0,0,.08);flex-wrap:wrap}
+.overview-card .csum-item{min-width:92px}
+.overview-list{padding:6px 0}
+.overview-row{display:flex;align-items:center;gap:10px;padding:10px 14px;border-top:1px solid var(--border);min-width:0;cursor:pointer}
+.overview-row:first-child{border-top:0}
+.overview-row:hover{background:rgba(255,255,255,.025)}
+.overview-row-main{flex:1;min-width:0}
+.overview-row-name{font-size:14px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.overview-row-sub{font-size:12px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.overview-empty{padding:18px 14px;color:var(--muted);font-size:13px}
+
+@media (max-width:1100px){
+  .shell{grid-template-columns:78px 1fr}
+  .brand{justify-content:center;padding:0}
+  .brand > div:nth-child(2),.nav span,.rail-section,.rail-foot{display:none}
+  .rail-resizer{display:none}
+  #sidebar{display:none}
+  .nav button{justify-content:center}
+  .overview-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:760px){
+  .topbar{padding:0 14px;gap:8px}
+  .search,#lupd,#pbtn-lbl,.pubstatus span{display:none}
+  .pubstatus{padding:0;width:36px;height:36px;justify-content:center}
+  .overview{padding:14px}
+  .overview-head{display:block}
+  .overview-kpis,.overview-grid{grid-template-columns:1fr}
 }
 
 </style>
@@ -313,48 +438,6 @@ html[data-theme="light"] .menu-drop{box-shadow:0 8px 24px rgba(0,0,0,.15)}
 
 <script>(function(){try{var t=localStorage.getItem('os_theme')||'dark';document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
 <div id="pbar"></div>
-
-<header>
-  <a href="/" class="logo">
-    <div class="ldot" id="hdot"></div>
-    OmniSight
-  </a>
-  <div class="hdr-r">
-    <a class="pubstatus" id="pubstatus" href="/status" target="_blank" rel="noopener" title="Public status page is enabled">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-      Public status
-    </a>
-    <span class="ghealth gh-green" id="ghealth"><span class="gh-dot"></span></span>
-    <button id="thbtn" onclick="toggleTheme()" title="Theme"></button>
-    <span id="lupd"></span>
-    <button id="pbtn" onclick="togglePause()">
-      <svg id="pbtn-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-        <rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>
-      </svg>
-      <span id="pbtn-lbl">Pause</span>
-    </button>
-    <button id="rbtn" onclick="doRefresh()">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-        <polyline points="23 4 23 10 17 10"></polyline>
-        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
-      </svg>
-      Refresh
-    </button>
-    <div class="menu-wrap">
-      <button class="menu-btn" onclick="toggleMenu()">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
-      </button>
-      <div class="menu-drop" id="menu-drop">
-        <button class="menu-item" onclick="openEmbed('/profile')">Profile</button>
-        <button class="menu-item" onclick="openEmbed('/settings')">Settings</button>
-        <button class="menu-item" onclick="openEmbed('/logs')">Logs</button>
-        <button class="menu-item" onclick="openEmbed('/about')">About</button>
-        <button class="menu-item" onclick="openEmbed('/help')">Help</button>
-        <button class="menu-item danger" onclick="doLogout()">Sign out</button>
-      </div>
-    </div>
-  </div>
-</header>
 
 <div id="logmodal" class="logmodal" onclick="if(event.target===this)closeLogs()">
   <div class="logbox">
@@ -368,23 +451,95 @@ html[data-theme="light"] .menu-drop{box-shadow:0 8px 24px rgba(0,0,0,.15)}
   </div>
 </div>
 
-<div class="layout">
-  <aside id="sidebar"></aside>
-  <div id="resizer"></div>
-  <main id="detail"><div class="empty" style="padding:48px">Loading…</div></main>
+<div class="shell">
+  <aside class="rail">
+    <a href="/" class="brand">
+      <div class="mark">
+        <img src="/assets/omnisight-logo.svg" alt="">
+      </div>
+      <div>
+        <div class="brand-name">OmniSight</div>
+        <div class="brand-sub">Unified monitoring</div>
+      </div>
+    </a>
+    <nav class="nav" id="main-nav">
+      <button id="nav-dashboard" class="active" onclick="returnDashboard()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        <span>Dashboard</span>
+      </button>
+      <button id="nav-settings" onclick="openEmbed('/settings')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 8.6 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 8.6a1.7 1.7 0 0 0-.34-1.88l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.1V3a2 2 0 1 1 4 0v.09A1.7 1.7 0 0 0 15 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9c.3.4.8.6 1.3.6H21a2 2 0 1 1 0 4h-.09A1.7 1.7 0 0 0 19.4 15z"/></svg>
+        <span>Settings</span>
+      </button>
+      <button id="nav-logs" onclick="openEmbed('/logs')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h8"/><path d="M8 9h2"/></svg>
+        <span>Logs</span>
+      </button>
+      <button id="nav-profile" onclick="openEmbed('/profile')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+        <span>Profile</span>
+      </button>
+      <button id="nav-about" onclick="openEmbed('/about')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+        <span>About</span>
+      </button>
+      <button id="nav-help" onclick="openEmbed('/help')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 1 1 5.82 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
+        <span>Help</span>
+      </button>
+    </nav>
+    <div class="rail-section">Live platforms</div>
+    <aside id="sidebar"></aside>
+    <div class="rail-foot">
+      <span id="rail-upd">Updated --</span>
+      <span id="foot-ver"></span>
+    </div>
+    <div class="rail-resizer" id="rail-resizer" title="Resize sidebar"></div>
+  </aside>
+  <main class="main-shell">
+    <header class="topbar">
+      <div class="search">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+        <input id="global-search" placeholder="Search host, service, container" oninput="filterSidebar(this.value)">
+      </div>
+      <div class="top-spacer"></div>
+      <a class="pubstatus" id="pubstatus" href="/status" target="_blank" rel="noopener" title="Public status page is enabled">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        <span>Public status</span>
+      </a>
+      <span class="ghealth gh-green" id="ghealth"><span class="gh-dot"></span></span>
+      <button id="thbtn" class="icon-btn" onclick="toggleTheme()" title="Theme"></button>
+      <span id="lupd"></span>
+      <button id="pbtn" class="top-action" onclick="togglePause()">
+        <svg id="pbtn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>
+        </svg>
+        <span id="pbtn-lbl">Pause</span>
+      </button>
+      <button id="rbtn" class="top-action" onclick="doRefresh()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="23 4 23 10 17 10"></polyline>
+          <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+        </svg>
+        Refresh
+      </button>
+      <div class="menu-wrap">
+        <button class="menu-btn" onclick="toggleMenu()" title="Account">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+        </button>
+        <div class="menu-drop" id="menu-drop">
+          <button class="menu-item" onclick="openEmbed('/profile')">Profile</button>
+          <button class="menu-item" onclick="openEmbed('/settings')">Settings</button>
+          <button class="menu-item" onclick="openEmbed('/logs')">Logs</button>
+          <button class="menu-item" onclick="openEmbed('/about')">About</button>
+          <button class="menu-item" onclick="openEmbed('/help')">Help</button>
+          <button class="menu-item danger" onclick="doLogout()">Sign out</button>
+        </div>
+      </div>
+    </header>
+    <main id="detail"><div class="empty" style="padding:48px">Loading…</div></main>
+  </main>
 </div>
-<footer class="appfoot">
-  <div style="flex:1"></div>
-  <a href="https://github.com/caglaryalcin/OmniSight/issues/new" target="_blank" rel="noopener" title="Help / report an issue">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-    Help
-  </a>
-  <a id="foot-gh" href="https://github.com/caglaryalcin/OmniSight" target="_blank" rel="noopener" title="GitHub">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.2.8-.5v-2c-3.2.7-3.9-1.4-3.9-1.4-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.1.1 1.7 1.1 1.7 1.1 1 1.7 2.7 1.2 3.3.9.1-.7.4-1.2.7-1.5-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.3c0 .3.2.6.8.5 4.6-1.5 7.9-5.8 7.9-10.9C23.5 5.7 18.3.5 12 .5z"/></svg>
-    GitHub
-  </a>
-  <span id="foot-ver"></span>
-</footer>
 
 <script>
 const INTERVAL = 15000;
@@ -461,9 +616,15 @@ const SEC_ICONS = {
 };
 
 function bc(v){ return v>=90?'var(--red)':v>=70?'var(--yellow)':'var(--green)' }
-function bchex(v){ return v>=90?'#e74c3c':v>=70?'#f39c12':'#3dba7e' }
+function bchex(v){ return v>=90?'#F87171':v>=70?'#FBBF24':'#34D399' }
 function dc(ok){ return ok?'md-green':'md-red' }
 function bdg(cls,txt){ return `<span class="badge bg-${cls}">${txt}</span>` }
+function hasNum(v){ return v !== null && v !== undefined && v !== '' && Number.isFinite(Number(v)); }
+function fmtRate(v){ return hasNum(v) ? `${fmtBytes(Number(v))}/s` : ''; }
+function metricSpan(label, value){
+  if(value==null || value==='') return '';
+  return `<span style="font-size:12px;color:var(--muted)">${label} <span style="color:var(--text);font-weight:600">${value}</span></span>`;
+}
 
 function sortSvcs(svcs) {
   if (!svcs) return [];
@@ -487,6 +648,14 @@ let configuredIds = [];
 function setConfiguredIds(ids){ configuredIds = Array.isArray(ids) ? ids : []; }
 function skeletonPanel(id){
   const m = PLATFORM_META[id] || { title:id, iconKey:id, color:'var(--muted)' };
+  if (id === 'linux') {
+    const waitBody = `<div style="display:flex;flex-direction:column;align-items:center;gap:10px;padding:60px;color:var(--muted);font-size:14px;text-align:center">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+      Waiting for agents to report…
+      <span style="font-size:12px">Install the agent from <a href="#" onclick="openEmbed('/settings');return false" style="color:var(--blue)">Settings → Linux Servers</a></span>
+    </div>`;
+    return { id, title:m.title, iconKey:m.iconKey, color:m.color, meta:'', badge:bdg('gray','no agents'), sbSummary:'', summary:'', body:waitBody };
+  }
   const connBody = `<div style="display:flex;align-items:center;justify-content:center;gap:10px;padding:60px;color:var(--muted);font-size:14px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>Connecting…</div>`;
   
   let sbSummary = '';
@@ -521,7 +690,6 @@ function applyConfigured(ids, cfg){
       return arr;
     };
     if(ids.includes('snmp'))     d.snmp     = mergeC(d.snmp,     cfg.snmp?.devices,      x=>x.name);
-    if(ids.includes('linux'))    d.linux    = mergeC(d.linux,    cfg.linux?.servers,     x=>x.name);
     if(ids.includes('docker'))   d.docker   = mergeC(d.docker,   cfg.docker?.hosts,      x=>x.name);
     if(ids.includes('database')) d.database = mergeC(d.database, cfg.database?.instances,x=>x.name);
     if(ids.includes('proxmox')){
@@ -973,7 +1141,7 @@ function buildLinux(linux){
   const sbSummaryHtml = `<div class="sb-csum">
     <div class="sb-csum-item"><div class="sb-csum-val">${reachable}/${linux.length}</div><div class="sb-csum-lbl">Servers</div></div>
     ${cpuM?`<div class="sb-csum-item"><div class="sb-csum-val" style="color:${cpuM.color}">${cpuM.val}</div><div class="sb-csum-lbl">CPU usage</div></div>`:''}
-    ${ramM?`<div class="sb-csum-item"><div class="sb-csum-val" style="color:${ramM.color}">${ramM.val}</div><div class="sb-csum-lbl">RAM usage</div></div>`:''}
+    ${ramM?`<div class="sb-csum-item"><div class="sb-csum-val" style="color:${ramM.color}">${ramM.val}</div><div class="sb-csum-lbl">Memory usage</div></div>`:''}
     <div class="sb-csum-item"><div class="sb-csum-val">${upSvcs}/${totalSvcs}</div><div class="sb-csum-lbl">Services up</div></div>
   </div>`;
 
@@ -994,20 +1162,26 @@ function buildLinux(linux){
     if(!srv.online) return `
       <div class="offline-row">
         <div class="mon-dot md-red" style="margin-top:2px"></div>
-        <div>
-          <div>${srv.name} <span style="color:var(--muted);font-size:11px">${srv.host}</span></div>
-          <div class="offline-err">SSH failed${srv.error?`: ${srv.error}`:''}</div>
+        <div style="flex:1">
+          <div>${srv.name} <span style="color:var(--muted);font-size:11px">${srv.ip||srv.host||''}</span></div>
+          <div class="offline-err">Agent offline${srv.error?` — ${srv.error}`:''}</div>
         </div>
         ${bdg('red','offline')}
+        ${notifyBell('lx:'+srv.name)}
       </div>`;
     const lkey = srv.host;
     const cpuPct = srv.cpu ?? null;
     const ramPct = srv.ram?.percent ?? null;
+    const diskIO = srv.metrics?.diskIO || null;
+    const bw = srv.metrics?.bandwidth || null;
+    const diskIOTxt = diskIO ? `${fmtRate(diskIO.readBps)} / ${fmtRate(diskIO.writeBps)}` : '';
+    const bwTxt = bw ? `${fmtRate(bw.rxBps)} / ${fmtRate(bw.txBps)}` : '';
+    const ptag = srv.platform && srv.platform!=='linux' ? ` <span class="badge bg-blue" style="font-size:10px;padding:1px 7px">${srv.platform}</span>` : '';
     return `
       <div class="node-hdr" onclick="toggleLinux('${lkey}')">
         <div class="mon-dot ${svcFailed?'md-yellow':'md-green'}"></div>
-        <div class="node-name">${srv.name}</div>
-        <div class="node-info">${srv.host}${cpuPct!=null?' · CPU '+cpuPct+'%':''}${ramPct!=null?' · RAM '+ramPct+'%':''}${srv.uptime?' · Uptime - '+fmtUptime(srv.uptime):''}</div>
+        <div class="node-name" style="width:auto;min-width:110px">${srv.name}${ptag}</div>
+        <div class="node-info">${srv.ip||srv.host||''}${cpuPct!=null?' · CPU '+cpuPct+'%':''}${ramPct!=null?' · Memory '+ramPct+'%':''}${srv.temp!=null?' · '+srv.temp+'°C':''}${srv.uptime?' · Uptime - '+fmtUptime(srv.uptime):''}</div>
         ${bdg(svcFailed?'red':'green', svcFailed?`${svcFailed} failed`:'all ok')}
         ${notifyBell('lx:'+srv.name)}
         <span class="chevron ${linuxOpen[lkey]?'open':''}" style="margin-left:4px">▼</span>
@@ -1024,12 +1198,39 @@ function buildLinux(linux){
         ${(()=>{ const lim=timeLimits['lx:'+lkey]||80; return srv.ram!=null?`
           <div class="chart-row">
             <div class="chart-hdr">
-              <span class="nb-label">RAM</span>
+              <span class="nb-label">Memory</span>
               <span style="font-size:12px;color:var(--muted)">${srv.ram.usedGB}/${srv.ram.totalGB} GB</span>
               <span class="nb-pct" style="color:${bc(ramPct)}">${ramPct}%</span>
             </div>
             ${srv.history?.length>1 ? histChart(srv.history,'ram',ramPct,lim) : ''}
           </div>` : '' })()}
+        ${(()=>{ const lim=timeLimits['lx:'+lkey]||80; const diskPct=srv.disk?.percent ?? null; return srv.disk!=null?`
+          <div class="chart-row">
+            <div class="chart-hdr">
+              <span class="nb-label">Disk</span>
+              <span style="font-size:12px;color:var(--muted)">${srv.disk.usedGB}/${srv.disk.totalGB} GB</span>
+              <span class="nb-pct" style="color:${bc(diskPct)}">${diskPct}%</span>
+            </div>
+            ${srv.history?.length>1 ? histChart(srv.history,'disk',diskPct,lim) : ''}
+          </div>` : '' })()}
+        ${srv.os||srv.kernel||srv.disk||srv.load||diskIO||bw?`
+          <div class="row" style="padding:8px 0;margin-top:6px;border-top:1px solid var(--border);flex-wrap:wrap;gap:14px">
+            ${srv.os?`<span style="font-size:12px;color:var(--muted)">OS <span style="color:var(--text);font-weight:600">${srv.os}</span></span>`:''}
+            ${srv.kernel?`<span style="font-size:12px;color:var(--muted)">Kernel <span style="color:var(--text);font-weight:600">${srv.kernel}</span></span>`:''}
+            ${srv.load?`<span style="font-size:12px;color:var(--muted)">Load <span style="color:var(--text);font-weight:600">${srv.load.map(x=>x==null?'?':x).join(' / ')}</span></span>`:''}
+            ${diskIOTxt?metricSpan('Disk I/O', diskIOTxt):''}
+            ${hasNum(diskIO?.iops)?metricSpan('IOPS', diskIO.iops):''}
+            ${hasNum(diskIO?.util)?metricSpan('Disk busy', diskIO.util+'%'):''}
+            ${bwTxt?metricSpan('Bandwidth', `↓ ${fmtRate(bw.rxBps)} / ↑ ${fmtRate(bw.txBps)}`):''}
+            ${srv.agentVersion?`<span style="font-size:12px;color:var(--muted)">Agent <span style="color:var(--text);font-weight:600">v${srv.agentVersion}</span></span>`:''}
+          </div>`:''}
+        ${srv.swap && srv.swap.totalKB>0?`
+          <div class="syn-bar" style="margin-top:8px">
+            <span class="syn-bl">Swap</span>
+            <div class="syn-bt"><div class="syn-bf" style="width:${srv.swap.percent}%;background:${bc(srv.swap.percent)}"></div></div>
+            <span class="syn-bv" style="color:${bc(srv.swap.percent)}">${srv.swap.percent}%</span>
+          </div>
+          <div style="font-size:10px;color:var(--muted);margin:-2px 0 4px 52px">${srv.swap.usedGB} / ${srv.swap.totalGB} GB</div>`:''}
         ${(srv.services||[]).length?`<div class="syn-section" style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">Services</div>`:''}
         ${sortSvcs(srv.services || []).map(s=>`
           <div class="row" style="padding:8px 0;${s.excluded?'opacity:0.6':''}">
@@ -1244,7 +1445,6 @@ function buildSynology(syn){
     ${cell(cpuM,'CPU usage',true)}
     ${cell(ramM,'RAM usage',true)}
     ${cell(tempM,'Temp',true)}
-    ${volCount?`<div class="sb-csum-item"><div class="sb-csum-val">${volCount}</div><div class="sb-csum-lbl">Volumes</div></div>`:''}
   </div>`;
 
   const summaryHtml = `<div class="csum">
@@ -1412,6 +1612,8 @@ function buildDocker(docker){
   const totalStopped = docker.reduce((a,h)=>a+(h.summary?.stopped||0),0);
   const totalAll     = docker.reduce((a,h)=>a+(h.summary?.total||0),0);
   const totalUnused  = docker.reduce((a,h)=>a+(h.summary?.unused||0),0);
+  const totalDockerCpu = Math.round(docker.reduce((a,h)=>a+(h.summary?.cpu||0),0) * 10) / 10;
+  const totalDockerMem = Math.round(docker.reduce((a,h)=>a+(h.summary?.memPercent||0),0) * 10) / 10;
   const cStates = docker.filter(h=>h.online).flatMap(h=>h.containers||[]).map(c=>c.state);
   const cStopped = cStates.filter(s=>s==='exited').length;
   const cPending = cStates.filter(s=>['created','restarting','paused','removing'].includes(s)).length;
@@ -1423,6 +1625,8 @@ function buildDocker(docker){
     <div class="sb-csum-item"><div class="sb-csum-val" style="color:${cStopped>0?'var(--red)':'var(--muted)'}">${cStopped}</div><div class="sb-csum-lbl">Stopped</div></div>
     <div class="sb-csum-item"><div class="sb-csum-val" style="color:${cPending>0?'var(--yellow)':'var(--muted)'}">${cPending}</div><div class="sb-csum-lbl">Pending</div></div>
     <div class="sb-csum-item"><div class="sb-csum-val" style="color:${cFailed>0?'var(--red)':'var(--muted)'}">${cFailed}</div><div class="sb-csum-lbl">Failed</div></div>
+    ${totalDockerCpu?`<div class="sb-csum-item"><div class="sb-csum-val">${totalDockerCpu}%</div><div class="sb-csum-lbl">CPU</div></div>`:''}
+    ${totalDockerMem?`<div class="sb-csum-item"><div class="sb-csum-val">${totalDockerMem}%</div><div class="sb-csum-lbl">Memory</div></div>`:''}
     <div class="sb-csum-item"><div class="sb-csum-val" style="color:var(--muted)">${totalUnused}</div><div class="sb-csum-lbl">Unused img</div></div>
   </div>`;
 
@@ -1443,11 +1647,17 @@ function buildDocker(docker){
 
     const dkey = host.name;
     const stopped = host.containers.filter(c=>c.state==='exited'||c.state==='dead').length;
+    const dockerBits = [
+      `${host.summary.running} running`,
+      `${host.summary.total} total`,
+      hasNum(host.summary?.cpu) ? `CPU ${host.summary.cpu}%` : '',
+      hasNum(host.summary?.memPercent) ? `Mem ${host.summary.memPercent}%` : '',
+    ].filter(Boolean).join(' · ');
     return `
       <div class="node-hdr" onclick="toggleDocker('${dkey}')">
         <div class="mon-dot ${stopped?'md-yellow':'md-green'}"></div>
         <div class="node-name">${host.name}</div>
-        <div class="node-info">${host.summary.running} running · ${host.summary.total} total</div>
+        <div class="node-info">${dockerBits}</div>
         ${bdg(stopped?'yellow':'green', stopped?`${stopped} stopped`:'all running')}
         ${notifyBell('dk:'+host.name)}
       </div>
@@ -1459,6 +1669,10 @@ function buildDocker(docker){
             <div class="mon-dot ${dotCls}"></div>
             <div class="mon-name" style="width:180px" title="${c.name}">${c.name}</div>
             <div class="mon-sub" style="flex:0 1 220px;min-width:0" title="${c.image}">${c.imageShort}</div>
+            ${hasNum(c.cpu)?`<span style="font-size:12px;color:var(--muted);flex-shrink:0;margin-right:10px">CPU ${c.cpu}%</span>`:''}
+            ${hasNum(c.memPercent)?`<span style="font-size:12px;color:var(--muted);flex-shrink:0;margin-right:10px">Mem ${c.memPercent}%</span>`:''}
+            ${c.netIO?`<span style="font-size:12px;color:var(--muted);flex-shrink:0;margin-right:10px">Net ${c.netIO}</span>`:''}
+            ${c.blockIO?`<span style="font-size:12px;color:var(--muted);flex-shrink:0;margin-right:10px">I/O ${c.blockIO}</span>`:''}
             ${c.ports.length?`<span style="font-size:13px;color:var(--muted);flex-shrink:0;margin-right:10px">${c.ports.join(' ')}</span>`:''}
             <div style="flex:1"></div>
             ${bdg(c.color, c.state)}
@@ -1723,8 +1937,130 @@ function sidebarCard(panel, isActive){
   </div>`;
 }
 
+function avgPct(vals){
+  vals = vals.filter(v => hasNum(v)).map(Number);
+  if(!vals.length) return null;
+  return Math.round(vals.reduce((a,b)=>a+b,0) / vals.length);
+}
+function overviewKpi(label, value, sub, color){
+  return `<div class="overview-kpi">
+    <div class="overview-kpi-head"><span>${label}</span><span class="mon-dot" style="background:${color||'var(--blue)'}"></span></div>
+    <div class="overview-kpi-value" style="color:${color||'var(--text)'}">${value}</div>
+    <div class="overview-kpi-sub">${sub||''}</div>
+  </div>`;
+}
+function escAttr(s){ return escHtml(s).replace(/"/g,'&quot;'); }
+function overviewRow(panelId, name, sub, badgeCls, badgeTxt, dotCls){
+  return `<div class="overview-row" onclick="selectPanel('${panelId}')">
+    <div class="mon-dot ${dotCls||'md-green'}"></div>
+    <div class="overview-row-main">
+      <div class="overview-row-name" title="${escAttr(name||'')}">${escHtml(name||'')}</div>
+      <div class="overview-row-sub" title="${escAttr(sub||'')}">${escHtml(sub||'')}</div>
+    </div>
+    ${bdg(badgeCls||'green', badgeTxt||'ok')}
+  </div>`;
+}
+function overviewRows(id, data){
+  if(id === 'linux'){
+    const rows = (data.linux||[]).slice(0,6).map(srv => {
+      const failed = (srv.services||[]).filter(s=>!s.active&&s.state!=='unknown'&&!s.excluded).length;
+      const sub = srv._connecting ? (srv.host||'Waiting for agent') :
+        srv.online ? [srv.ip||srv.host, hasNum(srv.cpu)?`CPU ${srv.cpu}%`:'', srv.ram?`Memory ${srv.ram.percent}%`:'', srv.temp!=null?`${srv.temp}°C`:'' ].filter(Boolean).join(' · ') :
+        (srv.error || 'Agent offline');
+      return overviewRow('linux', srv.name, sub, srv._connecting?'gray':!srv.online?'red':failed?'yellow':'green', srv._connecting?'connecting':!srv.online?'offline':failed?`${failed} failed`:'healthy', srv._connecting?'md-gray':!srv.online?'md-red':failed?'md-yellow':'md-green');
+    });
+    return rows.join('');
+  }
+  if(id === 'snmp'){
+    const rows = (data.snmp||[]).slice(0,6).map(dev => {
+      const sub = dev._connecting ? (dev.host||'Connecting') :
+        dev.online ? [dev.host, dev.cpu!=null?`CPU ${dev.cpu}%`:'', dev.ram?`RAM ${dev.ram.percent}%`:'', dev.systemTemp!=null?`${dev.systemTemp}°C`:'' ].filter(Boolean).join(' · ') :
+        (dev.error || 'SNMP unreachable');
+      return overviewRow('snmp', dev.name, sub, dev._connecting?'gray':dev.online?'green':'red', dev._connecting?'connecting':dev.online?'online':'offline', dev._connecting?'md-gray':dev.online?'md-green':'md-red');
+    });
+    return rows.join('');
+  }
+  if(id === 'docker'){
+    const rows = (data.docker||[]).slice(0,6).map(host => {
+      const stopped = (host.containers||[]).filter(c=>c.state==='exited'||c.state==='dead').length;
+      const sub = host._connecting ? (host.host||'Connecting') :
+        host.online ? [`${host.summary?.running||0} running`, `${host.summary?.total||0} total`, hasNum(host.summary?.cpu)?`CPU ${host.summary.cpu}%`:'', hasNum(host.summary?.memPercent)?`Mem ${host.summary.memPercent}%`:'' ].filter(Boolean).join(' · ') :
+        (host.error || 'Connection failed');
+      return overviewRow('docker', host.name, sub, host._connecting?'gray':!host.online?'red':stopped?'yellow':'green', host._connecting?'connecting':!host.online?'offline':stopped?`${stopped} stopped`:'healthy', host._connecting?'md-gray':!host.online?'md-red':stopped?'md-yellow':'md-green');
+    });
+    return rows.join('');
+  }
+  if(id === 'proxmox'){
+    return (data.proxmox?.nodes||[]).slice(0,6).map(({node, services=[]}) => {
+      const failed = services.filter(s=>!s.active&&!s.excluded).length;
+      const sub = node.online ? [node.ip, node.cpu!=null?`CPU ${node.cpu}%`:'', node.memPct!=null?`RAM ${node.memPct}%`:'' ].filter(Boolean).join(' · ') : 'Node offline';
+      return overviewRow('proxmox', node.name, sub, node.online?(failed?'yellow':'green'):'red', node.online?(failed?`${failed} failed`:'healthy'):'offline', node.online?(failed?'md-yellow':'md-green'):'md-red');
+    }).join('');
+  }
+  if(id === 'healthchecks'){
+    const checks = (data.healthchecks?.checks||[]).slice().sort((a,b)=>String(a.status).localeCompare(String(b.status))).slice(0,6);
+    return checks.map(c => {
+      const cls = c.status==='up'?'green':c.status==='down'?'red':c.status==='grace'?'yellow':'gray';
+      const dot = c.status==='up'?'md-green':c.status==='down'?'md-red':c.status==='grace'?'md-yellow':'md-gray';
+      return overviewRow('healthchecks', c.name, c.lastPing?`Last ping ${relTime(c.lastPing)}`:'No last ping', cls, c.status||'unknown', dot);
+    }).join('');
+  }
+  if(id === 'kubernetes'){
+    const deps = (data.kubernetes?.deployments||[]).slice(0,6);
+    if(deps.length) return deps.map(d => overviewRow('kubernetes', d.name, `${d.ready}/${d.desired} ready`, d.healthy?'green':'red', d.healthy?'healthy':'attention', d.healthy?'md-green':'md-red')).join('');
+    const s = data.kubernetes?.summary || {};
+    return overviewRow('kubernetes', 'Cluster summary', `${s.running||0} running pods · ${s.failed||0} failed`, (s.failed||0)>0?'red':'green', (s.failed||0)>0?'degraded':'healthy', (s.failed||0)>0?'md-red':'md-green');
+  }
+  if(id === 'database'){
+    return (data.database||[]).slice(0,6).map(d => {
+      const sub = [d.type, d.host, d.connections!=null?`${d.connections} conns`:'', d.sizeBytes?fmtBytes(d.sizeBytes):'' ].filter(Boolean).join(' · ');
+      return overviewRow('database', d.name, sub || 'Database', d._connecting?'gray':d.online?'green':'red', d._connecting?'connecting':d.online?'online':'offline', d._connecting?'md-gray':d.online?'md-green':'md-red');
+    }).join('');
+  }
+  return '';
+}
+function renderDashboardOverview(data, ids, panels){
+  const linuxOnline = (data.linux||[]).filter(s=>s.online);
+  const cpuAvg = avgPct(linuxOnline.map(s=>s.cpu));
+  const memAvg = avgPct(linuxOnline.map(s=>s.ram?.percent));
+  const diskBps = linuxOnline.reduce((a,s)=>a+(Number(s.metrics?.diskIO?.readBps)||0)+(Number(s.metrics?.diskIO?.writeBps)||0),0);
+  const bwBps = linuxOnline.reduce((a,s)=>a+(Number(s.metrics?.bandwidth?.rxBps)||0)+(Number(s.metrics?.bandwidth?.txBps)||0),0);
+  const cards = ids.map(id => {
+    const panel = panels[id];
+    const iconSvg = platformIcon(panel);
+    const title = id === 'snmp' ? 'Network devices' : panel.title;
+    const rows = overviewRows(id, data);
+    return `<section class="overview-card">
+      <div class="overview-card-h" onclick="selectPanel('${id}')" style="cursor:pointer">
+        <div class="overview-icon">${iconSvg}</div>
+        <div class="overview-title">${title}</div>
+        ${panel.meta?`<div class="overview-meta">${panel.meta}</div>`:''}
+        ${panel.badge}
+      </div>
+      ${panel.summary || panel.sbSummary || ''}
+      <div class="overview-list">${rows || '<div class="overview-empty">No rows to show yet</div>'}</div>
+    </section>`;
+  }).join('');
+  document.querySelectorAll('.sb-card.active').forEach(c=>c.classList.remove('active'));
+  document.getElementById('detail').innerHTML = `<section class="overview">
+    <div class="overview-head">
+      <div><h1>Operations overview</h1><div class="hint">Realtime host, container, network device and service health in one workspace.</div></div>
+      <span class="badge bg-blue">${ids.length} platform${ids.length===1?'':'s'}</span>
+    </div>
+    <div class="overview-kpis">
+      ${overviewKpi('CPU usage', cpuAvg==null?'--':cpuAvg+'%', `${linuxOnline.length} Linux host${linuxOnline.length===1?'':'s'}`, cpuAvg==null?'var(--muted)':bc(cpuAvg))}
+      ${overviewKpi('Memory usage', memAvg==null?'--':memAvg+'%', 'Average reported memory', memAvg==null?'var(--muted)':bc(memAvg))}
+      ${overviewKpi('Disk I/O', diskBps?fmtRate(diskBps):'--', 'Read and write combined', 'var(--cyan)')}
+      ${overviewKpi('Bandwidth', bwBps?fmtRate(bwBps):'--', 'Inbound plus outbound', 'var(--green)')}
+    </div>
+    <div class="overview-grid">${cards}</div>
+  </section>`;
+}
+
 function selectPanel(id){
   embedOpen = false;
+  dashboardOpen = false;
+  setNavActive('nav-dashboard');
   activePanel = id;
   document.querySelectorAll('.sb-card').forEach(c=>c.classList.remove('active'));
   const card = document.getElementById(`sbcard-${id}`);
@@ -1846,7 +2182,7 @@ function render(data){
   setLogoDot(anyOff);
 
   const dataHas={ proxmox:!!(data.proxmox?.nodes?.length), linux:!!((data.linux||[]).length), kubernetes:!!data.kubernetes, snmp:!!((data.snmp||[]).length), healthchecks:!!data.healthchecks, docker:!!((data.docker||[]).length), database:!!((data.database||[]).length) };
-  const connectingCount=configuredIds.filter(id=>!dataHas[id]).length;
+  const connectingCount=configuredIds.filter(id=>id!=='linux'&&!dataHas[id]).length;
   window._connecting = connectingCount;
 
   const gh=document.getElementById('ghealth');
@@ -1861,9 +2197,14 @@ function render(data){
     gh.innerHTML='<span class="gh-dot"></span>'+txt;
   }
   const ps=document.getElementById('pubstatus');
-  if(ps) ps.classList.toggle('on', !!data.publicStatus);
-  document.getElementById('lupd').textContent =
-    `Updated ${new Date(data.timestamp).toLocaleTimeString('en-GB')}`;
+  if(ps) {
+    ps.classList.toggle('on', !!data.publicStatus);
+    ps.title = data.publicStatus ? 'Public status page is enabled' : 'Open public status page';
+  }
+  const updatedText = `Updated ${new Date(data.timestamp).toLocaleTimeString('en-GB')}`;
+  document.getElementById('lupd').textContent = updatedText;
+  const railUpd = document.getElementById('rail-upd');
+  if(railUpd) railUpd.textContent = updatedText;
 
   const builders = {
     proxmox:      () => buildProxmox(data.proxmox),
@@ -1896,17 +2237,42 @@ function render(data){
     return;
   }
 
+  document.getElementById('sidebar').innerHTML = ids.map(id => sidebarCard(panels[id], !dashboardOpen && id === activePanel)).join('');
+  if(dashboardOpen){
+    renderDashboardOverview(data, ids, panels);
+    return;
+  }
   if(!activePanel || !panels[activePanel]) activePanel = ids[0];
-
-  document.getElementById('sidebar').innerHTML = ids.map(id => sidebarCard(panels[id], id === activePanel)).join('');
   selectPanel(activePanel);
 }
 
-/* ── Sidebar resize (locked) ── */
+/* ── Sidebar resize ── */
 (()=>{
-  const sidebar = document.getElementById('sidebar');
-  const saved = parseInt(localStorage.getItem('os_sb_width'));
-  if(saved && saved >= 160 && saved <= 800) sidebar.style.width = saved + 'px';
+  const shell = document.querySelector('.shell');
+  const handle = document.getElementById('rail-resizer');
+  if(!shell || !handle) return;
+  const clamp = v => Math.max(238, Math.min(440, Math.round(v)));
+  const apply = v => shell.style.setProperty('--rail-w', clamp(v) + 'px');
+  const saved = parseInt(localStorage.getItem('os_rail_width'), 10);
+  if(saved) apply(saved);
+  handle.addEventListener('pointerdown', e => {
+    if(window.matchMedia('(max-width: 1100px)').matches) return;
+    e.preventDefault();
+    handle.setPointerCapture(e.pointerId);
+    document.body.classList.add('os-resizing');
+    const move = ev => apply(ev.clientX - shell.getBoundingClientRect().left);
+    const up = ev => {
+      handle.releasePointerCapture(ev.pointerId);
+      document.body.classList.remove('os-resizing');
+      localStorage.setItem('os_rail_width', getComputedStyle(shell).getPropertyValue('--rail-w').trim().replace('px',''));
+      handle.removeEventListener('pointermove', move);
+      handle.removeEventListener('pointerup', up);
+      handle.removeEventListener('pointercancel', up);
+    };
+    handle.addEventListener('pointermove', move);
+    handle.addEventListener('pointerup', up);
+    handle.addEventListener('pointercancel', up);
+  });
 })();
 
 /* ── Progress bar ── */
@@ -1958,23 +2324,50 @@ function setFavicon(anyOff){
   const favicon = document.getElementById('favicon');
   if(!favicon) return;
   clearInterval(faviconTimer);
-  const make = (color, opacity=1) => `data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%231E2021' stroke='${encodeURIComponent(color)}' stroke-width='2' opacity='${opacity}'/><circle cx='16' cy='16' r='6' fill='${encodeURIComponent(color)}' opacity='${opacity}'/><circle cx='16' cy='16' r='10' fill='none' stroke='${encodeURIComponent(color)}' stroke-width='1.5' stroke-opacity='${opacity*.4}'/></svg>`;
+  const make = (color, opacity=1) => `data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><path d='M3 16c3.5-5.8 7.8-8.7 13-8.7S25.5 10.2 29 16c-3.5 5.8-7.8 8.7-13 8.7S6.5 21.8 3 16Z' fill='none' stroke='${encodeURIComponent(color)}' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round' opacity='${opacity}'/><circle cx='16' cy='16' r='4.5' fill='${encodeURIComponent(color)}' opacity='${opacity}'/><circle cx='16' cy='16' r='1.8' fill='%230B0E14' opacity='${opacity}'/></svg>`;
   if(!anyOff){
-    favicon.href = make('#3dba7e');
+    favicon.href = make('#34D399');
     return;
   }
   let visible = true;
-  favicon.href = make('#e74c3c');
+  favicon.href = make('#F87171');
   faviconTimer = setInterval(()=>{
     visible = !visible;
-    favicon.href = make('#e74c3c', visible ? 1 : 0.15);
+    favicon.href = make('#F87171', visible ? 1 : 0.15);
   }, 800);
 }
 
 let embedOpen = false;
+let dashboardOpen = true;
+function setNavActive(id){
+  document.querySelectorAll('#main-nav button').forEach(btn => btn.classList.toggle('active', btn.id === id));
+}
+function navIdForUrl(url){
+  if(url.includes('/settings')) return 'nav-settings';
+  if(url.includes('/logs')) return 'nav-logs';
+  if(url.includes('/profile')) return 'nav-profile';
+  if(url.includes('/about')) return 'nav-about';
+  if(url.includes('/help')) return 'nav-help';
+  return null;
+}
+function returnDashboard(){
+  embedOpen = false;
+  dashboardOpen = true;
+  activePanel = null;
+  setNavActive('nav-dashboard');
+  if(window._lastData) render(window._lastData);
+}
+function filterSidebar(q){
+  const term = String(q || '').trim().toLowerCase();
+  document.querySelectorAll('#sidebar .sb-card').forEach(card => {
+    card.style.display = !term || card.textContent.toLowerCase().includes(term) ? '' : 'none';
+  });
+}
 function openEmbed(url){
   document.getElementById('menu-drop')?.classList.remove('open');
   embedOpen = true;
+  dashboardOpen = false;
+  setNavActive(navIdForUrl(url));
   activePanel = null;
   document.querySelectorAll('.sb-card.active').forEach(el => el.classList.remove('active'));
   document.getElementById('detail').innerHTML = 
@@ -1983,7 +2376,7 @@ function openEmbed(url){
 function toggleMenu(){ document.getElementById('menu-drop').classList.toggle('open'); }
 document.addEventListener('click', e => { if(!e.target.closest('.menu-wrap')) document.getElementById('menu-drop')?.classList.remove('open'); });
 
-function escHtml(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function escHtml(s){ return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function highlightLog(text){
   const re=/(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?)|\b(ERROR|ERR|FATAL|CRITICAL|WARNING|WARN|INFO|NOTICE|DEBUG|TRACE)\b|(\b\d{1,3}(?:\.\d{1,3}){3}(?::\d+)?\b)|("[^"]*"|'+"'"+'[^'+"'"+']*'+"'"+')|(\b\d+(?:\.\d+)?\b)/g;
   let out='',last=0,m;

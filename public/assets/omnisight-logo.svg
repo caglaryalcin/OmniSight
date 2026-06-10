@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">OmniSight logo</title>
+  <desc id="desc">A minimal transparent eye mark for monitoring and visibility.</desc>
+  <defs>
+    <linearGradient id="eye" x1="116" y1="158" x2="396" y2="354" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#34D399"/>
+      <stop offset="0.52" stop-color="#22D3EE"/>
+      <stop offset="1" stop-color="#6366F1"/>
+    </linearGradient>
+    <radialGradient id="iris" cx="0" cy="0" r="1" gradientTransform="matrix(0 70 -70 0 256 256)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ECFDF5"/>
+      <stop offset="0.45" stop-color="#34D399"/>
+      <stop offset="1" stop-color="#0891B2"/>
+    </radialGradient>
+  </defs>
+  <path d="M92 256c39-65 94-98 164-98s125 33 164 98c-39 65-94 98-164 98S131 321 92 256Z" fill="none" stroke="url(#eye)" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="256" cy="256" r="58" fill="url(#iris)"/>
+  <circle cx="256" cy="256" r="24" fill="#0B0E14"/>
+  <circle cx="272" cy="238" r="10" fill="#ECFDF5"/>
+</svg>

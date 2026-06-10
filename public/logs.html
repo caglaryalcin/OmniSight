@@ -5,11 +5,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>OmniSight — Logs</title>
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%231E2021' stroke='%233dba7e' stroke-width='2'/><circle cx='16' cy='16' r='6' fill='%233dba7e'/><circle cx='16' cy='16' r='10' fill='none' stroke='%233dba7e' stroke-width='1.5' stroke-opacity='.4'/></svg>">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%230B0E14' stroke='%2334D399' stroke-width='2'/><circle cx='16' cy='16' r='6' fill='%2334D399'/><circle cx='16' cy='16' r='10' fill='none' stroke='%2334D399' stroke-width='1.5' stroke-opacity='.4'/></svg>">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-:root{--bg:#181A1B;--panel:#1E2021;--row:#242627;--border:#2E3234;--text:#C9D1D9;--muted:#6E7681;--green:#3dba7e;--red:#e74c3c;--yellow:#f39c12}
-body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;display:flex;flex-direction:column;height:100vh}
+:root{--bg:#0B0E14;--panel:#12161F;--row:#1A202C;--border:#242C3B;--text:#E2E8F2;--muted:#7D8AA3;--green:#34D399;--red:#F87171;--yellow:#FBBF24}
+body{background:var(--bg);color:var(--text);font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;display:flex;flex-direction:column;height:100vh}
 header{background:var(--panel);border-bottom:1px solid var(--border);height:64px;padding:0 24px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
 .logo{font-size:19px;font-weight:700;display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit}
 .ldot{width:12px;height:12px;border-radius:50%;background:var(--green)}
@@ -46,16 +46,16 @@ header{background:var(--panel);border-bottom:1px solid var(--border);height:64px
 .menu-item{display:block;padding:10px 16px;font-size:13px;color:var(--text);text-decoration:none;cursor:pointer;border:none;background:none;width:100%;text-align:left}
 .menu-item:hover{background:rgba(255,255,255,.05)}
 .menu-item.danger{color:var(--red)}
-html[data-theme="light"]{--bg:#f4f5f7;--panel:#ffffff;--row:#eef1f4;--border:#dce0e5;--text:#1f2933;--muted:#69707a;--green:#1f9d63;--red:#d63b2f;--yellow:#c9820a;--blue:#3b6fc4;}
+html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#dde3ec;--text:#1c2433;--muted:#64748b;--green:#0e9f6e;--red:#dc2f2f;--yellow:#b7791f;--blue:#3b82f6;}
 html.embed header{display:none}
 .lg-ts{color:var(--muted)}
 .lg-err{color:var(--red);font-weight:600}
 .lg-warn{color:var(--yellow);font-weight:600}
 .lg-info{color:var(--green)}
 .lg-dbg{color:var(--muted)}
-.lg-ip{color:var(--blue,#5086d4)}
+.lg-ip{color:var(--blue,#60A5FA)}
 .lg-str{color:#d9a05b}
-.lg-num{color:var(--blue,#5086d4)}
+.lg-num{color:var(--blue,#60A5FA)}
 </style>
 <script>if(window.self!==window.top)document.documentElement.classList.add("embed");</script>
 </head>

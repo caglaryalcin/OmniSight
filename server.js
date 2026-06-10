@@ -3,12 +3,10 @@ const fs = require('fs');
 const path = require('path');
 const yaml = require('js-yaml');
 const crypto = require('crypto');
-const { getAllProxmoxData, proxmoxServiceAction } = require('./src/proxmox');
-const { getAllLinuxData, runServiceAction } = require('./src/linux');
+const agents = require('./src/agents');
 const { getAllKubernetesData, getPodLogs } = require('./src/kubernetes');
 const { getAllSynologyData } = require('./src/snmp');
 const { getAllHealthchecks } = require('./src/healthchecks');
-const { getAllDockerData, getContainerLogs, pruneImages } = require('./src/docker');
 const { getAllDatabaseData } = require('./src/database');
 const { dispatchAlert } = require('./src/alerts');
 const { decryptConfig, encryptConfigValue, isEncrypted, SENSITIVE_KEYS, encryptionEnabled } = require('./src/crypto');
@@ -117,6 +115,7 @@ function genToken() {
 function authMiddleware(req, res, next) {
   const auth = loadAuth();
   if (req.path.startsWith('/api/icons/')) return next();
+  if (req.path.startsWith('/agent/') || ['/api/agent/report', '/api/agent/result', '/api/agent/commands'].includes(req.path)) return next();
   const token = req.headers['x-session-token'] || req.cookies?.session;
   if (token && sessions.has(token) && Date.now() < sessions.get(token).expires) return next();
   if (config.publicStatus && (req.path === '/status' || req.path === '/api/public/status')) return next();
@@ -198,12 +197,12 @@ function assignStatic(base) {
 function configuredList() {
   const en = c => c && c.enabled !== false;
   const ids = [];
-  if (en(config.proxmox)      && (config.proxmox.nodes || []).length)   ids.push('proxmox');
+  if (en(config.proxmox)      && agents.hasPve())                       ids.push('proxmox');
   if (en(config.kubernetes)   && config.kubernetes.kubeconfig)          ids.push('kubernetes');
-  if (en(config.linux)        && (config.linux.servers || []).length)   ids.push('linux');
+  if (en(config.linux)        && config.linux.agentToken)               ids.push('linux');
   if (en(config.snmp)         && (config.snmp.devices || []).length)    ids.push('snmp');
   if (en(config.healthchecks) && config.healthchecks.url)               ids.push('healthchecks');
-  if (en(config.docker)       && (config.docker.hosts || []).length)    ids.push('docker');
+  if (en(config.docker)       && agents.hasDocker())                    ids.push('docker');
   if (en(config.database)     && (config.database.instances || []).length) ids.push('database');
   return ids;
 }
@@ -286,12 +285,12 @@ function backgroundRefresh() {
   const base = cache.data;
   assignStatic(base);
   const tasks = [
-    ['proxmox',      enabled(config.proxmox)      ? getAllProxmoxData({ ...config.proxmox, excludedServices: config.excludedServices }) : Promise.resolve({ clusterSummary: null, nodes: [] }), { clusterSummary: null, nodes: [] }],
-    ['linux',        enabled(config.linux)        ? getAllLinuxData({ ...config.linux, excludedServices: config.excludedServices })     : Promise.resolve([]),   []],
+    ['proxmox',      enabled(config.proxmox)      ? Promise.resolve(agents.getProxmoxData({ excludedServices: config.excludedServices })) : Promise.resolve({ clusterSummary: null, nodes: [] }), { clusterSummary: null, nodes: [] }],
+    ['linux',        enabled(config.linux)        ? Promise.resolve(agents.getAllAgentData({ ...config.linux, excludedServices: config.excludedServices })) : Promise.resolve([]),   []],
     ['kubernetes',   enabled(config.kubernetes)   ? getAllKubernetesData(config.kubernetes)  : Promise.resolve(null), null],
     ['snmp',         enabled(config.snmp)         ? getAllSynologyData(config.snmp)          : Promise.resolve([]),   []],
     ['healthchecks', enabled(config.healthchecks) ? getAllHealthchecks(config.healthchecks) : Promise.resolve(null), null],
-    ['docker',       enabled(config.docker)       ? getAllDockerData(config.docker)          : Promise.resolve([]),   []],
+    ['docker',       enabled(config.docker)       ? Promise.resolve(agents.getDockerData())  : Promise.resolve([]),   []],
     ['database',     enabled(config.database)     ? getAllDatabaseData(config.database)      : Promise.resolve([]),   []],
   ];
   const ps = tasks.map(([key, p, fb]) =>
@@ -454,24 +453,11 @@ app.post('/api/config', (req, res) => {
       const en = c => c && c.enabled !== false;
 
       if (en(config.proxmox)) {
-        const nodes = config.proxmox.nodes || [];
-        cache.data.proxmox = cache.data.proxmox || { clusterSummary: null, nodes: [] };
-        cache.data.proxmox.nodes = cache.data.proxmox.nodes.filter(n => nodes.includes(n.node?.name));
-        nodes.forEach(nm => {
-          if (!cache.data.proxmox.nodes.some(n => n.node?.name === nm)) {
-            cache.data.proxmox.nodes.push({ node: { name: nm, online: false }, services: [], vms: [], history: [], storage: [], _connecting: true });
-          }
-        });
+        cache.data.proxmox = agents.getProxmoxData({ excludedServices: config.excludedServices });
       } else { cache.data.proxmox = { clusterSummary: null, nodes: [] }; }
 
       if (en(config.linux)) {
-        const servers = config.linux.servers || [];
-        cache.data.linux = (cache.data.linux || []).filter(s => servers.some(srv => srv.name === s.name || srv.host === s.host));
-        servers.forEach(srv => {
-          if (!cache.data.linux.some(s => s.name === srv.name || s.host === srv.host)) {
-            cache.data.linux.push({ name: srv.name, host: srv.host, online: false, services: [], _connecting: true });
-          }
-        });
+        cache.data.linux = agents.getAllAgentData({ ...config.linux, excludedServices: config.excludedServices });
       } else { cache.data.linux = []; }
 
       if (en(config.kubernetes)) {
@@ -497,13 +483,7 @@ app.post('/api/config', (req, res) => {
       } else { cache.data.healthchecks = null; }
 
       if (en(config.docker)) {
-        const hosts = config.docker.hosts || [];
-        cache.data.docker = (cache.data.docker || []).filter(h => hosts.some(host => host.name === h.name));
-        hosts.forEach(host => {
-          if (!cache.data.docker.some(h => h.name === host.name)) {
-            cache.data.docker.push({ name: host.name, online: false, containers: [], summary: { total: 0, running: 0, stopped: 0, other: 0, unused: null }, _connecting: true });
-          }
-        });
+        cache.data.docker = agents.getDockerData();
       } else { cache.data.docker = []; }
 
       if (en(config.database)) {
@@ -649,8 +629,8 @@ function mergePreservingSecrets(incoming, existing) {
   return out;
 }
 
-app.get('/api/debug/docker', async (req, res) => {
-  try { res.json(await getAllDockerData(config.docker || {})); }
+app.get('/api/debug/docker', (req, res) => {
+  try { res.json(agents.getDockerData()); }
   catch (err) { res.status(500).json({ error: err.message, stack: err.stack }); }
 });
 
@@ -701,6 +681,77 @@ app.get('/api/debug/snmp-probe', async (req, res) => {
     });
   } catch (e) { result.sessionError = e.message; }
   res.json(result);
+});
+
+function agentAuth(req, res) {
+  const token = String(req.headers['x-agent-token'] || '');
+  const expected = String(config.linux?.agentToken || '');
+  if (!expected || config.linux?.enabled === false) { res.status(403).json({ error: 'agents not enabled' }); return false; }
+  const a = Buffer.from(token), b = Buffer.from(expected);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) { res.status(401).json({ error: 'invalid agent token' }); return false; }
+  return true;
+}
+
+app.get('/agent/install.sh', (req, res) => {
+  res.type('text/x-shellscript').sendFile(path.join(__dirname, 'agent', 'install.sh'));
+});
+
+app.get('/agent/omnisight-agent.sh', (req, res) => {
+  res.type('text/x-shellscript').sendFile(path.join(__dirname, 'agent', 'omnisight-agent.sh'));
+});
+
+app.post('/api/agent/report', (req, res) => {
+  if (!agentAuth(req, res)) return;
+  try {
+    const a = agents.handleReport(req.body || {});
+    if (cache.data) {
+      const en = c => c && c.enabled !== false;
+      cache.data.linux = en(config.linux) ? agents.getAllAgentData({ ...config.linux, excludedServices: config.excludedServices }) : [];
+      cache.data.proxmox = en(config.proxmox) ? agents.getProxmoxData({ excludedServices: config.excludedServices }) : { clusterSummary: null, nodes: [] };
+      cache.data.docker = en(config.docker) ? agents.getDockerData() : [];
+      assignStatic(cache.data);
+    }
+    const cmds = agents.takeCommands(a.id);
+    res.type('text/plain').send(agents.commandLines(cmds));
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+app.get('/api/agent/commands', async (req, res) => {
+  if (!agentAuth(req, res)) return;
+  const id = String(req.query.id || '').replace(/[^\w.-]/g, '').slice(0, 128);
+  if (!id) return res.status(400).json({ error: 'id required' });
+  const waitMs = Math.min(Math.max(Number(req.query.wait) || 10, 1), 55) * 1000;
+  const cmds = await agents.waitForCommands(id, waitMs);
+  res.type('text/plain').send(agents.commandLines(cmds));
+});
+
+app.post('/api/agent/result', (req, res) => {
+  if (!agentAuth(req, res)) return;
+  res.json({ ok: agents.handleResult(req.body || {}) });
+});
+
+app.post('/api/agent/token', (req, res) => {
+  try {
+    const token = crypto.randomBytes(24).toString('hex');
+    const existing = fs.existsSync(CONFIG_PATH) ? yaml.load(fs.readFileSync(CONFIG_PATH, 'utf8')) || {} : {};
+    existing.linux = existing.linux || {};
+    existing.linux.agentToken = token;
+    if (existing.linux.enabled === undefined) existing.linux.enabled = true;
+    const toSave = encryptionEnabled() ? encryptConfigObj(existing) : existing;
+    fs.writeFileSync(CONFIG_PATH, yaml.dump(toSave, { lineWidth: -1 }), 'utf8');
+    config = loadConfig();
+    res.json({ ok: true, token });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/agent/remove', (req, res) => {
+  try {
+    const { id } = req.body || {};
+    if (!id) return res.status(400).json({ error: 'id required' });
+    const ok = agents.removeAgent(id);
+    if (cache.data) cache.data.linux = agents.getAllAgentData({ ...config.linux, excludedServices: config.excludedServices });
+    res.json({ ok, data: cache.data });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.get('/api/logs', (req, res) => {
@@ -812,8 +863,8 @@ app.post('/api/proxmox/service', async (req, res) => {
   try {
     const { node, service, action } = req.query;
     if (!['status', 'start', 'stop', 'restart'].includes(action)) return res.status(400).json({ error: 'invalid action' });
-    if (!config.proxmox) return res.status(404).json({ error: 'proxmox not configured' });
-    const output = await proxmoxServiceAction(config.proxmox, node, service, action);
+    if (!agents.findAgent(node)) return res.status(404).json({ error: 'node agent not found' });
+    const output = await agents.queueCommand(node, action, service);
     if (action !== 'status') {
       if (cache.data?.proxmox?.nodes) {
         const n = cache.data.proxmox.nodes.find(x => x.node?.name === node);
@@ -832,16 +883,15 @@ app.post('/api/proxmox/service', async (req, res) => {
 app.post('/api/linux/service', async (req, res) => {
   try {
     const { host, service, action } = req.query;
-    if (!['status', 'start', 'restart'].includes(action)) return res.status(400).json({ error: 'invalid action' });
-    const srv = (config.linux?.servers || []).find(s => s.host === host || s.name === host);
-    if (!srv) return res.status(404).json({ error: 'server not found' });
-    const output = await runServiceAction(srv, service, action);
+    if (!['status', 'start', 'stop', 'restart'].includes(action)) return res.status(400).json({ error: 'invalid action' });
+    if (!agents.findAgent(host)) return res.status(404).json({ error: 'agent not found' });
+    const output = await agents.queueCommand(host, action, service);
     if (action !== 'status') {
       if (cache.data?.linux) {
         const s = cache.data.linux.find(x => x.host === host || x.name === host);
         if (s && s.services) {
           const svc = s.services.find(x => x.name === service);
-          if (svc) svc.active = action === 'start';
+          if (svc) svc.active = action !== 'stop';
         }
       }
       refreshPromise = null;
@@ -853,16 +903,16 @@ app.post('/api/linux/service', async (req, res) => {
 
 app.post('/api/docker/prune', async (req, res) => {
   try {
-    const host = (config.docker?.hosts || []).find(h => h.name === req.query.host);
-    if (!host) return res.status(404).json({ error: 'host not found' });
-    const result = await pruneImages(host);
+    const host = String(req.query.host || '');
+    if (!agents.findAgent(host)) return res.status(404).json({ error: 'host agent not found' });
+    const output = await agents.queueCommand(host, 'docker_prune', 'all');
     if (cache.data?.docker) {
-      const h = cache.data.docker.find(x => x.name === req.query.host);
+      const h = cache.data.docker.find(x => x.name === host);
       if (h && h.summary) h.summary.unused = 0;
     }
     refreshPromise = null;
     backgroundRefresh();
-    res.json({ ok: true, ...result });
+    res.json({ ok: true, output });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -871,7 +921,8 @@ app.get('/api/docker/logs', async (req, res) => {
     const { host, id } = req.query;
     if (!host || !id) return res.status(400).json({ error: 'host and id required' });
     if (!/^[\w.-]+$/.test(id)) return res.status(400).json({ error: 'invalid id' });
-    const logs = await getContainerLogs(config.docker || {}, host, id, req.query.tail);
+    if (!agents.findAgent(host)) return res.status(404).json({ error: 'host agent not found' });
+    const logs = await agents.queueCommand(host, 'docker_logs', id);
     res.type('text/plain; charset=utf-8').send(logs || '');
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
