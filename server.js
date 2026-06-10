@@ -176,6 +176,7 @@ function encryptConfigObj(obj) {
 }
 
 let config = loadConfig();
+process.env.TZ = config.timezone || process.env.TZ || 'UTC';
 
 let cache = { data: null };
 let refreshPromise = null;
@@ -186,6 +187,7 @@ function assignStatic(base) {
   base.publicStatus = !!config.publicStatus;
   base.configured = configuredList();
   base.notifyDisabled = Array.from(notifyDisabled);
+  base.timeFormat = config.timeFormat || '24h';
   base.icons = {
     proxmox: config.proxmox?.icon, linux: config.linux?.icon, kubernetes: config.kubernetes?.icon,
     snmp: config.snmp?.icon, healthchecks: config.healthchecks?.icon, docker: config.docker?.icon,
@@ -242,7 +244,7 @@ function extractChecks(data) {
   const hc = data.healthchecks;
   if (hc && Array.isArray(hc.checks)) hc.checks.forEach(c => {
     const nm = c.name || c.slug;
-    add('hc:' + nm, c.status !== 'down' && c.status !== 'grace', 'Healthcheck ' + nm, c.status);
+    add('hc:' + nm, c.status !== 'down', 'Healthcheck ' + nm, c.status);
   });
   (data.database || []).forEach(d => add('db:' + d.name, !!d.online, 'Database ' + d.name, 'unreachable'));
   return m;
@@ -308,7 +310,7 @@ function backgroundRefresh() {
         if (s.status === 'down') score = 0;
         else if (s.status === 'warn') score = 65;
         PLATFORM_HISTORY[s.id].push({ health: score });
-        if (PLATFORM_HISTORY[s.id].length > 80) PLATFORM_HISTORY[s.id].shift();
+        if (PLATFORM_HISTORY[s.id].length > 1440) PLATFORM_HISTORY[s.id].shift();
       });
     })
     .catch(err => { console.error(err.message); })
@@ -412,6 +414,11 @@ app.get('/api/config', (req, res) => {
   const raw = fs.existsSync(CONFIG_PATH)
     ? yaml.load(fs.readFileSync(CONFIG_PATH, 'utf8')) || {}
     : {};
+    
+  if (!raw.timezone && process.env.TZ) {
+    raw.timezone = process.env.TZ;
+  }
+  
   const masked = maskConfig(raw);
   res.json(masked);
 });
@@ -438,6 +445,7 @@ app.post('/api/config', (req, res) => {
     }
 
     const merged = mergePreservingSecrets(incoming, existing);
+	if (merged.timezone) process.env.TZ = merged.timezone;
     const toSave = encryptionEnabled() ? encryptConfigObj(merged) : merged;
     fs.writeFileSync(CONFIG_PATH, yaml.dump(toSave, { lineWidth: -1 }), 'utf8');
     config = loadConfig();

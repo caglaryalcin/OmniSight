@@ -145,6 +145,15 @@ html[data-theme="light"] .hist-bg{fill:var(--bg)}
 .chart-row:last-child{margin-bottom:0}
 .chart-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;padding:0 1px}
 
+#os-tooltip {
+  position: fixed; background: var(--panel); border: 1px solid var(--border);
+  padding: 8px 12px; border-radius: 8px; pointer-events: none; opacity: 0;
+  transition: opacity 0.1s; z-index: 9999; box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  font-size: 13px; color: var(--text); min-width: 130px;
+}
+.tt-time { font-size: 12px; color: var(--muted); margin-bottom: 6px; font-weight: 600; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+.tt-val { font-weight: 700; }
+
 .csum{display:flex;gap:0;border-bottom:1px solid var(--border)}
 .csum-item{flex:1;padding:10px 16px;text-align:center;border-right:1px solid var(--border)}
 .csum-item:last-child{border-right:none}
@@ -278,6 +287,26 @@ html[data-theme="light"] .menu-drop{box-shadow:0 8px 24px rgba(0,0,0,.15)}
   color: var(--yellow);
 }
 
+#os-hover-dot {
+  position: fixed; width: 10px; height: 10px; border-radius: 50%;
+  border: 2.5px solid var(--panel); pointer-events: none; opacity: 0;
+  transition: opacity 0.1s; z-index: 9998; box-shadow: 0 0 4px rgba(0,0,0,0.5);
+  transform: translate(-50%, -50%);
+}
+
+.os-sel { position: relative; display: inline-block; font-size: 13px; font-weight: 500; cursor: pointer; }
+.os-sel-btn { background: var(--row); border: 1px solid var(--border); color: var(--text); padding: 4px 10px; border-radius: 6px; display: flex; align-items: center; gap: 6px; transition: border-color 0.15s, background-color 0.15s; }
+.os-sel-btn:hover { border-color: #4a5568; background: rgba(255,255,255,.03); }
+.os-sel-menu { display: none; position: absolute; right: 0; top: 100%; margin-top: 4px; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.4); z-index: 100; min-width: 110px; overflow: hidden; }
+.os-sel.open .os-sel-menu { display: block; }
+.os-sel-opt { padding: 8px 12px; color: var(--text); transition: background 0.1s; }
+.os-sel-opt:hover { background: rgba(255,255,255,.05); }
+.os-sel-opt.active { color: var(--green); font-weight: 600; }
+
+.os-crosshair {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='M8 0v5m0 6v5M0 8h5m6 0h5' stroke='%23888888' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E") 8 8, crosshair !important;
+}
+
 </style>
 </head>
 <body>
@@ -381,6 +410,34 @@ async function toggleNotify(key, el){
   try{ await fetch('/api/notifications',{method:'POST',headers:{'Content-Type':'application/json',...authHeaders()},body:JSON.stringify({key, enabled:!off})}); }catch(e){}
 }
 
+function openOsSel(el) {
+  document.querySelectorAll('.os-sel').forEach(d => { if (d !== el.parentElement) d.classList.remove('open'); });
+  el.parentElement.classList.toggle('open');
+}
+document.addEventListener('click', e => {
+  if(!e.target.closest('.os-sel')) document.querySelectorAll('.os-sel').forEach(d => d.classList.remove('open'));
+});
+
+function drawTimeSelect(id, currentLimit) {
+  const opts = [ { v: 80, l: '20 Mins' }, { v: 240, l: '1 Hour' }, { v: 1440, l: '6 Hours' } ];
+  const curLbl = opts.find(o => o.v === currentLimit)?.l || '20 Mins';
+  const optsHtml = opts.map(o => `<div class="os-sel-opt ${currentLimit === o.v ? 'active' : ''}" onclick="setTimeLimit('${id}', ${o.v})">${o.l}</div>`).join('');
+  return `<div class="os-sel" onclick="event.stopPropagation()">
+    <div class="os-sel-btn" onclick="openOsSel(this)">
+      ${curLbl} <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <div class="os-sel-menu">${optsHtml}</div>
+  </div>`;
+}
+
+let timeLimits = {};
+try { timeLimits = JSON.parse(localStorage.getItem('os_time_limits') || '{}'); } catch {}
+window.setTimeLimit = function(id, val) {
+  timeLimits[id] = Number(val);
+  try { localStorage.setItem('os_time_limits', JSON.stringify(timeLimits)); } catch {}
+  if (window._lastData) render(window._lastData);
+};
+
 const UO_KEY = 'os_user_override';
 let userOverride = {};
 try { userOverride = JSON.parse(localStorage.getItem(UO_KEY) || '{}'); } catch {}
@@ -483,14 +540,103 @@ function applyConfigured(ids, cfg){
   doRefresh();
 }
 
-function histChart(data, key, pct) {
+function showChartTooltip(e, el, clr) {
+  const tt = document.getElementById('os-tooltip');
+  const hDot = document.getElementById('os-hover-dot');
+  if (!tt || !hDot) return;
+  
+  const rect = el.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const pct = Math.max(0, Math.min(1, x / rect.width));
+  
+  const raw = el.getAttribute('data-pts');
+  if (!raw) return;
+  const pts = JSON.parse(raw);
+  const idx = Math.round(pct * (pts.length - 1));
+  if (!pts[idx]) return;
+  const pt = pts[idx];
+  
+  const dotX = rect.left + (idx / (pts.length - 1)) * rect.width;
+  const dotY = rect.top + (pt.y / 50) * rect.height;
+  
+  hDot.style.background = clr;
+  hDot.style.left = dotX + 'px';
+  hDot.style.top = dotY + 'px';
+  hDot.style.opacity = 1;
+  
+  const d = new Date(pt.t);
+  const dStr = d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  
+  const is12h = !!(window._lastData && window._lastData.timeFormat === '12h');
+  let tStr = '';
+  try {
+    tStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: is12h });
+  } catch (err) {
+    tStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+  
+  tt.innerHTML = `<div class="tt-time">${dStr}, ${tStr}</div>
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+                    <div style="display:flex;align-items:center;gap:6px">
+                      <div style="width:10px;height:10px;border-radius:2px;background:${clr}"></div>
+                      <span>Usage</span>
+                    </div>
+                    <span class="tt-val" style="color:${clr}">${pt.v}%</span>
+                  </div>`;
+  
+  let tx = e.clientX + 15;
+  let ty = e.clientY + 15;
+  if (tx + 160 > window.innerWidth) tx = e.clientX - 160;
+  if (ty + 80 > window.innerHeight) ty = e.clientY - 80;
+  
+  tt.style.left = tx + 'px';
+  tt.style.top = ty + 'px';
+  tt.style.opacity = 1;
+}
+
+function hideChartTooltip() {
+  const tt = document.getElementById('os-tooltip');
+  const hDot = document.getElementById('os-hover-dot');
+  if (tt) tt.style.opacity = 0;
+  if (hDot) hDot.style.opacity = 0;
+}
+
+function histChart(data, key, pct, limit = 80) {
   const W = 300, H = 50, clr = bchex(pct);
-  const empty = `<svg class="hist-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><rect width="${W}" height="${H}" class="hist-bg" rx="3"/><line x1="0" y1="${H}" x2="${W}" y2="${H}" stroke="${clr}" stroke-width="1.5" stroke-opacity=".3"/></svg>`;
+  const now = Date.now();
+  
+  const is12h = !!(window._lastData && window._lastData.timeFormat === '12h');
+  const fmtTime = (ts) => {
+    try { return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: is12h }); }
+    catch (err) { return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
+  };
+
+  const startTs = now - (limit - 1) * 15000;
+  const midTs = now - Math.floor((limit - 1) / 2) * 15000;
+  const endTs = now;
+  
+  const duration = (limit - 1) * 15000;
+  
+  const axisHtml = `<div style="display:flex; justify-content:space-between; font-size:10px; color:var(--muted); margin-top:4px; padding:0 2px;">
+      <span>${fmtTime(now - duration)}</span>
+      <span>${fmtTime(now - duration * 0.75)}</span>
+      <span>${fmtTime(now - duration * 0.5)}</span>
+      <span>${fmtTime(now - duration * 0.25)}</span>
+      <span>${fmtTime(now)}</span>
+    </div>`;
+
+  const emptySvg = `<svg class="hist-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><rect width="${W}" height="${H}" class="hist-bg" rx="3"/><line x1="0" y1="${H}" x2="${W}" y2="${H}" stroke="${clr}" stroke-width="1.5" stroke-opacity=".3"/></svg>`;
+  const empty = `<div>${emptySvg}${axisHtml.replace(/<span/g, '<span style="opacity:0.3"')}</div>`;
   
   if (!data || data.length < 2) return empty;
-  const vals = data.slice(-80).map(d => Math.min(100, Math.max(0, Number(d[key]) || 0)));
-  if (vals.length < 2) return empty;
   
+  const ptsRaw = data.slice(-limit);
+  const vals = ptsRaw.map(d => Math.min(100, Math.max(0, Number(d[key]) || 0)));
+  if (vals.length < 2) return empty;
+
+  const actualVals = vals.length < limit ? [...Array(limit - vals.length).fill(null), ...vals] : vals;
+  const actualPtsRaw = ptsRaw.length < limit ? [...Array(limit - ptsRaw.length).fill(null), ...ptsRaw] : ptsRaw;
+
   let minV = Math.min(...vals);
   let maxV = Math.max(...vals);
   if (maxV - minV < 5) {
@@ -503,18 +649,34 @@ function histChart(data, key, pct) {
   }
   const range = maxV - minV || 1;
   
-  const n = vals.length;
+  const n = actualVals.length;
   const xStep = W / (n - 1);
-  const pts = vals.map((v, i) => [i * xStep, H - ((v - minV) / range) * H]);
-  const line = pts.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(2)},${p[1].toFixed(2)}`).join('');
-  const area = `${line}L${W.toFixed(2)},${H}L0,${H}Z`;
+  
+  const linePts = actualVals.map((v, i) => v === null ? null : [i * xStep, H - ((v - minV) / range) * H]);
+
+  const pts = actualPtsRaw.map((d, i) => {
+    if (d === null) return null;
+    let t = d.time ? (d.time > 1e11 ? d.time : d.time * 1000) : (now - (n - 1 - i) * 15000);
+    return { t, v: actualVals[i], y: linePts[i][1].toFixed(2) };
+  });
+  const ptsJson = JSON.stringify(pts).replace(/'/g, "&#39;");
+  
+  const validLinePts = linePts.filter(p => p !== null);
+  if (validLinePts.length < 2) return empty;
+
+  const line = validLinePts.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(2)},${p[1].toFixed(2)}`).join('');
+  const firstX = validLinePts[0][0].toFixed(2);
+  const lastX = validLinePts[validLinePts.length - 1][0].toFixed(2);
+  const area = `${line}L${lastX},${H}L${firstX},${H}Z`;
   const gid = 'hg' + Math.random().toString(36).slice(2, 7);
   
   let gridPath = '';
   for (let i = 1; i < 4; i++) gridPath += `M0,${i * 12.5} L${W},${i * 12.5} `;
   for (let i = 1; i < 10; i++) gridPath += `M${i * 30},0 L${i * 30},${H} `;
   
-  return `<svg class="hist-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+  const svgHtml = `<svg class="hist-svg" style="cursor:default" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" 
+    onmousemove="showChartTooltip(event, this, '${clr}')" onmouseleave="hideChartTooltip()" 
+    data-pts='${ptsJson}'>
     <defs>
       <linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
         <stop offset="0%" stop-color="${clr}" stop-opacity="0.35"/>
@@ -524,8 +686,10 @@ function histChart(data, key, pct) {
     <rect width="${W}" height="${H}" class="hist-bg" rx="3"/>
     <path d="${gridPath}" stroke="var(--text)" stroke-width="1" opacity="0.07" vector-effect="non-scaling-stroke" />
     <path d="${area}" fill="url(#${gid})"/>
-    <path d="${line}" fill="none" stroke="${clr}" stroke-width="1" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+    <path d="${line}" fill="none" stroke="${clr}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
   </svg>`;
+
+  return `<div>${svgHtml}${axisHtml}</div>`;
 }
 
 function relTime(iso){
@@ -697,18 +861,20 @@ function buildProxmox(px){
     </div>
     <div class="node-body ${isOpen?'open':''}" id="nd-${node.name}">
       ${node.online ? `
-        <div class="chart-row">
+        ${(()=>{ const lim=timeLimits['px:'+node.name]||80; return `<div style="display:flex; justify-content:flex-end; margin-bottom:4px;">
+          ${drawTimeSelect('px:'+node.name, lim)}
+        </div><div class="chart-row">
           <div class="chart-hdr"><span class="nb-label">CPU</span><span class="nb-pct" style="color:${bc(cpuPct)}">${cpuPct}%</span></div>
-          ${histChart(history,'cpu',cpuPct)}
+          ${histChart(history,'cpu',cpuPct,lim)}
         </div>
         <div class="chart-row">
           <div class="chart-hdr">
             <span class="nb-label">RAM</span>
-            <span style="font-size:12px;color:var(--muted)">${node.ram?.usedGB?`${node.ram.usedGB}/${node.ram.totalGB} GB`:''}</span>
+            <span style="font-size:16px;color:var(--muted)">${node.ram?.usedGB?`${node.ram.usedGB}/${node.ram.totalGB} GB`:''}</span>
             <span class="nb-pct" style="color:${bc(ramPct)}">${ramPct}%</span>
           </div>
-          ${histChart(history,'mem',ramPct)}
-        </div>
+          ${histChart(history,'mem',ramPct,lim)}
+        </div>` })()}
         ${backup?`<div class="row" style="padding:8px 0;margin-top:6px;border-top:1px solid var(--border)">
           <span class="nb-label" style="flex:1">Last backup</span>
           ${backup.endtime?`<span style="font-size:12px;color:var(--muted);margin-right:8px">${relTime(new Date(backup.endtime*1000).toISOString())}</span>`:''}
@@ -847,20 +1013,23 @@ function buildLinux(linux){
         <span class="chevron ${linuxOpen[lkey]?'open':''}" style="margin-left:4px">▼</span>
       </div>
       <div class="node-body ${linuxOpen[lkey]?'open':''}" id="lx-${lkey}">
-        ${cpuPct!=null?`
+        ${(()=>{ const lim=timeLimits['lx:'+lkey]||80; return (cpuPct!=null||srv.ram!=null)?`<div style="display:flex; justify-content:flex-end; margin-bottom:4px;">
+          ${drawTimeSelect('lx:'+lkey, lim)}
+        </div>`:'' })()}
+        ${(()=>{ const lim=timeLimits['lx:'+lkey]||80; return cpuPct!=null?`
           <div class="chart-row">
             <div class="chart-hdr"><span class="nb-label">CPU</span><span class="nb-pct" style="color:${bc(cpuPct)}">${cpuPct}%</span></div>
-            ${srv.history?.length>1 ? histChart(srv.history,'cpu',cpuPct) : ''}
-          </div>` : ''}
-        ${srv.ram!=null?`
+            ${srv.history?.length>1 ? histChart(srv.history,'cpu',cpuPct,lim) : ''}
+          </div>` : '' })()}
+        ${(()=>{ const lim=timeLimits['lx:'+lkey]||80; return srv.ram!=null?`
           <div class="chart-row">
             <div class="chart-hdr">
               <span class="nb-label">RAM</span>
               <span style="font-size:12px;color:var(--muted)">${srv.ram.usedGB}/${srv.ram.totalGB} GB</span>
               <span class="nb-pct" style="color:${bc(ramPct)}">${ramPct}%</span>
             </div>
-            ${srv.history?.length>1 ? histChart(srv.history,'ram',ramPct) : ''}
-          </div>` : ''}
+            ${srv.history?.length>1 ? histChart(srv.history,'ram',ramPct,lim) : ''}
+          </div>` : '' })()}
         ${(srv.services||[]).length?`<div class="syn-section" style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">Services</div>`:''}
         ${sortSvcs(srv.services || []).map(s=>`
           <div class="row" style="padding:8px 0;${s.excluded?'opacity:0.6':''}">
@@ -1120,10 +1289,13 @@ function buildSynology(syn){
         ${notifyBell('snmp:'+dev.name)}
       </div>
       <div class="node-body ${snmpOpen[skey]?'open':''}" id="snmp-${skey}">
+        ${(()=>{ const lim=timeLimits['snmp:'+skey]||80; return (dev.cpu!=null||dev.ram!=null)?`<div style="display:flex; justify-content:flex-end; margin-bottom:4px;">
+          ${drawTimeSelect('snmp:'+skey, lim)}
+        </div>`:'' })()}
         ${bars('CPU', dev.cpu)}
-        ${dev.cpu!=null && dev.history?.length>1 ? `<div style="margin:-2px 0 16px 44px">${histChart(dev.history,'cpu',dev.cpu)}</div>` : ''}
+        ${(()=>{ const lim=timeLimits['snmp:'+skey]||80; return dev.cpu!=null && dev.history?.length>1 ? `<div style="margin:-2px 0 16px 44px">${histChart(dev.history,'cpu',dev.cpu,lim)}</div>` : '' })()}
         ${bars('RAM', dev.ram?.percent, dev.ram ? `${dev.ram.usedGB} / ${dev.ram.totalGB} GB` : '')}
-        ${dev.ram && dev.history?.length>1 ? `<div style="margin:-2px 0 16px 44px">${histChart(dev.history,'ram',dev.ram.percent)}</div>` : ''}
+        ${(()=>{ const lim=timeLimits['snmp:'+skey]||80; return dev.ram && dev.history?.length>1 ? `<div style="margin:-2px 0 16px 44px">${histChart(dev.history,'ram',dev.ram.percent,lim)}</div>` : '' })()}
         ${dev.volumes?.length ? `
           <div class="syn-section" style="margin-top:6px">Volumes</div>
           ${dev.volumes.map(v => {
@@ -1956,6 +2128,8 @@ async function initialLoad(){
     .catch(() => {});
 })();
 </script>
+<div id="os-tooltip"></div>
+<div id="os-hover-dot"></div>
 </body>
 </html>
  

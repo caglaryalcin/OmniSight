@@ -127,6 +127,31 @@ html[data-theme="light"]{--bg:#f4f5f7;--panel:#ffffff;--row:#eef1f4;--border:#dc
 
 <main>
 
+<!-- Timezone -->
+<div class="card">
+  <div class="card-hdr" style="cursor:default">
+    <div class="card-left">
+      <div class="card-icon" style="background:var(--blue)"></div>
+      <span class="card-title">System Settings</span>
+    </div>
+  </div>
+  <div class="card-body" style="display:block !important">
+    <div class="form-grid" style="grid-template-columns: 2fr 1fr; max-width: 450px;">
+      <div class="form-group" style="margin-bottom:0;">
+        <label>Timezone</label>
+        <input type="text" id="cfg-timezone" placeholder="e.g. Europe/Istanbul (leave blank for UTC)">
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label>Time Format</label>
+        <select id="cfg-timeformat">
+          <option value="24h">24 Hour (20:52)</option>
+          <option value="12h">12 Hour (08:52 PM)</option>
+        </select>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- General -->
 <div class="card">
   <div class="card-hdr">
@@ -772,6 +797,12 @@ function maskedVal(el) {
 }
 
 function populate(cfg) {
+  if (document.getElementById('cfg-timezone')) {
+    document.getElementById('cfg-timezone').value = cfg.timezone || '';
+  }
+  if (document.getElementById('cfg-timeformat')) {
+    document.getElementById('cfg-timeformat').value = cfg.timeFormat || '24h';
+  }
   document.getElementById('en-public').checked = !!cfg.publicStatus;
   if (cfg.publicTitle) document.getElementById('public-title').value = cfg.publicTitle;
   if (cfg.proxmox) {
@@ -859,6 +890,16 @@ function populate(cfg) {
 /* ── Collect config ── */
 function collect() {
   const cfg = {};
+  
+  const tzEl = document.getElementById('cfg-timezone');
+  if (tzEl && tzEl.value.trim()) {
+    cfg.timezone = tzEl.value.trim();
+  }
+
+  const tfEl = document.getElementById('cfg-timeformat');
+  if (tfEl && tfEl.value) {
+    cfg.timeFormat = tfEl.value;
+  }
 
   {
     const on = document.getElementById('en-proxmox').checked;
@@ -1036,7 +1077,13 @@ function collect() {
 }
 
 function toggleMenu(){ document.getElementById('menu-drop').classList.toggle('open'); }
-document.addEventListener('click', e => { if(!e.target.closest('.menu-wrap')) document.getElementById('menu-drop')?.classList.remove('open'); });
+document.addEventListener('click', e => { 
+  if(!e.target.closest('.menu-wrap')) document.getElementById('menu-drop')?.classList.remove('open'); 
+  if(window.parent && window.parent !== window) {
+    const pMenu = window.parent.document.getElementById('menu-drop');
+    if(pMenu) pMenu.classList.remove('open');
+  }
+});
 
 function authHeaders(){ const t=sessionStorage.getItem('os_token')||localStorage.getItem('os_token'); return t?{'x-session-token':t}:{}; }
 function handleUnauth(r){ if(r.status===401){ sessionStorage.removeItem('os_token'); localStorage.removeItem('os_token'); document.cookie='session=; path=/; max-age=0'; window.location.href='/login'; throw new Error('Unauthorized'); } }
