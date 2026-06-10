@@ -206,7 +206,7 @@ EOF
     printf '"services":[%s]}' "$(services_json)"
   } > "$tmp"
   curl -fsS $CURL_TLS_ARGS -m 20 -X POST -H "X-Agent-Token: $TOKEN" -H "Content-Type: application/json" \
-    --data-binary @"$tmp" "$URL/api/agent/report" 2>/dev/null
+    --data-binary @"$tmp" "$URL/api/agent/report"
   rc=$?
   rm -f "$tmp"
   return $rc
@@ -246,6 +246,7 @@ echo "omnisight-agent $VERSION starting (id=$AGENT_ID, server=$URL, interval=${I
 while true; do
   resp=$(send_report)
   if [ $? -ne 0 ]; then
+    echo "omnisight-agent report failed; retrying in ${INTERVAL}s" >&2
     sleep "$INTERVAL"
     continue
   fi

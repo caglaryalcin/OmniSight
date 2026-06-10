@@ -372,8 +372,8 @@ html[data-theme="light"] .topbar{background:rgba(255,255,255,.78)}
 .nav button.active{background:var(--panel2);color:var(--text);box-shadow:0 0 0 1px rgba(255,255,255,.04) inset}
 .nav svg,.topbar .icon{width:17px;height:17px;flex:0 0 auto}
 .rail-section{padding:10px 16px 8px;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.08em}
-.rail-foot{margin-top:auto;padding:14px 16px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:flex-end;color:var(--muted);font-size:12px;gap:10px}
-.rail-link{display:inline-flex;align-items:center;gap:7px;color:inherit;text-decoration:none;padding:7px 9px;border-radius:8px;border:1px solid transparent;transition:background .15s,border-color .15s,color .15s}
+.rail-foot{margin-top:auto;padding:8px 12px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:flex-end;color:var(--muted);font-size:11.5px;gap:8px;min-height:44px}
+.rail-link{display:inline-flex;align-items:center;gap:6px;color:inherit;text-decoration:none;padding:5px 7px;border-radius:8px;border:1px solid transparent;transition:background .15s,border-color .15s,color .15s}
 .rail-link:hover{background:var(--panel2);border-color:var(--border);color:var(--text)}
 .rail-toggle{position:absolute;top:16px;right:12px;width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:var(--panel);color:var(--muted);display:grid;place-items:center;cursor:pointer;z-index:45;transition:background .15s,border-color .15s,color .15s}
 .rail-toggle:hover{border-color:var(--border2);background:var(--panel2);color:var(--text)}
@@ -456,6 +456,8 @@ html[data-theme="light"] body.rail-collapsed .shell .sb-card.active{background:#
 .overview-side-row:first-child{border-top:0}
 .overview-side-row strong{display:block;color:var(--text);font-size:13px}
 .overview-side-msg{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.overview-log-list{max-height:320px;overflow-y:auto}
+.overview-log-time{color:var(--muted);font-size:11px;white-space:nowrap;margin-top:1px;flex-shrink:0}
 .overview-card{position:relative;width:100%;background:var(--panel);border:1px solid var(--border);border-radius:8px;overflow:hidden;min-width:0;box-shadow:var(--shadow);cursor:grab;transition:opacity .16s ease,border-color .16s ease,box-shadow .16s ease}
 .overview-card.dragging{opacity:.88;border:1px dashed var(--blue);z-index:9000;pointer-events:none;box-shadow:0 18px 48px rgba(0,0,0,.32);transition:none}
 .overview-card:active{cursor:grabbing}
@@ -2327,8 +2329,12 @@ function overviewSide(data){
   const alertRows = alerts.length ? alerts.map(([t,m])=>`<div class="overview-side-row"><div class="mon-dot md-red" style="margin-top:4px"></div><div class="overview-side-msg"><strong>${escHtml(t)}</strong>${escHtml(m||'')}</div></div>`).join('') : '<div class="overview-empty">No active alerts</div>';
   return `<aside class="overview-side">
     <section class="overview-side-card"><div class="overview-side-h">Active alerts</div>${alertRows}</section>
-    <section class="overview-side-card"><div class="overview-side-h">Recent logs</div><div id="recent-logs"><div class="overview-empty">Loading logs…</div></div></section>
+    <section class="overview-side-card"><div class="overview-side-h">Recent logs</div><div id="recent-logs" class="overview-log-list"><div class="overview-empty">Loading logs…</div></div></section>
   </aside>`;
+}
+function overviewLogTime(ts){
+  try{ return new Date(ts).toLocaleTimeString('en-GB', { hour12:false }); }
+  catch(e){ return ''; }
 }
 async function loadRecentLogs(){
   const el = document.getElementById('recent-logs');
@@ -2336,8 +2342,8 @@ async function loadRecentLogs(){
   try{
     const r = await fetch('/api/logs', { headers: authHeaders() });
     handleUnauth(r);
-    const logs = (await r.json()).sort((a,b)=>b.t-a.t).slice(0,8);
-    el.innerHTML = logs.length ? logs.map(l=>`<div class="overview-side-row"><span class="badge bg-${l.level==='error'?'red':l.level==='warn'?'yellow':'gray'}" style="font-size:10px">${escHtml(l.level)}</span><div class="overview-side-msg">${escHtml(l.msg||'')}</div></div>`).join('') : '<div class="overview-empty">No recent logs</div>';
+    const logs = (await r.json()).sort((a,b)=>b.t-a.t).slice(0,80);
+    el.innerHTML = logs.length ? logs.map(l=>`<div class="overview-side-row"><span class="badge bg-${l.level==='error'?'red':l.level==='warn'?'yellow':'gray'}" style="font-size:10px">${escHtml(l.level)}</span><div class="overview-log-time">${overviewLogTime(l.t)}</div><div class="overview-side-msg">${escHtml(l.msg||'')}</div></div>`).join('') : '<div class="overview-empty">No recent logs</div>';
   }catch(e){ if(e.message!=='Unauthorized') el.innerHTML = '<div class="overview-empty">Could not load logs</div>'; }
 }
 function renderDashboardOverview(data, ids, panels){

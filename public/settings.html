@@ -546,6 +546,7 @@ html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#dd
           <pre class="code-snip" id="am-cmd-binary"></pre>
           <button type="button" class="btn-sm code-copy" onclick="copyToClip(document.getElementById('am-cmd-binary').textContent,this)">Copy</button>
         </div>
+        <div style="font-size:12px;color:var(--muted);margin-top:10px;margin-bottom:6px">Uninstall command:</div>
         <div class="code-snip-wrap" style="margin-top:8px">
           <pre class="code-snip" id="am-cmd-uninstall"></pre>
           <button type="button" class="btn-sm code-copy" onclick="copyToClip(document.getElementById('am-cmd-uninstall').textContent,this)">Copy</button>
@@ -730,7 +731,7 @@ const AM_META = {
 
 let amTab = 'binary';
 let amPollTimer = null;
-let amKnownIds = new Set();
+let amKnownIds = new Map();
 
 function agentCmds() {
   const token = document.getElementById('lx-token').value.trim() || '<token>';
@@ -794,12 +795,12 @@ async function openAddModal(kind) {
   setAddTab(kind === 'docker' ? 'docker' : 'binary');
   document.getElementById('en-' + (kind === 'proxmox' ? 'proxmox' : kind === 'docker' ? 'docker' : 'linux')).checked = true;
   document.getElementById('agent-modal').classList.add('open');
-  amKnownIds = new Set(window._agentData.map(a => a.key));
+  amKnownIds = new Map(window._agentData.map(a => [a.key, !!a.online]));
   document.getElementById('am-wait').textContent = 'Waiting for the agent to connect — it will appear in the list automatically…';
   clearInterval(amPollTimer);
   amPollTimer = setInterval(async () => {
     await loadAgents();
-    const fresh = window._agentData.find(a => !amKnownIds.has(a.key) && a.online);
+    const fresh = window._agentData.find(a => a.online && (!amKnownIds.has(a.key) || amKnownIds.get(a.key) === false));
     if (fresh) {
       document.getElementById('am-wait').innerHTML = `<span style="color:var(--green);font-weight:600">✓ ${escHtml(fresh.name)} connected!</span> You can close this dialog.`;
       document.querySelector('#agent-modal .await-dot').style.background = 'var(--green)';

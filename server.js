@@ -769,7 +769,7 @@ app.get('/api/debug/snmp-probe', async (req, res) => {
 function agentAuth(req, res) {
   const token = String(req.headers['x-agent-token'] || '');
   const expected = String(config.linux?.agentToken || '');
-  if (!expected || config.linux?.enabled === false) { res.status(403).json({ error: 'agents not enabled' }); return false; }
+  if (!expected) { res.status(403).json({ error: 'agent token is not configured' }); return false; }
   const a = Buffer.from(token), b = Buffer.from(expected);
   if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) { res.status(401).json({ error: 'invalid agent token' }); return false; }
   return true;
