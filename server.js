@@ -3,11 +3,14 @@ const fs = require('fs');
 const path = require('path');
 const yaml = require('js-yaml');
 const crypto = require('crypto');
+const childProcess = require('child_process');
 const agents = require('./src/agents');
 const { getAllKubernetesData, getPodLogs } = require('./src/kubernetes');
 const { getAllSynologyData } = require('./src/snmp');
 const { getAllHealthchecks } = require('./src/healthchecks');
 const { getAllDatabaseData } = require('./src/database');
+const { getProxmoxApiData } = require('./src/proxmox');
+const { getDockerApiData, dockerLogs: dockerApiLogs, dockerPrune: dockerApiPrune } = require('./src/docker');
 const { dispatchAlert } = require('./src/alerts');
 const { decryptConfig, encryptConfigValue, isEncrypted, SENSITIVE_KEYS, encryptionEnabled } = require('./src/crypto');
 
@@ -36,20 +39,22 @@ console.error = (...a) => { try { _error(...a); } catch {} pushLog('error', a); 
 const REFRESH_INTERVAL = 15000;
 try { fs.mkdirSync(path.join(__dirname, 'data'), { recursive: true }); } catch {}
 
-try {
-  const https = require('https');
-  const tls = require('tls');
-  const certDir = path.join(__dirname, 'data', 'certs');
-  fs.mkdirSync(certDir, { recursive: true });
-  const extra = [];
-  for (const f of fs.readdirSync(certDir)) {
-    if (/\.(crt|pem|cer)$/i.test(f)) { try { extra.push(fs.readFileSync(path.join(certDir, f))); } catch {} }
-  }
-  if (extra.length) {
-    https.globalAgent.options.ca = [...tls.rootCertificates, ...extra];
-    console.log(`Trusting ${extra.length} extra CA certificate(s) from data/certs/`);
-  }
-} catch (e) { console.warn('CA cert load failed:', e.message); }
+function reloadExtraCA() {
+  try {
+    const https = require('https');
+    const tls = require('tls');
+    const certDir = path.join(__dirname, 'data', 'certs');
+    fs.mkdirSync(certDir, { recursive: true });
+    const extra = [];
+    for (const f of fs.readdirSync(certDir)) {
+      if (/\.(crt|pem|cer)$/i.test(f)) { try { extra.push(fs.readFileSync(path.join(certDir, f))); } catch {} }
+    }
+    https.globalAgent.options.ca = extra.length ? [...tls.rootCertificates, ...extra] : undefined;
+    if (extra.length) console.log(`Trusting ${extra.length} extra CA certificate(s) from data/certs/`);
+    return extra.length;
+  } catch (e) { console.warn('CA cert load failed:', e.message); return 0; }
+}
+reloadExtraCA();
 const CONFIG_PATH = path.join(__dirname, 'data', 'config.yaml');
 const AUTH_PATH  = path.join(__dirname, 'data', 'auth.yaml');
 
@@ -182,6 +187,26 @@ let refreshPromise = null;
 
 const PLATFORM_HISTORY = {};
 
+function hasProxmoxApi() {
+  return !!(config.proxmox && config.proxmox.url && config.proxmox.tokenId && config.proxmox.tokenSecret);
+}
+
+function hasDockerApi() {
+  return !!(config.docker && Array.isArray(config.docker.hosts) && config.docker.hosts.length);
+}
+
+async function getProxmoxData() {
+  if (hasProxmoxApi()) return getProxmoxApiData({ ...config.proxmox, excludedServices: config.excludedServices });
+  return agents.getProxmoxData({ excludedServices: config.excludedServices });
+}
+
+async function getDockerData() {
+  const apiData = hasDockerApi() ? await getDockerApiData(config.docker) : [];
+  const agentData = agents.getDockerData();
+  const names = new Set(apiData.map(h => h.name));
+  return [...apiData, ...agentData.filter(h => !names.has(h.name))];
+}
+
 function assignStatic(base) {
   base.publicStatus = !!config.publicStatus;
   base.configured = configuredList();
@@ -197,12 +222,12 @@ function assignStatic(base) {
 function configuredList() {
   const en = c => c && c.enabled !== false;
   const ids = [];
-  if (en(config.proxmox)      && agents.hasPve())                       ids.push('proxmox');
+  if (en(config.proxmox)      && (agents.hasPve() || (config.proxmox.url && config.proxmox.tokenId && config.proxmox.tokenSecret))) ids.push('proxmox');
   if (en(config.kubernetes)   && config.kubernetes.kubeconfig)          ids.push('kubernetes');
   if (en(config.linux)        && config.linux.agentToken)               ids.push('linux');
   if (en(config.snmp)         && (config.snmp.devices || []).length)    ids.push('snmp');
   if (en(config.healthchecks) && config.healthchecks.url)               ids.push('healthchecks');
-  if (en(config.docker)       && agents.hasDocker())                    ids.push('docker');
+  if (en(config.docker)       && (agents.hasDocker() || (config.docker.hosts || []).length)) ids.push('docker');
   if (en(config.database)     && (config.database.instances || []).length) ids.push('database');
   return ids;
 }
@@ -243,7 +268,7 @@ function extractChecks(data) {
   const hc = data.healthchecks;
   if (hc && Array.isArray(hc.checks)) hc.checks.forEach(c => {
     const nm = c.name || c.slug;
-    add('hc:' + nm, c.status !== 'down', 'Healthcheck ' + nm, c.status);
+    add('hc:' + nm, c.status !== 'down' && c.status !== 'grace', 'Healthcheck ' + nm, c.status);
   });
   (data.database || []).forEach(d => add('db:' + d.name, !!d.online, 'Database ' + d.name, 'unreachable'));
   return m;
@@ -285,12 +310,12 @@ function backgroundRefresh() {
   const base = cache.data;
   assignStatic(base);
   const tasks = [
-    ['proxmox',      enabled(config.proxmox)      ? Promise.resolve(agents.getProxmoxData({ excludedServices: config.excludedServices })) : Promise.resolve({ clusterSummary: null, nodes: [] }), { clusterSummary: null, nodes: [] }],
+    ['proxmox',      enabled(config.proxmox)      ? getProxmoxData() : Promise.resolve({ clusterSummary: null, nodes: [] }), { clusterSummary: null, nodes: [] }],
     ['linux',        enabled(config.linux)        ? Promise.resolve(agents.getAllAgentData({ ...config.linux, excludedServices: config.excludedServices })) : Promise.resolve([]),   []],
     ['kubernetes',   enabled(config.kubernetes)   ? getAllKubernetesData(config.kubernetes)  : Promise.resolve(null), null],
     ['snmp',         enabled(config.snmp)         ? getAllSynologyData(config.snmp)          : Promise.resolve([]),   []],
     ['healthchecks', enabled(config.healthchecks) ? getAllHealthchecks(config.healthchecks) : Promise.resolve(null), null],
-    ['docker',       enabled(config.docker)       ? Promise.resolve(agents.getDockerData())  : Promise.resolve([]),   []],
+    ['docker',       enabled(config.docker)       ? getDockerData()  : Promise.resolve([]),   []],
     ['database',     enabled(config.database)     ? getAllDatabaseData(config.database)      : Promise.resolve([]),   []],
   ];
   const ps = tasks.map(([key, p, fb]) =>
@@ -453,7 +478,11 @@ app.post('/api/config', (req, res) => {
       const en = c => c && c.enabled !== false;
 
       if (en(config.proxmox)) {
-        cache.data.proxmox = agents.getProxmoxData({ excludedServices: config.excludedServices });
+        if (hasProxmoxApi()) {
+          cache.data.proxmox = { clusterSummary: null, nodes: [], _connecting: true };
+        } else {
+          cache.data.proxmox = agents.getProxmoxData({ excludedServices: config.excludedServices });
+        }
       } else { cache.data.proxmox = { clusterSummary: null, nodes: [] }; }
 
       if (en(config.linux)) {
@@ -483,7 +512,9 @@ app.post('/api/config', (req, res) => {
       } else { cache.data.healthchecks = null; }
 
       if (en(config.docker)) {
-        cache.data.docker = agents.getDockerData();
+        cache.data.docker = hasDockerApi()
+          ? config.docker.hosts.map(h => ({ name: h.name || h.url || h.socketPath || 'docker', host: h.url || h.socketPath, online: false, _connecting: true, summary: { total: 0, running: 0, stopped: 0, unused: 0 }, containers: [] }))
+          : agents.getDockerData();
       } else { cache.data.docker = []; }
 
       if (en(config.database)) {
@@ -594,6 +625,58 @@ app.post('/api/upload/icon', (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.get('/api/certificates', (req, res) => {
+  try {
+    const dir = path.join(__dirname, 'data', 'certs');
+    fs.mkdirSync(dir, { recursive: true });
+    const files = fs.readdirSync(dir)
+      .filter(f => /\.(crt|pem|cer|pfx|p12)$/i.test(f))
+      .map(f => ({ name: f, size: fs.statSync(path.join(dir, f)).size, trusted: /\.(crt|pem|cer)$/i.test(f) }));
+    res.json({ files });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/upload/certificate', (req, res) => {
+  try {
+    const { name, dataUrl, password } = req.body || {};
+    if (!dataUrl || typeof dataUrl !== 'string') return res.status(400).json({ error: 'No file content' });
+    const m = dataUrl.match(/^data:[^;]+;base64,(.+)$/);
+    const b64 = m ? m[1] : dataUrl;
+    let base = path.basename(String(name || 'ca.crt')).replace(/[^a-zA-Z0-9._-]/g, '_');
+    if (!/\.(crt|pem|cer|pfx|p12)$/i.test(base)) return res.status(400).json({ error: 'Use .crt, .pem, .cer, .pfx or .p12' });
+    const dir = path.join(__dirname, 'data', 'certs');
+    fs.mkdirSync(dir, { recursive: true });
+    const dest = path.join(dir, base);
+    fs.writeFileSync(dest, Buffer.from(b64, 'base64'), { mode: 0o600 });
+    if (/\.(pfx|p12)$/i.test(base)) {
+      const out = path.join(dir, base.replace(/\.(pfx|p12)$/i, '.pem'));
+      try {
+        childProcess.execFileSync('openssl', ['pkcs12', '-in', dest, '-nokeys', '-nodes', '-passin', `pass:${String(password || '')}`, '-out', out], { stdio: 'ignore' });
+      } catch {
+        return res.status(400).json({ error: 'PFX uploaded, but openssl could not extract a CA certificate. Try .crt/.pem or provide the PFX password.' });
+      }
+    }
+    const count = reloadExtraCA();
+    res.json({ ok: true, name: base, trusted: count });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/certificates/:name', (req, res) => {
+  try {
+    const dir = path.join(__dirname, 'data', 'certs');
+    const base = path.basename(req.params.name || '');
+    if (!/\.(crt|pem|cer|pfx|p12)$/i.test(base)) return res.status(400).json({ error: 'invalid certificate name' });
+    const dest = path.join(dir, base);
+    if (fs.existsSync(dest)) fs.unlinkSync(dest);
+    if (/\.(pfx|p12)$/i.test(base)) {
+      const pem = path.join(dir, base.replace(/\.(pfx|p12)$/i, '.pem'));
+      if (fs.existsSync(pem)) fs.unlinkSync(pem);
+    }
+    reloadExtraCA();
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.get('/api/icons/:file', (req, res) => {
   const dir = path.join(__dirname, 'data', 'icons');
   const fp = path.join(dir, path.basename(req.params.file));
@@ -629,8 +712,8 @@ function mergePreservingSecrets(incoming, existing) {
   return out;
 }
 
-app.get('/api/debug/docker', (req, res) => {
-  try { res.json(agents.getDockerData()); }
+app.get('/api/debug/docker', async (req, res) => {
+  try { res.json(await getDockerData()); }
   catch (err) { res.status(500).json({ error: err.message, stack: err.stack }); }
 });
 
@@ -904,8 +987,10 @@ app.post('/api/linux/service', async (req, res) => {
 app.post('/api/docker/prune', async (req, res) => {
   try {
     const host = String(req.query.host || '');
-    if (!agents.findAgent(host)) return res.status(404).json({ error: 'host agent not found' });
-    const output = await agents.queueCommand(host, 'docker_prune', 'all');
+    let output;
+    if (agents.findAgent(host)) output = await agents.queueCommand(host, 'docker_prune', 'all');
+    else if (hasDockerApi()) output = await dockerApiPrune(config.docker, host);
+    else return res.status(404).json({ error: 'docker host not found' });
     if (cache.data?.docker) {
       const h = cache.data.docker.find(x => x.name === host);
       if (h && h.summary) h.summary.unused = 0;
@@ -921,8 +1006,10 @@ app.get('/api/docker/logs', async (req, res) => {
     const { host, id } = req.query;
     if (!host || !id) return res.status(400).json({ error: 'host and id required' });
     if (!/^[\w.-]+$/.test(id)) return res.status(400).json({ error: 'invalid id' });
-    if (!agents.findAgent(host)) return res.status(404).json({ error: 'host agent not found' });
-    const logs = await agents.queueCommand(host, 'docker_logs', id);
+    let logs;
+    if (agents.findAgent(host)) logs = await agents.queueCommand(host, 'docker_logs', id);
+    else if (hasDockerApi()) logs = await dockerApiLogs(config.docker, host, id);
+    else return res.status(404).json({ error: 'docker host not found' });
     res.type('text/plain; charset=utf-8').send(logs || '');
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

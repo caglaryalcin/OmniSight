@@ -124,7 +124,9 @@ function fmt(ts){
 function renderLogs(){
   const search = document.getElementById('search').value.toLowerCase();
   const wrap = document.getElementById('log-wrap');
-  const visible = allLogs.filter(l => l.t > cleared && filters[l.level] && (!search || l.msg.toLowerCase().includes(search)));
+  const visible = allLogs
+    .filter(l => l.t > cleared && filters[l.level] && (!search || l.msg.toLowerCase().includes(search)))
+    .sort((a,b) => b.t - a.t);
   document.getElementById('count').textContent = `${visible.length} entries`;
   if(!visible.length){ wrap.innerHTML='<div class="empty-msg">No matching logs</div>'; return; }
   wrap.innerHTML = visible.map(l => `
@@ -154,7 +156,7 @@ function highlightLog(text){
   out+=escHtml(text.slice(last));
   return out;
 }
-function scrollToBottom(){ const w=document.getElementById('log-wrap'); w.scrollTop=w.scrollHeight; }
+function scrollToBottom(){ const w=document.getElementById('log-wrap'); w.scrollTop=0; }
 
 function clearLogs(){
   cleared = Date.now();

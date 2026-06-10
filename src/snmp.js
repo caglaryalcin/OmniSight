@@ -50,14 +50,14 @@ function createSession(device) {
     return snmp.createV3Session(device.host, user, {
       context: '',
       transport: 'udp4',
-      timeout: 8000,
-      retries: 1,
+      timeout: 3000,
+      retries: 0,
     });
   }
   return snmp.createSession(device.host, device.community || 'public', {
     version: snmp.Version2c,
-    timeout: 8000,
-    retries: 1,
+    timeout: 3000,
+    retries: 0,
   });
 }
 
@@ -351,10 +351,12 @@ async function getNetwork(session, deviceKey) {
 async function getDeviceData(device) {
   const session = createSession(device);
   try {
-    const sysInfo = await getSystemInfo(session, device.host).catch(e => { console.error(`[SNMP ${device.name}] sysInfo:`, e.message); return {}; });
-    const disks   = await getDisks(session).catch(e => { console.error(`[SNMP ${device.name}] disks:`, e.message); return []; });
-    const volumes = await getVolumes(session).catch(e => { console.error(`[SNMP ${device.name}] volumes:`, e.message); return []; });
-    const network = await getNetwork(session, device.host).catch(e => { console.error(`[SNMP ${device.name}] network:`, e.message); return []; });
+    const [sysInfo, disks, volumes, network] = await Promise.all([
+      getSystemInfo(session, device.host).catch(e => { console.error(`[SNMP ${device.name}] sysInfo:`, e.message); return {}; }),
+      getDisks(session).catch(e => { console.error(`[SNMP ${device.name}] disks:`, e.message); return []; }),
+      getVolumes(session).catch(e => { console.error(`[SNMP ${device.name}] volumes:`, e.message); return []; }),
+      getNetwork(session, device.host).catch(e => { console.error(`[SNMP ${device.name}] network:`, e.message); return []; }),
+    ]);
     const hist = synHistory.get(device.host) || [];
     if (sysInfo.cpu != null || sysInfo.ram) {
       hist.push({ time: Date.now(), cpu: sysInfo.cpu ?? 0, ram: sysInfo.ram?.percent ?? 0 });

@@ -35,7 +35,7 @@ header{
 .menu-item:hover{background:rgba(255,255,255,.05)}
 .menu-item.danger{color:var(--red)}
 .btn-save{
-  background:var(--green);color:#000;border:none;
+  background:var(--green);color:#fff;border:none;
   padding:7px 18px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;
   display:flex;align-items:center;gap:6px;
 }
@@ -53,6 +53,11 @@ main{padding:20px;max-width:1100px;margin:0 auto;display:flex;flex-direction:col
 .card-title{font-size:15px;font-weight:600}
 .card-body{border-top:1px solid var(--border);padding:18px}
 .card-body.hidden{display:none}
+.settings-pair{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.settings-pair .card{height:100%;display:flex;flex-direction:column}
+.settings-pair .card-body{flex:1;display:flex !important;flex-direction:column}
+.settings-pair .save-row{margin-top:auto}
+@media (max-width:760px){.settings-pair{grid-template-columns:1fr}}
 
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .form-grid.g3{grid-template-columns:1fr 1fr 1fr}
@@ -157,6 +162,7 @@ html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#dd
 
 <main>
 
+<div class="settings-pair">
 <!-- Timezone -->
 <div class="card">
   <div class="card-hdr" style="cursor:default">
@@ -165,7 +171,7 @@ html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#dd
       <span class="card-title">System Settings</span>
     </div>
   </div>
-  <div class="card-body" style="display:block !important">
+  <div class="card-body" style="display:flex !important;flex-direction:column">
     <div class="form-grid" style="grid-template-columns: 2fr 1fr; max-width: 450px;">
       <div class="form-group" style="margin-bottom:0;">
         <label>Timezone</label>
@@ -180,6 +186,29 @@ html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#dd
       </div>
     </div>
   </div>
+</div>
+
+<!-- Certificates -->
+<div class="card">
+  <div class="card-hdr" style="cursor:default">
+    <div class="card-left">
+      <div class="card-icon" style="background:var(--blue)"></div>
+      <span class="card-title">Certificates</span>
+    </div>
+  </div>
+  <div class="card-body" id="cb-certificates" style="display:flex !important;flex-direction:column">
+    <div class="form-group">
+      <label>CA certificates</label>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Upload .crt/.pem/.cer directly, or .pfx/.p12 when openssl is available on the server.</div>
+      <div class="path-row">
+        <input type="password" id="cert-password" placeholder="PFX password (optional)">
+        <button type="button" class="btn-sm" onclick="document.getElementById('cert-file').click()">Upload certificate</button>
+        <input type="file" id="cert-file" accept=".crt,.pem,.cer,.pfx,.p12" style="display:none" onchange="uploadCertificate(this)">
+      </div>
+    </div>
+    <div id="cert-list" class="sys-list"><div class="sys-empty">No certificates uploaded.</div></div>
+  </div>
+</div>
 </div>
 
 <!-- General -->
@@ -216,6 +245,12 @@ html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#dd
         <button type="button" class="btn-sm" onclick="document.getElementById('icon-proxmox-f').click()">Browse…</button>
         <input type="file" id="icon-proxmox-f" accept="image/*,.svg" style="display:none" onchange="uploadIcon(this,'icon-proxmox')">
       </div>
+    </div>
+    <div class="form-grid">
+      <div class="form-group"><label>API URL</label><input type="text" id="px-url" placeholder="https://pve.example.local:8006"></div>
+      <div class="form-group"><label>Token ID</label><input type="text" id="px-tokenid" placeholder="root@pam!omnisight"></div>
+      <div class="form-group"><label>Token Secret</label><input type="password" id="px-tokensecret" placeholder=""></div>
+      <div class="form-group"><label>API TLS</label><select id="px-insecure"><option value="false">Verify certificate</option><option value="true">Allow self-signed</option></select></div>
     </div>
     <div class="form-group" style="margin-bottom:0">
       <div class="sys-hdr">
@@ -362,6 +397,13 @@ html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#dd
         <input type="file" id="icon-docker-f" accept="image/*,.svg" style="display:none" onchange="uploadIcon(this,'icon-docker')">
       </div>
     </div>
+    <div class="form-group">
+      <div class="sys-hdr">
+        <label style="margin:0">API hosts (optional)</label>
+        <button class="btn-add" type="button" onclick="addDockerApiHost()">+ Add API Host</button>
+      </div>
+      <div id="docker-api-list"></div>
+    </div>
     <div class="form-group" style="margin-bottom:0">
       <div class="sys-hdr">
         <label style="margin:0">Hosts</label>
@@ -504,7 +546,10 @@ html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#dd
           <pre class="code-snip" id="am-cmd-binary"></pre>
           <button type="button" class="btn-sm code-copy" onclick="copyToClip(document.getElementById('am-cmd-binary').textContent,this)">Copy</button>
         </div>
-        <div style="font-size:12px;color:var(--muted);margin-top:8px">Uninstall: <code style="color:var(--text);font-size:11px">curl -fsSL <span class="am-base"></span>/agent/install.sh | sudo bash -s uninstall</code></div>
+        <div class="code-snip-wrap" style="margin-top:8px">
+          <pre class="code-snip" id="am-cmd-uninstall"></pre>
+          <button type="button" class="btn-sm code-copy" onclick="copyToClip(document.getElementById('am-cmd-uninstall').textContent,this)">Copy</button>
+        </div>
       </div>
       <div id="am-docker" style="display:none">
         <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Run on the Docker host — agent runs in a container, token included:</div>
@@ -532,7 +577,7 @@ html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#dd
 <div id="toast"></div>
 
 <script>
-let lCount = 0, sCount = 0, dCount = 0, dbCount = 0;
+let lCount = 0, sCount = 0, dCount = 0, dbCount = 0, dkApiCount = 0;
 
 function toggleAlertBody(enId, bodyId) {
   document.getElementById(bodyId).classList.toggle('hidden', !document.getElementById(enId).checked);
@@ -627,6 +672,27 @@ function toggleArr(id) {
   document.getElementById(`ab-${id}`)?.classList.toggle('hidden');
 }
 
+function addDockerApiHost(data = {}) {
+  const idx = dkApiCount++;
+  const id = `dkapi-${idx}`;
+  const item = document.createElement('div');
+  item.className = 'arr-item';
+  item.innerHTML = `
+    <div class="arr-hdr" onclick="toggleArr('${id}')">
+      <span class="arr-hdr-name">${escHtml(data.name || 'Docker API host')}</span>
+      <button class="btn-rm" type="button" onclick="event.stopPropagation();this.closest('.arr-item').remove()">✕</button>
+    </div>
+    <div class="arr-body" id="ab-${id}">
+      <div class="form-grid">
+        <div class="form-group"><label>Name</label><input type="text" class="dkapi-name" value="${escHtml(data.name||'')}" placeholder="docker01"></div>
+        <div class="form-group"><label>URL</label><input type="text" class="dkapi-url" value="${escHtml(data.url||'')}" placeholder="tcp: http://host:2375 or https://host:2376"></div>
+        <div class="form-group"><label>Unix socket path</label><input type="text" class="dkapi-socket" value="${escHtml(data.socketPath||'')}" placeholder="/var/run/docker.sock"></div>
+        <div class="form-group"><label>TLS</label><select class="dkapi-insecure"><option value="false" ${!data.insecureTLS?'selected':''}>Verify certificate</option><option value="true" ${data.insecureTLS?'selected':''}>Allow self-signed</option></select></div>
+      </div>
+    </div>`;
+  document.getElementById('docker-api-list').appendChild(item);
+}
+
 document.addEventListener('click', e => {
   const hdr = e.target.closest('#cb-alerts .arr-hdr');
   if (!hdr || e.target.closest('.toggle')) return;
@@ -672,10 +738,12 @@ function agentCmds() {
   const insecure = !!document.getElementById('am-insecure')?.checked;
   const curlTLS = insecure ? ' --insecure' : '';
   const envTLS = insecure ? ' OMNISIGHT_INSECURE_TLS=1' : '';
+  const sudoTLS = insecure ? ' OMNISIGHT_INSECURE_TLS=1' : '';
   const dockerEnvTLS = insecure ? '  -e OMNISIGHT_INSECURE_TLS=1 \\\n' : '';
   const stackEnvTLS = insecure ? '      OMNISIGHT_INSECURE_TLS: "1"\n' : '';
   return {
     binary: `curl -fsSL${curlTLS} ${base}/agent/install.sh | sudo OMNISIGHT_URL=${base} OMNISIGHT_TOKEN=${token}${envTLS} bash`,
+    uninstall: `curl -fsSL${curlTLS} ${base}/agent/install.sh | sudo${sudoTLS} bash -s uninstall`,
     docker: `docker run -d --name omnisight-agent --restart unless-stopped \\
   --network host --pid host \\
   -e OMNISIGHT_URL=${base} \\
@@ -708,6 +776,7 @@ EOF`,
 function refreshAgentCmds() {
   const cmds = agentCmds();
   document.getElementById('am-cmd-binary').textContent = cmds.binary;
+  document.getElementById('am-cmd-uninstall').textContent = cmds.uninstall;
   document.getElementById('am-cmd-docker').textContent = cmds.docker;
   document.getElementById('am-cmd-stack').textContent = cmds.stack;
 }
@@ -968,6 +1037,10 @@ function populate(cfg) {
     document.getElementById('en-proxmox').checked = cfg.proxmox.enabled !== false;
     document.getElementById('cb-proxmox').classList.remove('hidden');
     document.getElementById('icon-proxmox').value = cfg.proxmox.icon || '';
+    document.getElementById('px-url').value = cfg.proxmox.url || '';
+    document.getElementById('px-tokenid').value = cfg.proxmox.tokenId || '';
+    secVal(cfg.proxmox.tokenSecret, document.getElementById('px-tokensecret'));
+    document.getElementById('px-insecure').value = cfg.proxmox.insecureTLS ? 'true' : 'false';
   }
   if (cfg.linux) {
     document.getElementById('en-linux').checked = cfg.linux.enabled !== false;
@@ -999,7 +1072,9 @@ function populate(cfg) {
     document.getElementById('en-docker').checked = cfg.docker.enabled !== false;
     document.getElementById('cb-docker').classList.remove('hidden');
     document.getElementById('icon-docker').value = cfg.docker.icon || '';
+    (cfg.docker.hosts || []).forEach(addDockerApiHost);
   }
+  loadCertificates();
   loadAgents();
   if (cfg.database) {
     document.getElementById('en-database').checked = cfg.database.enabled !== false;
@@ -1057,9 +1132,16 @@ function collect() {
 
   {
     const on = document.getElementById('en-proxmox').checked;
+    const url = document.getElementById('px-url').value.trim();
+    const tokenId = document.getElementById('px-tokenid').value.trim();
+    const tokenSecret = maskedVal(document.getElementById('px-tokensecret'));
     if (on) cfg.proxmox = {
       enabled: on,
       icon: document.getElementById('icon-proxmox').value.trim() || undefined,
+      url: url || undefined,
+      tokenId: tokenId || undefined,
+      tokenSecret: tokenSecret || undefined,
+      insecureTLS: document.getElementById('px-insecure').value === 'true' || undefined,
     };
   }
 
@@ -1118,7 +1200,17 @@ function collect() {
 
   {
     const on = document.getElementById('en-docker').checked;
-    if (on) cfg.docker = { enabled: on, icon: document.getElementById('icon-docker').value.trim() || undefined };
+    const hosts = [];
+    document.querySelectorAll('#docker-api-list .arr-item').forEach(item => {
+      const h = {
+        name: item.querySelector('.dkapi-name').value.trim(),
+        url: item.querySelector('.dkapi-url').value.trim() || undefined,
+        socketPath: item.querySelector('.dkapi-socket').value.trim() || undefined,
+        insecureTLS: item.querySelector('.dkapi-insecure').value === 'true' || undefined,
+      };
+      if (h.name && (h.url || h.socketPath)) hosts.push(h);
+    });
+    if (on || hosts.length) cfg.docker = { enabled: on, hosts, icon: document.getElementById('icon-docker').value.trim() || undefined };
   }
 
   {
@@ -1253,6 +1345,65 @@ function uploadIcon(input, targetId) {
   reader.readAsDataURL(f);
 }
 
+async function loadCertificates() {
+  const el = document.getElementById('cert-list');
+  if (!el) return;
+  try {
+    const r = await fetch('/api/certificates', { headers: authHeaders() });
+    handleUnauth(r);
+    const b = await r.json();
+    const files = b.files || [];
+    el.innerHTML = files.length ? files.map(f => `
+      <div class="agent-row">
+        <span style="font-weight:600">${escHtml(f.name)}</span>
+        <span style="color:var(--muted);font-size:12px">${Math.round((f.size||0)/1024)} KB · ${f.trusted?'trusted':'stored'}</span>
+        <span style="flex:1"></span>
+        <button class="btn-rm" type="button" onclick="deleteCertificate('${escHtml(f.name)}',this)">✕</button>
+      </div>`).join('') : '<div class="sys-empty">No certificates uploaded.</div>';
+  } catch {
+    el.innerHTML = '<div class="sys-empty">Could not load certificates.</div>';
+  }
+}
+
+function uploadCertificate(input) {
+  const f = input.files && input.files[0];
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = async () => {
+    try {
+      const r = await fetch('/api/upload/certificate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ name: f.name, dataUrl: reader.result, password: document.getElementById('cert-password').value }),
+      });
+      handleUnauth(r);
+      const b = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(b.error || r.statusText);
+      toast('Certificate uploaded', 'ok');
+      loadCertificates();
+    } catch (e) {
+      toast('Certificate upload failed: ' + e.message, 'err');
+    } finally {
+      input.value = '';
+    }
+  };
+  reader.readAsDataURL(f);
+}
+
+async function deleteCertificate(name, btn) {
+  if (!confirm('Delete this certificate?')) return;
+  if (btn) btn.disabled = true;
+  try {
+    const r = await fetch('/api/certificates/' + encodeURIComponent(name), { method: 'DELETE', headers: authHeaders() });
+    handleUnauth(r);
+    const b = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(b.error || r.statusText);
+    toast('Certificate deleted', 'ok');
+    loadCertificates();
+  } catch (e) { toast(e.message, 'err'); }
+  if (btn) btn.disabled = false;
+}
+
 /* ── Save ── */
 async function saveConfig() {
   const btns = document.querySelectorAll('.btn-save');
@@ -1351,7 +1502,9 @@ async function refreshDots(cfg, newData){
   const svg='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>';
   document.querySelectorAll('.card-body').forEach(cb => {
     const bar = document.createElement('div');
+    bar.className = 'save-row';
     bar.style.cssText = 'display:flex;justify-content:flex-end;margin-top:16px';
+    if(cb.closest('.settings-pair')) bar.style.marginTop = 'auto';
     bar.innerHTML = '<button class="btn-save" type="button" onclick="saveConfig()">' + svg + ' Save & Apply</button>';
     cb.appendChild(bar);
   });
