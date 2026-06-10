@@ -1,4 +1,4 @@
-# OmniSight
+![](https://raw.githubusercontent.com/caglaryalcin/OmniSight/refs/heads/main/public/assets/omnisight-wordmark.png)
 
 ![Status](https://img.shields.io/badge/status-stable-brightgreen) [![Version](https://img.shields.io/badge/version-1.0.0-blue)](https://github.com/caglaryalcin/OmniSight/releases) [![Latest Release](https://img.shields.io/github/v/release/caglaryalcin/OmniSight?include_prereleases&color=blue)](https://github.com/caglaryalcin/OmniSight/releases)
 
