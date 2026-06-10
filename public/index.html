@@ -71,10 +71,10 @@ header{
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes cardin{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
 
-.menu-wrap{position:relative}
+.menu-wrap{position:relative;z-index:5000}
 .menu-btn{background:var(--row);border:1px solid var(--border);color:var(--text);padding:7px 12px;border-radius:9px;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:6px;transition:border-color .15s,background .15s}
 .menu-btn:hover{border-color:var(--border2);background:var(--panel2)}
-.menu-drop{display:none;position:absolute;right:0;top:calc(100% + 8px);background:var(--panel);border:1px solid var(--border);border-radius:12px;min-width:190px;overflow:hidden;z-index:200;box-shadow:var(--shadow);padding:5px}
+.menu-drop{display:none;position:absolute;right:0;top:calc(100% + 8px);background:var(--panel);border:1px solid var(--border);border-radius:12px;min-width:190px;overflow:hidden;z-index:6000;box-shadow:var(--shadow);padding:5px}
 .menu-drop.open{display:block;animation:cardin .15s ease}
 .menu-item{display:block;padding:10px 14px;font-size:13px;font-weight:500;color:var(--text);text-decoration:none;cursor:pointer;border:none;background:none;width:100%;text-align:left;border-radius:8px}
 .menu-item:hover{background:rgba(255,255,255,.06)}
@@ -99,7 +99,11 @@ header{
 .sb-card.active{border-color:rgba(99,102,241,.55);background:linear-gradient(180deg,rgba(99,102,241,.07),var(--panel) 55%);box-shadow:0 0 0 1px rgba(99,102,241,.25),var(--shadow)}
 .sb-hdr{display:flex;align-items:center;gap:10px;padding:13px 15px 11px}
 .sb-icon{width:26px;height:26px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--row);border:1px solid var(--border);border-radius:8px;padding:4px}
+.sb-icon > svg,.sb-icon > img,.sb-icon > .sec-glyph{display:block;margin:auto}
+.sb-icon > .sec-glyph{width:100%;height:100%;display:grid;place-items:center;line-height:1}
 .sb-title{font-size:15px;font-weight:650;letter-spacing:-.01em;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sb-main{min-width:0;display:flex;flex-direction:column;gap:2px}
+.sb-meta{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sb-summary{border-top:1px solid var(--border);overflow:hidden;background:rgba(0,0,0,.12)}
 
 /* Detail header */
@@ -165,9 +169,9 @@ html[data-theme="light"] .hist-bg{fill:rgba(0,0,0,.04)}
 .tt-time { font-size: 12px; color: var(--muted); margin-bottom: 6px; font-weight: 600; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
 .tt-val { font-weight: 700; font-variant-numeric:tabular-nums; }
 
-.csum{display:flex;gap:8px;border-bottom:1px solid var(--border);padding:10px 12px;background:rgba(0,0,0,.1)}
-.csum-item{flex:1;padding:9px 10px;text-align:center;background:var(--row);border:1px solid var(--border);border-radius:10px}
-.csum-val{font-size:19px;font-weight:750;line-height:1.1;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.csum{display:grid;grid-template-columns:repeat(auto-fit,minmax(92px,1fr));gap:8px;border-bottom:1px solid var(--border);padding:10px 12px;background:rgba(0,0,0,.1)}
+.csum-item{min-width:0;padding:9px 10px;text-align:center;background:var(--row);border:1px solid var(--border);border-radius:10px}
+.csum-val{font-size:19px;font-weight:750;line-height:1.1;letter-spacing:0;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .csum-lbl{font-size:10px;color:var(--muted);margin-top:3px;text-transform:uppercase;letter-spacing:.06em}
 .hc-csum .csum-val{font-size:24px}
 .hc-csum .csum-lbl{font-size:11px}
@@ -202,9 +206,9 @@ html[data-theme="light"] .hist-bg{fill:rgba(0,0,0,.04)}
 .vm-chip:hover{border-color:var(--border2)}
 .vm-type{font-size:11px;color:var(--muted);background:var(--border);padding:1px 5px;border-radius:3px}
 
-.k8s-sum{display:flex;gap:8px;border-bottom:1px solid var(--border);padding:10px 12px;background:rgba(0,0,0,.1)}
-.k8s-stat{flex:1;padding:9px;text-align:center;background:var(--row);border:1px solid var(--border);border-radius:10px}
-.k8s-n{font-size:22px;font-weight:750;line-height:1.1;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.k8s-sum{display:grid;grid-template-columns:repeat(auto-fit,minmax(86px,1fr));gap:8px;border-bottom:1px solid var(--border);padding:10px 12px;background:rgba(0,0,0,.1)}
+.k8s-stat{min-width:0;padding:9px;text-align:center;background:var(--row);border:1px solid var(--border);border-radius:10px}
+.k8s-n{font-size:22px;font-weight:750;line-height:1.1;letter-spacing:0;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .k8s-l{font-size:10.5px;color:var(--muted);margin-top:3px;text-transform:uppercase;letter-spacing:.06em}
 
 .k8s-grp{margin:12px;border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--panel)}
@@ -280,8 +284,9 @@ html[data-theme="light"] .rail{
 html[data-theme="light"] .brand,
 html[data-theme="light"] .rail-foot{background:rgba(255,255,255,.64)}
 html[data-theme="light"] .nav button.active{background:#edf4ff;box-shadow:inset 0 0 0 1px rgba(59,130,246,.13)}
-html[data-theme="light"] .shell .sb-card{background:#ffffff;border-color:#dfe7f2;box-shadow:0 1px 2px rgba(16,24,40,.04)}
-html[data-theme="light"] .shell .sb-card.active{background:linear-gradient(180deg,#f8fbff,#ffffff 58%);border-color:rgba(59,130,246,.42);box-shadow:0 0 0 1px rgba(59,130,246,.10),0 8px 22px rgba(16,24,40,.07)}
+html[data-theme="light"] .shell .sb-card{background:rgba(255,255,255,.72);border-color:#dfe7f2;box-shadow:none}
+html[data-theme="light"] .shell .sb-card:hover{background:#ffffff;border-color:#ccd8e8}
+html[data-theme="light"] .shell .sb-card.active{background:rgba(255,255,255,.72);border-color:#dfe7f2;box-shadow:none}
 html[data-theme="light"] .shell .sb-summary{background:#f7faff}
 html[data-theme="light"] .shell .sb-csum-item{background:#ffffff;border-color:#dde7f3}
 html[data-theme="light"] .topbar{background:rgba(255,255,255,.78)}
@@ -306,6 +311,10 @@ html[data-theme="light"] .topbar{background:rgba(255,255,255,.78)}
 .loghdr button{background:var(--row);border:1px solid var(--border);color:var(--text);padding:5px 12px;border-radius:8px;cursor:pointer;font-size:12px}
 .loghdr button:hover{border-color:var(--border2)}
 .logbody{margin:0;padding:14px 16px;overflow:auto;flex:1;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;line-height:1.55;white-space:pre-wrap;word-break:break-word;color:var(--text)}
+.detail-kv{font-family:Inter,ui-sans-serif,system-ui,sans-serif;display:grid;gap:10px;white-space:normal}
+.detail-kv-row{display:grid;grid-template-columns:minmax(110px,160px) minmax(0,1fr);gap:14px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--row)}
+.detail-kv-key{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em;font-weight:700}
+.detail-kv-val{font-size:13px;font-weight:650;min-width:0;overflow-wrap:anywhere}
 .mon-row.clickable{cursor:pointer}
 .mon-row.clickable:hover{background:rgba(255,255,255,.045)}
 .lg-ts{color:var(--muted)}
@@ -347,7 +356,7 @@ html[data-theme="light"] .topbar{background:rgba(255,255,255,.78)}
   cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='M8 0v5m0 6v5M0 8h5m6 0h5' stroke='%23888888' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E") 8 8, crosshair !important;
 }
 
-.shell{height:100vh;display:grid;grid-template-columns:var(--rail-w,264px) 1fr;background:var(--bg)}
+.shell{height:100vh;display:grid;grid-template-columns:minmax(238px,var(--rail-w,264px)) minmax(0,1fr);background:var(--bg)}
 .rail{border-right:1px solid var(--border);background:rgba(13,17,23,.72);backdrop-filter:blur(18px);display:flex;flex-direction:column;min-width:0;position:relative}
 .brand{height:68px;display:flex;align-items:center;gap:12px;padding:0 20px;border-bottom:1px solid var(--border);text-decoration:none;color:inherit}
 .mark{width:34px;height:34px;border-radius:10px;background:transparent;display:grid;place-items:center;flex-shrink:0;overflow:visible}
@@ -361,11 +370,15 @@ html[data-theme="light"] .topbar{background:rgba(255,255,255,.78)}
 .nav svg,.topbar .icon{width:17px;height:17px;flex:0 0 auto}
 .rail-section{padding:10px 16px 8px;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.08em}
 .rail-foot{margin-top:auto;padding:14px 16px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;color:var(--muted);font-size:12px;gap:10px}
+.rail-toggle{position:absolute;top:16px;right:12px;width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:var(--panel);color:var(--muted);display:grid;place-items:center;cursor:pointer;z-index:45;transition:background .15s,border-color .15s,color .15s}
+.rail-toggle:hover{border-color:var(--border2);background:var(--panel2);color:var(--text)}
+.rail-toggle svg{width:16px;height:16px;transition:transform .18s}
 .rail-resizer{position:absolute;top:0;right:-4px;width:8px;height:100%;cursor:col-resize;z-index:40;touch-action:none}
 .rail-resizer::after{content:'';position:absolute;top:68px;bottom:0;left:3px;width:1px;background:transparent;transition:background .15s,box-shadow .15s}
 .rail-resizer:hover::after,body.os-resizing .rail-resizer::after{background:var(--blue);box-shadow:0 0 10px rgba(96,165,250,.45)}
 .main-shell{display:grid;grid-template-rows:68px 1fr;min-width:0;min-height:0}
-.topbar{border-bottom:1px solid var(--border);background:rgba(13,17,23,.58);backdrop-filter:blur(18px);display:flex;align-items:center;gap:14px;padding:0 22px;min-width:0}
+.topbar{border-bottom:1px solid var(--border);background:rgba(13,17,23,.58);backdrop-filter:blur(18px);display:flex;align-items:center;gap:14px;padding:0 22px;min-width:0;overflow:visible}
+.topbar::-webkit-scrollbar{display:none}
 .search{width:min(440px,42vw);height:38px;background:var(--panel);border:1px solid var(--border);border-radius:8px;display:flex;align-items:center;gap:10px;padding:0 12px;color:var(--muted);flex-shrink:1}
 .search input{background:transparent;border:0;outline:0;color:var(--text);width:100%;font-size:13px}
 .top-spacer{flex:1}
@@ -374,19 +387,47 @@ html[data-theme="light"] .topbar{background:rgba(255,255,255,.78)}
 .top-action{height:36px;border-radius:8px;border:1px solid var(--border);background:var(--panel);color:var(--text);display:inline-flex;align-items:center;gap:8px;padding:0 12px;cursor:pointer;transition:border-color .15s,background .15s,color .15s;font-size:13px;font-weight:650;white-space:nowrap}
 .top-action:hover{border-color:var(--border2);background:var(--panel2)}
 .top-action svg,.icon-btn svg{width:16px;height:16px}
-.topbar{height:68px;position:static;top:auto;z-index:20;justify-content:flex-start}
+.topbar{height:68px;position:relative;top:auto;z-index:3000;justify-content:flex-start}
 .topbar .pubstatus{height:36px;border-radius:8px;background:var(--panel);padding:0 12px}
 .topbar #pbtn,.topbar #rbtn{height:36px;border-radius:8px;background:var(--panel);padding:0 12px;font-weight:650;display:inline-flex;align-items:center;gap:8px}
 .topbar #thbtn{width:36px;height:36px;border-radius:8px;background:var(--panel);display:grid;place-items:center;flex-shrink:0}
 .topbar .menu-btn{width:36px;height:36px;border-radius:8px;background:var(--panel);display:grid;place-items:center;padding:0}
-.shell #sidebar{width:auto;min-width:0;max-width:none;border-right:0;background:transparent;backdrop-filter:none;position:relative;padding:0 6px 12px;overflow-y:auto;flex:1}
+.shell #sidebar{width:auto;min-width:0;max-width:none;border-right:0;background:transparent;backdrop-filter:none;position:relative;padding:0 12px 16px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:8px}
 .shell #detail{overflow-y:auto;padding:0;background:transparent;min-width:0;min-height:0;flex:none}
-.shell .sb-card{margin:0 0 8px}
+.shell .sb-card{margin:0;border:1px solid var(--border);background:rgba(17,24,39,.62);border-radius:8px;padding:10px 11px;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:9px;box-shadow:none;overflow:visible}
+.shell .sb-card:hover{border-color:var(--border2);transform:none;box-shadow:none;background:rgba(22,28,41,.72)}
+.shell .sb-card.active{border-color:var(--border);background:rgba(17,24,39,.62);box-shadow:none}
+.shell .sb-card.dragging{border:1px dashed var(--blue);background:rgba(96,165,250,.08)}
+.shell .sb-hdr{display:contents;padding:0}
+.shell .sb-icon{width:26px;height:26px;border-radius:8px;background:var(--panel2);border:1px solid var(--border);padding:5px}
+.shell .sb-title{font-size:13px;font-weight:650;letter-spacing:0}
+.shell .sb-summary{display:none}
 .shell .menu-btn{width:36px;height:36px;border-radius:8px}
 .shell .sb-csum{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;padding:8px}
 .shell .sb-csum-item{min-width:0;padding:7px 3px;border-radius:8px}
 .shell .sb-csum-val{font-size:18px;white-space:nowrap;overflow:hidden;text-overflow:clip}
 .shell .sb-csum-lbl{font-size:9px;line-height:1.05;letter-spacing:.035em;min-height:19px;display:flex;align-items:flex-start;justify-content:center}
+body.rail-collapsed .shell{grid-template-columns:78px minmax(0,1fr)}
+body.rail-collapsed .brand{justify-content:center;padding:0}
+body.rail-collapsed .brand > div:nth-child(2),body.rail-collapsed .nav span,body.rail-collapsed .rail-section,body.rail-collapsed .rail-foot{display:none}
+body.rail-collapsed .mark{width:30px;height:30px}
+body.rail-collapsed .rail-toggle{position:static;width:38px;height:38px;margin:8px auto 6px;padding:0;box-sizing:border-box;background:transparent;display:grid;place-items:center;line-height:1}
+body.rail-collapsed .rail-toggle svg{display:block;margin:auto}
+body.rail-collapsed .rail-toggle svg{transform:rotate(180deg)}
+body.rail-collapsed .rail-resizer{display:none}
+body.rail-collapsed .nav{padding:8px 0 14px;gap:4px;align-items:center}
+body.rail-collapsed .nav button{width:38px;height:38px;box-sizing:border-box;justify-content:center;padding:0;display:grid;place-items:center;line-height:1}
+body.rail-collapsed .nav button svg{display:block;margin:auto}
+body.rail-collapsed .shell #sidebar{padding:0 0 16px;align-items:center;gap:4px;scrollbar-width:none}
+body.rail-collapsed .shell #sidebar::-webkit-scrollbar{display:none}
+body.rail-collapsed .shell .sb-card{width:38px;height:38px;box-sizing:border-box;padding:0;border:1px solid var(--border);background:rgba(17,24,39,.62);display:grid;grid-template-columns:1fr;place-items:center;justify-items:center;align-items:center}
+body.rail-collapsed .shell .sb-card:hover,body.rail-collapsed .shell .sb-card.active{background:var(--panel2);border-color:var(--border2)}
+body.rail-collapsed .shell .sb-hdr{display:grid;place-items:center;width:100%;height:100%}
+body.rail-collapsed .shell .sb-icon{width:24px;height:24px;padding:0;border:0;background:transparent;border-radius:0;display:grid!important;place-items:center;line-height:1}
+body.rail-collapsed .shell .sb-icon > span{width:24px;height:24px;display:grid!important;place-items:center;line-height:1}
+body.rail-collapsed .shell .sb-icon img{width:22px!important;height:22px!important;object-fit:contain;display:block;margin:auto}
+body.rail-collapsed .shell .sb-icon svg{width:20px;height:20px;display:block;margin:auto}
+body.rail-collapsed .shell .sb-main,body.rail-collapsed .shell .sb-badge-wrap{display:none}
 
 .overview{padding:22px;min-height:100%;background:transparent}
 .overview-head{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:18px}
@@ -397,15 +438,16 @@ html[data-theme="light"] .topbar{background:rgba(255,255,255,.78)}
 .overview-kpi-head{display:flex;align-items:center;justify-content:space-between;gap:8px;color:var(--muted);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.045em}
 .overview-kpi-value{font-size:28px;font-weight:800;letter-spacing:0;margin-top:12px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .overview-kpi-sub{font-size:12px;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.overview-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px}
+.overview-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:14px;align-items:start}
 .overview-card{background:var(--panel);border:1px solid var(--border);border-radius:8px;overflow:hidden;min-width:0;box-shadow:var(--shadow)}
-.overview-card-h{height:54px;display:flex;align-items:center;gap:10px;padding:0 14px;border-bottom:1px solid var(--border)}
+.overview-card-h{min-height:54px;display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);min-width:0}
 .overview-icon{width:28px;height:28px;display:grid;place-items:center;background:var(--row);border:1px solid var(--border);border-radius:8px;padding:5px;flex-shrink:0}
 .overview-title{font-size:15px;font-weight:750;letter-spacing:0;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .overview-meta{font-size:12px;color:var(--muted);flex-shrink:0}
-.overview-card .csum{border-bottom:1px solid var(--border);padding:10px;background:rgba(0,0,0,.08);flex-wrap:wrap}
-.overview-card .csum-item{min-width:92px}
+.overview-card .csum{border-bottom:1px solid var(--border);padding:10px;background:rgba(0,0,0,.08);grid-template-columns:repeat(auto-fit,minmax(92px,1fr))}
+.overview-card .csum-item{min-width:0}
 .overview-list{padding:6px 0}
+.overview-list.is-scroll{max-height:260px;overflow-y:auto}
 .overview-row{display:flex;align-items:center;gap:10px;padding:10px 14px;border-top:1px solid var(--border);min-width:0;cursor:pointer}
 .overview-row:first-child{border-top:0}
 .overview-row:hover{background:rgba(255,255,255,.025)}
@@ -413,14 +455,35 @@ html[data-theme="light"] .topbar{background:rgba(255,255,255,.78)}
 .overview-row-name{font-size:14px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .overview-row-sub{font-size:12px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .overview-empty{padding:18px 14px;color:var(--muted);font-size:13px}
+.overview-group{border-top:1px solid var(--border)}
+.overview-group:first-child{border-top:0}
+.overview-group-title{padding:9px 14px 7px;color:var(--muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;font-weight:750;background:rgba(0,0,0,.08);display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;user-select:none}
+.overview-group-title:hover{color:var(--text);background:rgba(255,255,255,.035)}
+.overview-group-title .chevron{width:14px;height:14px;display:grid;place-items:center;transition:transform .16s ease;color:var(--muted)}
+.overview-group.open .overview-group-title .chevron{transform:rotate(90deg);color:var(--text)}
+.overview-group-body{display:none;max-height:260px;overflow-y:auto}
+.overview-group.open .overview-group-body{display:block}
+.overview-group .overview-row:first-of-type{border-top:1px solid var(--border)}
 
 @media (max-width:1100px){
   .shell{grid-template-columns:78px 1fr}
   .brand{justify-content:center;padding:0}
   .brand > div:nth-child(2),.nav span,.rail-section,.rail-foot{display:none}
+  .rail-toggle{display:none}
   .rail-resizer{display:none}
-  #sidebar{display:none}
-  .nav button{justify-content:center}
+  .nav{padding-left:0;padding-right:0;align-items:center}
+  .nav button{width:38px;height:38px;justify-content:center;display:grid;place-items:center;line-height:1;padding:0;box-sizing:border-box}
+  .nav button svg{display:block;margin:auto}
+  .shell #sidebar{display:flex;padding:0 0 16px;align-items:center;scrollbar-width:none}
+  .shell #sidebar::-webkit-scrollbar{display:none}
+  .shell .sb-card{width:38px;height:38px;box-sizing:border-box;padding:0;border:1px solid var(--border);background:rgba(17,24,39,.62);display:grid;grid-template-columns:1fr;place-items:center}
+  .shell .sb-card:hover,.shell .sb-card.active{background:var(--panel2);border-color:var(--border2)}
+  .shell .sb-hdr{display:grid;place-items:center;width:100%;height:100%}
+  .shell .sb-icon{width:24px;height:24px;padding:0;border:0;background:transparent;border-radius:0;display:grid!important;place-items:center;line-height:1}
+  .shell .sb-icon > span{width:24px;height:24px;display:grid!important;place-items:center;line-height:1}
+  .shell .sb-icon img{width:22px!important;height:22px!important;object-fit:contain;display:block;margin:auto}
+  .shell .sb-icon svg{width:20px;height:20px;display:block;margin:auto}
+  .shell .sb-main,.shell .sb-badge-wrap{display:none}
   .overview-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media (max-width:760px){
@@ -462,6 +525,9 @@ html[data-theme="light"] .topbar{background:rgba(255,255,255,.78)}
         <div class="brand-sub">Unified monitoring</div>
       </div>
     </a>
+    <button class="rail-toggle" id="rail-toggle" type="button" onclick="toggleRail()" title="Collapse sidebar" aria-label="Collapse sidebar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+    </button>
     <nav class="nav" id="main-nav">
       <button id="nav-dashboard" class="active" onclick="returnDashboard()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
@@ -549,6 +615,7 @@ const linuxOpen = {};
 const hcOpen = {};
 const snmpOpen = {};
 const k8sGrpOpen = {};
+const overviewK8sOpen = { pods:true, deps:false, svcs:false };
 const dockerOpen = {};
 let notifyOff = new Set();
 const BELL_ON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>';
@@ -606,9 +673,9 @@ let activePanel = null;
 const ALL_IDS = ['proxmox','kubernetes','linux','snmp','healthchecks','docker','database'];
 
 const SEC_ICONS = {
-  proxmox:     () => `<span style="font-size:15px;line-height:1">🖧</span>`,
+  proxmox:     () => `<span class="sec-glyph" style="font-size:15px">🖧</span>`,
   linux:       (c) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>`,
-  kubernetes:  () => `<span style="font-size:15px;line-height:1">⎈</span>`,
+  kubernetes:  () => `<span class="sec-glyph" style="font-size:15px">⎈</span>`,
   snmp:        (c) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4.03 3 9 3s9-1.34 9-3"/></svg>`,
   healthchecks:(c) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>`,
   docker:      () => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2496ed" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="9" width="4" height="4" rx="1"/><rect x="7" y="9" width="4" height="4" rx="1"/><rect x="12" y="9" width="4" height="4" rx="1"/><rect x="7" y="4" width="4" height="4" rx="1"/><rect x="12" y="4" width="4" height="4" rx="1"/><path d="M22 11c-.5-3-3-4-6-4"/><path d="M2 13c1 4 5 5 9 5h3c4 0 6-2 6-5"/></svg>`,
@@ -1911,7 +1978,7 @@ function iconUrl(name){
 function iconFallback(img, iconKey, color){
   const html = SEC_ICONS[iconKey] ? SEC_ICONS[iconKey](color) : '';
   const span = document.createElement('span');
-  span.style.cssText = 'display:flex;align-items:center;justify-content:center;width:100%;height:100%';
+  span.style.cssText = 'display:grid;place-items:center;width:100%;height:100%;line-height:1';
   span.innerHTML = html;
   img.replaceWith(span);
 }
@@ -1926,12 +1993,16 @@ function platformIcon(panel){
 /* ── Sidebar card ── */
 function sidebarCard(panel, isActive){
   const iconSvg = platformIcon(panel);
+  const meta = panel.meta || panel.sbMeta || '';
   return `
-  <div class="sb-card ${isActive?'active':''}" id="sbcard-${panel.id}" data-id="${panel.id}" draggable="true" onclick="selectPanel('${panel.id}')">
+  <div class="sb-card ${isActive?'active':''}" id="sbcard-${panel.id}" data-id="${panel.id}" draggable="true" title="${escAttr(panel.title)}" onclick="selectPanel('${panel.id}')">
     <div class="sb-hdr">
       <div class="sb-icon">${iconSvg}</div>
-      <span class="sb-title">${panel.title}</span>
-      <span style="flex-shrink:0;margin-left:4px">${panel.badge}</span>
+      <div class="sb-main">
+        <span class="sb-title">${panel.title}</span>
+        ${meta?`<span class="sb-meta">${meta}</span>`:''}
+      </div>
+      <span class="sb-badge-wrap" style="flex-shrink:0;margin-left:4px">${panel.badge}</span>
     </div>
     ${panel.sbSummary?`<div class="sb-summary">${panel.sbSummary}</div>`:''}
   </div>`;
@@ -1950,14 +2021,28 @@ function overviewKpi(label, value, sub, color){
   </div>`;
 }
 function escAttr(s){ return escHtml(s).replace(/"/g,'&quot;'); }
-function overviewRow(panelId, name, sub, badgeCls, badgeTxt, dotCls){
-  return `<div class="overview-row" onclick="selectPanel('${panelId}')">
+function jsStr(s){
+  return `'${String(s ?? '').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\r/g,'\\r').replace(/\n/g,'\\n')}'`;
+}
+function overviewRow(panelId, name, sub, badgeCls, badgeTxt, dotCls, action){
+  const click = action || `selectPanel('${panelId}')`;
+  return `<div class="overview-row" onclick="${escAttr(click)}">
     <div class="mon-dot ${dotCls||'md-green'}"></div>
     <div class="overview-row-main">
       <div class="overview-row-name" title="${escAttr(name||'')}">${escHtml(name||'')}</div>
       <div class="overview-row-sub" title="${escAttr(sub||'')}">${escHtml(sub||'')}</div>
     </div>
     ${bdg(badgeCls||'green', badgeTxt||'ok')}
+  </div>`;
+}
+function overviewGroup(gid, title, rows, emptyText){
+  const open = !!overviewK8sOpen[gid];
+  return `<div class="overview-group ${open?'open':''}" id="ov-k8s-${gid}">
+    <div class="overview-group-title" onclick="toggleOverviewGroup('${gid}')">
+      <span>${title}</span>
+      <span class="chevron">&rsaquo;</span>
+    </div>
+    <div class="overview-group-body">${rows || `<div class="overview-empty">${emptyText}</div>`}</div>
   </div>`;
 }
 function overviewRows(id, data){
@@ -1998,7 +2083,7 @@ function overviewRows(id, data){
     }).join('');
   }
   if(id === 'healthchecks'){
-    const checks = (data.healthchecks?.checks||[]).slice().sort((a,b)=>String(a.status).localeCompare(String(b.status))).slice(0,6);
+    const checks = (data.healthchecks?.checks||[]).slice().sort((a,b)=>String(a.status).localeCompare(String(b.status)));
     return checks.map(c => {
       const cls = c.status==='up'?'green':c.status==='down'?'red':c.status==='grace'?'yellow':'gray';
       const dot = c.status==='up'?'md-green':c.status==='down'?'md-red':c.status==='grace'?'md-yellow':'md-gray';
@@ -2006,13 +2091,35 @@ function overviewRows(id, data){
     }).join('');
   }
   if(id === 'kubernetes'){
-    const deps = (data.kubernetes?.deployments||[]).slice(0,6);
-    if(deps.length) return deps.map(d => overviewRow('kubernetes', d.name, `${d.ready}/${d.desired} ready`, d.healthy?'green':'red', d.healthy?'healthy':'attention', d.healthy?'md-green':'md-red')).join('');
-    const s = data.kubernetes?.summary || {};
-    return overviewRow('kubernetes', 'Cluster summary', `${s.running||0} running pods · ${s.failed||0} failed`, (s.failed||0)>0?'red':'green', (s.failed||0)>0?'degraded':'healthy', (s.failed||0)>0?'md-red':'md-green');
+    const k = data.kubernetes || {};
+    const sortedPods = [
+      ...(k.pods||[]).filter(p => p.failed || p.phase === 'Failed'),
+      ...(k.pods||[]).filter(p => !p.failed && p.phase !== 'Failed')
+    ];
+    const podRows = sortedPods.map(p => {
+      const phase = p.phase || 'Unknown';
+      const ok = !!p.running || phase === 'Succeeded';
+      const warn = phase === 'Pending' || (!p.ready && phase === 'Running');
+      const badgeCls = ok ? (phase === 'Succeeded' ? 'blue' : 'green') : warn ? 'yellow' : 'red';
+      const dotCls = ok ? (phase === 'Succeeded' ? 'md-blue' : 'md-green') : warn ? 'md-yellow' : 'md-red';
+      const readyText = phase === 'Running' ? (p.ready ? 'ready' : 'not ready') : phase.toLowerCase();
+      const restartText = Number(p.restarts || 0) > 0 ? ` · ${p.restarts} restarts` : '';
+      return overviewRow('kubernetes', p.name, `${p.namespace || 'default'} · ${readyText}${restartText}`, badgeCls, phase, dotCls, `showPodLogs(${jsStr(p.namespace || 'default')},${jsStr(p.name)})`);
+    }).join('');
+    const depRows = (k.deployments||[]).map(d => overviewRow('kubernetes', d.name, `${d.namespace || 'default'} · ${d.ready || 0}/${d.desired || 0} ready`, d.healthy?'green':'yellow', d.healthy?'healthy':'attention', d.healthy?'md-green':'md-yellow', `showK8sDeployment(${jsStr(d.namespace || 'default')},${jsStr(d.name)})`)).join('');
+    const svcRows = (k.services||[]).map(s => {
+      const ports = (s.ports||[]).map(p => p.nodePort ? `${p.port}:${p.nodePort}` : `${p.port}`).join(', ');
+      const sub = [s.namespace || 'default', s.type || 'service', ports ? `ports ${ports}` : '', s.clusterIP || ''].filter(Boolean).join(' · ');
+      return overviewRow('kubernetes', s.name, sub, 'blue', s.type || 'svc', 'md-blue', `showK8sService(${jsStr(s.namespace || 'default')},${jsStr(s.name)})`);
+    }).join('');
+    return [
+      overviewGroup('pods', 'Pods', podRows, 'No pods found'),
+      overviewGroup('deps', 'Deployments', depRows, 'No deployments found'),
+      overviewGroup('svcs', 'Services', svcRows, 'No services found'),
+    ].join('');
   }
   if(id === 'database'){
-    return (data.database||[]).slice(0,6).map(d => {
+    return (data.database||[]).map(d => {
       const sub = [d.type, d.host, d.connections!=null?`${d.connections} conns`:'', d.sizeBytes?fmtBytes(d.sizeBytes):'' ].filter(Boolean).join(' · ');
       return overviewRow('database', d.name, sub || 'Database', d._connecting?'gray':d.online?'green':'red', d._connecting?'connecting':d.online?'online':'offline', d._connecting?'md-gray':d.online?'md-green':'md-red');
     }).join('');
@@ -2038,7 +2145,7 @@ function renderDashboardOverview(data, ids, panels){
         ${panel.badge}
       </div>
       ${panel.summary || panel.sbSummary || ''}
-      <div class="overview-list">${rows || '<div class="overview-empty">No rows to show yet</div>'}</div>
+      <div class="overview-list ${['healthchecks','database'].includes(id)?'is-scroll':''}">${rows || '<div class="overview-empty">No rows to show yet</div>'}</div>
     </section>`;
   }).join('');
   document.querySelectorAll('.sb-card.active').forEach(c=>c.classList.remove('active'));
@@ -2152,6 +2259,22 @@ function selectPanel(id){
     });
   }
 }
+function selectPanelGroup(id, grpId){
+  selectPanel(id);
+  if(id !== 'kubernetes') return;
+  k8sGrpOpen[grpId] = true;
+  const body = document.getElementById(`kg-${grpId}`);
+  const hdr = document.getElementById(`kh-${grpId}`);
+  if(body) body.classList.add('open');
+  const chev = hdr?.querySelector('.chevron');
+  if(chev) chev.classList.add('open');
+  try{ body?.scrollIntoView({ block:'start' }); }catch(e){}
+}
+function toggleOverviewGroup(grpId){
+  overviewK8sOpen[grpId] = !overviewK8sOpen[grpId];
+  const grp = document.getElementById(`ov-k8s-${grpId}`);
+  if(grp) grp.classList.toggle('open', overviewK8sOpen[grpId]);
+}
 
 /* ── Render ── */
 function render(data){
@@ -2247,6 +2370,19 @@ function render(data){
 }
 
 /* ── Sidebar resize ── */
+function applyRailCollapsed(collapsed){
+  document.body.classList.toggle('rail-collapsed', !!collapsed);
+  const btn = document.getElementById('rail-toggle');
+  if(btn){
+    btn.title = collapsed ? 'Expand sidebar' : 'Collapse sidebar';
+    btn.setAttribute('aria-label', btn.title);
+  }
+}
+function toggleRail(){
+  const collapsed = !document.body.classList.contains('rail-collapsed');
+  try{ localStorage.setItem('os_rail_collapsed', collapsed ? '1' : '0'); }catch(e){}
+  applyRailCollapsed(collapsed);
+}
 (()=>{
   const shell = document.querySelector('.shell');
   const handle = document.getElementById('rail-resizer');
@@ -2255,7 +2391,9 @@ function render(data){
   const apply = v => shell.style.setProperty('--rail-w', clamp(v) + 'px');
   const saved = parseInt(localStorage.getItem('os_rail_width'), 10);
   if(saved) apply(saved);
+  applyRailCollapsed(localStorage.getItem('os_rail_collapsed') === '1');
   handle.addEventListener('pointerdown', e => {
+    if(document.body.classList.contains('rail-collapsed')) return;
     if(window.matchMedia('(max-width: 1100px)').matches) return;
     e.preventDefault();
     handle.setPointerCapture(e.pointerId);
@@ -2416,6 +2554,38 @@ async function fetchLogs(url,title){
 function reloadLogs(){ if(_logCtx) fetchLogs(_logCtx.url,_logCtx.title); }
 function showDockerLogs(host,id,name){ fetchLogs('/api/docker/logs?host='+encodeURIComponent(host)+'&id='+encodeURIComponent(id)+'&tail=300', name+' \u2014 logs'); }
 function showPodLogs(ns,pod){ fetchLogs('/api/kubernetes/logs?namespace='+encodeURIComponent(ns)+'&pod='+encodeURIComponent(pod)+'&tail=300', pod+' \u2014 logs'); }
+function showK8sDetail(title, rows){
+  const m=document.getElementById('logmodal');
+  const el=document.getElementById('logbody');
+  m.classList.add('open');
+  document.getElementById('logtitle').textContent=title;
+  _logCtx=null;
+  el.innerHTML = `<div class="detail-kv">${rows.map(([k,v])=>`
+    <div class="detail-kv-row">
+      <div class="detail-kv-key">${escHtml(k)}</div>
+      <div class="detail-kv-val">${escHtml(v == null || v === '' ? '-' : String(v))}</div>
+    </div>`).join('')}</div>`;
+}
+function showK8sDeployment(ns,name){
+  const d=(window._lastData?.kubernetes?.deployments||[]).find(x=>x.name===name && (x.namespace||'default')===ns);
+  if(!d) return;
+  showK8sDetail(name+' \u2014 deployment', [
+    ['Namespace', d.namespace || 'default'],
+    ['Ready', `${d.ready || 0}/${d.desired || 0}`],
+    ['Status', d.healthy ? 'healthy' : 'attention'],
+  ]);
+}
+function showK8sService(ns,name){
+  const svc=(window._lastData?.kubernetes?.services||[]).find(x=>x.name===name && (x.namespace||'default')===ns);
+  if(!svc) return;
+  const ports=(svc.ports||[]).map(p=>`${p.protocol || 'TCP'} ${p.port}${p.target ? ' -> '+p.target : ''}${p.nodePort ? ' / node '+p.nodePort : ''}`).join(', ');
+  showK8sDetail(name+' \u2014 service', [
+    ['Namespace', svc.namespace || 'default'],
+    ['Type', svc.type || 'service'],
+    ['Cluster IP', svc.clusterIP || ''],
+    ['Ports', ports],
+  ]);
+}
 document.addEventListener('keydown',e=>{ if(e.key==='Escape')closeLogs(); });
 function authHeaders(){ const t=sessionStorage.getItem('os_token')||localStorage.getItem('os_token'); return t?{'x-session-token':t}:{}; }
 function handleUnauth(r){ if(r.status===401){ sessionStorage.removeItem('os_token'); localStorage.removeItem('os_token'); document.cookie='session=; path=/; max-age=0'; window.location.href='/login'; throw new Error('Unauthorized'); } }

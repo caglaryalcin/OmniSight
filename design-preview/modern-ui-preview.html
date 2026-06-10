@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OmniSight Modern UI Preview</title>
+<style>
+:root{
+  --bg:#0d1117;
+  --surface:#111827;
+  --surface2:#151d2b;
+  --surface3:#1c2535;
+  --line:#263244;
+  --line2:#344156;
+  --text:#e7edf7;
+  --muted:#8a98ad;
+  --soft:#b8c3d5;
+  --green:#25c08b;
+  --blue:#4f9cf9;
+  --yellow:#e8b84c;
+  --red:#ef6363;
+  --violet:#9b87f5;
+  --cyan:#29c7d9;
+  --shadow:0 18px 44px rgba(0,0,0,.34);
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Arial,sans-serif}
+body{overflow:hidden}
+button,input{font:inherit}
+.shell{height:100vh;display:grid;grid-template-columns:264px 1fr;background:
+  linear-gradient(180deg,rgba(79,156,249,.08),transparent 34%),
+  linear-gradient(90deg,rgba(41,199,217,.05),transparent 42%),
+  var(--bg)}
+.rail{border-right:1px solid var(--line);background:rgba(13,17,23,.72);backdrop-filter:blur(18px);display:flex;flex-direction:column;min-width:0}
+.brand{height:68px;display:flex;align-items:center;gap:12px;padding:0 20px;border-bottom:1px solid var(--line)}
+.mark{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--green),var(--blue));display:grid;place-items:center;box-shadow:0 0 0 1px rgba(255,255,255,.08) inset}
+.mark svg{width:19px;height:19px;color:#061015}
+.brand-name{font-weight:800;letter-spacing:0;font-size:18px}
+.brand-sub{font-size:11px;color:var(--muted);margin-top:1px}
+.nav{padding:14px 12px;display:flex;flex-direction:column;gap:4px}
+.nav button{height:38px;border:0;background:transparent;color:var(--muted);border-radius:8px;padding:0 10px;display:flex;align-items:center;gap:10px;cursor:pointer;text-align:left}
+.nav button.active{background:var(--surface2);color:var(--text);box-shadow:0 0 0 1px rgba(255,255,255,.04) inset}
+.nav svg,.icon{width:17px;height:17px;flex:0 0 auto}
+.rail-section{padding:10px 16px 8px;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.08em}
+.mini-list{padding:0 12px 16px;display:flex;flex-direction:column;gap:8px}
+.mini{border:1px solid var(--line);background:rgba(17,24,39,.62);border-radius:8px;padding:10px 11px;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:9px}
+.dot{width:8px;height:8px;border-radius:999px;background:var(--green);box-shadow:0 0 0 4px rgba(37,192,139,.12)}
+.dot.yellow{background:var(--yellow);box-shadow:0 0 0 4px rgba(232,184,76,.12)}
+.dot.red{background:var(--red);box-shadow:0 0 0 4px rgba(239,99,99,.12)}
+.mini-title{font-size:13px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mini-meta{font-size:11px;color:var(--muted);margin-top:2px}
+.badge{border:1px solid transparent;border-radius:999px;padding:3px 8px;font-size:11px;font-weight:700;white-space:nowrap}
+.badge.green{color:var(--green);background:rgba(37,192,139,.1);border-color:rgba(37,192,139,.24)}
+.badge.yellow{color:var(--yellow);background:rgba(232,184,76,.1);border-color:rgba(232,184,76,.24)}
+.badge.red{color:var(--red);background:rgba(239,99,99,.1);border-color:rgba(239,99,99,.24)}
+.badge.gray{color:var(--muted);background:rgba(138,152,173,.1);border-color:rgba(138,152,173,.18)}
+.rail-foot{margin-top:auto;padding:14px 16px;border-top:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;color:var(--muted);font-size:12px}
+.main{display:grid;grid-template-rows:68px 1fr;min-width:0}
+.topbar{border-bottom:1px solid var(--line);background:rgba(13,17,23,.58);backdrop-filter:blur(18px);display:flex;align-items:center;gap:14px;padding:0 22px}
+.search{width:min(440px,42vw);height:38px;background:var(--surface);border:1px solid var(--line);border-radius:8px;display:flex;align-items:center;gap:10px;padding:0 12px;color:var(--muted)}
+.search input{background:transparent;border:0;outline:0;color:var(--text);width:100%;font-size:13px}
+.top-spacer{flex:1}
+.health{display:flex;align-items:center;gap:9px;border:1px solid rgba(37,192,139,.22);background:rgba(37,192,139,.08);height:36px;border-radius:999px;padding:0 13px;color:var(--green);font-size:13px;font-weight:750}
+.icon-btn{width:36px;height:36px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--soft);display:grid;place-items:center;cursor:pointer}
+.content{overflow:auto;padding:22px;display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:18px}
+.section-title{display:flex;align-items:end;justify-content:space-between;margin-bottom:14px}
+h1{font-size:24px;line-height:1.15;margin:0;font-weight:800;letter-spacing:0}
+.hint{color:var(--muted);font-size:13px;margin-top:5px}
+.seg{display:flex;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:3px}
+.seg button{border:0;background:transparent;color:var(--muted);height:28px;padding:0 11px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700}
+.seg button.active{background:var(--surface3);color:var(--text)}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:14px}
+.kpi{background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.01)),var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px;min-height:112px}
+.kpi-head{display:flex;align-items:center;justify-content:space-between;color:var(--muted);font-size:12px;font-weight:700}
+.kpi-icon{width:30px;height:30px;border-radius:8px;background:var(--surface3);display:grid;place-items:center;color:var(--blue)}
+.kpi-value{font-size:28px;font-weight:820;letter-spacing:0;margin-top:13px}
+.kpi-trend{margin-top:5px;color:var(--muted);font-size:12px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow);min-width:0}
+.panel-h{height:54px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;padding:0 14px}
+.panel-title{font-size:14px;font-weight:760;flex:1}
+.panel-meta{color:var(--muted);font-size:12px}
+.bars{padding:14px;display:flex;flex-direction:column;gap:13px}
+.bar-row{display:grid;grid-template-columns:86px 1fr 42px;align-items:center;gap:10px;font-size:12px;color:var(--muted)}
+.track{height:8px;background:#0b1018;border-radius:999px;overflow:hidden;border:1px solid rgba(255,255,255,.04)}
+.fill{height:100%;background:var(--green);border-radius:inherit}
+.fill.yellow{background:var(--yellow)}
+.fill.red{background:var(--red)}
+.history-stack{padding:14px;display:flex;flex-direction:column;gap:14px}
+.history-row{display:grid;grid-template-columns:88px 1fr 42px;align-items:center;gap:10px;font-size:12px;color:var(--muted)}
+.spark{height:44px;border:1px solid rgba(255,255,255,.05);background:#0b1018;border-radius:8px;overflow:hidden}
+.spark svg{display:block;width:100%;height:100%}
+.spark path.area{opacity:.22}
+.spark path.line{fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.list{display:flex;flex-direction:column}
+.row{min-height:54px;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:10px;padding:0 14px;border-bottom:1px solid var(--line)}
+.row:last-child{border-bottom:0}
+.row-name{font-size:13px;font-weight:700}
+.row-sub{font-size:12px;color:var(--muted);margin-top:3px}
+.right{display:flex;flex-direction:column;gap:12px;min-width:0}
+.side-card{background:var(--surface);border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow)}
+.side-h{height:52px;border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 14px;font-size:14px;font-weight:760}
+.incident{padding:14px;border-bottom:1px solid var(--line)}
+.incident:last-child{border-bottom:0}
+.incident-top{display:flex;gap:8px;align-items:center;font-size:13px;font-weight:740}
+.incident p{margin:7px 0 0;color:var(--muted);font-size:12px;line-height:1.45}
+.settings-preview{padding:14px;display:grid;gap:11px}
+.setting-row{height:46px;border:1px solid var(--line);background:rgba(28,37,53,.42);border-radius:8px;display:flex;align-items:center;gap:10px;padding:0 12px}
+.setting-row span:first-of-type{font-weight:700;font-size:13px}
+.setting-row span:last-of-type{margin-left:auto;color:var(--muted);font-size:12px}
+.toggle{width:36px;height:20px;border-radius:999px;background:rgba(37,192,139,.22);padding:2px;display:flex;justify-content:flex-end}
+.toggle:before{content:"";width:16px;height:16px;border-radius:50%;background:var(--green)}
+@media (max-width:1100px){
+  .shell{grid-template-columns:78px 1fr}
+  .brand div:nth-child(2),.nav span,.rail-section,.mini-list,.rail-foot{display:none}
+  .brand{justify-content:center;padding:0}.nav button{justify-content:center}
+  .content{grid-template-columns:1fr}.right{grid-row:auto}
+}
+@media (max-width:760px){
+  .kpis,.grid{grid-template-columns:1fr}
+  .topbar{padding:0 14px}.search{display:none}.content{padding:14px}
+}
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside class="rail">
+    <div class="brand">
+      <div class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><circle cx="12" cy="12" r="7"/><path d="M12 5v14M5 12h14"/></svg></div>
+      <div><div class="brand-name">OmniSight</div><div class="brand-sub">Unified monitoring</div></div>
+    </div>
+    <nav class="nav">
+      <button class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 13h6V4H4v9Zm10 7h6V4h-6v16ZM4 20h6v-4H4v4Z"/></svg><span>Dashboard</span></button>
+      <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h10"/></svg><span>Systems</span></button>
+      <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8l-9-5-9 5v8l9 5 9-5Z"/><path d="M3.3 7.5 12 12l8.7-4.5M12 22V12"/></svg><span>Containers</span></button>
+      <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M3 12h18"/><circle cx="12" cy="12" r="8"/></svg><span>Kubernetes</span></button>
+      <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5m0 14h16M8 17v-6m5 6V7m5 10v-9"/></svg><span>Logs</span></button>
+      <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1A2 2 0 1 1 4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7A2 2 0 1 1 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3h.1A1.7 1.7 0 0 0 10 3.1V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.6h.1a1.7 1.7 0 0 0 1.9-.3l.1-.1A2 2 0 1 1 19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9v.1a1.7 1.7 0 0 0 1.6.9h.1a2 2 0 1 1 0 4H21a1.7 1.7 0 0 0-1.6 1Z"/></svg><span>Settings</span></button>
+    </nav>
+    <div class="rail-section">Live platforms</div>
+    <div class="mini-list">
+      <div class="mini"><span class="dot"></span><div><div class="mini-title">Linux Servers</div><div class="mini-meta">8 hosts reporting</div></div><span class="badge green">OK</span></div>
+      <div class="mini"><span class="dot yellow"></span><div><div class="mini-title">Docker</div><div class="mini-meta">36 containers</div></div><span class="badge yellow">2 stopped</span></div>
+      <div class="mini"><span class="dot"></span><div><div class="mini-title">Proxmox</div><div class="mini-meta">3 nodes</div></div><span class="badge green">OK</span></div>
+      <div class="mini"><span class="dot red"></span><div><div class="mini-title">Healthchecks</div><div class="mini-meta">1 down</div></div><span class="badge red">Alert</span></div>
+    </div>
+    <div class="rail-foot"><span>Updated 12s ago</span><span>v0.8</span></div>
+  </aside>
+  <main class="main">
+    <header class="topbar">
+      <div class="search"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3-3"/></svg><input value="" placeholder="Search host, service, container"></div>
+      <div class="top-spacer"></div>
+      <a class="health" href="/status" style="text-decoration:none;color:var(--soft);border-color:var(--line);background:var(--surface)"><span>Public status</span></a>
+      <div class="health"><span class="dot"></span><span>All core systems healthy</span></div>
+      <button class="icon-btn"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5"/><path d="M10 21h4"/></svg></button>
+      <button class="icon-btn"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.8-4 5-6 8-6s6.2 2 8 6"/></svg></button>
+    </header>
+    <section class="content">
+      <div>
+        <div class="section-title">
+          <div><h1>Operations overview</h1><div class="hint">Realtime host, container and service health in one dense workspace.</div></div>
+          <div class="seg"><button class="active">Live</button><button>1h</button><button>6h</button></div>
+        </div>
+        <div class="kpis">
+          <div class="kpi"><div class="kpi-head"><span>CPU usage</span><span class="kpi-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="5" width="14" height="14" rx="2"/><path d="M9 1v4M15 1v4M9 19v4M15 19v4M1 9h4M1 15h4M19 9h4M19 15h4"/></svg></span></div><div class="kpi-value">42%</div><div class="kpi-trend">Across 8 Linux hosts</div></div>
+          <div class="kpi"><div class="kpi-head"><span>Memory usage</span><span class="kpi-icon" style="color:var(--violet)"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 19V5h12v14H6Z"/><path d="M9 9h6v6H9Z"/></svg></span></div><div class="kpi-value">61%</div><div class="kpi-trend">126 GB used of 206 GB</div></div>
+          <div class="kpi"><div class="kpi-head"><span>Disk I/O</span><span class="kpi-icon" style="color:var(--cyan)"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg></span></div><div class="kpi-value">84 MB/s</div><div class="kpi-trend">Read and write combined</div></div>
+          <div class="kpi"><div class="kpi-head"><span>Bandwidth</span><span class="kpi-icon" style="color:var(--green)"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M7 8l5-5 5 5M17 16l-5 5-5-5"/></svg></span></div><div class="kpi-value">18 MB/s</div><div class="kpi-trend">Inbound plus outbound</div></div>
+        </div>
+        <div class="grid">
+          <div class="panel">
+            <div class="panel-h"><span class="dot"></span><div class="panel-title">Linux host detail</div><div class="panel-meta">node-a.local</div></div>
+            <div class="history-stack">
+              <div class="history-row"><span>CPU</span><div class="spark"><svg viewBox="0 0 220 44" preserveAspectRatio="none"><path class="area" d="M0 32 L24 28 L48 30 L72 18 L96 24 L120 14 L144 18 L168 12 L192 23 L220 16 L220 44 L0 44 Z" fill="var(--green)"/><path class="line" d="M0 32 L24 28 L48 30 L72 18 L96 24 L120 14 L144 18 L168 12 L192 23 L220 16" stroke="var(--green)"/></svg></div><span>42%</span></div>
+              <div class="history-row"><span>Memory</span><div class="spark"><svg viewBox="0 0 220 44" preserveAspectRatio="none"><path class="area" d="M0 26 L24 25 L48 22 L72 24 L96 21 L120 19 L144 16 L168 18 L192 14 L220 13 L220 44 L0 44 Z" fill="var(--yellow)"/><path class="line" d="M0 26 L24 25 L48 22 L72 24 L96 21 L120 19 L144 16 L168 18 L192 14 L220 13" stroke="var(--yellow)"/></svg></div><span>71%</span></div>
+              <div class="history-row"><span>Disk</span><div class="spark"><svg viewBox="0 0 220 44" preserveAspectRatio="none"><path class="area" d="M0 30 L24 31 L48 28 L72 26 L96 27 L120 22 L144 21 L168 20 L192 18 L220 19 L220 44 L0 44 Z" fill="var(--blue)"/><path class="line" d="M0 30 L24 31 L48 28 L72 26 L96 27 L120 22 L144 21 L168 20 L192 18 L220 19" stroke="var(--blue)"/></svg></div><span>58%</span></div>
+              <div class="bar-row"><span>Swap</span><div class="track"><div class="fill" style="width:12%"></div></div><span>12%</span></div>
+            </div>
+            <div class="list">
+              <div class="row"><span class="dot"></span><div><div class="row-name">nginx</div><div class="row-sub">active · uptime 18d</div></div><span class="badge green">running</span></div>
+              <div class="row"><span class="dot yellow"></span><div><div class="row-name">backup.timer</div><div class="row-sub">last run delayed</div></div><span class="badge yellow">warning</span></div>
+              <div class="row"><span class="dot"></span><div><div class="row-name">docker</div><div class="row-sub">socket available</div></div><span class="badge green">active</span></div>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-h"><span class="dot yellow"></span><div class="panel-title">Docker containers</div><div class="panel-meta">36 total</div></div>
+            <div class="list">
+              <div class="row"><span class="dot"></span><div><div class="row-name">omnisight</div><div class="row-sub">CPU 3.2% · Mem 1.4% · Net 1.8 MB/s</div></div><span class="badge green">running</span></div>
+              <div class="row"><span class="dot"></span><div><div class="row-name">postgres</div><div class="row-sub">CPU 8.6% · Block I/O 240 MB / 1.2 GB</div></div><span class="badge green">running</span></div>
+              <div class="row"><span class="dot red"></span><div><div class="row-name">worker-old</div><div class="row-sub">exited 2 hours ago</div></div><span class="badge red">stopped</span></div>
+              <div class="row"><span class="dot"></span><div><div class="row-name">redis-cache</div><div class="row-sub">CPU 0.9% · Mem 0.5%</div></div><span class="badge green">running</span></div>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-h"><span class="dot"></span><div class="panel-title">Proxmox cluster</div><div class="panel-meta">3/3 nodes</div></div>
+            <div class="bars">
+              <div class="bar-row"><span>Cores</span><div class="track"><div class="fill" style="width:48%"></div></div><span>48%</span></div>
+              <div class="bar-row"><span>RAM</span><div class="track"><div class="fill yellow" style="width:68%"></div></div><span>68%</span></div>
+              <div class="bar-row"><span>Storage</span><div class="track"><div class="fill" style="width:53%"></div></div><span>53%</span></div>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-h"><span class="dot"></span><div class="panel-title">Network devices</div><div class="panel-meta">SNMP</div></div>
+            <div class="list">
+              <div class="row"><span class="dot"></span><div><div class="row-name">core-switch</div><div class="row-sub">Temp 43 C · CPU 18%</div></div><span class="badge green">online</span></div>
+              <div class="row"><span class="dot"></span><div><div class="row-name">nas-storage</div><div class="row-sub">RAM 56% · Disk 64%</div></div><span class="badge green">online</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <aside class="right">
+        <div class="side-card">
+          <div class="side-h">Active alerts</div>
+          <div class="incident"><div class="incident-top"><span class="dot red"></span><span>healthcheck: nightly-sync</span><span class="badge red">down</span></div><p>No ping received within the grace window. Notifications are armed.</p></div>
+          <div class="incident"><div class="incident-top"><span class="dot yellow"></span><span>docker: worker-old</span><span class="badge yellow">stopped</span></div><p>Container is stopped on node-a. Prune and logs actions stay close to the row.</p></div>
+        </div>
+        <div class="side-card">
+          <div class="side-h">Recent logs</div>
+          <div class="list">
+            <div class="row"><span class="dot"></span><div><div class="row-name">agent report accepted</div><div class="row-sub">node-c · 15 seconds ago</div></div></div>
+            <div class="row"><span class="dot yellow"></span><div><div class="row-name">container state changed</div><div class="row-sub">worker-old · exited</div></div></div>
+            <div class="row"><span class="dot"></span><div><div class="row-name">backup completed</div><div class="row-sub">pve-02 · OK</div></div></div>
+          </div>
+        </div>
+      </aside>
+    </section>
+  </main>
+</div>
+</body>
+</html>
