@@ -2248,9 +2248,9 @@ function initOverviewDrag(){
     card.setPointerCapture?.(e.pointerId);
   });
   const moveDrag = e => {
+    if(!drag || e.pointerId !== drag.id) return;
     if(e._overviewDragHandled) return;
     e._overviewDragHandled = true;
-    if(!drag || e.pointerId !== drag.id) return;
     if(!drag.active && Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY) < 5) return;
     e.preventDefault();
     if(!drag.active){
@@ -2271,9 +2271,9 @@ function initOverviewDrag(){
   grid.addEventListener('pointermove', moveDrag);
   window.addEventListener('pointermove', moveDrag, true);
   const endDrag = e => {
+    if(!drag || e.pointerId !== drag.id) return;
     if(e._overviewDropHandled) return;
     e._overviewDropHandled = true;
-    if(!drag || e.pointerId !== drag.id) return;
     const { card, placeholder, header } = drag;
     card.releasePointerCapture?.(e.pointerId);
     if(drag.active){

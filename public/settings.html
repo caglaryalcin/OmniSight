@@ -650,7 +650,7 @@ function addTag(listId, inputId) {
 function appendTag(listId, val) {
   const tag = document.createElement('div');
   tag.className = 'tag';
-  tag.innerHTML = `<span>${escHtml(val)}</span><button type="button" onclick="this.parentElement.remove()">✕</button>`;
+  tag.innerHTML = `<span>${escHtml(val)}</span><button type="button" onclick="removeSettingsTag(this)">✕</button>`;
   document.getElementById(listId).appendChild(tag);
 }
 
@@ -659,7 +659,7 @@ function getTagVals(listId) {
 }
 
 function escHtml(s) {
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 const TZ_FALLBACK = [
@@ -1095,19 +1095,44 @@ function onSynSecLevel(sel, id) {
 
 /* ── Populate from config ── */
 function secVal(v, el) {
+  if (!el) return;
   if (v === '__encrypted__' || v === '__set__') {
     el.value = '';
     el.placeholder = '••••••••  (set — leave blank to keep)';
     el.dataset.masked = '1';
   } else {
-    el.value = v || '';
+    el.value = v == null ? '' : String(v);
     el.dataset.masked = '';
   }
 }
 function maskedVal(el) {
-  if (el.dataset.masked === '1' && !el.value.trim()) return '__set__';
-  return el.value.trim();
+  if (!el) return '';
+  const value = String(el.value || '').trim();
+  if (el.dataset.masked === '1' && !value) return '__set__';
+  return value;
 }
+
+let autoSaveTimer = null;
+function scheduleSettingsAutoSave() {
+  clearTimeout(autoSaveTimer);
+  autoSaveTimer = setTimeout(() => saveConfig({ silent: true, reason: 'delete' }), 350);
+}
+function removeSettingsTag(btn) {
+  btn.closest('.tag')?.remove();
+  scheduleSettingsAutoSave();
+}
+function removeSettingsItem(btn) {
+  btn.closest('.arr-item')?.remove();
+  scheduleSettingsAutoSave();
+}
+document.addEventListener('click', e => {
+  const btn = e.target.closest('.btn-rm');
+  const item = btn?.closest('.arr-item');
+  if (!btn || !item) return;
+  e.preventDefault();
+  e.stopImmediatePropagation();
+  removeSettingsItem(btn);
+}, true);
 
 function populate(cfg) {
   if (document.getElementById('cfg-timezone')) {
@@ -1527,7 +1552,8 @@ async function deleteCertificate(name, btn) {
 }
 
 /* ── Save ── */
-async function saveConfig() {
+async function saveConfig(opts = {}) {
+  const silent = !!opts.silent;
   const btns = document.querySelectorAll('.btn-save');
   flushPendingTags();
   btns.forEach(b => b.disabled = true);
@@ -1541,7 +1567,8 @@ async function saveConfig() {
     handleUnauth(r);
     const body = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(body.error || r.statusText);
-    toast('Saved and applied!', 'ok');
+    if (!silent) toast('Saved and applied!', 'ok');
+    else if (opts.reason === 'delete') toast('Removed and saved', 'ok');
     refreshDots(cfgPayload, body.data);
     try {
       const p = window.parent;

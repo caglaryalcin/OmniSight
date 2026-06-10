@@ -197,6 +197,37 @@ function hasDockerApi() {
   return !!(config.docker && Array.isArray(config.docker.hosts) && config.docker.hosts.length);
 }
 
+function dockerConfigHostName(h = {}) {
+  return h.name || h.url || h.socketPath || h.sshHost || 'docker';
+}
+
+function dockerConfigHostTarget(h = {}) {
+  return h.url || h.socketPath || h.sshHost || '';
+}
+
+function dockerConfigRows() {
+  const hosts = Array.isArray(config.docker?.hosts) ? config.docker.hosts : [];
+  return hosts.map(h => ({
+    name: dockerConfigHostName(h),
+    host: dockerConfigHostTarget(h),
+    online: false,
+    _connecting: true,
+    summary: { total: 0, running: 0, stopped: 0, unused: 0 },
+    containers: [],
+  }));
+}
+
+function mergeDockerConfiguredRows(currentRows = [], agentRows = []) {
+  if (!hasDockerApi()) return agentRows;
+  const currentByName = new Map((currentRows || []).map(h => [h.name, h]));
+  const configured = dockerConfigRows().map(row => {
+    const prev = currentByName.get(row.name);
+    return prev ? { ...row, ...prev, name: row.name, host: prev.host || row.host } : row;
+  });
+  const configuredNames = new Set(configured.map(h => h.name));
+  return [...configured, ...agentRows.filter(h => !configuredNames.has(h.name))];
+}
+
 async function getProxmoxData() {
   if (hasProxmoxApi()) return getProxmoxApiData({ ...config.proxmox, excludedServices: config.excludedServices });
   return agents.getProxmoxData({ excludedServices: config.excludedServices });
@@ -492,8 +523,8 @@ function maskConfig(obj) {
   if (Array.isArray(obj)) return obj.map(maskConfig);
   const out = {};
   for (const [k, v] of Object.entries(obj)) {
-    if (typeof v === 'object' && v !== null) out[k] = maskConfig(v);
-    else if (SENSITIVE_KEYS.has(k) && v) out[k] = isEncrypted(v) ? '__encrypted__' : '__set__';
+    if (SENSITIVE_KEYS.has(k) && v) out[k] = isEncrypted(v) ? '__encrypted__' : '__set__';
+    else if (typeof v === 'object' && v !== null) out[k] = maskConfig(v);
     else out[k] = v;
   }
   return out;
@@ -558,9 +589,7 @@ app.post('/api/config', (req, res) => {
       } else { cache.data.uptimekuma = null; }
 
       if (en(config.docker)) {
-        cache.data.docker = hasDockerApi()
-          ? config.docker.hosts.map(h => ({ name: h.name || h.url || h.socketPath || 'docker', host: h.url || h.socketPath, online: false, _connecting: true, summary: { total: 0, running: 0, stopped: 0, unused: 0 }, containers: [] }))
-          : agents.getDockerData();
+        cache.data.docker = mergeDockerConfiguredRows(cache.data.docker, agents.getDockerData());
       } else { cache.data.docker = []; }
 
       if (en(config.database)) {
@@ -740,10 +769,27 @@ app.post('/api/notifications', (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+function configItemKey(item) {
+  if (!item || typeof item !== 'object' || Array.isArray(item)) return null;
+  const parts = [item.type, item.name, item.host, item.url, item.socketPath, item.sshHost, item.database]
+    .filter(v => v != null && v !== '')
+    .map(String);
+  return parts.length ? parts.join('|') : null;
+}
+
 function mergePreservingSecrets(incoming, existing) {
   if (!incoming || typeof incoming !== 'object') return incoming;
   if (Array.isArray(incoming)) {
-    return incoming.map((item, i) => mergePreservingSecrets(item, Array.isArray(existing) ? existing[i] : undefined));
+    const existingArr = Array.isArray(existing) ? existing : [];
+    const existingByKey = new Map();
+    existingArr.forEach(item => {
+      const key = configItemKey(item);
+      if (key && !existingByKey.has(key)) existingByKey.set(key, item);
+    });
+    return incoming.map((item, i) => {
+      const key = configItemKey(item);
+      return mergePreservingSecrets(item, key ? existingByKey.get(key) : existingArr[i]);
+    });
   }
   const out = {};
   for (const [k, v] of Object.entries(incoming)) {
@@ -841,7 +887,7 @@ app.post('/api/agent/report', (req, res) => {
       } else if (!en(config.proxmox)) {
         cache.data.proxmox = { clusterSummary: null, nodes: [] };
       }
-      cache.data.docker = en(config.docker) ? agents.getDockerData() : [];
+      cache.data.docker = en(config.docker) ? mergeDockerConfiguredRows(cache.data.docker, agents.getDockerData()) : [];
       assignStatic(cache.data);
     }
     const cmds = agents.takeCommands(a.id);
@@ -889,7 +935,7 @@ app.post('/api/agent/pending', (req, res) => {
         cache.data.proxmox = preserveProxmoxOnTransient(agents.getProxmoxData({ excludedServices: config.excludedServices }));
       }
       if (kind === 'docker') {
-        cache.data.docker = agents.getDockerData();
+        cache.data.docker = mergeDockerConfiguredRows(cache.data.docker, agents.getDockerData());
       }
       assignStatic(cache.data);
     }
@@ -907,7 +953,7 @@ app.post('/api/agent/remove', (req, res) => {
       cache.data.proxmox = hasProxmoxApi()
         ? cache.data.proxmox
         : preserveProxmoxOnTransient(agents.getProxmoxData({ excludedServices: config.excludedServices }));
-      cache.data.docker = agents.getDockerData();
+      cache.data.docker = mergeDockerConfiguredRows(cache.data.docker, agents.getDockerData());
       assignStatic(cache.data);
     }
     res.json({ ok, data: cache.data });

@@ -75,12 +75,34 @@ function pct(v) {
   return Number.isFinite(n) ? Math.round(n * 10) / 10 : null;
 }
 
+function cleanSshError(message) {
+  const lines = String(message || '')
+    .split(/\r?\n/)
+    .map(s => s.trim())
+    .filter(Boolean)
+    .filter(line => {
+      const l = line.toLowerCase();
+      return !(
+        l.includes('post-quantum key exchange') ||
+        l.includes('store now, decrypt later') ||
+        l.includes('openssh.com/pq.html') ||
+        l.includes('server may need to be upgraded')
+      );
+    });
+  const cleaned = lines.join('\n').trim();
+  if (/(\b|sh:\s*)docker:\s*(command\s+)?not found/i.test(cleaned)) {
+    return 'Docker CLI not found on remote host. Install Docker or add it to PATH for the SSH user.';
+  }
+  return cleaned || 'SSH command failed';
+}
+
 function execSsh(host, command) {
   return new Promise((resolve, reject) => {
     const port = Number(host.sshPort) || 22;
     const user = host.sshUser || 'root';
     const target = `${user}@${host.sshHost}`;
-    const hasPassword = !!host.sshPassword;
+    const password = host.sshPassword == null ? '' : String(host.sshPassword);
+    const hasPassword = !!password;
     const sshArgs = [
       '-o', 'ConnectTimeout=10',
       '-o', 'StrictHostKeyChecking=accept-new',
@@ -94,10 +116,12 @@ function execSsh(host, command) {
     if (host.sshKey) sshArgs.push('-i', host.sshKey);
     sshArgs.push(target, command);
     const bin = hasPassword ? 'sshpass' : 'ssh';
-    const args = hasPassword ? ['-p', host.sshPassword, 'ssh', ...sshArgs] : sshArgs;
-    execFile(bin, args, { timeout: 20000, maxBuffer: 1024 * 1024 * 3 }, (err, stdout, stderr) => {
+    const args = hasPassword ? ['-e', 'ssh', ...sshArgs] : sshArgs;
+    const opts = { timeout: 20000, maxBuffer: 1024 * 1024 * 3 };
+    if (hasPassword) opts.env = { ...process.env, SSHPASS: password };
+    execFile(bin, args, opts, (err, stdout, stderr) => {
       if (err) {
-        const msg = (stderr || err.message || '').trim();
+        const msg = cleanSshError(stderr || err.message || '');
         if (hasPassword && err.code === 'ENOENT') return reject(new Error('sshpass is required for SSH password authentication'));
         return reject(new Error(msg));
       }
