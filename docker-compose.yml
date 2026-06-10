@@ -1,13 +1,15 @@
 services:
   omnisight:
-    build: .
-    # image: omnisight:latest
+    image: ghcr.io/caglaryalcin/omnisight:latest
+    # For local development builds, use this instead of the published image:
+    # build: .
     container_name: omnisight
     restart: unless-stopped
     ports:
       - "3000:3000"
     environment:
       - PORT=3000
+      - TZ=${TZ:-UTC}
       # Encryption is ON by default (auto-managed secret.key). Optional overrides:
       - OMNISIGHT_SECRET=${OMNISIGHT_SECRET:-}
       # - OMNISIGHT_ENCRYPT=false   # disable config encryption

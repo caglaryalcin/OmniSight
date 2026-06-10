@@ -175,7 +175,7 @@ function encryptConfigObj(obj) {
 }
 
 let config = loadConfig();
-process.env.TZ = config.timezone || process.env.TZ || 'UTC';
+process.env.TZ = config.timezone || process.env.TZ || process.env.TIMEZONE || 'UTC';
 
 let cache = { data: null };
 let refreshPromise = null;

@@ -13,6 +13,7 @@ services:
       - "3000:3000"
     environment:
       - PORT=3000
+      - TZ=${TZ:-UTC}
       - OMNISIGHT_SECRET=${OMNISIGHT_SECRET:-}
     volumes:
       - ./data:/app/data      # all state (config.yaml, secret.key, auth.yaml, sessions.yaml, kube.bin)

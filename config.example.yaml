@@ -4,6 +4,10 @@
 # Useful for Docker / secrets — set the env var and reference it here.
 # Keep key files (kubeconfig, SSH keys) in the ./data/ folder (git-ignored).
 
+# Optional timezone for server-side timestamps/notifications.
+# Can also be set with TZ=Europe/Istanbul (or TIMEZONE=Europe/Istanbul).
+timezone: "${TZ:-UTC}"
+
 # Linux servers, Proxmox nodes and Docker hosts are all monitored by the
 # OmniSight agent (push). Use Settings -> "+ Add System / Node / Host" to get
 # a copy-paste install command (Binary/systemd or Docker) with the token

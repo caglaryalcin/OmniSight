@@ -128,18 +128,19 @@ EOF
 ## Quick start (Docker)
 
 ```bash
-docker compose up -d --build
+docker compose up -d
 ```
 
-Nothing to pre-create. The single `data/` directory holds all state (`config.yaml`, `secret.key`, `auth.yaml`, `sessions.yaml`, `agents.yaml`, `kube.bin`); Docker auto-creates it and it persists across restarts. The app starts empty — set up your account and configure platforms from the Settings UI. Standalone Docker using the published image:
+Nothing to pre-create. The single `data/` directory holds all state (`config.yaml`, `secret.key`, `auth.yaml`, `sessions.yaml`, `agents.yaml`, `kube.bin`); Docker auto-creates it and it persists across restarts. The compose file uses the published image by default (`ghcr.io/caglaryalcin/omnisight:latest`). The app starts empty — set up your account and configure platforms from the Settings UI. Standalone Docker using the published image:
 
 ```bash
 docker run -d --name omnisight -p 3000:3000 \
+  -e TZ=UTC \
   -v $(pwd)/data:/app/data \
   ghcr.io/caglaryalcin/omnisight
 ```
 
-To build the image yourself instead, run `docker build -t omnisight .` and replace the last line with `omnisight`.
+To build the image yourself instead, uncomment `build: .` in `docker-compose.yml`, or run `docker build -t omnisight .` and replace the last line with `omnisight`.
 
 ### Pre-built image (CI/CD)
 
@@ -177,6 +178,7 @@ No ConfigMap/Secret to create: the app starts empty and you configure it from th
 | Variable | Required | Default | Description |
 |---|---|---|---|
 | `PORT` | No | `3000` | HTTP port |
+| `TZ` | No | `UTC` | Server timezone for Node timestamps and notifications, e.g. `Europe/Istanbul`. `TIMEZONE` is also accepted as an alias. |
 | `OMNISIGHT_ENCRYPT` | No | `true` | Config encryption is **enabled by default**. Set to `false` (or `0`/`off`/`no`) to disable. |
 | `OMNISIGHT_SECRET` | No | auto | Encryption key. If unset, a random key is generated and stored in `data/secret.key` (auto-managed). Set this to use your own key (e.g. shared across instances). |
 | `NODE_EXTRA_CA_CERTS` | No | — | Path to a CA certificate file to trust (Node standard), e.g. `/app/data/certs/ca.crt`. You can also just drop `*.crt`/`*.pem` files into `data/certs/` — they are auto-trusted on startup. See [Custom CA certificates](#custom-ca-certificates). |
