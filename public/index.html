@@ -142,6 +142,16 @@ header{
 
 .hb{display:flex;gap:2px;align-items:center;flex:1}
 .hb-bar{width:7px;height:22px;border-radius:2px;flex-shrink:0}
+.uk-bars{display:flex;align-items:center;gap:4px;min-width:0;overflow:hidden}
+.uk-bar{width:5px;height:18px;border-radius:4px;flex:0 0 5px;background:var(--muted);opacity:.95}
+.uk-bar.up{background:var(--green)}
+.uk-bar.down{background:var(--red)}
+.uk-bar.warn{background:var(--yellow)}
+.uk-bar.maintenance,.uk-bar.unknown{background:var(--muted);opacity:.7}
+.uk-mon-row{display:block;padding:10px 16px}
+.uk-mon-top{display:flex;align-items:center;gap:10px;min-width:0}
+.uk-mon-bars{margin:9px 34px 0 19px}
+.overview-uk-bars{margin-top:8px;max-width:280px}
 .hst{display:flex;gap:1px;align-items:flex-end;height:32px;flex:1}
 .hst-bar{flex:1;min-width:2px;border-radius:1px 1px 0 0}
 
@@ -173,8 +183,9 @@ html[data-theme="light"] .hist-bg{fill:rgba(0,0,0,.04)}
 .csum-item{min-width:0;min-height:58px;padding:9px 10px;text-align:center;background:var(--row);border:1px solid var(--border);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center}
 .csum-val{font-size:19px;font-weight:750;line-height:1.1;letter-spacing:0;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .csum-lbl{font-size:10px;color:var(--muted);margin-top:3px;text-transform:uppercase;letter-spacing:.06em}
-.hc-csum .csum-val{font-size:24px}
-.hc-csum .csum-lbl{font-size:11px}
+.hc-csum .csum-item{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:9px 10px}
+.hc-csum .csum-val{font-size:19px}
+.hc-csum .csum-lbl{font-size:10px;margin-top:3px;line-height:normal}
 
 .sb-csum{display:flex;gap:6px;padding:9px 10px}
 .sb-csum-item{flex:1;min-height:58px;padding:8px 6px;text-align:center;background:var(--row);border:1px solid var(--border);border-radius:9px;display:flex;flex-direction:column;align-items:center;justify-content:center}
@@ -438,15 +449,17 @@ html[data-theme="light"] body.rail-collapsed .shell .sb-card:hover,
 html[data-theme="light"] body.rail-collapsed .shell .sb-card.active{background:#eef4ff;border-color:#c7d7ea}
 
 .overview{padding:22px;min-height:100%;background:transparent}
-.overview-head{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:18px}
-.overview h1{font-size:22px;line-height:1.15;letter-spacing:0;font-weight:800;margin:0}
-.overview .hint{color:var(--muted);font-size:13px;margin-top:6px}
-.overview-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:14px}
+.overview-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) minmax(280px,340px);gap:12px;margin-bottom:14px}
 .overview-kpi{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:14px;min-width:0;box-shadow:var(--shadow)}
 .overview-kpi-head{display:flex;align-items:center;justify-content:space-between;gap:8px;color:var(--muted);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.045em}
+.overview-kpi .os-sel{font-size:11px;font-weight:650;text-transform:none;letter-spacing:0;flex-shrink:0}
+.overview-kpi .os-sel-btn{height:26px;padding:0 8px;border-radius:7px;gap:5px;background:var(--row);max-width:138px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.overview-kpi .os-sel-btn span{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.overview-kpi .os-sel-menu{z-index:2500;min-width:140px;text-transform:none;letter-spacing:0}
+.overview-kpi .os-sel-opt{font-size:12px;text-transform:none;letter-spacing:0}
 .overview-kpi-value{font-size:28px;font-weight:800;letter-spacing:0;margin-top:12px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .overview-kpi-sub{font-size:12px;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.overview-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:14px;align-items:start}
+.overview-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;align-items:start}
 .overview-col{display:flex;flex-direction:column;gap:14px;min-width:0}
 .overview-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,340px);gap:14px;align-items:start}
 .overview-side{display:grid;gap:14px}
@@ -463,12 +476,25 @@ html[data-theme="light"] body.rail-collapsed .shell .sb-card.active{background:#
 .overview-card:active{cursor:grabbing}
 .overview-placeholder{border:1px dashed var(--blue);border-radius:8px;background:rgba(96,165,250,.08);min-height:76px}
 .overview-card-h{min-height:54px;display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);min-width:0}
+.overview-card-h:hover{background:rgba(255,255,255,.025)}
 .overview-icon{width:28px;height:28px;display:grid;place-items:center;background:var(--row);border:1px solid var(--border);border-radius:8px;padding:5px;flex-shrink:0}
 .overview-title{font-size:15px;font-weight:750;letter-spacing:0;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .overview-meta{font-size:12px;color:var(--muted);flex-shrink:0}
+.overview-card-toggle{width:18px;height:18px;display:grid;place-items:center;color:var(--muted);transition:transform .16s ease,color .16s ease;flex-shrink:0}
+.overview-card-h:hover .overview-card-toggle{color:var(--text)}
+.overview-card.collapsed .overview-card-toggle{transform:rotate(-90deg)}
+.overview-card.collapsed .overview-list{display:none}
 .overview-card .csum{border-bottom:1px solid var(--border);padding:10px;background:rgba(0,0,0,.08);grid-template-columns:repeat(auto-fit,minmax(92px,1fr))}
 .overview-card .csum-item{min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.overview-card .hc-csum .csum-item{padding:9px 10px;align-items:center;justify-content:center}
+.overview-card .sb-csum{display:grid;grid-template-columns:repeat(auto-fit,minmax(70px,1fr));gap:0;padding:10px 14px 8px;border-bottom:0;background:transparent;text-align:center}
+.overview-card .sb-csum-item{min-width:0;min-height:0;padding:7px 8px;display:flex;flex-direction:column;align-items:center!important;justify-content:center!important;gap:3px;border:1px solid var(--border);background:transparent!important;border-radius:0;text-align:center;margin:-1px 0 0 -1px}
+.overview-card .sb-csum-val{font-size:20px;line-height:1;font-weight:850;white-space:nowrap;overflow:visible;text-overflow:clip}
+.overview-card .sb-csum-lbl{font-size:10px;line-height:1;margin-top:0;min-height:0;display:block;letter-spacing:.06em;white-space:nowrap}
 html[data-theme="light"] .overview-card .csum-item{background:#eef1f6;border-color:#dde7f3}
+html[data-theme="light"] .overview-card[data-id="healthchecks"] .sb-csum,
+html[data-theme="light"] .overview-card[data-id="database"] .sb-csum{background:transparent}
+html[data-theme="light"] .overview-card .sb-csum-item{background:transparent!important;border-color:#d6deea}
 .overview-list{padding:6px 0}
 .overview-list.is-scroll{max-height:260px;overflow-y:auto}
 .overview-row{display:flex;align-items:center;gap:10px;padding:10px 14px;border-top:1px solid var(--border);min-width:0;cursor:pointer}
@@ -508,14 +534,15 @@ html[data-theme="light"] .overview-card .csum-item{background:#eef1f6;border-col
   .shell .sb-icon svg{width:20px;height:20px;display:block;margin:auto}
   .shell .sb-main,.shell .sb-badge-wrap{display:none}
   .overview-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .overview-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media (max-width:760px){
   .topbar{padding:0 14px;gap:8px}
   .search,#lupd,#pbtn-lbl,.pubstatus span{display:none}
   .pubstatus{padding:0;width:36px;height:36px;justify-content:center}
   .overview{padding:14px}
-  .overview-head{display:block}
   .overview-kpis,.overview-layout{grid-template-columns:1fr}
+  .overview-grid{grid-template-columns:1fr}
 }
 
 </style>
@@ -643,6 +670,8 @@ const snmpOpen = {};
 const k8sGrpOpen = {};
 const overviewK8sOpen = { pods:true, deps:false, svcs:false };
 const dockerOpen = {};
+let overviewCardCollapsed = {};
+try { overviewCardCollapsed = JSON.parse(localStorage.getItem('os_overview_card_collapsed') || '{}'); } catch {}
 let notifyOff = new Set();
 const BELL_ON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>';
 const BELL_OFF = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13.73 21a2 2 0 0 1-3.46 0"/><path d="M18.63 13A17.89 17.89 0 0 1 18 8"/><path d="M6.26 6.26A5.86 5.86 0 0 0 6 8c0 7-3 9-3 9h14"/><path d="M18 8a6 6 0 0 0-9.33-5"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
@@ -686,6 +715,15 @@ window.setTimeLimit = function(id, val) {
   if (window._lastData) render(window._lastData);
 };
 
+let overviewKpiPlatforms = {};
+try { overviewKpiPlatforms = JSON.parse(localStorage.getItem('os_overview_kpi_platforms') || '{}'); } catch {}
+window.setOverviewKpiPlatform = function(metric, platform) {
+  overviewKpiPlatforms[metric] = platform || 'all';
+  try { localStorage.setItem('os_overview_kpi_platforms', JSON.stringify(overviewKpiPlatforms)); } catch {}
+  clearOverviewCache();
+  if (window._lastData) render(window._lastData);
+};
+
 const UO_KEY = 'os_user_override';
 let userOverride = {};
 try { userOverride = JSON.parse(localStorage.getItem(UO_KEY) || '{}'); } catch {}
@@ -696,7 +734,7 @@ function setOverride(key, val) {
 
 let activePanel = null;
 
-const ALL_IDS = ['proxmox','kubernetes','linux','snmp','healthchecks','docker','database'];
+const ALL_IDS = ['proxmox','kubernetes','linux','snmp','healthchecks','uptimekuma','docker','database'];
 
 const SEC_ICONS = {
   proxmox:     () => `<span class="sec-glyph" style="font-size:15px">🖧</span>`,
@@ -704,6 +742,7 @@ const SEC_ICONS = {
   kubernetes:  () => `<span class="sec-glyph" style="font-size:15px">⎈</span>`,
   snmp:        (c) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4.03 3 9 3s9-1.34 9-3"/></svg>`,
   healthchecks:(c) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>`,
+  uptimekuma:  (c) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12c2.8-4.7 5.8-7 9-7s6.2 2.3 9 7c-2.8 4.7-5.8 7-9 7s-6.2-2.3-9-7Z"/><path d="M8 12h2l1.5-3 2.5 6 1.5-3H16"/></svg>`,
   docker:      () => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2496ed" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="9" width="4" height="4" rx="1"/><rect x="7" y="9" width="4" height="4" rx="1"/><rect x="12" y="9" width="4" height="4" rx="1"/><rect x="7" y="4" width="4" height="4" rx="1"/><rect x="12" y="4" width="4" height="4" rx="1"/><path d="M22 11c-.5-3-3-4-6-4"/><path d="M2 13c1 4 5 5 9 5h3c4 0 6-2 6-5"/></svg>`,
   database:    (c) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>`,
 };
@@ -734,6 +773,7 @@ const PLATFORM_META = {
   linux:       { title:'Linux Servers', iconKey:'linux',       color:'var(--green)' },
   snmp:        { title:'SNMP',          iconKey:'snmp',        color:'var(--yellow)' },
   healthchecks:{ title:'Healthchecks',  iconKey:'healthchecks',color:'var(--green)' },
+  uptimekuma:  { title:'Uptime Kuma',   iconKey:'uptimekuma',  color:'var(--green)' },
   docker:      { title:'Docker',        iconKey:'docker',      color:'var(--blue)' },
   database:    { title:'Databases',     iconKey:'database',     color:'var(--blue)' },
 };
@@ -766,13 +806,14 @@ function skeletonPanel(id){
 }
 function applyConfigured(ids, cfg){
   setConfiguredIds(ids);
-  const d = window._lastData || { timestamp:new Date().toISOString(), proxmox:{nodes:[]}, linux:[], kubernetes:null, snmp:[], healthchecks:null, docker:[], database:[] };
+  const d = window._lastData || { timestamp:new Date().toISOString(), proxmox:{nodes:[]}, linux:[], kubernetes:null, snmp:[], healthchecks:null, uptimekuma:null, docker:[], database:[] };
   d.configured = ids;
   if(!ids.includes('proxmox')) d.proxmox = { clusterSummary:null, nodes:[] };
   if(!ids.includes('linux')) d.linux = [];
   if(!ids.includes('kubernetes')) d.kubernetes = null;
   if(!ids.includes('snmp')) d.snmp = [];
   if(!ids.includes('healthchecks')) d.healthchecks = null;
+  if(!ids.includes('uptimekuma')) d.uptimekuma = null;
   if(!ids.includes('docker')) d.docker = [];
   if(!ids.includes('database')) d.database = [];
   if(cfg){
@@ -795,6 +836,9 @@ function applyConfigured(ids, cfg){
       if(!d.kubernetes || !d.kubernetes.online) {
         d.kubernetes = { _connecting: true, online: false };
       }
+    }
+    if(ids.includes('uptimekuma') && !d.uptimekuma){
+      d.uptimekuma = { _connecting: true, online: false, summary: { total: 0, up: 0, down: 0, pending: 0, maintenance: 0, unknown: 0 }, monitors: [] };
     }
   }
   render(d);
@@ -1699,6 +1743,85 @@ function buildHealthchecks(hc){
   };
 }
 
+/* ── Uptime Kuma ── */
+function uptimeBars(history, currentStatus){
+  const source = Array.isArray(history) && history.length
+    ? history.slice(-36)
+    : Array.from({ length: 36 }, () => ({ status: currentStatus || 'unknown' }));
+  return `<div class="uk-bars">${source.map(h => {
+    const st = h?.status || currentStatus || 'unknown';
+    const cls = st === 'up' ? 'up' : st === 'down' ? 'down' : (st === 'pending' || st === 'unknown') ? 'warn' : st;
+    const title = [st, h?.time ? new Date(h.time).toLocaleString() : '', h?.ping != null ? `${h.ping} ms` : ''].filter(Boolean).join(' · ');
+    return `<span class="uk-bar ${cls}" title="${escAttr(title)}"></span>`;
+  }).join('')}</div>`;
+}
+function buildUptimeKuma(uk){
+  if(!uk) return null;
+  if(uk._connecting) return null;
+  const {online, summary:s={}, monitors=[]} = uk;
+  const down = s.down??0;
+  const warn = (s.pending??0) + (s.unknown??0);
+  const maint = s.maintenance??0;
+
+  const sbSummaryHtml = online ? `<div class="sb-csum">
+    <div class="sb-csum-item"><div class="sb-csum-val">${s.total??0}</div><div class="sb-csum-lbl">Total</div></div>
+    <div class="sb-csum-item"><div class="sb-csum-val" style="color:var(--green)">${s.up??0}</div><div class="sb-csum-lbl">Up</div></div>
+    <div class="sb-csum-item"><div class="sb-csum-val" style="color:${down>0?'var(--red)':'var(--muted)'}">${down}</div><div class="sb-csum-lbl">Down</div></div>
+    <div class="sb-csum-item"><div class="sb-csum-val" style="color:${warn>0?'var(--yellow)':'var(--muted)'}">${warn}</div><div class="sb-csum-lbl">Pending</div></div>
+    <div class="sb-csum-item"><div class="sb-csum-val" style="color:var(--muted)">${maint}</div><div class="sb-csum-lbl">Maint</div></div>
+  </div>` : `<div class="sb-csum"><div class="sb-csum-item"><div class="sb-csum-val" style="color:var(--red)">✕</div><div class="sb-csum-lbl">Unreachable</div></div></div>`;
+
+  const summaryHtml = online ? `<div class="csum hc-csum">
+    <div class="csum-item"><div class="csum-val">${s.total??0}</div><div class="csum-lbl">Total</div></div>
+    <div class="csum-item"><div class="csum-val" style="color:var(--green)">${s.up??0}</div><div class="csum-lbl">Up</div></div>
+    <div class="csum-item"><div class="csum-val" style="color:${down>0?'var(--red)':'var(--muted)'}">${down}</div><div class="csum-lbl">Down</div></div>
+    <div class="csum-item"><div class="csum-val" style="color:${warn>0?'var(--yellow)':'var(--muted)'}">${warn}</div><div class="csum-lbl">Pending</div></div>
+    <div class="csum-item"><div class="csum-val" style="color:var(--muted)">${maint}</div><div class="csum-lbl">Maint</div></div>
+  </div>` : '';
+
+  const colHdr = `<div style="display:flex;align-items:center;gap:10px;padding:7px 16px;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);border-bottom:1px solid var(--border)">
+    <div style="width:10px;flex-shrink:0"></div>
+    <span style="flex:1;min-width:0">Monitor</span>
+    <span style="width:120px;flex-shrink:0">Last Heartbeat</span>
+    <span style="width:70px;flex-shrink:0">Ping</span>
+    <span style="width:96px;flex-shrink:0">Status</span>
+  </div>`;
+  const statusColor = st => st==='up'?'green':st==='down'?'red':(st==='pending'||st==='unknown')?'yellow':'gray';
+  const dotColor = st => st==='up'?'md-green':st==='down'?'md-red':(st==='pending'||st==='unknown')?'md-yellow':'md-gray';
+  const body = !online
+    ? `<div class="offline-row">
+        <div class="mon-dot md-red"></div>
+        <div>Uptime Kuma unreachable<div class="offline-err">${uk.error||''}</div></div>
+       </div>`
+    : `<div id="uk-monitors">
+        ${monitors.length?colHdr:''}
+        ${monitors.map(m=>`<div class="mon-row uk-mon-row">
+          <div class="uk-mon-top">
+            <div class="mon-dot ${dotColor(m.status)}"></div>
+            <div class="mon-name" style="flex:1;width:0;min-width:0" title="${escAttr(m.name)}">${escHtml(m.name)}</div>
+            <span style="width:120px;flex-shrink:0;font-size:13px;color:var(--muted)">${m.lastPing?relTime(m.lastPing):'—'}</span>
+            <span style="width:70px;flex-shrink:0;font-size:13px;color:var(--muted)">${m.ping!=null?`${m.ping} ms`:'—'}</span>
+            <span style="width:96px;flex-shrink:0"><span class="badge bg-${statusColor(m.status)}" style="font-size:13px">${m.status}</span></span>
+            ${notifyBell('uk:'+m.name)}
+          </div>
+          <div class="uk-mon-bars">${uptimeBars(m.history, m.status)}</div>
+        </div>`).join('')}
+        ${!monitors.length?'<div class="empty">No monitors found</div>':''}
+      </div>`;
+
+  return {
+    id: 'uptimekuma',
+    title: 'Uptime Kuma',
+    iconKey: 'uptimekuma',
+    color: 'var(--green)',
+    meta: online?`${s.up??0}/${s.total??0} up`:'',
+    badge: bdg(online?(down>0?'red':warn>0?'yellow':'green'):'red', online?(down>0?`${down} down`:warn>0?`${warn} pending`:'healthy'):'unreachable'),
+    sbSummary: sbSummaryHtml,
+    summary: '',
+    body,
+  };
+}
+
 /* ── Docker ── */
 function buildDocker(docker){
   if(!docker?.length) return null;
@@ -1999,9 +2122,11 @@ function saveOverviewLayout(grid){
   savePanelOrder(cols.flat());
 }
 function overviewColCount(grid){
-  const gap = 14, minWidth = 340, totalWidth = grid.clientWidth;
-  if(totalWidth <= 0) return 1;
-  return Math.max(1, Math.floor((totalWidth + gap) / (minWidth + gap)));
+  const cols = getComputedStyle(grid).gridTemplateColumns
+    .split(' ')
+    .filter(v => v && v !== 'none');
+  if(cols.length) return cols.length;
+  return 1;
 }
 function normalizeOverviewColumns(ids, colCount, fallbackCards = []){
   const idSet = new Set(ids);
@@ -2081,9 +2206,11 @@ function initOverviewDrag(){
   grid.addEventListener('pointerdown', e => {
     const card = e.target.closest('.overview-card');
     if(!card) return;
+    if(e.target.closest('.overview-group-title,.overview-row,.os-sel,button,a,input,select,textarea')) return;
     if(e.button != null && e.button !== 0) return;
     if(!grid.querySelector('.overview-col')) layoutOverviewMasonry();
     const box = card.getBoundingClientRect();
+    const header = e.target.closest('.overview-card-h');
     drag = {
       card,
       id: e.pointerId,
@@ -2093,6 +2220,7 @@ function initOverviewDrag(){
       offsetY: e.clientY - box.top,
       box,
       active: false,
+      header,
       placeholder: document.createElement('div'),
     };
     drag.placeholder.className = 'overview-placeholder';
@@ -2126,7 +2254,7 @@ function initOverviewDrag(){
     if(e._overviewDropHandled) return;
     e._overviewDropHandled = true;
     if(!drag || e.pointerId !== drag.id) return;
-    const { card, placeholder } = drag;
+    const { card, placeholder, header } = drag;
     card.releasePointerCapture?.(e.pointerId);
     if(drag.active){
       placeholder.replaceWith(card);
@@ -2134,6 +2262,8 @@ function initOverviewDrag(){
       card.style.cssText = '';
       saveOverviewLayout(grid);
       setTimeout(() => { window._overviewDragging = false; }, 120);
+    } else if(header) {
+      toggleOverviewCard(card.dataset.id, e, header);
     }
     drag = null;
   };
@@ -2160,7 +2290,7 @@ function iconFallback(img, iconKey, color){
   span.innerHTML = html;
   img.replaceWith(span);
 }
-const DEFAULT_ICON = { proxmox:'proxmox', kubernetes:'kubernetes', healthchecks:'healthchecks', docker:'docker' };
+const DEFAULT_ICON = { proxmox:'proxmox', kubernetes:'kubernetes', healthchecks:'healthchecks', uptimekuma:'uptime-kuma', docker:'docker' };
 function platformIcon(panel){
   const name = (window._lastData?.icons||{})[panel.id] || DEFAULT_ICON[panel.id];
   const url = iconUrl(name);
@@ -2178,12 +2308,46 @@ function sidebarCard(panel, isActive){
       <div class="sb-icon">${iconSvg}</div>
       <div class="sb-main">
         <span class="sb-title">${panel.title}</span>
-        ${meta?`<span class="sb-meta">${meta}</span>`:''}
+        <span class="sb-meta" style="${meta?'':'display:none'}">${meta}</span>
       </div>
       <span class="sb-badge-wrap" style="flex-shrink:0;margin-left:4px">${panel.badge}</span>
     </div>
-    ${panel.sbSummary?`<div class="sb-summary">${panel.sbSummary}</div>`:''}
+    <div class="sb-summary" style="${panel.sbSummary?'':'display:none'}">${panel.sbSummary||''}</div>
   </div>`;
+}
+function updateSidebarCard(card, panel, isActive){
+  card.classList.toggle('active', !!isActive);
+  card.title = panel.title || '';
+  const title = card.querySelector('.sb-title');
+  if(title && title.textContent !== panel.title) title.textContent = panel.title;
+  const metaText = panel.meta || panel.sbMeta || '';
+  const meta = card.querySelector('.sb-meta');
+  if(meta){
+    meta.style.display = metaText ? '' : 'none';
+    if(meta.textContent !== metaText) meta.textContent = metaText;
+  }
+  const badge = card.querySelector('.sb-badge-wrap');
+  if(badge && badge.innerHTML !== panel.badge) badge.innerHTML = panel.badge;
+  const summary = card.querySelector('.sb-summary');
+  if(summary){
+    const html = panel.sbSummary || '';
+    summary.style.display = html ? '' : 'none';
+    if(summary.innerHTML !== html) summary.innerHTML = html;
+  }
+}
+function renderSidebar(ids, panels, activeId){
+  const sidebar = document.getElementById('sidebar');
+  const key = ids.join('|');
+  if(sidebar.dataset.ids !== key){
+    sidebar.innerHTML = ids.map(id => sidebarCard(panels[id], id === activeId)).join('');
+    sidebar.dataset.ids = key;
+    sidebar.dataset.html = '';
+    return;
+  }
+  ids.forEach(id => {
+    const card = document.getElementById(`sbcard-${id}`);
+    if(card) updateSidebarCard(card, panels[id], id === activeId);
+  });
 }
 
 function avgPct(vals){
@@ -2191,24 +2355,105 @@ function avgPct(vals){
   if(!vals.length) return null;
   return Math.round(vals.reduce((a,b)=>a+b,0) / vals.length);
 }
-function overviewKpi(label, value, sub, color){
+function platformKpiLabel(id, panels){
+  if(id === 'all') return 'All platforms';
+  if(id === 'snmp') return 'Network devices';
+  return panels?.[id]?.title || id;
+}
+function overviewKpiOptions(metric, ids, panels){
+  const supported = {
+    cpu: ['proxmox','linux','snmp','docker'],
+    mem: ['proxmox','linux','snmp','docker'],
+    disk: ['linux'],
+    bandwidth: ['linux','snmp'],
+  }[metric] || [];
+  return ['all', ...ids.filter(id => supported.includes(id))].map(id => ({ id, label: platformKpiLabel(id, panels) }));
+}
+function drawOverviewKpiSelect(metric, current, options){
+  if(!options.some(o => o.id === current)) current = 'all';
+  const cur = options.find(o => o.id === current) || options[0];
+  const optsHtml = options.map(o =>
+    `<div class="os-sel-opt ${o.id === current ? 'active' : ''}" onclick="setOverviewKpiPlatform('${metric}','${o.id}')">${escHtml(o.label)}</div>`
+  ).join('');
+  return `<div class="os-sel" onclick="event.stopPropagation()">
+    <div class="os-sel-btn" onclick="openOsSel(this)" title="${escAttr(cur.label)}">
+      <span>${escHtml(cur.label)}</span>
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <div class="os-sel-menu">${optsHtml}</div>
+  </div>`;
+}
+function kpiPct(label, vals){
+  const nums = vals.filter(v => hasNum(v)).map(Number);
+  const avg = avgPct(nums);
+  return {
+    value: avg == null ? '--' : `${avg}%`,
+    sub: nums.length ? `${nums.length} ${label}${nums.length===1?'':'s'}` : 'Not reported',
+    color: avg == null ? 'var(--muted)' : bc(avg),
+  };
+}
+function kpiRate(label, vals){
+  const nums = vals.filter(v => hasNum(v)).map(Number);
+  const total = nums.reduce((a,b)=>a+b,0);
+  return {
+    value: total ? fmtRate(total) : '--',
+    sub: nums.length ? label : 'Not reported',
+    color: nums.length ? 'var(--cyan)' : 'var(--muted)',
+  };
+}
+function overviewKpiMetric(data, metric, platform){
+  const linuxOnline = (data.linux||[]).filter(s=>s.online);
+  const snmpOnline = (data.snmp||[]).filter(s=>s.online);
+  const pveOnline = (data.proxmox?.nodes||[]).map(n=>n.node||n).filter(n=>n.online);
+  const dockerOnline = (data.docker||[]).filter(h=>h.online);
+  const cpu = {
+    proxmox: pveOnline.map(n=>n.cpu),
+    linux: linuxOnline.map(s=>s.cpu),
+    snmp: snmpOnline.map(s=>s.cpu),
+    docker: dockerOnline.map(h=>h.summary?.cpu),
+  };
+  const mem = {
+    proxmox: pveOnline.map(n=>n.memPct ?? n.ram?.percent),
+    linux: linuxOnline.map(s=>s.ram?.percent),
+    snmp: snmpOnline.map(s=>s.ram?.percent),
+    docker: dockerOnline.map(h=>h.summary?.memPercent),
+  };
+  const disk = {
+    linux: linuxOnline.map(s=>(Number(s.metrics?.diskIO?.readBps)||0)+(Number(s.metrics?.diskIO?.writeBps)||0)),
+  };
+  const bandwidth = {
+    linux: linuxOnline.map(s=>(Number(s.metrics?.bandwidth?.rxBps)||0)+(Number(s.metrics?.bandwidth?.txBps)||0)),
+    snmp: snmpOnline.map(dev => (dev.network||[]).reduce((a,n)=>a+(Number(n.rxMBps)||0)*1024*1024+(Number(n.txMBps)||0)*1024*1024,0)),
+  };
+  const allVals = obj => Object.values(obj).flat();
+  if(metric === 'cpu') return kpiPct('reporting source', platform === 'all' ? allVals(cpu) : (cpu[platform] || []));
+  if(metric === 'mem') return kpiPct('reporting source', platform === 'all' ? allVals(mem) : (mem[platform] || []));
+  if(metric === 'disk') return kpiRate('Read and write combined', platform === 'all' ? allVals(disk) : (disk[platform] || []));
+  if(metric === 'bandwidth') return { ...kpiRate('Inbound plus outbound', platform === 'all' ? allVals(bandwidth) : (bandwidth[platform] || [])), color: 'var(--green)' };
+  return { value:'--', sub:'Not reported', color:'var(--muted)' };
+}
+function overviewKpi(metric, label, data, ids, panels){
+  const options = overviewKpiOptions(metric, ids, panels);
+  const current = options.some(o => o.id === overviewKpiPlatforms[metric]) ? overviewKpiPlatforms[metric] : 'all';
+  const stat = overviewKpiMetric(data, metric, current);
   return `<div class="overview-kpi">
-    <div class="overview-kpi-head"><span>${label}</span><span class="mon-dot" style="background:${color||'var(--blue)'}"></span></div>
-    <div class="overview-kpi-value" style="color:${color||'var(--text)'}">${value}</div>
-    <div class="overview-kpi-sub">${sub||''}</div>
+    <div class="overview-kpi-head"><span>${label}</span>${drawOverviewKpiSelect(metric, current, options)}</div>
+    <div class="overview-kpi-value" style="color:${stat.color||'var(--text)'}">${stat.value}</div>
+    <div class="overview-kpi-sub">${stat.sub||''}</div>
   </div>`;
 }
 function escAttr(s){ return escHtml(s).replace(/"/g,'&quot;'); }
 function jsStr(s){
   return `'${String(s ?? '').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\r/g,'\\r').replace(/\n/g,'\\n')}'`;
 }
-function overviewRow(panelId, name, sub, badgeCls, badgeTxt, dotCls, action){
+function overviewRow(panelId, name, sub, badgeCls, badgeTxt, dotCls, action, extraHtml=''){
   const click = action || `selectPanel('${panelId}')`;
-  return `<div class="overview-row" onclick="${escAttr(click)}">
+  return `<div class="overview-row" onclick="event.stopPropagation();${escAttr(click)}">
     <div class="mon-dot ${dotCls||'md-green'}"></div>
     <div class="overview-row-main">
       <div class="overview-row-name" title="${escAttr(name||'')}">${escHtml(name||'')}</div>
       <div class="overview-row-sub" title="${escAttr(sub||'')}">${escHtml(sub||'')}</div>
+      ${extraHtml}
     </div>
     ${bdg(badgeCls||'green', badgeTxt||'ok')}
   </div>`;
@@ -2216,11 +2461,11 @@ function overviewRow(panelId, name, sub, badgeCls, badgeTxt, dotCls, action){
 function overviewGroup(gid, title, rows, emptyText){
   const open = !!overviewK8sOpen[gid];
   return `<div class="overview-group ${open?'open':''}" id="ov-k8s-${gid}">
-    <div class="overview-group-title" onclick="toggleOverviewGroup('${gid}')">
+    <div class="overview-group-title" onclick="event.stopPropagation();toggleOverviewGroup('${gid}')">
       <span>${title}</span>
       <span class="chevron">&rsaquo;</span>
     </div>
-    <div class="overview-group-body">${rows || `<div class="overview-empty">${emptyText}</div>`}</div>
+    <div class="overview-group-body" data-scroll-key="k8s-${gid}">${rows || `<div class="overview-empty">${emptyText}</div>`}</div>
   </div>`;
 }
 function overviewRows(id, data){
@@ -2266,6 +2511,14 @@ function overviewRows(id, data){
       const cls = c.status==='up'?'green':c.status==='down'?'red':c.status==='grace'?'yellow':'gray';
       const dot = c.status==='up'?'md-green':c.status==='down'?'md-red':c.status==='grace'?'md-yellow':'md-gray';
       return overviewRow('healthchecks', c.name, c.lastPing?`Last ping ${relTime(c.lastPing)}`:'No last ping', cls, c.status||'unknown', dot);
+    }).join('');
+  }
+  if(id === 'uptimekuma'){
+    return (data.uptimekuma?.monitors||[]).map(m => {
+      const cls = m.status==='up'?'green':m.status==='down'?'red':m.status==='pending'||m.status==='unknown'?'yellow':'gray';
+      const dot = m.status==='up'?'md-green':m.status==='down'?'md-red':m.status==='pending'||m.status==='unknown'?'md-yellow':'md-gray';
+      const sub = [m.group, m.lastPing?`Last ${relTime(m.lastPing)}`:'No heartbeat', m.ping!=null?`${m.ping} ms`:'' ].filter(Boolean).join(' · ');
+      return overviewRow('uptimekuma', m.name, sub, cls, m.status||'unknown', dot, null, `<div class="overview-uk-bars">${uptimeBars(m.history, m.status)}</div>`);
     }).join('');
   }
   if(id === 'kubernetes'){
@@ -2319,6 +2572,8 @@ function activeAlerts(data){
   });
   const hc = data.healthchecks;
   (hc?.checks||[]).filter(c=>c.status==='down'||c.status==='grace').forEach(c=>out.push([c.status==='grace'?'Healthcheck grace':'Healthcheck down', c.name || c.slug]));
+  const uk = data.uptimekuma;
+  (uk?.monitors||[]).filter(m=>m.status==='down').forEach(m=>out.push(['Uptime Kuma down', m.name || m.id]));
   (data.database||[]).forEach(d => { if(!d._connecting && !d.online) out.push(['Database offline', d.name]); });
   const k = data.kubernetes;
   if(k?.online && (k.pods||[]).some(p=>p.failed)) out.push(['Kubernetes pod issue', `${(k.pods||[]).filter(p=>p.failed).length} failed`]);
@@ -2329,7 +2584,7 @@ function overviewSide(data){
   const alertRows = alerts.length ? alerts.map(([t,m])=>`<div class="overview-side-row"><div class="mon-dot md-red" style="margin-top:4px"></div><div class="overview-side-msg"><strong>${escHtml(t)}</strong>${escHtml(m||'')}</div></div>`).join('') : '<div class="overview-empty">No active alerts</div>';
   return `<aside class="overview-side">
     <section class="overview-side-card"><div class="overview-side-h">Active alerts</div>${alertRows}</section>
-    <section class="overview-side-card"><div class="overview-side-h">Recent logs</div><div id="recent-logs" class="overview-log-list"><div class="overview-empty">Loading logs…</div></div></section>
+    <section class="overview-side-card"><div class="overview-side-h">Recent logs</div><div id="recent-logs" class="overview-log-list" data-scroll-key="recent-logs"><div class="overview-empty">Loading logs…</div></div></section>
   </aside>`;
 }
 function overviewLogTime(ts){
@@ -2343,60 +2598,129 @@ async function loadRecentLogs(){
     const r = await fetch('/api/logs', { headers: authHeaders() });
     handleUnauth(r);
     const logs = (await r.json()).sort((a,b)=>b.t-a.t).slice(0,80);
+    const sig = logs.map(l => `${l.t}:${l.level}:${l.msg}`).join('|');
+    if(el.dataset.sig === sig) return;
+    if(el.dataset.sig && overviewScrollLocked(document.getElementById('detail'))) return;
+    const oldTop = el.scrollTop;
     el.innerHTML = logs.length ? logs.map(l=>`<div class="overview-side-row"><span class="badge bg-${l.level==='error'?'red':l.level==='warn'?'yellow':'gray'}" style="font-size:10px">${escHtml(l.level)}</span><div class="overview-log-time">${overviewLogTime(l.t)}</div><div class="overview-side-msg">${escHtml(l.msg||'')}</div></div>`).join('') : '<div class="overview-empty">No recent logs</div>';
+    el.dataset.sig = sig;
+    el.scrollTop = oldTop;
   }catch(e){ if(e.message!=='Unauthorized') el.innerHTML = '<div class="overview-empty">Could not load logs</div>'; }
 }
+function initOverviewScrollHold(root){
+  if(!root || root.dataset.scrollHoldReady) return;
+  root.dataset.scrollHoldReady = '1';
+  root.addEventListener('scroll', e => {
+    if(e.target?.dataset?.scrollKey) window._overviewScrollHoldUntil = Date.now() + 3500;
+  }, true);
+}
+function initPageScrollHold(){
+  if(window._pageScrollHoldReady) return;
+  window._pageScrollHoldReady = true;
+  window.addEventListener('scroll', () => { window._pageScrollHoldUntil = Date.now() + 3500; }, { passive: true });
+}
+function pageScrollLocked(){
+  initPageScrollHold();
+  const y = window.scrollY || document.documentElement.scrollTop || 0;
+  return y > 0 && Date.now() < (window._pageScrollHoldUntil || 0);
+}
+function capturePageScroll(){
+  return { x: window.scrollX || document.documentElement.scrollLeft || 0, y: window.scrollY || document.documentElement.scrollTop || 0 };
+}
+function restorePageScroll(pos){
+  if(!pos || (!pos.x && !pos.y)) return;
+  requestAnimationFrame(() => {
+    const maxY = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+    window.scrollTo(pos.x, Math.min(pos.y, maxY));
+  });
+}
+function overviewScrollLocked(root){
+  if(pageScrollLocked()) return true;
+  if(Date.now() < (window._overviewScrollHoldUntil || 0)) return true;
+  return !!root?.querySelector('[data-scroll-key]') &&
+    Array.from(root.querySelectorAll('[data-scroll-key]')).some(el => el.scrollTop > 0);
+}
+function captureOverviewScroll(root){
+  const out = {};
+  root?.querySelectorAll('[data-scroll-key]').forEach(el => { out[el.dataset.scrollKey] = el.scrollTop; });
+  return out;
+}
+function restoreOverviewScroll(root, state){
+  if(!state) return;
+  root?.querySelectorAll('[data-scroll-key]').forEach(el => {
+    if(Object.prototype.hasOwnProperty.call(state, el.dataset.scrollKey)) el.scrollTop = state[el.dataset.scrollKey];
+  });
+}
+function toggleOverviewCard(id, event, headerEl){
+  event?.stopPropagation?.();
+  if(window._overviewDragging) return;
+  overviewCardCollapsed[id] = !overviewCardCollapsed[id];
+  try { localStorage.setItem('os_overview_card_collapsed', JSON.stringify(overviewCardCollapsed)); } catch {}
+  const card = headerEl?.closest?.('.overview-card') || document.querySelector(`.overview-card[data-id="${id}"]`);
+  if(card){
+    card.classList.toggle('collapsed', !!overviewCardCollapsed[id]);
+    const header = card.querySelector('.overview-card-h');
+    const title = card.querySelector('.overview-title')?.textContent || id;
+    if(header) header.title = `${overviewCardCollapsed[id] ? 'Expand' : 'Collapse'} ${title}`;
+  }
+  requestAnimationFrame(layoutOverviewMasonry);
+}
 function renderDashboardOverview(data, ids, panels){
-  const linuxOnline = (data.linux||[]).filter(s=>s.online);
-  const snmpOnline = (data.snmp||[]).filter(s=>s.online);
-  const cpuSources = [...linuxOnline.map(s=>s.cpu), ...snmpOnline.map(s=>s.cpu)];
-  const memSources = [...linuxOnline.map(s=>s.ram?.percent), ...snmpOnline.map(s=>s.ram?.percent)];
-  const cpuAvg = avgPct(cpuSources);
-  const memAvg = avgPct(memSources);
-  const diskBps = linuxOnline.reduce((a,s)=>a+(Number(s.metrics?.diskIO?.readBps)||0)+(Number(s.metrics?.diskIO?.writeBps)||0),0);
-  const snmpBwBps = snmpOnline.reduce((sum,dev)=>sum+(dev.network||[]).reduce((a,n)=>a+(Number(n.rxMBps)||0)*1024*1024+(Number(n.txMBps)||0)*1024*1024,0),0);
-  const bwBps = linuxOnline.reduce((a,s)=>a+(Number(s.metrics?.bandwidth?.rxBps)||0)+(Number(s.metrics?.bandwidth?.txBps)||0),0) + snmpBwBps;
   const cards = ids.map(id => {
     const panel = panels[id];
     const iconSvg = platformIcon(panel);
     const title = id === 'snmp' ? 'Network devices' : panel.title;
     const rows = overviewRows(id, data);
-    return `<section class="overview-card" data-id="${id}">
-      <div class="overview-card-h" onclick="if(window._overviewDragging)return;selectPanel('${id}')" style="cursor:pointer">
+    const collapsed = !!overviewCardCollapsed[id];
+    return `<section class="overview-card ${collapsed?'collapsed':''}" data-id="${id}">
+      <div class="overview-card-h" style="cursor:pointer" title="${collapsed?'Expand':'Collapse'} ${escAttr(title)}">
         <div class="overview-icon">${iconSvg}</div>
         <div class="overview-title">${title}</div>
         ${panel.meta?`<div class="overview-meta">${panel.meta}</div>`:''}
         ${panel.badge}
+        <div class="overview-card-toggle"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></div>
       </div>
-      ${panel.summary || panel.sbSummary || ''}
-      <div class="overview-list ${['healthchecks','database'].includes(id)?'is-scroll':''}">${rows || '<div class="overview-empty">No rows to show yet</div>'}</div>
+      ${panel.sbSummary || ''}
+      <div class="overview-list ${['healthchecks','database'].includes(id)?'is-scroll':''}" data-scroll-key="overview-${id}">${rows || '<div class="overview-empty">No rows to show yet</div>'}</div>
     </section>`;
   }).join('');
   document.querySelectorAll('.sb-card.active').forEach(c=>c.classList.remove('active'));
-  document.getElementById('detail').innerHTML = `<section class="overview">
-    <div class="overview-head">
-      <div><h1>Operations overview</h1><div class="hint">Realtime host, container, network device and service health in one workspace.</div></div>
-      <span class="badge bg-blue">${ids.length} platform${ids.length===1?'':'s'}</span>
-    </div>
+  const detail = document.getElementById('detail');
+  initOverviewScrollHold(detail);
+  const scrollState = captureOverviewScroll(detail);
+  const html = `<section class="overview">
     <div class="overview-kpis">
-      ${overviewKpi('CPU usage', cpuAvg==null?'--':cpuAvg+'%', `${linuxOnline.length + snmpOnline.length} reporting source${linuxOnline.length + snmpOnline.length===1?'':'s'}`, cpuAvg==null?'var(--muted)':bc(cpuAvg))}
-      ${overviewKpi('Memory usage', memAvg==null?'--':memAvg+'%', 'Average reported memory', memAvg==null?'var(--muted)':bc(memAvg))}
-      ${overviewKpi('Disk I/O', diskBps?fmtRate(diskBps):'--', 'Read and write combined', 'var(--cyan)')}
-      ${overviewKpi('Bandwidth', bwBps?fmtRate(bwBps):'--', 'Inbound plus outbound', 'var(--green)')}
+      ${overviewKpi('cpu', 'CPU usage', data, ids, panels)}
+      ${overviewKpi('mem', 'Memory usage', data, ids, panels)}
+      ${overviewKpi('disk', 'Disk I/O', data, ids, panels)}
+      ${overviewKpi('bandwidth', 'Bandwidth', data, ids, panels)}
     </div>
     <div class="overview-layout">
       <div class="overview-grid">${cards}</div>
       ${overviewSide(data)}
     </div>
   </section>`;
-  initOverviewDrag();
-  requestAnimationFrame(layoutOverviewMasonry);
+  if(detail.dataset.overviewHtml !== html && !overviewScrollLocked(detail)){
+    detail.innerHTML = html;
+    detail.dataset.overviewHtml = html;
+    initOverviewScrollHold(detail);
+    initOverviewDrag();
+    requestAnimationFrame(() => {
+      layoutOverviewMasonry();
+      restoreOverviewScroll(detail, scrollState);
+    });
+  }
   loadRecentLogs();
+}
+function clearOverviewCache(){
+  const detail = document.getElementById('detail');
+  if(detail) detail.dataset.overviewHtml = '';
 }
 
 function selectPanel(id){
   embedOpen = false;
   dashboardOpen = false;
+  clearOverviewCache();
   setNavActive('nav-dashboard');
   activePanel = id;
   document.querySelectorAll('.sb-card').forEach(c=>c.classList.remove('active'));
@@ -2405,7 +2729,8 @@ function selectPanel(id){
   const panel = window._panels?.[id];
   if(!panel) return;
   const iconSvg = platformIcon(panel);
-  document.getElementById('detail').innerHTML = `
+  const detail = document.getElementById('detail');
+  const html = `
     <div class="det-hdr">
       <div class="det-icon">${iconSvg}</div>
       <span class="det-title">${panel.title}</span>
@@ -2413,6 +2738,11 @@ function selectPanel(id){
       ${panel.badge}
     </div>
     <div class="det-body">${panel.body}</div>`;
+  if(detail.dataset.panelId !== id || detail.dataset.panelHtml !== html){
+    detail.innerHTML = html;
+    detail.dataset.panelId = id;
+    detail.dataset.panelHtml = html;
+  }
   const data = window._lastData;
   if(!data) return;
 
@@ -2508,6 +2838,7 @@ function toggleOverviewGroup(grpId){
 
 /* ── Render ── */
 function render(data){
+  const pageScroll = capturePageScroll();
   window._lastData = data;
   if(Array.isArray(data.configured)) configuredIds = data.configured;
   if(Array.isArray(data.notifyDisabled)) notifyOff = new Set(data.notifyDisabled);
@@ -2529,6 +2860,8 @@ function render(data){
   if((data.snmp||[]).length){ if(data.snmp.some(d=>d._connecting)) platforms.push('connecting'); else { const o=data.snmp.filter(d=>d.online).length; platforms.push(o===0?'down':o<data.snmp.length?'degraded':'ok'); } }
   const hc=data.healthchecks;
   if(hc && (hc._connecting || hc.online!==undefined)){ platforms.push(hc._connecting?'connecting':(!hc.online?'down':((hc.summary?.down||0)>0||(hc.summary?.grace||0)>0?'degraded':'ok'))); }
+  const uk=data.uptimekuma;
+  if(uk && (uk._connecting || uk.online!==undefined)){ platforms.push(uk._connecting?'connecting':(!uk.online?'down':((uk.summary?.down||0)>0?'down':((uk.summary?.pending||0)>0||(uk.summary?.unknown||0)>0?'degraded':'ok')))); }
   if((data.docker||[]).length){ if(data.docker.some(h=>h._connecting)) platforms.push('connecting'); else { const o=data.docker.filter(h=>h.online).length; const stopped=data.docker.some(h=>h.online&&(h.summary?.stopped||0)>0); platforms.push(o===0?'down':(o<data.docker.length||stopped)?'degraded':'ok'); } }
   if((data.database||[]).length){ if(data.database.some(d=>d._connecting)) platforms.push('connecting'); }
 
@@ -2539,7 +2872,7 @@ function render(data){
   setFavicon(anyOff);
   setLogoDot(anyOff);
 
-  const dataHas={ proxmox:!!(data.proxmox?.nodes?.length), linux:!!((data.linux||[]).length), kubernetes:!!data.kubernetes, snmp:!!((data.snmp||[]).length), healthchecks:!!data.healthchecks, docker:!!((data.docker||[]).length), database:!!((data.database||[]).length) };
+  const dataHas={ proxmox:!!(data.proxmox?.nodes?.length), linux:!!((data.linux||[]).length), kubernetes:!!data.kubernetes, snmp:!!((data.snmp||[]).length), healthchecks:!!data.healthchecks, uptimekuma:!!data.uptimekuma, docker:!!((data.docker||[]).length), database:!!((data.database||[]).length) };
   const connectingCount=platformConnectingCount + configuredIds.filter(id=>id!=='linux'&&!dataHas[id]).length;
   window._connecting = connectingCount;
 
@@ -2570,6 +2903,7 @@ function render(data){
     linux:        () => buildLinux(data.linux),
     snmp:         () => buildSynology(data.snmp),
     healthchecks: () => buildHealthchecks(data.healthchecks),
+    uptimekuma:   () => buildUptimeKuma(data.uptimekuma),
     docker:       () => buildDocker(data.docker),
     database:     () => buildDatabase(data.database),
   };
@@ -2585,23 +2919,30 @@ function render(data){
   const ids = orderedIds(ALL_IDS.filter(id => panels[id]));
 
   if(embedOpen){
-    document.getElementById('sidebar').innerHTML = ids.map(id => sidebarCard(panels[id], false)).join('');
+    renderSidebar(ids, panels, null);
+    restorePageScroll(pageScroll);
     return;
   }
 
   if(!ids.length){
-    document.getElementById('sidebar').innerHTML = '';
+    const sidebar = document.getElementById('sidebar');
+    sidebar.innerHTML = '';
+    sidebar.dataset.html = '';
+    sidebar.dataset.ids = '';
     document.getElementById('detail').innerHTML = '<div class="empty" style="padding:48px">No data configured</div>';
+    restorePageScroll(pageScroll);
     return;
   }
 
-  document.getElementById('sidebar').innerHTML = ids.map(id => sidebarCard(panels[id], !dashboardOpen && id === activePanel)).join('');
+  renderSidebar(ids, panels, !dashboardOpen ? activePanel : null);
   if(dashboardOpen){
     renderDashboardOverview(data, ids, panels);
+    restorePageScroll(pageScroll);
     return;
   }
   if(!activePanel || !panels[activePanel]) activePanel = ids[0];
   selectPanel(activePanel);
+  restorePageScroll(pageScroll);
 }
 
 /* ── Sidebar resize ── */
@@ -2727,6 +3068,7 @@ function returnDashboard(){
   embedOpen = false;
   dashboardOpen = true;
   activePanel = null;
+  clearOverviewCache();
   setNavActive('nav-dashboard');
   if(window._lastData) render(window._lastData);
 }
@@ -2740,6 +3082,7 @@ function openEmbed(url){
   document.getElementById('menu-drop')?.classList.remove('open');
   embedOpen = true;
   dashboardOpen = false;
+  clearOverviewCache();
   setNavActive(navIdForUrl(url));
   activePanel = null;
   document.querySelectorAll('.sb-card.active').forEach(el => el.classList.remove('active'));
@@ -2856,12 +3199,12 @@ async function pollOnce(){
   if(paused) return;
   try{
     const data = await fetchStatus();
+    render(data);
     if(data.loading){
       clearTimeout(timer);
       timer = setTimeout(pollOnce, 1500);
       return;
     }
-    render(data);
   }catch{}
   if(window._connecting>0){ clearTimeout(timer); timer=setTimeout(pollOnce, 2000); return; }
   resetPbar();
@@ -2891,6 +3234,7 @@ async function initialLoad(){
   try {
     const data = await fetchStatus();
     render(data);
+    if(data.loading){ setTimeout(initialLoad, 1500); return; }
     if(data.loading || window._connecting>0){ setTimeout(initialLoad, 2000); return; }
     startPbar();
     scheduleRefresh();

@@ -41,6 +41,10 @@ healthchecks:
   url: "https://healthchecks.yourdomain.com"
   apiKey: "your-api-key-here"
 
+uptimekuma:
+  url: "https://kuma.yourdomain.com"
+  slug: "default"
+
 # Docker containers are reported by the same agent when docker is present on
 # the host (or run the agent itself as a container - see Settings -> Docker).
 docker:

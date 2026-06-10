@@ -1,7 +1,7 @@
 {
   "name": "omnisight",
-  "version": "1.0.7",
-  "description": "Agent-based monitoring dashboard for Proxmox, Linux servers, Docker, Kubernetes, SNMP devices, databases and Healthchecks",
+  "version": "1.1.0",
+  "description": "Agent-based monitoring dashboard for Proxmox, Linux servers, Docker, Kubernetes, SNMP devices, databases, Healthchecks and Uptime Kuma",
   "main": "server.js",
   "scripts": {
     "start": "node --openssl-legacy-provider server.js",

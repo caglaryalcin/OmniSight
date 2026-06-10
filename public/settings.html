@@ -380,6 +380,32 @@ html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#dd
 </div>
 
 
+<!-- Uptime Kuma -->
+<div class="card">
+  <div class="card-hdr">
+    <div class="card-left">
+      <div class="card-icon" id="dot-uptimekuma" style="background:var(--muted)"></div>
+      <span class="card-title">Uptime Kuma</span>
+    </div>
+    <label class="toggle"><input type="checkbox" id="en-uptimekuma" onchange="toggleCard('uptimekuma')"><span class="toggle-t"></span></label>
+  </div>
+  <div class="card-body hidden" id="cb-uptimekuma">
+    <div class="form-group"><label>Icon (optional)</label>
+      <div class="path-row">
+        <input type="text" id="icon-uptimekuma" placeholder="e.g. uptime-kuma — from dashboard-icons">
+        <button type="button" class="btn-sm" onclick="document.getElementById('icon-uptimekuma-f').click()">Browse…</button>
+        <input type="file" id="icon-uptimekuma-f" accept="image/*,.svg" style="display:none" onchange="uploadIcon(this,'icon-uptimekuma')">
+      </div>
+    </div>
+    <div class="form-grid">
+      <div class="form-group"><label>URL</label><input type="text" id="uk-url" placeholder="https://kuma.yourdomain.com"></div>
+      <div class="form-group"><label>Status page slug</label><input type="text" id="uk-slug" placeholder="default"></div>
+      <div class="form-group"><label>API Key (optional)</label><input type="password" id="uk-apikey" placeholder="optional"></div>
+    </div>
+  </div>
+</div>
+
+
 <!-- Docker -->
 <div class="card">
   <div class="card-hdr">
@@ -1075,6 +1101,14 @@ function populate(cfg) {
     document.getElementById('hc-url').value = cfg.healthchecks.url || '';
     secVal(cfg.healthchecks.apiKey, document.getElementById('hc-apikey'));
   }
+  if (cfg.uptimekuma) {
+    document.getElementById('en-uptimekuma').checked = cfg.uptimekuma.enabled !== false;
+    document.getElementById('cb-uptimekuma').classList.remove('hidden');
+    document.getElementById('icon-uptimekuma').value = cfg.uptimekuma.icon || '';
+    document.getElementById('uk-url').value = cfg.uptimekuma.url || '';
+    document.getElementById('uk-slug').value = cfg.uptimekuma.slug || '';
+    secVal(cfg.uptimekuma.apiKey, document.getElementById('uk-apikey'));
+  }
   if (cfg.docker) {
     document.getElementById('en-docker').checked = cfg.docker.enabled !== false;
     document.getElementById('cb-docker').classList.remove('hidden');
@@ -1202,6 +1236,19 @@ function collect() {
       url,
       apiKey: maskedVal(document.getElementById('hc-apikey')),
       icon: document.getElementById('icon-healthchecks').value.trim() || undefined,
+    };
+  }
+
+  {
+    const on = document.getElementById('en-uptimekuma').checked;
+    const url = document.getElementById('uk-url').value.trim();
+    const slug = document.getElementById('uk-slug').value.trim();
+    if (on || url || slug) cfg.uptimekuma = {
+      enabled: on,
+      url,
+      slug: slug || undefined,
+      apiKey: maskedVal(document.getElementById('uk-apikey')) || undefined,
+      icon: document.getElementById('icon-uptimekuma').value.trim() || undefined,
     };
   }
 
@@ -1484,6 +1531,7 @@ async function refreshDots(cfg, newData){
   setDot('dot-kubernetes', ev(en(cfg.kubernetes), !!(d.kubernetes && d.kubernetes.online) && !((d.kubernetes?.pods)||[]).some(p=>p.failed)));
   setDot('dot-synology', ev(en(cfg.snmp), (d.snmp||[]).length>0 && (d.snmp||[]).every(x=>x.online)));
   setDot('dot-healthchecks', ev(en(cfg.healthchecks), !!(d.healthchecks && d.healthchecks.online) && ((d.healthchecks?.summary?.down)||0)===0));
+  setDot('dot-uptimekuma', ev(en(cfg.uptimekuma), !!(d.uptimekuma && d.uptimekuma.online) && ((d.uptimekuma?.summary?.down)||0)===0));
   setDot('dot-docker', ev(en(cfg.docker), (d.docker||[]).length>0 && (d.docker||[]).every(h=>h.online)));
   setDot('dot-database', ev(en(cfg.database), (d.database||[]).length>0 && (d.database||[]).every(x=>x.online)));
   document.querySelectorAll('#db-list .arr-item').forEach(item => {

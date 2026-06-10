@@ -8,6 +8,7 @@ const agents = require('./src/agents');
 const { getAllKubernetesData, getPodLogs } = require('./src/kubernetes');
 const { getAllSynologyData } = require('./src/snmp');
 const { getAllHealthchecks } = require('./src/healthchecks');
+const { getAllUptimeKuma } = require('./src/uptimekuma');
 const { getAllDatabaseData } = require('./src/database');
 const { getProxmoxApiData } = require('./src/proxmox');
 const { getDockerApiData, dockerLogs: dockerApiLogs, dockerPrune: dockerApiPrune } = require('./src/docker');
@@ -119,6 +120,7 @@ function genToken() {
 
 function authMiddleware(req, res, next) {
   const auth = loadAuth();
+  if (req.path.startsWith('/assets/')) return next();
   if (req.path.startsWith('/api/icons/')) return next();
   if (req.path.startsWith('/agent/') || ['/api/agent/report', '/api/agent/result', '/api/agent/commands'].includes(req.path)) return next();
   const token = req.headers['x-session-token'] || req.cookies?.session;
@@ -215,7 +217,7 @@ function assignStatic(base) {
   base.icons = {
     proxmox: config.proxmox?.icon, linux: config.linux?.icon, kubernetes: config.kubernetes?.icon,
     snmp: config.snmp?.icon, healthchecks: config.healthchecks?.icon, docker: config.docker?.icon,
-    database: config.database?.icon,
+    database: config.database?.icon, uptimekuma: config.uptimekuma?.icon,
   };
 }
 
@@ -227,6 +229,7 @@ function configuredList() {
   if (en(config.linux)        && config.linux.agentToken)               ids.push('linux');
   if (en(config.snmp)         && (config.snmp.devices || []).length)    ids.push('snmp');
   if (en(config.healthchecks) && config.healthchecks.url)               ids.push('healthchecks');
+  if (en(config.uptimekuma)   && config.uptimekuma.url)                 ids.push('uptimekuma');
   if (en(config.docker)       && (agents.hasDocker() || (config.docker.hosts || []).length)) ids.push('docker');
   if (en(config.database)     && (config.database.instances || []).length) ids.push('database');
   return ids;
@@ -270,6 +273,11 @@ function extractChecks(data) {
     const nm = c.name || c.slug;
     add('hc:' + nm, c.status !== 'down' && c.status !== 'grace', 'Healthcheck ' + nm, c.status);
   });
+  const uk = data.uptimekuma;
+  if (uk && Array.isArray(uk.monitors)) uk.monitors.forEach(m => {
+    const nm = m.name || m.id;
+    add('uk:' + nm, m.status !== 'down', 'Uptime Kuma ' + nm, m.status);
+  });
   (data.database || []).forEach(d => add('db:' + d.name, !!d.online, 'Database ' + d.name, 'unreachable'));
   return m;
 }
@@ -309,6 +317,7 @@ function preserveProxmoxOnTransient(next, err) {
   if (!prev?.nodes?.length) return next;
   const prevHadOnline = prev.nodes.some(n => n.node?.online);
   if (!prevHadOnline) return next;
+  if (next?._connecting) return { ...prev, _stale: true, _staleSince: prev._staleSince || Date.now(), error: 'refresh in progress' };
   const nodes = next?.nodes || [];
   const looksDropped = !nodes.length || nodes.every(n => !n.node?.online);
   if (!looksDropped) return { ...next, _stale: false, _staleSince: null, error: undefined };
@@ -321,7 +330,7 @@ function preserveProxmoxOnTransient(next, err) {
 function backgroundRefresh() {
   if (refreshPromise) return refreshPromise;
   const enabled = c => c && c.enabled !== false;
-  if (!cache.data) cache.data = { timestamp: new Date().toISOString(), proxmox: { clusterSummary: null, nodes: [] }, linux: [], kubernetes: null, snmp: [], healthchecks: null, docker: [], database: [], publicStatus: false, loading: true };
+  if (!cache.data) cache.data = { timestamp: new Date().toISOString(), proxmox: { clusterSummary: null, nodes: [] }, linux: [], kubernetes: null, snmp: [], healthchecks: null, uptimekuma: null, docker: [], database: [], publicStatus: false, loading: true };
   const base = cache.data;
   assignStatic(base);
   const tasks = [
@@ -330,6 +339,7 @@ function backgroundRefresh() {
     ['kubernetes',   enabled(config.kubernetes)   ? getAllKubernetesData(config.kubernetes)  : Promise.resolve(null), null],
     ['snmp',         enabled(config.snmp)         ? getAllSynologyData(config.snmp)          : Promise.resolve([]),   []],
     ['healthchecks', enabled(config.healthchecks) ? getAllHealthchecks(config.healthchecks) : Promise.resolve(null), null],
+    ['uptimekuma',   enabled(config.uptimekuma)   ? getAllUptimeKuma(config.uptimekuma)     : Promise.resolve(null), null],
     ['docker',       enabled(config.docker)       ? getDockerData()  : Promise.resolve([]),   []],
     ['database',     enabled(config.database)     ? getAllDatabaseData(config.database)      : Promise.resolve([]),   []],
   ];
@@ -375,6 +385,7 @@ const EMPTY = {
   kubernetes: null,
   snmp: [],
   healthchecks: null,
+  uptimekuma: null,
   docker: [],
   database: [],
   publicStatus: false,
@@ -383,7 +394,7 @@ const EMPTY = {
 function getCachedData() {
   if (!cache.data) {
     backgroundRefresh();
-    return Promise.resolve({ ...EMPTY, timestamp: new Date().toISOString(), configured: configuredList() });
+    return Promise.resolve(cache.data || { ...EMPTY, timestamp: new Date().toISOString(), configured: configuredList() });
   }
   return Promise.resolve(cache.data);
 }
@@ -505,7 +516,7 @@ app.post('/api/config', (req, res) => {
 
       if (en(config.proxmox)) {
         if (hasProxmoxApi()) {
-          cache.data.proxmox = { clusterSummary: null, nodes: [], _connecting: true };
+          cache.data.proxmox = preserveProxmoxOnTransient({ clusterSummary: null, nodes: [], _connecting: true });
         } else {
           cache.data.proxmox = agents.getProxmoxData({ excludedServices: config.excludedServices });
         }
@@ -536,6 +547,12 @@ app.post('/api/config', (req, res) => {
           cache.data.healthchecks = { _connecting: true, online: false, summary: { total: 0, up: 0, down: 0, grace: 0, paused: 0 }, checks: [] };
         }
       } else { cache.data.healthchecks = null; }
+
+      if (en(config.uptimekuma)) {
+        if (!cache.data.uptimekuma) {
+          cache.data.uptimekuma = { _connecting: true, online: false, summary: { total: 0, up: 0, down: 0, pending: 0, maintenance: 0, unknown: 0 }, monitors: [] };
+        }
+      } else { cache.data.uptimekuma = null; }
 
       if (en(config.docker)) {
         cache.data.docker = hasDockerApi()
@@ -816,7 +833,11 @@ app.post('/api/agent/report', (req, res) => {
     if (cache.data) {
       const en = c => c && c.enabled !== false;
       cache.data.linux = en(config.linux) ? agents.getAllAgentData({ ...config.linux, excludedServices: config.excludedServices }) : [];
-      cache.data.proxmox = en(config.proxmox) ? agents.getProxmoxData({ excludedServices: config.excludedServices }) : { clusterSummary: null, nodes: [] };
+      if (en(config.proxmox) && !hasProxmoxApi()) {
+        cache.data.proxmox = preserveProxmoxOnTransient(agents.getProxmoxData({ excludedServices: config.excludedServices }));
+      } else if (!en(config.proxmox)) {
+        cache.data.proxmox = { clusterSummary: null, nodes: [] };
+      }
       cache.data.docker = en(config.docker) ? agents.getDockerData() : [];
       assignStatic(cache.data);
     }
@@ -910,6 +931,15 @@ function buildPublicSummary(data) {
     const sm = hc.summary || {};
     out.push({ id: 'healthchecks', title: 'Healthchecks', status: !hc.online ? 'down' : ((sm.down || 0) > 0 ? 'down' : (sm.grace || 0) > 0 ? 'warn' : 'ok'), meta: hc.online ? `${sm.up || 0}/${sm.total || 0} up` : 'unreachable' });
   }
+  const uk = data.uptimekuma;
+  if (uk && uk.online !== undefined) {
+    const sm = uk.summary || {};
+    const up = sm.up || 0;
+    const down = sm.down || 0;
+    const warn = (sm.pending || 0) + (sm.unknown || 0);
+    const status = !uk.online ? 'down' : (down > 0 ? (up > 0 ? 'warn' : 'down') : (warn > 0 ? 'warn' : 'ok'));
+    out.push({ id: 'uptimekuma', title: 'Uptime Kuma', status, meta: uk.online ? `${up}/${sm.total || 0} up` : 'unreachable' });
+  }
   if ((data.docker || []).length) {
     const up = data.docker.filter(h => h.online).length;
     const running = data.docker.reduce((a, h) => a + (h.summary?.running || 0), 0);
@@ -931,7 +961,7 @@ app.get('/api/public/status', (req, res) => {
   const data = cache.data || EMPTY;
   const services = buildPublicSummary(data);
   const present = new Set(services.map(s => s.id));
-  const titles = { proxmox: 'Proxmox', linux: 'Linux Servers', kubernetes: 'Kubernetes', snmp: 'SNMP', healthchecks: 'Healthchecks', docker: 'Docker', database: 'Databases' };
+  const titles = { proxmox: 'Proxmox', linux: 'Linux Servers', kubernetes: 'Kubernetes', snmp: 'SNMP', healthchecks: 'Healthchecks', uptimekuma: 'Uptime Kuma', docker: 'Docker', database: 'Databases' };
   (data.configured || configuredList()).forEach(id => {
     if (!present.has(id)) services.push({ id, title: titles[id] || id, status: 'connecting', meta: 'connecting…' });
   });

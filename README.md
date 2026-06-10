@@ -2,7 +2,7 @@
 
 ![Status](https://img.shields.io/badge/status-stable-brightgreen) [![Version](https://img.shields.io/badge/version-1.0.0-blue)](https://github.com/caglaryalcin/OmniSight/releases) [![Latest Release](https://img.shields.io/github/v/release/caglaryalcin/OmniSight?include_prereleases&color=blue)](https://github.com/caglaryalcin/OmniSight/releases)
 
-A simple, single-glance monitoring dashboard for Proxmox, Linux servers, Kubernetes, SNMP devices, Docker, databases and Healthchecks.
+A simple, single-glance monitoring dashboard for Proxmox, Linux servers, Kubernetes, SNMP devices, Docker, databases, Healthchecks and Uptime Kuma.
 
 ## Features
 
@@ -14,6 +14,7 @@ A simple, single-glance monitoring dashboard for Proxmox, Linux servers, Kuberne
 - **SNMP** — status of any SNMP v2c/v3 device (Synology, UniFi, switches, routers, …) with CPU/RAM/temperature where exposed
 - **Docker** — container status, ports, CPU/memory, network I/O, block I/O, unused (dangling) image count with a **Prune** action and live container log viewer — all through the agent (run it on the host or as a container with the docker socket mounted)
 - **Databases** — **PostgreSQL**, **MySQL/MariaDB** and **MongoDB**: up/down, active/max connections, total size and version
+- **Uptime Kuma** — import monitors from a public status page slug and show up/down/pending/maintenance state alongside the rest of your platforms
 
 ![](https://raw.githubusercontent.com/caglaryalcin/OmniSight/refs/heads/main/screenshots/dashboard.png)
 
@@ -235,6 +236,7 @@ The live config is `data/config.yaml` (created automatically on first save). Eas
 - `kubernetes` — kubeconfig, namespaces[] (the Settings UI has a **Browse…** button that uploads a kubeconfig from your machine into `data/` and fills in the container path automatically)
 - `snmp.devices[]` — SNMP v2c (community) or v3 (username, authPassword, privPassword, …)
 - `healthchecks` — url, apiKey
+- `uptimekuma` — url, status page `slug`, optional apiKey
 - `database.instances[]` — `type: postgresql | mysql | mariadb | mongodb`, name, host, port, user, password, optional `database`
 - `alerts` — `enabled` + `ntfy` / `telegram` / `smtp` channels
 - `publicStatus: true` and `publicTitle` — expose the `/status` page publicly
