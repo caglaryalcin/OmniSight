@@ -80,16 +80,27 @@ function execSsh(host, command) {
     const port = Number(host.sshPort) || 22;
     const user = host.sshUser || 'root';
     const target = `${user}@${host.sshHost}`;
-    const args = [
-      '-o', 'BatchMode=yes',
+    const hasPassword = !!host.sshPassword;
+    const sshArgs = [
       '-o', 'ConnectTimeout=10',
       '-o', 'StrictHostKeyChecking=accept-new',
       '-p', String(port),
     ];
-    if (host.sshKey) args.push('-i', host.sshKey);
-    args.push(target, command);
-    execFile('ssh', args, { timeout: 20000, maxBuffer: 1024 * 1024 * 3 }, (err, stdout, stderr) => {
-      if (err) return reject(new Error((stderr || err.message || '').trim()));
+    if (hasPassword) {
+      sshArgs.unshift('-o', 'PreferredAuthentications=password,keyboard-interactive');
+    } else {
+      sshArgs.unshift('-o', 'BatchMode=yes');
+    }
+    if (host.sshKey) sshArgs.push('-i', host.sshKey);
+    sshArgs.push(target, command);
+    const bin = hasPassword ? 'sshpass' : 'ssh';
+    const args = hasPassword ? ['-p', host.sshPassword, 'ssh', ...sshArgs] : sshArgs;
+    execFile(bin, args, { timeout: 20000, maxBuffer: 1024 * 1024 * 3 }, (err, stdout, stderr) => {
+      if (err) {
+        const msg = (stderr || err.message || '').trim();
+        if (hasPassword && err.code === 'ENOENT') return reject(new Error('sshpass is required for SSH password authentication'));
+        return reject(new Error(msg));
+      }
       resolve(stdout);
     });
   });
