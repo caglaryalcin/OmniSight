@@ -572,6 +572,37 @@ setInterval(backgroundRefresh, REFRESH_INTERVAL);
 
 app.use(express.json({ limit: '5mb' }));
 app.use(parseCookies);
+
+function isLoopbackRequest(req) {
+  const addr = String(req.ip || req.socket?.remoteAddress || '').replace(/^::ffff:/, '');
+  return addr === '127.0.0.1' || addr === '::1' || addr === 'localhost';
+}
+
+app.get('/api/debug/docker', async (req, res, next) => {
+  if (!isLoopbackRequest(req)) return next();
+  try {
+    const started = Date.now();
+    const live = await getDockerData();
+    const configured = (config.docker?.hosts || []).map(h => ({
+      type: h.type || (h.sshHost ? 'ssh' : 'api'),
+      name: dockerConfigHostName(h),
+      target: dockerConfigHostTarget(h),
+      sshMode: h.sshMode || '',
+      sudo: h.sudo === undefined ? 'auto' : !!h.sudo,
+    }));
+    res.json({
+      ok: true,
+      ms: Date.now() - started,
+      refreshing: !!refreshPromise,
+      configured,
+      cache: cache.data?.docker || [],
+      live,
+    });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message, stack: err.stack });
+  }
+});
+
 app.use(authMiddleware);
 app.use(express.static(path.join(__dirname, 'public'), { extensions: ['html'] }));
 

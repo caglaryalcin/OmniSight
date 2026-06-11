@@ -786,6 +786,7 @@ function addDockerSshHost(data = {}) {
         <div class="form-group"><label>SSH user</label><input type="text" class="dkssh-user" value="${escHtml(data.sshUser||'root')}" placeholder="root"></div>
         <div class="form-group"><label>SSH port</label><input type="number" class="dkssh-port" value="${escHtml(data.sshPort||'22')}" placeholder="22"></div>
         <div class="form-group"><label>Host type</label><select class="dkssh-mode"><option value="linux" ${(data.sshMode||'linux')!=='synology'?'selected':''}>Linux Docker</option><option value="synology" ${(data.sshMode||'linux')==='synology'?'selected':''}>Synology</option></select></div>
+        <div class="form-group"><label>Docker command</label><select class="dkssh-sudo"><option value="" ${data.sudo===undefined?'selected':''}>Auto</option><option value="true" ${data.sudo===true?'selected':''}>Use sudo</option><option value="false" ${data.sudo===false?'selected':''}>No sudo</option></select></div>
         <div class="form-group"><label>SSH key path (optional)</label><input type="text" class="dkssh-key" value="${escHtml(data.sshKey||'')}" placeholder="/data/id_rsa"></div>
         <div class="form-group"><label>SSH password (optional)</label><input type="password" class="dkssh-password" placeholder="Leave blank to keep current password"></div>
       </div>
@@ -1473,6 +1474,7 @@ function collect() {
     });
     document.querySelectorAll('#docker-ssh-list .arr-item').forEach(item => {
       const sshHost = item.querySelector('.dkssh-host').value.trim();
+      const sudoVal = item.querySelector('.dkssh-sudo')?.value || '';
       const h = {
         type: 'ssh',
         name: item.querySelector('.dkssh-name').value.trim() || sshHost,
@@ -1480,6 +1482,7 @@ function collect() {
         sshUser: item.querySelector('.dkssh-user').value.trim() || undefined,
         sshPort: Number(item.querySelector('.dkssh-port').value) || undefined,
         sshMode: item.querySelector('.dkssh-mode').value || 'linux',
+        sudo: sudoVal ? sudoVal === 'true' : undefined,
         sshKey: item.querySelector('.dkssh-key').value.trim() || undefined,
         sshPassword: maskedVal(item.querySelector('.dkssh-password')) || undefined,
       };

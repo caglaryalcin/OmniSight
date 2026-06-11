@@ -2029,6 +2029,7 @@ function buildDocker(docker){
         <div class="node-name">${host.name}</div>
         <div class="node-info">${host.host||''}</div>
         ${bdg('gray','connecting…')}
+        ${host.id ? `<button class="btn-act" onclick="event.stopPropagation();removePendingAgent(${jsStr(host.id)},this)">Remove</button>` : ''}
       </div>`;
     if(!host.online) return `
       <div class="offline-row">
@@ -2251,6 +2252,26 @@ async function dockerPrune(name, btn){
     if(window._lastData) render(window._lastData);
     doRefresh();
   }catch(e){ if(btn){ btn.disabled=false; btn.textContent='Prune'; } if(e.message!=='Unauthorized') console.error(e); }
+}
+
+async function removePendingAgent(id, btn){
+  if(!id) return;
+  if(btn){ btn.disabled = true; btn.textContent = 'Removing'; }
+  try{
+    const r = await fetch('/api/agent/remove', {
+      method:'POST',
+      headers:{'Content-Type':'application/json',...authHeaders()},
+      body:JSON.stringify({id})
+    });
+    handleUnauth(r);
+    const b = await r.json();
+    if(!r.ok) throw new Error(b.error || r.statusText);
+    if(b.data) render(b.data);
+    else doRefresh();
+  }catch(e){
+    if(btn){ btn.disabled = false; btn.textContent = 'Remove'; }
+    if(e.message !== 'Unauthorized') console.error(e);
+  }
 }
 
 /* ── Sidebar order (drag & drop) ── */
@@ -2935,6 +2956,26 @@ function updateOverviewKpis(data, ids, panels){
   });
 }
 
+function buildPanels(data){
+  const builders = {
+    proxmox:      () => buildProxmox(data.proxmox),
+    kubernetes:   () => buildKubernetes(data.kubernetes),
+    linux:        () => buildLinux(data.linux),
+    snmp:         () => buildSynology(data.snmp),
+    healthchecks: () => buildHealthchecks(data.healthchecks),
+    uptimekuma:   () => buildUptimeKuma(data.uptimekuma),
+    prometheus:   () => buildPrometheus(data.prometheus),
+    docker:       () => buildDocker(data.docker),
+    database:     () => buildDatabase(data.database),
+  };
+  const panels = {};
+  ALL_IDS.forEach(id => {
+    const p = builders[id]?.();
+    if(p) panels[id] = p;
+  });
+  return panels;
+}
+
 function selectPanel(id){
   const wasEmbedOpen = embedOpen;
   embedOpen = false;
@@ -2945,8 +2986,12 @@ function selectPanel(id){
   document.querySelectorAll('.sb-card').forEach(c=>c.classList.remove('active'));
   const card = document.getElementById(`sbcard-${id}`);
   if(card) card.classList.add('active');
+  if(!window._panels?.[id] && window._lastData) window._panels = buildPanels(window._lastData);
   const panel = window._panels?.[id];
-  if(!panel) return;
+  if(!panel){
+    if(window._lastData) render(window._lastData);
+    return;
+  }
   const iconSvg = platformIcon(panel);
   const detail = document.getElementById('detail');
   const html = `
@@ -3128,23 +3173,7 @@ function render(data, opts = {}){
   const railUpd = document.getElementById('rail-upd');
   if(railUpd) railUpd.textContent = updatedText;
 
-  const builders = {
-    proxmox:      () => buildProxmox(data.proxmox),
-    kubernetes:   () => buildKubernetes(data.kubernetes),
-    linux:        () => buildLinux(data.linux),
-    snmp:         () => buildSynology(data.snmp),
-    healthchecks: () => buildHealthchecks(data.healthchecks),
-    uptimekuma:   () => buildUptimeKuma(data.uptimekuma),
-    prometheus:   () => buildPrometheus(data.prometheus),
-    docker:       () => buildDocker(data.docker),
-    database:     () => buildDatabase(data.database),
-  };
-
-  const panels = {};
-  ALL_IDS.forEach(id => {
-    const p = builders[id]?.();
-    if(p) panels[id] = p;
-  });
+  const panels = buildPanels(data);
   configuredIds.forEach(id => { if(!panels[id]) panels[id] = skeletonPanel(id); });
   window._panels = panels;
 
@@ -3486,14 +3515,13 @@ async function initialLoad(){
 })();
 
 (function(){
-  const RELEASES = 'https://github.com/caglaryalcin/OmniSight/releases';
   const v = document.getElementById('foot-ver');
   if(!v) return;
   fetch('/api/about', {headers: authHeaders()})
     .then(r => r.ok ? r.json() : Promise.reject())
     .then(a => {
       window._currentVersion = 'v' + (a.version || '1.0.0');
-      v.innerHTML = '<a href="' + RELEASES + '" target="_blank" rel="noopener">' + window._currentVersion + '</a>';
+      v.textContent = window._currentVersion;
     })
     .catch(() => {});
 })();
