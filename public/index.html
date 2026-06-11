@@ -699,7 +699,12 @@ const linuxOpen = {};
 const hcOpen = {};
 const snmpOpen = {};
 const k8sGrpOpen = {};
-const overviewK8sOpen = { pods:true, deps:false, svcs:false, dockerHosts:true, dockerContainers:true, prometheusServers:true, prometheusTargets:true };
+const defaultOverviewGroupOpen = { pods:true, deps:false, svcs:false, dockerHosts:true, dockerContainers:true, prometheusServers:true, prometheusTargets:true };
+let overviewK8sOpen = { ...defaultOverviewGroupOpen };
+try { overviewK8sOpen = { ...overviewK8sOpen, ...JSON.parse(localStorage.getItem('os_overview_group_open') || '{}') }; } catch {}
+function saveOverviewGroupOpen(){
+  try { localStorage.setItem('os_overview_group_open', JSON.stringify(overviewK8sOpen)); } catch {}
+}
 const dockerOpen = {};
 let overviewCardCollapsed = {};
 try { overviewCardCollapsed = JSON.parse(localStorage.getItem('os_overview_card_collapsed') || '{}'); } catch {}
@@ -3181,6 +3186,7 @@ function selectPanelGroup(id, grpId){
   selectPanel(id);
   if(id !== 'kubernetes') return;
   k8sGrpOpen[grpId] = true;
+  setOverride('k8s:'+grpId, true);
   const body = document.getElementById(`kg-${grpId}`);
   const hdr = document.getElementById(`kh-${grpId}`);
   if(body) body.classList.add('open');
@@ -3190,6 +3196,7 @@ function selectPanelGroup(id, grpId){
 }
 function toggleOverviewGroup(grpId){
   overviewK8sOpen[grpId] = !overviewK8sOpen[grpId];
+  saveOverviewGroupOpen();
   const grp = document.getElementById(`ov-grp-${grpId}`);
   if(grp) grp.classList.toggle('open', overviewK8sOpen[grpId]);
   requestAnimationFrame(layoutOverviewMasonry);
