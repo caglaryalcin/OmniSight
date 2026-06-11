@@ -7,7 +7,10 @@ RUN apk add --no-cache openssh-client tzdata
 COPY package*.json ./
 RUN npm install --omit=dev --no-optional && npm cache clean --force
 
-COPY . .
+COPY server.js ./
+COPY src ./src
+COPY public ./public
+COPY agent/install.sh agent/omnisight-agent.sh ./agent/
 RUN mkdir -p /app/data
 
 ENV PORT=3000

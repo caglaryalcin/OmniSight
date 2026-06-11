@@ -224,10 +224,20 @@ function mergeDockerConfiguredRows(currentRows = [], agentRows = []) {
   const currentByName = new Map((currentRows || []).map(h => [h.name, h]));
   const configured = dockerConfigRows().map(row => {
     const prev = currentByName.get(row.name);
-    return prev ? { ...row, ...prev, source: row.source, name: row.name, host: prev.host || row.host } : row;
+    return normalizeDockerRow(prev ? { ...row, ...prev, source: row.source, name: row.name, host: prev.host || row.host } : row);
   });
   const configuredNames = new Set(configured.map(h => h.name));
-  return [...configured, ...agentRows.filter(h => !configuredNames.has(h.name))];
+  return [...configured, ...agentRows.filter(h => !configuredNames.has(h.name)).map(normalizeDockerRow)];
+}
+
+function normalizeDockerRow(row) {
+  if (!row || typeof row !== 'object') return row;
+  if (!row.online) return row;
+  return { ...row, _connecting: false };
+}
+
+function normalizeDockerRows(rows) {
+  return Array.isArray(rows) ? rows.map(normalizeDockerRow) : rows;
 }
 
 function dockerRowKeys(row = {}) {
@@ -252,6 +262,7 @@ function keepPreviousDockerRow(prev, next, now) {
   if (now - staleSince > STALE_KEEP_MS) return null;
   return {
     ...prev,
+    _connecting: false,
     _stale: true,
     _staleSince: staleSince,
     error: next?._connecting ? 'refresh in progress' : (next?.error || 'temporary Docker refresh failure'),
@@ -259,6 +270,7 @@ function keepPreviousDockerRow(prev, next, now) {
 }
 
 function preserveDockerOnTransient(nextRows) {
+  nextRows = normalizeDockerRows(nextRows);
   const prevRows = Array.isArray(cache.data?.docker) ? cache.data.docker : [];
   if (!Array.isArray(nextRows) || !prevRows.length) return nextRows;
   const prevOnline = prevRows.filter(row => row?.online);
@@ -274,7 +286,7 @@ function preserveDockerOnTransient(nextRows) {
   }
   const now = Date.now();
   return nextRows.map(next => {
-    if (!next || next.online) return next;
+    if (!next || next.online) return normalizeDockerRow(next);
     const isKnownConfigured = configured.some(row => sameDockerRow(row, next));
     const prev = findPreviousOnlineDockerRow(prevOnline, next);
     if (!isKnownConfigured && !prev) return next;
@@ -595,8 +607,8 @@ app.get('/api/debug/docker', async (req, res, next) => {
       ms: Date.now() - started,
       refreshing: !!refreshPromise,
       configured,
-      cache: cache.data?.docker || [],
-      live,
+      cache: normalizeDockerRows(cache.data?.docker || []),
+      live: normalizeDockerRows(live),
     });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message, stack: err.stack });

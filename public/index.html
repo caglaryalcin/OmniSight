@@ -1996,8 +1996,9 @@ function buildPrometheus(prom){
 /* ── Docker ── */
 function buildDocker(docker){
   if(!docker?.length) return null;
-  const anyConnecting = docker.some(h => h._connecting);
-  const connectingHosts = docker.filter(h => h._connecting).length;
+  const isConnectingHost = h => h._connecting && !h.online;
+  const anyConnecting = docker.some(isConnectingHost);
+  const connectingHosts = docker.filter(isConnectingHost).length;
   const allOk = docker.every(h=>h.online);
   const onlineHosts = docker.filter(h=>h.online).length;
   const totalRunning = docker.reduce((a,h)=>a+(h.summary?.running||0),0);
@@ -2023,7 +2024,7 @@ function buildDocker(docker){
   </div>`;
 
   const body = docker.map(host=>{
-    if(host._connecting) return `
+    if(isConnectingHost(host)) return `
       <div class="node-hdr" style="cursor:default">
         <div class="mon-dot md-gray"></div>
         <div class="node-name">${host.name}</div>
@@ -3131,12 +3132,13 @@ function render(data, opts = {}){
   const prom=data.prometheus;
   if(prom && (prom._connecting || prom.online!==undefined)){ platforms.push(prometheusHealth(prom).state); }
   if((data.docker||[]).length){
-    const realDocker = data.docker.filter(h=>!h._connecting);
-    if(data.docker.some(h=>h._connecting) && !realDocker.length) platforms.push('connecting');
+    const realDocker = data.docker.filter(h=>!h._connecting || h.online);
+    const dockerConnecting = data.docker.some(h=>h._connecting && !h.online);
+    if(dockerConnecting && !realDocker.length) platforms.push('connecting');
     else {
       const o=realDocker.filter(h=>h.online).length;
       const stopped=realDocker.some(h=>h.online&&(h.summary?.stopped||0)>0);
-      platforms.push(o===0?'down':(o<realDocker.length||data.docker.some(h=>h._connecting)||stopped)?'degraded':'ok');
+      platforms.push(o===0?'down':(o<realDocker.length||dockerConnecting||stopped)?'degraded':'ok');
     }
   }
   if((data.database||[]).length){ if(data.database.some(d=>d._connecting)) platforms.push('connecting'); }

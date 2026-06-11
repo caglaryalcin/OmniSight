@@ -7,3 +7,13 @@ npm-debug.log*
 config.yaml
 data
 .fuse_hidden*
+Dockerfile
+**/Dockerfile
+LICENSE
+README.md
+config.example.yaml
+docker-compose.yml
+docker-stack.yml
+screenshots
+scripts
+deploy
