@@ -1242,7 +1242,12 @@ function manualAgentUpdateCommand() {
 }
 
 app.get('/api/agents', (req, res) => {
-  res.json({ latestVersion: agentLatestVersion(), agents: agents.listAgents() });
+  try {
+    res.json({ latestVersion: agentLatestVersion(), agents: agents.listAgents() });
+  } catch (err) {
+    console.warn('agents list failed:', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.post('/api/agent/update', async (req, res) => {

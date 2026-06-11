@@ -464,7 +464,7 @@ body.rail-collapsed .rail-resizer{display:none}
 body.rail-collapsed .nav{padding:8px 0 14px;gap:4px;align-items:center}
 body.rail-collapsed .nav button{width:38px;height:38px;box-sizing:border-box;justify-content:center;padding:0;display:grid;place-items:center;line-height:1}
 body.rail-collapsed .nav button svg{display:block;margin:auto}
-body.rail-collapsed .shell #sidebar{padding:0 0 16px;align-items:center;gap:4px;scrollbar-width:none}
+body.rail-collapsed .shell #sidebar{padding:0 0 16px;align-items:center;gap:7px;scrollbar-width:none}
 body.rail-collapsed .shell #sidebar::-webkit-scrollbar{display:none}
 body.rail-collapsed .shell .sb-card{width:38px;height:38px;box-sizing:border-box;padding:0;border:1px solid var(--border);background:rgba(24,26,27,.78);display:grid;grid-template-columns:1fr;place-items:center;justify-items:center;align-items:center}
 body.rail-collapsed .shell .sb-card:hover,body.rail-collapsed .shell .sb-card.active{background:var(--panel2);border-color:var(--border2)}
@@ -558,7 +558,7 @@ html[data-theme="light"] .overview-card .sb-csum-item{background:transparent!imp
   .nav{padding-left:0;padding-right:0;align-items:center}
   .nav button{width:38px;height:38px;justify-content:center;display:grid;place-items:center;line-height:1;padding:0;box-sizing:border-box}
   .nav button svg{display:block;margin:auto}
-  .shell #sidebar{display:flex;padding:0 0 16px;align-items:center;scrollbar-width:none}
+  .shell #sidebar{display:flex;padding:0 0 16px;align-items:center;gap:7px;scrollbar-width:none}
   .shell #sidebar::-webkit-scrollbar{display:none}
   .shell .sb-card{width:38px;height:38px;box-sizing:border-box;padding:0;border:1px solid var(--border);background:rgba(24,26,27,.78);display:grid;grid-template-columns:1fr;place-items:center}
   .shell .sb-card:hover,.shell .sb-card.active{background:var(--panel2);border-color:var(--border2)}
@@ -641,7 +641,7 @@ html[data-theme="light"] .overview-card .sb-csum-item{background:transparent!imp
       <button class="rail-link rail-icon-link" type="button" onclick="openEmbed('/about')" title="About" aria-label="About">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
       </button>
-      <a class="rail-link rail-icon-link" href="https://github.com/caglaryalcin/OmniSight/issues" target="_blank" rel="noopener" title="Help" aria-label="Help">
+      <a class="rail-link rail-icon-link" href="https://github.com/caglaryalcin/OmniSight/issues/new" target="_blank" rel="noopener" title="Help" aria-label="Help">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 1 1 5.82 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
       </a>
     </div>
@@ -699,7 +699,7 @@ const linuxOpen = {};
 const hcOpen = {};
 const snmpOpen = {};
 const k8sGrpOpen = {};
-const overviewK8sOpen = { pods:true, deps:false, svcs:false, dockerHosts:true, dockerContainers:true };
+const overviewK8sOpen = { pods:true, deps:false, svcs:false, dockerHosts:true, dockerContainers:true, prometheusServers:true, prometheusTargets:true };
 const dockerOpen = {};
 let overviewCardCollapsed = {};
 try { overviewCardCollapsed = JSON.parse(localStorage.getItem('os_overview_card_collapsed') || '{}'); } catch {}
@@ -2753,12 +2753,46 @@ function overviewRows(id, data){
     }).join('');
   }
   if(id === 'prometheus'){
-    return (data.prometheus?.targets||[]).map(t => {
+    const prom = data.prometheus || {};
+    const instances = prom.instances || [];
+    const targets = prom.targets || [];
+    const targetMatchesInstance = (t, inst) => {
+      const srcName = String(t.sourceName || '').trim();
+      const srcUrl = String(t.sourceUrl || '').trim();
+      return (srcName && srcName === String(inst.name || '').trim()) || (srcUrl && srcUrl === String(inst.url || '').trim());
+    };
+    const serverRows = instances.map(inst => {
+      const sm = inst.summary || {};
+      const connecting = inst._connecting && !inst.online;
+      const down = Number(sm.down || 0);
+      const unknown = Number(sm.unknown || 0);
+      const sub = connecting ? (inst.url || 'Connecting') :
+        inst.online ? [`${sm.up ?? 0}/${sm.total ?? 0} up`, inst.url || '', unknown ? `${unknown} unknown` : '', inst.error || ''].filter(Boolean).join(' · ') :
+        (inst.error || inst.url || 'Unreachable');
+      return overviewRow('prometheus', inst.name || inst.url || 'Prometheus', sub,
+        connecting ? 'gray' : !inst.online ? 'red' : down > 0 || unknown > 0 ? 'yellow' : 'green',
+        connecting ? 'connecting' : !inst.online ? 'offline' : down > 0 ? `${down} down` : unknown > 0 ? `${unknown} unknown` : 'healthy',
+        connecting ? 'md-gray' : !inst.online ? 'md-red' : down > 0 || unknown > 0 ? 'md-yellow' : 'md-green');
+    }).join('');
+    const instanceTargetRows = instances.length ? instances.map(inst => {
+      const rows = targets.filter(t => targetMatchesInstance(t, inst)).map(t => {
+        const cls = t.health==='up'?'green':t.health==='down'?'red':'yellow';
+        const dot = t.health==='up'?'md-green':t.health==='down'?'md-red':'md-yellow';
+        const sub = [t.job || t.scrapePool, t.lastScrape?`Last ${relTime(t.lastScrape)}`:'No scrape', t.lastError].filter(Boolean).join(' · ');
+        return overviewRow('prometheus', t.name, sub, cls, t.health||'unknown', dot);
+      }).join('');
+      const dot = inst._connecting && !inst.online ? 'md-gray' : inst.online ? 'md-green' : 'md-red';
+      return `<div class="overview-nested-title"><div class="mon-dot ${dot}"></div><span>${escHtml(inst.name || inst.url || 'Prometheus')}</span></div>${rows || '<div class="overview-empty">No active targets</div>'}`;
+    }).join('') : targets.map(t => {
       const cls = t.health==='up'?'green':t.health==='down'?'red':'yellow';
       const dot = t.health==='up'?'md-green':t.health==='down'?'md-red':'md-yellow';
       const sub = [t.sourceName, t.job || t.scrapePool, t.lastScrape?`Last ${relTime(t.lastScrape)}`:'No scrape', t.lastError].filter(Boolean).join(' · ');
       return overviewRow('prometheus', t.name, sub, cls, t.health||'unknown', dot);
     }).join('');
+    return [
+      overviewGroup('prometheusServers', 'Servers', serverRows, 'No Prometheus servers found'),
+      overviewGroup('prometheusTargets', 'Targets', instanceTargetRows, 'No targets found'),
+    ].join('');
   }
   if(id === 'kubernetes'){
     const k = data.kubernetes || {};

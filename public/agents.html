@@ -68,7 +68,12 @@ html.embed header{display:none}
 </main>
 <script>
 function authHeaders(){ const t=sessionStorage.getItem('os_token')||localStorage.getItem('os_token'); return t?{'x-session-token':t}:{}; }
-function handleUnauth(r){ if(r.status===401){ sessionStorage.removeItem('os_token'); localStorage.removeItem('os_token'); document.cookie='session=; path=/; max-age=0'; window.location.href='/login'; throw new Error('Unauthorized'); } }
+function handleUnauth(r){ if(r.status===401 || (r.redirected && r.url.includes('/login'))){ sessionStorage.removeItem('os_token'); localStorage.removeItem('os_token'); document.cookie='session=; path=/; max-age=0'; window.location.href='/login'; throw new Error('Unauthorized'); } }
+async function readJson(r){
+  const text = await r.text();
+  try { return text ? JSON.parse(text) : {}; }
+  catch { throw new Error(`Unexpected response from server (${r.status}): ${text.slice(0,120) || r.statusText}`); }
+}
 function esc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function rel(ts){ if(!ts) return 'never'; const s=Math.max(0,Math.round((Date.now()-Number(ts))/1000)); if(s<60)return s+'s ago'; const m=Math.round(s/60); if(m<60)return m+'m ago'; const h=Math.round(m/60); if(h<48)return h+'h ago'; return Math.round(h/24)+'d ago'; }
 function cmpVer(a,b){
@@ -131,7 +136,7 @@ async function loadAgents(){
   try{
     const r = await fetch('/api/agents',{headers:authHeaders()});
     handleUnauth(r);
-    const d = await r.json();
+    const d = await readJson(r);
     if(!r.ok) throw new Error(d.error||r.statusText);
     renderAgents(d);
   }catch(e){ const msg = document.getElementById('msg'); msg.textContent = e.message; msg.className = 'msg err'; }
@@ -143,7 +148,7 @@ async function updateAgent(id, btn){
   try{
     const r = await fetch('/api/agent/update',{method:'POST',headers:{'Content-Type':'application/json',...authHeaders()},body:JSON.stringify({id})});
     handleUnauth(r);
-    const d = await r.json().catch(()=>({}));
+    const d = await readJson(r).catch(e=>({ error:e.message }));
     if(r.status === 409 && d.manualCommand){
       showManualCommand(d.error || 'Manual update required.', d.manualCommand);
       btn.disabled = false; btn.textContent = old;

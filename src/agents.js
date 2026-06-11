@@ -490,7 +490,7 @@ function listAgents() {
   const now = Date.now();
   return [...agents.values()].map(a => ({
     id: a.id,
-    name: a.hostname,
+    name: a.hostname || a.id || 'agent',
     ip: a.ip || '',
     os: a.os || '',
     kernel: a.kernel || '',
@@ -502,7 +502,7 @@ function listAgents() {
     online: isOnline(a, now),
     hasDocker: !!a.docker,
     pveNode: a.pve?.node || a.pveNode || null,
-  })).sort((a, b) => (a.online === b.online ? a.name.localeCompare(b.name) : a.online ? -1 : 1));
+  })).sort((a, b) => (a.online === b.online ? String(a.name || '').localeCompare(String(b.name || '')) : a.online ? -1 : 1));
 }
 
 function waitForCommands(agentId, waitMs) {

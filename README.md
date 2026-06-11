@@ -1,20 +1,21 @@
 ![](https://raw.githubusercontent.com/caglaryalcin/OmniSight/refs/heads/main/public/assets/omnisight-wordmark.png)
 
-![Status](https://img.shields.io/badge/status-stable-brightgreen) [![Version](https://img.shields.io/badge/version-1.0.0-blue)](https://github.com/caglaryalcin/OmniSight/releases) [![Latest Release](https://img.shields.io/github/v/release/caglaryalcin/OmniSight?include_prereleases&color=blue)](https://github.com/caglaryalcin/OmniSight/releases)
+![Status](https://img.shields.io/badge/status-stable-brightgreen) [![Version](https://img.shields.io/badge/version-1.4.2-blue)](https://github.com/caglaryalcin/OmniSight/releases) [![Latest Release](https://img.shields.io/github/v/release/caglaryalcin/OmniSight?include_prereleases&color=blue)](https://github.com/caglaryalcin/OmniSight/releases)
 
-A simple, single-glance monitoring dashboard for Proxmox, Linux servers, Kubernetes, SNMP devices, Docker, databases, Healthchecks and Uptime Kuma.
+A simple, single-glance monitoring dashboard for Proxmox, Linux servers, Kubernetes, SNMP devices, Docker, databases, Healthchecks, Uptime Kuma and Prometheus.
 
 ## Features
 
 - **Modern UI** — fully redesigned interface: glass header, soft-glow status indicators, card-grid summaries, Inter typography, refined dark & light themes and subtle micro-animations
-- **One agent, one command** — Linux servers, Proxmox nodes and Docker hosts are all monitored by a single tiny push agent (one bash script + systemd, nothing beyond `curl`). In Settings just click **+ Add System / Node / Host**, pick **Binary**, **Docker** or **Stack**, copy the pre-filled command, run it on the server — the system self-registers and pops up online within seconds. No SSH keys, no API tokens, no inbound firewall rules, NAT-friendly (see [The agent](#the-agent))
-- **Proxmox** — node CPU/RAM/temperature/uptime, VM/LXC, per-node service status with **start/stop/restart/exclude** actions, **last backup** (vzdump) status, **Ceph cluster storage health** with active alert summaries, and **node storage status** (NFS, Local, ZFS, LVM, etc.) with utilization — collected locally by the agent via `pvesh`, **no API token required**
+- **One agent, one command** — Linux servers, Proxmox nodes and Docker hosts can be monitored by a single tiny push agent (one bash script + systemd, nothing beyond `curl`). In Settings just click **+ Add System / Node / Host**, pick **Binary**, **Docker** or **Stack**, copy the pre-filled command, run it on the server — the system self-registers and pops up online within seconds. No inbound firewall rules, NAT-friendly (see [The agent](#the-agent))
+- **Proxmox** — node CPU/RAM/temperature/uptime, VM/LXC, per-node service status with **start/stop/restart/exclude** actions, **last backup** (vzdump) status, **Ceph cluster storage health** with active alert summaries, and **node storage status** (NFS, Local, ZFS, LVM, etc.) with utilization — collected via API token or locally by the agent via `pvesh`
 - **Linux servers** — CPU/RAM/disk/swap/load/temperature/uptime/OS plus disk I/O and bandwidth, with **auto-discovered** running/failed services and near-instant **status/start/stop/restart/exclude** actions over the agent's command long-poll. Works on any systemd Linux incl. NAS devices (e.g. Synology)
 - **Kubernetes** — pod / deployment / service status and live pod log viewer (kubeconfig)
 - **SNMP** — status of any SNMP v2c/v3 device (Synology, UniFi, switches, routers, …) with CPU/RAM/temperature where exposed
-- **Docker** — container status, ports, CPU/memory, network I/O, block I/O, unused (dangling) image count with a **Prune** action and live container log viewer — all through the agent (run it on the host or as a container with the docker socket mounted)
+- **Docker** — container status, ports, CPU/memory, network I/O, block I/O, unused (dangling) image count with a **Prune** action and live container log viewer — via agent, Docker API host or SSH host (Linux/Synology, key or password)
 - **Databases** — **PostgreSQL**, **MySQL/MariaDB** and **MongoDB**: up/down, active/max connections, total size and version
 - **Uptime Kuma** — import monitors from a public status page slug and show up/down/pending/maintenance state alongside the rest of your platforms
+- **Prometheus** — monitor one or more Prometheus instances and track active target health
 
 ![](https://raw.githubusercontent.com/caglaryalcin/OmniSight/refs/heads/main/screenshots/dashboard.png)
 
@@ -27,6 +28,7 @@ A simple, single-glance monitoring dashboard for Proxmox, Linux servers, Kuberne
 - **Custom icons** — set any platform's icon from [dashboard-icons](https://github.com/homarr-labs/dashboard-icons) by name/URL or upload your own (see [Platform icons](#platform-icons))
 - **Custom CA** — trust private/self-signed CAs (see [Custom CA certificates](#custom-ca-certificates))
 - **Public status** — Read-only public summary page (`/status`)
+- **Agents** — connected agent inventory, installed versions and update actions
 
 ![](https://raw.githubusercontent.com/caglaryalcin/OmniSight/refs/heads/main/screenshots/public-page.png)
 
@@ -55,7 +57,7 @@ Dashboard: `http://localhost:3000` — the app starts with no config; set up you
 
 ## The agent
 
-Linux servers, Proxmox nodes and Docker hosts are all monitored by the **OmniSight agent** — a single bash script that **pushes** metrics to OmniSight over HTTP(S). Nothing to expose on the servers, no credentials stored in OmniSight, works behind NAT/firewalls as long as the server can reach the dashboard.
+Linux servers, and optionally Proxmox nodes and Docker hosts, are monitored by the **OmniSight agent** — a single bash script that **pushes** metrics to OmniSight over HTTP(S). Nothing to expose on the servers, no credentials stored in OmniSight for this mode, works behind NAT/firewalls as long as the server can reach the dashboard.
 
 **Setup :**
 
@@ -128,11 +130,12 @@ EOF
 - Authentication: one shared token (`X-Agent-Token` header), auto-generated on first add and regenerable from **Settings → Linux Servers**. Regenerating invalidates all installed agents until updated.
 - Agent identity: the installer writes a unique `OMNISIGHT_AGENT_ID` into `/etc/omnisight-agent/agent.env`, so cloned VMs with the same `/etc/machine-id` still appear as separate systems.
 - A system is marked **offline** when no report arrives for ~2.5× its interval.
+- Agent versions are visible in **Agents**. If an agent is outdated, use the Update action there; very old agents may show a one-time manual update command.
 - Logs: `journalctl -u omnisight-agent -f` (binary) / `docker logs -f omnisight-agent` (container)
 - Uninstall: `curl -fsSL http://<omnisight-host>:3000/agent/install.sh | sudo bash -s uninstall` / `docker rm -f omnisight-agent` / `docker stack rm omnisight-agent`
 - Remove from dashboard: the ✕ button next to the system in Settings.
 
-> Upgrading from ≤0.7.x: SSH-based `linux.servers[]`, Proxmox API (`tokenId`/`tokenSecret`/`nodes`) and `docker.hosts[]` configs are no longer used. Install the agent on each system instead; service exclude lists are preserved per hostname.
+> Upgrading from ≤0.7.x: SSH-based `linux.servers[]` is no longer used. Install the agent on Linux systems instead; service exclude lists are preserved per hostname. Proxmox and Docker can be monitored either with agents or with the dedicated API/SSH options in Settings.
 
 ## Quick start (Docker)
 
@@ -190,6 +193,7 @@ No ConfigMap/Secret to create: the app starts empty and you configure it from th
 | `TZ` | No | `UTC` | Server timezone for Node timestamps and notifications, e.g. `Europe/Istanbul`. `TIMEZONE` is also accepted as an alias. |
 | `OMNISIGHT_ENCRYPT` | No | `true` | Config encryption is **enabled by default**. Set to `false` (or `0`/`off`/`no`) to disable. |
 | `OMNISIGHT_SECRET` | No | auto | Encryption key. If unset, a random key is generated and stored in `data/secret.key` (auto-managed). Set this to use your own key (e.g. shared across instances). |
+| `OMNISIGHT_DEBUG` | No | `false` | Enables local-only debug endpoints such as `/api/debug/docker`. Keep disabled in production. |
 | `NODE_EXTRA_CA_CERTS` | No | — | Path to a CA certificate file to trust (Node standard), e.g. `/app/data/certs/ca.crt`. You can also just drop `*.crt`/`*.pem` files into `data/certs/` — they are auto-trusted on startup. See [Custom CA certificates](#custom-ca-certificates). |
 
 ### Encryption
@@ -222,6 +226,7 @@ Unresolved `${VAR}` (no env value, no default) is left as-is. This works for eve
 To make OmniSight trust a private/self-signed CA (e.g. a corporate root for your Healthchecks/SMTP/ntfy endpoints), use either method:
 
 - **Drop-in (recommended):** place one or more `*.crt` / `*.pem` files into `data/certs/`. They are auto-trusted on startup — no env needed. In Docker/Kubernetes this directory lives inside the mounted `data` volume.
+- **Settings UI:** upload `.crt`, `.pem`, `.cer`, `.pfx` or `.p12` files from **Settings → Certificates**. PFX/P12 files are converted to a trusted PEM when `openssl` can extract the CA certificate.
 - **Env var (Node standard):** set `NODE_EXTRA_CA_CERTS` to a cert file path, e.g. `NODE_EXTRA_CA_CERTS=/app/data/certs/ca.crt`.
 
 In Kubernetes you can also mount the CA from a ConfigMap — `deploy/kubernetes.yaml` has a ready, commented example (ConfigMap `omnisight-ca` + `NODE_EXTRA_CA_CERTS=/app/certs/ca.crt` + a read-only `/app/certs` mount).
@@ -231,12 +236,13 @@ In Kubernetes you can also mount the CA from a ConfigMap — `deploy/kubernetes.
 The live config is `data/config.yaml` (created automatically on first save). Easiest is to configure everything from the Settings UI; to hand-edit, copy the template — `cp config.example.yaml data/config.yaml` — and edit it. All sections are optional; include only what you use. See `config.example.yaml`.
 
 - `linux` — `enabled` + `agentToken` (auto-generated from the Settings UI). Systems self-register via the [agent](#the-agent); no per-server entries needed. Services are auto-discovered and Exclude/Include is managed from the UI
-- `proxmox` — just `enabled` (+ optional `icon`). Data comes from agents running on the nodes (`pvesh`)
-- `docker` — just `enabled` (+ optional `icon`). Data comes from agents on the hosts
+- `proxmox` — `enabled`, optional `url` / `tokenId` / `tokenSecret` / `insecureTLS` for API mode, plus optional `icon`. Without API settings, data can come from agents running on the nodes (`pvesh`)
+- `docker` — `enabled`, optional `hosts[]` for Docker API or SSH hosts (`sshHost`, `sshUser`, `sshPassword`/`sshKey`, `sshMode`, `sudo`, `insecureTLS`), plus optional `icon`. Agent-reported Docker hosts also appear automatically
 - `kubernetes` — kubeconfig, namespaces[] (the Settings UI has a **Browse…** button that uploads a kubeconfig from your machine into `data/` and fills in the container path automatically)
 - `snmp.devices[]` — SNMP v2c (community) or v3 (username, authPassword, privPassword, …)
 - `healthchecks` — url, apiKey
 - `uptimekuma` — url, status page `slug`, optional apiKey
+- `prometheus` — one or more `instances[]` with name, url, optional bearerToken and `insecureTLS`
 - `database.instances[]` — `type: postgresql | mysql | mariadb | mongodb`, name, host, port, user, password, optional `database`
 - `alerts` — `enabled` + `ntfy` / `telegram` / `smtp` channels
 - `publicStatus: true` and `publicTitle` — expose the `/status` page publicly
@@ -247,7 +253,7 @@ The live config is `data/config.yaml` (created automatically on first save). Eas
 Some cards expose actions (no extra setup beyond the access the connection already has):
 
 - **Linux & Proxmox services** — query `status`, `start`, `stop`, `restart` on inactive/failed units via the agent (executed locally with `systemctl`, delivered near-instantly over the command long-poll). You can also Exclude/Include intentionally stopped services directly from the UI so they don't degrade the dashboard health or trigger alerts.
-- **Docker** — `Prune` removes dangling images and the live log viewer streams `docker logs`, both executed locally by the agent on the host.
+- **Docker** — `Prune` removes dangling images and the live log viewer streams `docker logs`, executed through the agent or the configured Docker API/SSH host.
 
 ### Databases
 
@@ -285,7 +291,7 @@ alerts:
     to: ["alerts@domain.com"]
 ```
 
-Notifications are sent only on **state changes** (running→down = DOWN, down→running = UP). Pre-existing problems at startup do not trigger a flood. Each channel can be tested individually from the Settings page.
+Notifications are sent only on **state changes** (running→down = DOWN, down→running = UP). Pre-existing problems at startup do not trigger a flood. Healthchecks `grace` is treated as degraded/warning; the DOWN notification is sent only after the check becomes `down`. Each channel can be tested individually from the Settings page.
 
 ## Pages
 
@@ -294,15 +300,22 @@ Notifications are sent only on **state changes** (running→down = DOWN, down→
 | `/` | Main dashboard (login required) |
 | `/status` | Public read-only summary (only when `publicStatus: true`) |
 | `/settings` | Configuration |
+| `/agents` | Connected agents, versions and update actions |
 | `/profile` | Username / password |
 | `/logs` | Live log / warning / error stream |
-| `/about`, `/help` | Version info and GitHub |
+| `/about` | Version info and GitHub |
+
+The sidebar footer also links to GitHub and opens a new issue form for help/bug reports.
 
 ## Security
 
 - The `data/` folder and `.env` are git-ignored.
 - All state lives in `./data/` (`config.yaml`, `secret.key`, `kube.bin`, `auth.yaml`, `sessions.yaml`, SSH keys) — it never leaves your machine.
-- Login password is set on first run from `/profile`. Passwords must be at least 8 characters and contain both an uppercase and a lowercase letter.
+- Login password is set on first run. Passwords must be at least 8 characters and contain both an uppercase and a lowercase letter.
+- Sessions use `HttpOnly`, `SameSite=Strict` cookies; login attempts are rate-limited.
+- Mutating API requests are protected by same-origin checks, and browser security headers are enabled.
+- Uploaded icons, kubeconfigs and certificates are size-limited; uploaded SVG icons are checked for active content.
+- TLS verification is enabled by default for integrations. Use each platform's explicit self-signed/insecure option only when needed.
 - Config secrets are encrypted at rest by default (see Encryption above).
 
 ## License
