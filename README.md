@@ -1,4 +1,6 @@
-![](https://raw.githubusercontent.com/caglaryalcin/OmniSight/refs/heads/main/public/assets/omnisight-wordmark.png)
+<div align="center" width="100%">
+    <img src="./public/assets/omnisight-wordmark.svg" width="512" alt="Uptime Kuma Logo" />
+</div>
 
 ![Status](https://img.shields.io/badge/status-stable-brightgreen) [![Version](https://img.shields.io/badge/version-1.4.2-blue)](https://github.com/caglaryalcin/OmniSight/releases) [![Latest Release](https://img.shields.io/github/v/release/caglaryalcin/OmniSight?include_prereleases&color=blue)](https://github.com/caglaryalcin/OmniSight/releases)
 
