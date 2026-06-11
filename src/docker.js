@@ -5,6 +5,16 @@ const os = require('os');
 const { execFile } = require('child_process');
 const { Client } = require('ssh2');
 
+const warnTimes = new Map();
+
+function warnThrottled(key, message) {
+  const now = Date.now();
+  const last = warnTimes.get(key) || 0;
+  if (now - last < 60000) return;
+  warnTimes.set(key, now);
+  console.warn(message);
+}
+
 function reqJson(host, path, opts = {}) {
   return new Promise((resolve, reject) => {
     const isSocket = !!host.socketPath;
@@ -118,12 +128,12 @@ function execSshNode(host, command) {
       conn.end();
       err ? reject(err) : resolve(value);
     };
-    const timer = setTimeout(() => done(new Error('SSH command timed out')), 20000);
+    const timer = setTimeout(() => done(new Error('SSH command timed out')), 45000);
     const cfg = {
       host: host.sshHost,
       port: Number(host.sshPort) || 22,
       username: host.sshUser || 'root',
-      readyTimeout: 15000,
+      readyTimeout: 30000,
       tryKeyboard: true,
     };
     if (host.sshPassword) cfg.password = String(host.sshPassword);
@@ -158,7 +168,7 @@ function execSsh(host, command) {
     const user = host.sshUser || 'root';
     const target = `${user}@${host.sshHost}`;
     const sshArgs = [
-      '-o', 'ConnectTimeout=10',
+      '-o', 'ConnectTimeout=20',
       '-o', 'StrictHostKeyChecking=accept-new',
       '-p', String(port),
     ];
@@ -167,7 +177,7 @@ function execSsh(host, command) {
     sshArgs.push(target, command);
     const bin = 'ssh';
     const args = sshArgs;
-    const opts = { timeout: 20000, maxBuffer: 1024 * 1024 * 3 };
+    const opts = { timeout: 45000, maxBuffer: 1024 * 1024 * 3 };
     execFile(bin, args, opts, (err, stdout, stderr) => {
       if (err) {
         const msg = cleanSshError(stderr || err.message || '');
@@ -190,6 +200,19 @@ function parsePortsText(raw) {
   let m;
   while ((m = re.exec(String(raw || ''))) && out.length < 8) out.push(`${m[1]}:${m[2]}`);
   if (!out.length && raw) out.push(String(raw).slice(0, 80));
+  return out;
+}
+
+async function mapLimit(items, limit, fn) {
+  const out = new Array(items.length);
+  let next = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (next < items.length) {
+      const idx = next++;
+      out[idx] = await fn(items[idx], idx);
+    }
+  });
+  await Promise.all(workers);
   return out;
 }
 
@@ -227,11 +250,17 @@ async function execDockerCliCaptured(host, args, tailBytes) {
 async function getDockerSshHost(host) {
   const name = host.name || host.sshHost || 'docker';
   try {
-    const [psTxt, statsTxt, danglingTxt] = await Promise.all([
-      execDockerCli(host, "ps -a --no-trunc --format '{{json .}}'"),
-      execDockerCli(host, "stats --no-stream --no-trunc --format '{{json .}}'").catch(() => ''),
-      execDockerCli(host, 'images -f dangling=true -q').then(txt => String(txt || '').trim().split(/\r?\n/).filter(Boolean).length).catch(() => 0),
-    ]);
+    const psTxt = await execDockerCli(host, "ps -a --no-trunc --format '{{json .}}'");
+    const statsTxt = await execDockerCli(host, "stats --no-stream --no-trunc --format '{{json .}}'").catch(err => {
+      warnThrottled(`docker-stats:${name}`, `[Docker ${name}] stats unavailable: ${err.message}`);
+      return '';
+    });
+    const danglingTxt = await execDockerCli(host, 'images -f dangling=true -q')
+      .then(txt => String(txt || '').trim().split(/\r?\n/).filter(Boolean).length)
+      .catch(err => {
+        warnThrottled(`docker-images:${name}`, `[Docker ${name}] dangling image check failed: ${err.message}`);
+        return 0;
+      });
     const stats = new Map(parseJsonLines(statsTxt).map(s => [String(s.ID || '').slice(0, 12), s]));
     const containers = parseJsonLines(psTxt).slice(0, 200).map(c => {
       const id = String(c.ID || '').slice(0, 12);
@@ -272,6 +301,7 @@ async function getDockerSshHost(host) {
       containers,
     };
   } catch (err) {
+    warnThrottled(`docker-host:${name}`, `[Docker ${name}] refresh failed: ${err.message}`);
     return { source: 'configured', name, host: host.sshHost || '', online: false, error: err.message, summary: { total: 0, running: 0, stopped: 0, unused: 0 }, containers: [] };
   }
 }
@@ -284,7 +314,7 @@ async function getDockerHost(host) {
       reqJson(host, '/containers/json?all=1'),
       reqJson(host, '/system/df').catch(() => ({})),
     ]);
-    const detailed = await Promise.all((containers || []).slice(0, 200).map(async c => {
+    const detailed = await mapLimit((containers || []).slice(0, 200), 6, async c => {
       const id = String(c.Id || '').slice(0, 12);
       const stats = c.State === 'running' ? await reqJson(host, `/containers/${id}/stats?stream=false`).catch(() => null) : null;
       return {
@@ -301,7 +331,7 @@ async function getDockerHost(host) {
         netIO: stats ? netIO(stats) : '',
         blockIO: stats ? blockIO(stats) : '',
       };
-    }));
+    });
     const running = detailed.filter(c => c.state === 'running').length;
     const stopped = detailed.filter(c => c.state === 'exited' || c.state === 'dead').length;
     const cpuVals = detailed.filter(c => c.cpu != null).map(c => c.cpu);
@@ -322,6 +352,7 @@ async function getDockerHost(host) {
       containers: detailed,
     };
   } catch (err) {
+    warnThrottled(`docker-api:${name}`, `[Docker ${name}] refresh failed: ${err.message}`);
     return { source: 'configured', name, host: host.url || host.socketPath || '', online: false, error: err.message, summary: { total: 0, running: 0, stopped: 0, unused: 0 }, containers: [] };
   }
 }
