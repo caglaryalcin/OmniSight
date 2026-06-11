@@ -85,10 +85,20 @@ function badge(cls, text){ return `<span class="badge bg-${cls}">${esc(text)}</s
 function copyText(text, btn){
   navigator.clipboard?.writeText(text).then(()=>{ const o=btn.textContent; btn.textContent='Copied'; setTimeout(()=>btn.textContent=o,1200); });
 }
+let msgHoldUntil = 0;
+function clearMsg(force = false){
+  if(!force && Date.now() < msgHoldUntil) return;
+  const msg = document.getElementById('msg');
+  msg.textContent = '';
+  msg.className = 'msg';
+  msgHoldUntil = 0;
+}
 function showManualCommand(message, command){
   const msg = document.getElementById('msg');
   msg.className = 'msg err';
+  msgHoldUntil = Date.now() + 60000;
   msg.innerHTML = `${esc(message)}<div class="cmd">${esc(command)}<button class="btn" onclick="copyText(this.parentElement.childNodes[0].textContent,this)">Copy</button></div>`;
+  setTimeout(() => clearMsg(), 60050);
 }
 function renderAgents(data){
   const latest = data.latestVersion || '1.0.0';
@@ -117,19 +127,18 @@ function renderAgents(data){
   }).join('');
 }
 async function loadAgents(){
-  const msg = document.getElementById('msg');
-  msg.textContent = '';
+  clearMsg();
   try{
     const r = await fetch('/api/agents',{headers:authHeaders()});
     handleUnauth(r);
     const d = await r.json();
     if(!r.ok) throw new Error(d.error||r.statusText);
     renderAgents(d);
-  }catch(e){ msg.textContent = e.message; msg.className = 'msg err'; }
+  }catch(e){ const msg = document.getElementById('msg'); msg.textContent = e.message; msg.className = 'msg err'; }
 }
 async function updateAgent(id, btn){
   const msg = document.getElementById('msg');
-  msg.textContent = ''; msg.className = 'msg';
+  clearMsg(true);
   const old = btn.textContent; btn.disabled = true; btn.textContent = 'Updating...';
   try{
     const r = await fetch('/api/agent/update',{method:'POST',headers:{'Content-Type':'application/json',...authHeaders()},body:JSON.stringify({id})});
