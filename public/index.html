@@ -699,7 +699,7 @@ const linuxOpen = {};
 const hcOpen = {};
 const snmpOpen = {};
 const k8sGrpOpen = {};
-const defaultOverviewGroupOpen = { pods:true, deps:false, svcs:false, dockerHosts:true, dockerContainers:true, prometheusServers:true, prometheusTargets:true };
+const defaultOverviewGroupOpen = { pods:true, deps:false, svcs:false, snmpServers:true, dockerHosts:true, dockerContainers:true, prometheusServers:true, prometheusTargets:true, databaseServers:true };
 let overviewK8sOpen = { ...defaultOverviewGroupOpen };
 try { overviewK8sOpen = { ...overviewK8sOpen, ...JSON.parse(localStorage.getItem('os_overview_group_open') || '{}') }; } catch {}
 function saveOverviewGroupOpen(){
@@ -2706,8 +2706,8 @@ function overviewRows(id, data){
         dev.online ? [dev.host, dev.cpu!=null?`CPU ${dev.cpu}%`:'', dev.ram?`RAM ${dev.ram.percent}%`:'', dev.systemTemp!=null?`${dev.systemTemp}°C`:'' ].filter(Boolean).join(' · ') :
         (dev.error || 'SNMP unreachable');
       return overviewRow('snmp', dev.name, sub, dev._connecting?'gray':dev.online?'green':'red', dev._connecting?'connecting':dev.online?'online':'offline', dev._connecting?'md-gray':dev.online?'md-green':'md-red');
-    });
-    return rows.join('');
+    }).join('');
+    return overviewGroup('snmpServers', 'Servers', rows, 'No network devices found');
   }
   if(id === 'docker'){
     const hosts = data.docker || [];
@@ -2832,10 +2832,11 @@ function overviewRows(id, data){
     ].join('');
   }
   if(id === 'database'){
-    return (data.database||[]).map(d => {
+    const rows = (data.database||[]).map(d => {
       const sub = [d.type, d.host, d.connections!=null?`${d.connections} conns`:'', d.sizeBytes?fmtBytes(d.sizeBytes):'' ].filter(Boolean).join(' · ');
       return overviewRow('database', d.name, sub || 'Database', d._connecting?'gray':d.online?'green':'red', d._connecting?'connecting':d.online?'online':'offline', d._connecting?'md-gray':d.online?'md-green':'md-red');
     }).join('');
+    return overviewGroup('databaseServers', 'Servers', rows, 'No database servers found');
   }
   return '';
 }
