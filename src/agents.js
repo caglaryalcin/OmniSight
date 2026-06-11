@@ -295,7 +295,7 @@ function getDockerData() {
   const now = Date.now();
   const rows = [...agents.values()].filter(a => a.role === 'docker').map(a => {
     const online = isOnline(a, now) && !!a.docker;
-    if (!online) return { name: a.hostname, online: false, error: 'agent offline', containers: [], summary: { total: 0, running: 0, stopped: 0, other: 0, unused: null } };
+    if (!online) return { source: 'agent', id: a.id, name: a.hostname, host: a.ip || '', online: false, error: 'agent offline', containers: [], summary: { total: 0, running: 0, stopped: 0, other: 0, unused: null } };
     const containers = (a.docker.containers || []).map(c => ({
       id: c.id,
       name: c.name,
@@ -319,7 +319,7 @@ function getDockerData() {
     const cpu = Math.round(containers.reduce((s, c) => s + (c.cpu || 0), 0) * 10) / 10;
     const memPercent = Math.round(containers.reduce((s, c) => s + (c.memPercent || 0), 0) * 10) / 10;
     return {
-      name: a.hostname, online: true, containers,
+      source: 'agent', id: a.id, name: a.hostname, host: a.ip || '', online: true, containers,
       metrics: { bandwidth: a.metrics?.bandwidth || null },
       summary: { total: containers.length, running, stopped, other: containers.length - running - stopped, unused: a.docker.unused ?? null, cpu, memPercent },
     };

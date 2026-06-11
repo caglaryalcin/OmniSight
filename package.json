@@ -1,6 +1,6 @@
 {
   "name": "omnisight",
-  "version": "1.1.5",
+  "version": "1.2.0",
   "description": "Agent-based monitoring dashboard for Proxmox, Linux servers, Docker, Kubernetes, SNMP devices, databases, Healthchecks and Uptime Kuma",
   "main": "server.js",
   "scripts": {
@@ -9,14 +9,15 @@
     "encrypt-config": "node scripts/encrypt-config.js"
   },
   "dependencies": {
+    "@kubernetes/client-node": "^0.20.0",
     "express": "^4.18.2",
     "js-yaml": "^4.1.0",
+    "mongodb": "^6.5.0",
+    "mysql2": "^3.9.7",
     "net-snmp": "^3.11.3",
-    "@kubernetes/client-node": "^0.20.0",
     "nodemailer": "^6.9.14",
     "pg": "^8.11.5",
-    "mysql2": "^3.9.7",
-    "mongodb": "^6.5.0"
+    "ssh2": "^1.17.0"
   },
   "author": "caglaryalcin",
   "homepage": "https://github.com/caglaryalcin"

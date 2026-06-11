@@ -11,7 +11,7 @@
 *{margin:0;padding:0;box-sizing:border-box}
 
 :root{
-  --bg:#0B0E14; --panel:#12161F; --panel2:#161C29; --row:#1A202C;
+  --bg:#141617; --panel:#181A1B; --panel2:#1D2021; --row:#1A202C;
   --border:#242C3B; --border2:#2E3850;
   --text:#E2E8F2; --muted:#7D8AA3;
   --green:#34D399; --red:#F87171; --yellow:#FBBF24; --blue:#60A5FA;
@@ -25,8 +25,8 @@ html[data-theme="light"]{color-scheme:light}
 
 body{background:var(--bg);color:var(--text);font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;overflow:hidden;-webkit-font-smoothing:antialiased}
 body::before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;background:
-  linear-gradient(180deg,rgba(79,156,249,.08),transparent 34%),
-  linear-gradient(90deg,rgba(41,199,217,.05),transparent 42%)}
+  radial-gradient(900px 500px at 85% -10%, rgba(99,102,241,.10), transparent 60%),
+  radial-gradient(800px 500px at -10% 110%, rgba(34,211,238,.06), transparent 60%)}
 
 body {
   -webkit-user-select: none;
@@ -45,7 +45,7 @@ body {
 #pbar{position:fixed;top:0;left:0;height:2px;background:linear-gradient(90deg,var(--accent),var(--cyan));z-index:8000;transition:width 1s linear;box-shadow:0 0 8px rgba(99,102,241,.6)}
 
 header{
-  background:rgba(18,22,31,.82);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  background:rgba(24,26,27,.82);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
   border-bottom:1px solid var(--border);
   height:60px;padding:0 22px;
   display:flex;align-items:center;justify-content:space-between;
@@ -82,10 +82,10 @@ header{
 
 /* Layout */
 .layout{display:flex;height:calc(100vh - 88px)}
-.appfoot{height:28px;display:flex;align-items:center;gap:14px;padding:0 16px;border-top:1px solid var(--border);font-size:12px;color:var(--muted);background:rgba(18,22,31,.82);backdrop-filter:blur(14px)}
+.appfoot{height:28px;display:flex;align-items:center;gap:14px;padding:0 16px;border-top:1px solid var(--border);font-size:12px;color:var(--muted);background:rgba(24,26,27,.82);backdrop-filter:blur(14px)}
 .appfoot a{color:var(--muted);text-decoration:none;display:inline-flex;align-items:center;gap:5px;transition:color .15s}
 .appfoot a:hover{color:var(--text)}
-#sidebar{width:312px;min-width:260px;max-width:380px;border-right:1px solid var(--border);overflow-y:auto;flex-shrink:0;background:rgba(13,17,23,.58);backdrop-filter:blur(18px);position:relative;padding:6px}
+#sidebar{width:312px;min-width:260px;max-width:380px;border-right:1px solid var(--border);overflow-y:auto;flex-shrink:0;background:rgba(24,26,27,.72);backdrop-filter:blur(18px);position:relative;padding:6px}
 #resizer{width:1px;background:var(--border);cursor:default;flex-shrink:0;position:relative;z-index:10}
 #detail{flex:1;overflow-y:auto;padding:0;background:transparent;min-width:0}
 
@@ -109,12 +109,14 @@ header{
 /* Detail header */
 .det-hdr{
   display:flex;align-items:center;gap:12px;
-  padding:16px 22px;background:rgba(18,22,31,.85);backdrop-filter:blur(14px);
+  padding:16px 22px;background:rgba(24,26,27,.85);backdrop-filter:blur(14px);
   border-bottom:1px solid var(--border);position:sticky;top:0;z-index:10;
 }
 .det-icon{width:34px;height:34px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--row);border:1px solid var(--border);border-radius:10px;padding:6px}
 .det-title{font-size:18px;font-weight:750;letter-spacing:-.02em;flex:1}
-.det-meta{font-size:12px;color:var(--muted)}
+.det-summary{display:flex;align-items:center;gap:12px;margin-right:16px}
+.det-summary .badge{font-size:12.5px;padding:4px 11px;font-weight:700}
+.det-meta{font-size:13.5px;color:var(--muted);font-weight:600}
 .det-body{padding:0 0 24px}
 
 /* Monitor rows */
@@ -331,6 +333,29 @@ html[data-theme="light"] .topbar{background:rgba(255,255,255,.78)}
 .detail-kv-val{font-size:13px;font-weight:650;min-width:0;overflow-wrap:anywhere}
 .mon-row.clickable{cursor:pointer}
 .mon-row.clickable:hover{background:rgba(255,255,255,.045)}
+.prom-instance{border-top:1px solid var(--border)}
+.prom-instance:first-child{border-top:0}
+.prom-instance-h{display:flex;align-items:center;gap:10px;padding:11px 16px;background:rgba(0,0,0,.08);border-bottom:1px solid var(--border);min-width:0;cursor:pointer;user-select:none}
+.prom-instance-h:hover{background:rgba(255,255,255,.035)}
+.prom-instance-name{font-size:14px;font-weight:750;color:var(--text);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.prom-instance-url{font-size:12px;color:var(--muted);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.prom-instance-main{flex:1;min-width:0}
+.prom-instance-meta{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.prom-instance-body{display:none}
+.prom-instance-body.open{display:block}
+.docker-row{
+  display:grid;
+  grid-template-columns:9px minmax(150px,190px) minmax(170px,230px) 68px 78px minmax(126px,150px) minmax(100px,120px) minmax(130px,1fr) auto;
+  align-items:center;
+  column-gap:12px;
+}
+.docker-row .mon-dot{margin:0}
+.docker-cell{min-width:0;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+.docker-cell.name{color:var(--text);font-size:14px;font-weight:650}
+.docker-cell.ports{font-size:13px}
+@media (max-width:1200px){
+  .docker-row{grid-template-columns:9px minmax(130px,1.2fr) minmax(140px,1fr) 62px 70px minmax(110px,1fr) minmax(90px,1fr) minmax(110px,1fr) auto}
+}
 .lg-ts{color:var(--muted)}
 .lg-err{color:var(--red);font-weight:600}
 .lg-warn{color:var(--yellow);font-weight:600}
@@ -371,7 +396,7 @@ html[data-theme="light"] .topbar{background:rgba(255,255,255,.78)}
 }
 
 .shell{height:100vh;display:grid;grid-template-columns:minmax(238px,var(--rail-w,264px)) minmax(0,1fr);background:var(--bg)}
-.rail{border-right:1px solid var(--border);background:rgba(13,17,23,.72);backdrop-filter:blur(18px);display:flex;flex-direction:column;min-width:0;position:relative}
+.rail{border-right:1px solid var(--border);background:rgba(24,26,27,.92);backdrop-filter:blur(18px);display:flex;flex-direction:column;min-width:0;position:relative}
 .brand{height:68px;display:flex;align-items:center;gap:12px;padding:0 20px;border-bottom:1px solid var(--border);text-decoration:none;color:inherit}
 .mark{width:34px;height:34px;border-radius:10px;background:transparent;display:grid;place-items:center;flex-shrink:0;overflow:visible}
 .mark svg{width:19px;height:19px;color:#061015}
@@ -388,6 +413,7 @@ html[data-theme="light"] .topbar{background:rgba(255,255,255,.78)}
 .rail-icon-link{width:28px;height:28px;padding:0;justify-content:center;gap:0}
 .rail-icon-link svg{width:15px;height:15px}
 .rail-link:hover{background:var(--panel2);border-color:var(--border);color:var(--text)}
+#foot-ver{margin-right:auto;transform:translateY(2px)}
 .rail-toggle{position:absolute;top:16px;right:12px;width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:var(--panel);color:var(--muted);display:grid;place-items:center;cursor:pointer;z-index:45;transition:background .15s,border-color .15s,color .15s}
 .rail-toggle:hover{border-color:var(--border2);background:var(--panel2);color:var(--text)}
 .rail-toggle svg{width:16px;height:16px;transition:transform .18s}
@@ -395,7 +421,7 @@ html[data-theme="light"] .topbar{background:rgba(255,255,255,.78)}
 .rail-resizer::after{content:'';position:absolute;top:68px;bottom:0;left:3px;width:1px;background:transparent;transition:background .15s,box-shadow .15s}
 .rail-resizer:hover::after,body.os-resizing .rail-resizer::after{background:var(--blue);box-shadow:0 0 10px rgba(96,165,250,.45)}
 .main-shell{display:grid;grid-template-rows:68px 1fr;min-width:0;min-height:0}
-.topbar{border-bottom:1px solid var(--border);background:rgba(13,17,23,.58);backdrop-filter:blur(18px);display:flex;align-items:center;gap:14px;padding:0 22px;min-width:0;overflow:visible}
+.topbar{border-bottom:1px solid var(--border);background:rgba(24,26,27,.72);backdrop-filter:blur(18px);display:flex;align-items:center;gap:14px;padding:0 22px;min-width:0;overflow:visible}
 .topbar::-webkit-scrollbar{display:none}
 .search{width:min(440px,42vw);height:38px;background:var(--panel);border:1px solid var(--border);border-radius:8px;display:flex;align-items:center;gap:10px;padding:0 12px;color:var(--muted);flex-shrink:1}
 .search input{background:transparent;border:0;outline:0;color:var(--text);width:100%;font-size:13px}
@@ -412,9 +438,9 @@ html[data-theme="light"] .topbar{background:rgba(255,255,255,.78)}
 .topbar .menu-btn{width:36px;height:36px;border-radius:8px;background:var(--panel);display:grid;place-items:center;padding:0}
 .shell #sidebar{width:auto;min-width:0;max-width:none;border-right:0;background:transparent;backdrop-filter:none;position:relative;padding:0 12px 16px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:8px}
 .shell #detail{overflow-y:auto;padding:0;background:transparent;min-width:0;min-height:0;flex:none}
-.shell .sb-card{margin:0;border:1px solid var(--border);background:rgba(17,24,39,.62);border-radius:8px;padding:10px 11px;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:9px;box-shadow:none;overflow:visible}
-.shell .sb-card:hover{border-color:var(--border2);transform:none;box-shadow:none;background:rgba(22,28,41,.72)}
-.shell .sb-card.active{border-color:var(--border);background:rgba(17,24,39,.62);box-shadow:none}
+.shell .sb-card{margin:0;border:1px solid var(--border);background:rgba(24,26,27,.78);border-radius:8px;padding:10px 11px;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:9px;box-shadow:none;overflow:visible}
+.shell .sb-card:hover{border-color:var(--border2);transform:none;box-shadow:none;background:rgba(29,32,33,.72)}
+.shell .sb-card.active{border-color:var(--border);background:rgba(24,26,27,.78);box-shadow:none}
 .shell .sb-card.dragging{border:1px dashed var(--blue);background:rgba(96,165,250,.08)}
 .shell .sb-hdr{display:contents;padding:0}
 .shell .sb-icon{width:26px;height:26px;border-radius:8px;background:var(--panel2);border:1px solid var(--border);padding:5px}
@@ -438,7 +464,7 @@ body.rail-collapsed .nav button{width:38px;height:38px;box-sizing:border-box;jus
 body.rail-collapsed .nav button svg{display:block;margin:auto}
 body.rail-collapsed .shell #sidebar{padding:0 0 16px;align-items:center;gap:4px;scrollbar-width:none}
 body.rail-collapsed .shell #sidebar::-webkit-scrollbar{display:none}
-body.rail-collapsed .shell .sb-card{width:38px;height:38px;box-sizing:border-box;padding:0;border:1px solid var(--border);background:rgba(17,24,39,.62);display:grid;grid-template-columns:1fr;place-items:center;justify-items:center;align-items:center}
+body.rail-collapsed .shell .sb-card{width:38px;height:38px;box-sizing:border-box;padding:0;border:1px solid var(--border);background:rgba(24,26,27,.78);display:grid;grid-template-columns:1fr;place-items:center;justify-items:center;align-items:center}
 body.rail-collapsed .shell .sb-card:hover,body.rail-collapsed .shell .sb-card.active{background:var(--panel2);border-color:var(--border2)}
 body.rail-collapsed .shell .sb-hdr{display:grid;place-items:center;width:100%;height:100%}
 body.rail-collapsed .shell .sb-icon{width:24px;height:24px;padding:0;border:0;background:transparent;border-radius:0;display:grid!important;place-items:center;line-height:1}
@@ -479,7 +505,7 @@ html[data-theme="light"] body.rail-collapsed .shell .sb-card.active{background:#
 .overview-placeholder{border:1px dashed var(--blue);border-radius:8px;background:rgba(96,165,250,.08);min-height:76px}
 .overview-card-h{min-height:54px;display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);min-width:0}
 .overview-card-h:hover{background:rgba(255,255,255,.025)}
-.overview-icon{width:28px;height:28px;display:grid;place-items:center;background:var(--row);border:1px solid var(--border);border-radius:8px;padding:5px;flex-shrink:0}
+.overview-icon{width:28px;height:28px;display:grid;place-items:center;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:5px;flex-shrink:0}
 .overview-title{font-size:15px;font-weight:750;letter-spacing:0;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .overview-meta{font-size:12px;color:var(--muted);flex-shrink:0}
 .overview-card-toggle{width:18px;height:18px;display:grid;place-items:center;color:var(--muted);transition:transform .16s ease,color .16s ease;flex-shrink:0}
@@ -527,7 +553,7 @@ html[data-theme="light"] .overview-card .sb-csum-item{background:transparent!imp
   .nav button svg{display:block;margin:auto}
   .shell #sidebar{display:flex;padding:0 0 16px;align-items:center;scrollbar-width:none}
   .shell #sidebar::-webkit-scrollbar{display:none}
-  .shell .sb-card{width:38px;height:38px;box-sizing:border-box;padding:0;border:1px solid var(--border);background:rgba(17,24,39,.62);display:grid;grid-template-columns:1fr;place-items:center}
+  .shell .sb-card{width:38px;height:38px;box-sizing:border-box;padding:0;border:1px solid var(--border);background:rgba(24,26,27,.78);display:grid;grid-template-columns:1fr;place-items:center}
   .shell .sb-card:hover,.shell .sb-card.active{background:var(--panel2);border-color:var(--border2)}
   .shell .sb-hdr{display:grid;place-items:center;width:100%;height:100%}
   .shell .sb-icon{width:24px;height:24px;padding:0;border:0;background:transparent;border-radius:0;display:grid!important;place-items:center;line-height:1}
@@ -601,17 +627,16 @@ html[data-theme="light"] .overview-card .sb-csum-item{background:transparent!imp
     <div class="rail-section">Live platforms</div>
     <aside id="sidebar"></aside>
     <div class="rail-foot">
+      <span id="foot-ver"></span>
+      <a class="rail-link rail-icon-link" href="https://github.com/caglaryalcin/OmniSight" target="_blank" rel="noopener" title="GitHub" aria-label="GitHub">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5a12 12 0 0 0-3.79 23.39c.6.11.82-.26.82-.58v-2.04c-3.34.73-4.04-1.42-4.04-1.42-.55-1.39-1.34-1.76-1.34-1.76-1.09-.75.08-.73.08-.73 1.2.08 1.84 1.24 1.84 1.24 1.07 1.83 2.8 1.3 3.49.99.11-.78.42-1.3.76-1.6-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.13-.3-.54-1.52.11-3.18 0 0 1.01-.32 3.3 1.23a11.45 11.45 0 0 1 6 0c2.29-1.55 3.3-1.23 3.3-1.23.65 1.66.24 2.88.12 3.18.77.84 1.23 1.91 1.23 3.22 0 4.61-2.81 5.62-5.49 5.92.43.37.82 1.1.82 2.22v3.29c0 .32.22.69.83.57A12 12 0 0 0 12 .5z"/></svg>
+      </a>
       <button class="rail-link rail-icon-link" type="button" onclick="openEmbed('/about')" title="About" aria-label="About">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
       </button>
       <a class="rail-link rail-icon-link" href="https://github.com/caglaryalcin/OmniSight" target="_blank" rel="noopener" title="Help" aria-label="Help">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 1 1 5.82 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
       </a>
-      <a class="rail-link" href="https://github.com/caglaryalcin/OmniSight" target="_blank" rel="noopener">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5a12 12 0 0 0-3.79 23.39c.6.11.82-.26.82-.58v-2.04c-3.34.73-4.04-1.42-4.04-1.42-.55-1.39-1.34-1.76-1.34-1.76-1.09-.75.08-.73.08-.73 1.2.08 1.84 1.24 1.84 1.24 1.07 1.83 2.8 1.3 3.49.99.11-.78.42-1.3.76-1.6-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.13-.3-.54-1.52.11-3.18 0 0 1.01-.32 3.3 1.23a11.45 11.45 0 0 1 6 0c2.29-1.55 3.3-1.23 3.3-1.23.65 1.66.24 2.88.12 3.18.77.84 1.23 1.91 1.23 3.22 0 4.61-2.81 5.62-5.49 5.92.43.37.82 1.1.82 2.22v3.29c0 .32.22.69.83.57A12 12 0 0 0 12 .5z"/></svg>
-        <span>GitHub</span>
-      </a>
-      <span id="foot-ver"></span>
     </div>
     <div class="rail-resizer" id="rail-resizer" title="Resize sidebar"></div>
   </aside>
@@ -733,7 +758,7 @@ function setOverride(key, val) {
 
 let activePanel = null;
 
-const ALL_IDS = ['proxmox','kubernetes','linux','snmp','healthchecks','uptimekuma','docker','database'];
+const ALL_IDS = ['proxmox','kubernetes','linux','snmp','healthchecks','uptimekuma','prometheus','docker','database'];
 
 const SEC_ICONS = {
   proxmox:     () => `<span class="sec-glyph" style="font-size:15px">🖧</span>`,
@@ -742,6 +767,7 @@ const SEC_ICONS = {
   snmp:        (c) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4.03 3 9 3s9-1.34 9-3"/></svg>`,
   healthchecks:(c) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>`,
   uptimekuma:  (c) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12c2.8-4.7 5.8-7 9-7s6.2 2.3 9 7c-2.8 4.7-5.8 7-9 7s-6.2-2.3-9-7Z"/><path d="M8 12h2l1.5-3 2.5 6 1.5-3H16"/></svg>`,
+  prometheus:  (c) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v5"/><path d="M8 5h8"/><path d="M7 10a5 5 0 0 1 10 0c0 2.5-2 4-5 6-3-2-5-3.5-5-6Z"/><path d="M9 21h6"/><path d="M10 17h4"/></svg>`,
   docker:      () => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2496ed" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="9" width="4" height="4" rx="1"/><rect x="7" y="9" width="4" height="4" rx="1"/><rect x="12" y="9" width="4" height="4" rx="1"/><rect x="7" y="4" width="4" height="4" rx="1"/><rect x="12" y="4" width="4" height="4" rx="1"/><path d="M22 11c-.5-3-3-4-6-4"/><path d="M2 13c1 4 5 5 9 5h3c4 0 6-2 6-5"/></svg>`,
   database:    (c) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>`,
 };
@@ -773,6 +799,7 @@ const PLATFORM_META = {
   snmp:        { title:'SNMP',          iconKey:'snmp',        color:'var(--yellow)' },
   healthchecks:{ title:'Healthchecks',  iconKey:'healthchecks',color:'var(--green)' },
   uptimekuma:  { title:'Uptime Kuma',   iconKey:'uptimekuma',  color:'var(--green)' },
+  prometheus:  { title:'Prometheus',    iconKey:'prometheus',  color:'var(--red)' },
   docker:      { title:'Docker',        iconKey:'docker',      color:'var(--blue)' },
   database:    { title:'Databases',     iconKey:'database',     color:'var(--blue)' },
 };
@@ -805,7 +832,7 @@ function skeletonPanel(id){
 }
 function applyConfigured(ids, cfg){
   setConfiguredIds(ids);
-  const d = window._lastData || { timestamp:new Date().toISOString(), proxmox:{nodes:[]}, linux:[], kubernetes:null, snmp:[], healthchecks:null, uptimekuma:null, docker:[], database:[] };
+  const d = window._lastData || { timestamp:new Date().toISOString(), proxmox:{nodes:[]}, linux:[], kubernetes:null, snmp:[], healthchecks:null, uptimekuma:null, prometheus:null, docker:[], database:[] };
   d.configured = ids;
   if(!ids.includes('proxmox')) d.proxmox = { clusterSummary:null, nodes:[] };
   if(!ids.includes('linux')) d.linux = [];
@@ -813,6 +840,7 @@ function applyConfigured(ids, cfg){
   if(!ids.includes('snmp')) d.snmp = [];
   if(!ids.includes('healthchecks')) d.healthchecks = null;
   if(!ids.includes('uptimekuma')) d.uptimekuma = null;
+  if(!ids.includes('prometheus')) d.prometheus = null;
   if(!ids.includes('docker')) d.docker = [];
   if(!ids.includes('database')) d.database = [];
   if(cfg){
@@ -838,6 +866,9 @@ function applyConfigured(ids, cfg){
     }
     if(ids.includes('uptimekuma') && !d.uptimekuma){
       d.uptimekuma = { _connecting: true, online: false, summary: { total: 0, up: 0, down: 0, pending: 0, maintenance: 0, unknown: 0 }, monitors: [] };
+    }
+    if(ids.includes('prometheus') && !d.prometheus){
+      d.prometheus = { _connecting: true, online: false, summary: { instances: 0, instanceUp: 0, instanceDown: 0, total: 0, up: 0, down: 0, unknown: 0 }, instances: [], targets: [] };
     }
   }
   render(d);
@@ -1050,6 +1081,16 @@ function toggleSnmp(key){
   setOverride('snmp:'+key, snmpOpen[key]);
   const el = document.getElementById(`snmp-${key}`);
   if(el){ el.classList.toggle('open', !!snmpOpen[key]); el.style.display=''; }
+}
+
+function togglePrometheusInstance(idx, key){
+  const overrideKey = 'prometheus:' + key;
+  const body = document.getElementById(`prom-body-${idx}`);
+  const next = body ? !body.classList.contains('open') : !(userOverride[overrideKey] !== false);
+  setOverride(overrideKey, next);
+  if(body) body.classList.toggle('open', next);
+  const chev = document.getElementById(`prom-chev-${idx}`);
+  if(chev) chev.classList.toggle('open', next);
 }
 
 function toggleLinux(key){
@@ -1841,6 +1882,116 @@ function buildUptimeKuma(uk){
   };
 }
 
+/* ── Prometheus ── */
+function prometheusHealth(prom){
+  if(!prom) return { state:'unknown', badgeCls:'gray', label:'unknown' };
+  const instances = prom.instances || [];
+  if(prom._connecting || instances.some(i => i._connecting)) return { state:'connecting', badgeCls:'gray', label:'connecting...' };
+  if(!prom.online) return { state:'down', badgeCls:'red', label:'unreachable' };
+  const s = prom.summary || {};
+  const up = Number(s.up || 0);
+  const down = Number(s.down || 0);
+  const unknown = Number(s.unknown || 0);
+  const instanceDown = Number(s.instanceDown || 0);
+  if(down > 0) return up > 0
+    ? { state:'degraded', badgeCls:'yellow', label:'degraded' }
+    : { state:'down', badgeCls:'red', label:`${down} down` };
+  if(unknown > 0 || instanceDown > 0) return { state:'degraded', badgeCls:'yellow', label:'degraded' };
+  return { state:'ok', badgeCls:'green', label:'healthy' };
+}
+function buildPrometheus(prom){
+  if(!prom) return null;
+  if(prom._connecting && !(prom.instances||[]).length) return null;
+  const {online, summary:s={}, targets=[], instances=[]} = prom;
+  const down = s.down??0;
+  const unknown = s.unknown??0;
+  const instanceDown = s.instanceDown??0;
+  const health = prometheusHealth(prom);
+  const sbSummaryHtml = online ? `<div class="sb-csum">
+    <div class="sb-csum-item"><div class="sb-csum-val">${s.instanceUp??0}/${s.instances??0}</div><div class="sb-csum-lbl">Servers</div></div>
+    <div class="sb-csum-item"><div class="sb-csum-val">${s.total??0}</div><div class="sb-csum-lbl">Targets</div></div>
+    <div class="sb-csum-item"><div class="sb-csum-val" style="color:var(--green)">${s.up??0}</div><div class="sb-csum-lbl">Up</div></div>
+    <div class="sb-csum-item"><div class="sb-csum-val" style="color:${down>0?'var(--red)':'var(--muted)'}">${down}</div><div class="sb-csum-lbl">Down</div></div>
+    <div class="sb-csum-item"><div class="sb-csum-val" style="color:${unknown>0?'var(--yellow)':'var(--muted)'}">${unknown}</div><div class="sb-csum-lbl">Unknown</div></div>
+  </div>` : `<div class="sb-csum"><div class="sb-csum-item"><div class="sb-csum-val" style="color:var(--red)">x</div><div class="sb-csum-lbl">Unreachable</div></div></div>`;
+
+  const colHdr = `<div style="display:flex;align-items:center;gap:10px;padding:7px 16px;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);border-bottom:1px solid var(--border)">
+    <div style="width:10px;flex-shrink:0"></div>
+    <span style="flex:1;min-width:0">Target</span>
+    <span style="width:140px;flex-shrink:0">Prometheus</span>
+    <span style="width:140px;flex-shrink:0">Job</span>
+    <span style="width:130px;flex-shrink:0">Last Scrape</span>
+    <span style="width:90px;flex-shrink:0">Status</span>
+  </div>`;
+  const statusColor = st => st==='up'?'green':st==='down'?'red':'yellow';
+  const dotColor = st => st==='up'?'md-green':st==='down'?'md-red':'md-yellow';
+  const offlineInstances = (instances||[]).filter(i => !i.online);
+  const offlineRows = offlineInstances.map(i => `<div class="offline-row">
+    <div class="mon-dot ${i._connecting?'md-gray':'md-red'}"></div>
+    <div>${escHtml(i.name || i.url || 'Prometheus')} ${i._connecting?'connecting...':'unreachable'}<div class="offline-err">${escHtml(i._connecting ? (i.url||'') : (i.error||i.url||''))}</div></div>
+  </div>`).join('');
+  const targetMatchesInstance = (t, inst) => {
+    const srcName = String(t.sourceName || '').trim();
+    const srcUrl = String(t.sourceUrl || '').trim();
+    return (srcName && srcName === String(inst.name || '').trim()) || (srcUrl && srcUrl === String(inst.url || '').trim());
+  };
+  const targetRows = (rows) => rows.map(t=>`<div class="mon-row">
+    <div class="mon-dot ${dotColor(t.health)}"></div>
+    <div class="mon-name" style="flex:1;width:0;min-width:0" title="${escAttr(t.scrapeUrl || t.name)}">${escHtml(t.name)}</div>
+    <span style="width:140px;flex-shrink:0;font-size:13px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escAttr(t.sourceUrl || t.sourceName || '')}">${escHtml(t.sourceName || '—')}</span>
+    <span style="width:140px;flex-shrink:0;font-size:13px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escAttr(t.job || t.scrapePool || '')}">${escHtml(t.job || t.scrapePool || '—')}</span>
+    <span style="width:130px;flex-shrink:0;font-size:13px;color:var(--muted)">${t.lastScrape?relTime(t.lastScrape):'—'}</span>
+    <span style="width:90px;flex-shrink:0"><span class="badge bg-${statusColor(t.health)}" style="font-size:13px">${t.health}</span></span>
+    ${notifyBell('prom:'+(t.sourceName || t.sourceUrl || 'default')+':'+t.name)}
+    ${t.lastError?`<span style="width:240px;flex-shrink:0;font-size:12px;color:var(--red);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escAttr(t.lastError)}">${escHtml(t.lastError)}</span>`:''}
+  </div>`).join('');
+  const instanceSections = (instances||[]).length ? instances.map((inst, idx) => {
+    const rows = targets.filter(t => targetMatchesInstance(t, inst));
+    const sm = inst.summary || {};
+    const instBadge = inst._connecting ? bdg('gray','connecting...') : inst.online ? bdg('green','online') : bdg('red','offline');
+    const instMeta = inst.online ? `${sm.up??rows.filter(t=>t.health==='up').length}/${sm.total??rows.length} up` : (inst._connecting ? 'waiting for first check' : 'unreachable');
+    const instKey = inst.url || inst.name || String(idx);
+    const isOpen = userOverride['prometheus:' + instKey] !== undefined ? userOverride['prometheus:' + instKey] : true;
+    return `<section class="prom-instance">
+      <div class="prom-instance-h" onclick="togglePrometheusInstance(${idx},${jsStr(instKey)})">
+        <div class="mon-dot ${inst._connecting?'md-gray':inst.online?'md-green':'md-red'}"></div>
+        <div class="prom-instance-main">
+          <div class="prom-instance-name">${escHtml(inst.name || inst.url || 'Prometheus')}</div>
+          <div class="prom-instance-url">${escHtml(inst.url || '')}</div>
+        </div>
+        <div class="prom-instance-meta">${escHtml(instMeta)}</div>
+        ${instBadge}
+        <span class="chevron ${isOpen?'open':''}" id="prom-chev-${idx}" style="margin-left:4px">▼</span>
+      </div>
+      <div class="prom-instance-body ${isOpen?'open':''}" id="prom-body-${idx}">
+        ${inst.online && rows.length ? colHdr : ''}
+        ${inst.online ? (rows.length ? targetRows(rows) : '<div class="empty">No active targets found</div>') : `<div class="offline-row"><div class="mon-dot ${inst._connecting?'md-gray':'md-red'}"></div><div>${inst._connecting?'Connecting to Prometheus...':'Prometheus unreachable'}<div class="offline-err">${escHtml(inst._connecting ? (inst.url||'') : (inst.error||inst.url||''))}</div></div></div>`}
+      </div>
+    </section>`;
+  }).join('') : '';
+  const body = !online
+    ? (instanceSections || offlineRows || `<div class="offline-row">
+        <div class="mon-dot md-red"></div>
+        <div>Prometheus unreachable<div class="offline-err">${escHtml(prom.error||'')}</div></div>
+       </div>`)
+    : `<div id="prom-targets">
+        ${instanceSections || `${targets.length?colHdr:''}${targetRows(targets)}`}
+        ${!targets.length && !instanceDown && !instanceSections?'<div class="empty">No active targets found</div>':''}
+      </div>`;
+
+  return {
+    id: 'prometheus',
+    title: 'Prometheus',
+    iconKey: 'prometheus',
+    color: 'var(--red)',
+    meta: online?`${s.up??0}/${s.total??0} up${s.instances?` · ${s.instanceUp??0}/${s.instances} servers`:''}`:'',
+    badge: bdg(health.badgeCls, health.label),
+    sbSummary: sbSummaryHtml,
+    summary: '',
+    body,
+  };
+}
+
 /* ── Docker ── */
 function buildDocker(docker){
   if(!docker?.length) return null;
@@ -1903,16 +2054,16 @@ function buildDocker(docker){
         ${host.summary?.unused>0?`<div class="mon-row" style="justify-content:space-between"><span style="color:var(--muted)">${host.summary.unused} unused image${host.summary.unused>1?'s':''}</span><button class="btn-act" onclick="event.stopPropagation();dockerPrune('${host.name.replace(/'/g,"\\'")}',this)">Prune</button></div>`:''}
         ${host.containers.map(c=>{
           const dotCls = c.color==='green'?'md-green':c.color==='yellow'?'md-yellow':c.color==='red'?'md-red':'md-gray';
-          return `<div class="mon-row clickable" onclick="showDockerLogs('${host.name}','${c.id}','${(c.name||'').replace(/'/g,"\\'")}')" title="View logs">
+          const portsTxt = (c.ports || []).join(' ');
+          return `<div class="mon-row docker-row clickable" onclick="showDockerLogs('${host.name}','${c.id}','${(c.name||'').replace(/'/g,"\\'")}')" title="View logs">
             <div class="mon-dot ${dotCls}"></div>
-            <div class="mon-name" style="width:180px" title="${c.name}">${c.name}</div>
-            <div class="mon-sub" style="flex:0 1 220px;min-width:0" title="${c.image}">${c.imageShort}</div>
-            ${hasNum(c.cpu)?`<span style="font-size:12px;color:var(--muted);flex-shrink:0;margin-right:10px">CPU ${c.cpu}%</span>`:''}
-            ${hasNum(c.memPercent)?`<span style="font-size:12px;color:var(--muted);flex-shrink:0;margin-right:10px">Mem ${c.memPercent}%</span>`:''}
-            ${c.netIO?`<span style="font-size:12px;color:var(--muted);flex-shrink:0;margin-right:10px">Net ${c.netIO}</span>`:''}
-            ${c.blockIO?`<span style="font-size:12px;color:var(--muted);flex-shrink:0;margin-right:10px">I/O ${c.blockIO}</span>`:''}
-            ${c.ports.length?`<span style="font-size:13px;color:var(--muted);flex-shrink:0;margin-right:10px">${c.ports.join(' ')}</span>`:''}
-            <div style="flex:1"></div>
+            <div class="docker-cell name" title="${c.name}">${c.name}</div>
+            <div class="docker-cell image" title="${c.image}">${c.imageShort}</div>
+            <div class="docker-cell cpu">${hasNum(c.cpu)?`CPU ${c.cpu}%`:''}</div>
+            <div class="docker-cell mem">${hasNum(c.memPercent)?`Mem ${c.memPercent}%`:''}</div>
+            <div class="docker-cell net" title="${c.netIO||''}">${c.netIO?`Net ${c.netIO}`:''}</div>
+            <div class="docker-cell io" title="${c.blockIO||''}">${c.blockIO?`I/O ${c.blockIO}`:''}</div>
+            <div class="docker-cell ports" title="${portsTxt}">${portsTxt}</div>
             ${bdg(c.color, c.state)}
           </div>`;
         }).join('')}
@@ -2310,7 +2461,7 @@ function iconFallback(img, iconKey, color){
   span.innerHTML = html;
   img.replaceWith(span);
 }
-const DEFAULT_ICON = { proxmox:'proxmox', kubernetes:'kubernetes', healthchecks:'healthchecks', uptimekuma:'uptime-kuma', docker:'docker' };
+const DEFAULT_ICON = { proxmox:'proxmox', kubernetes:'kubernetes', healthchecks:'healthchecks', uptimekuma:'uptime-kuma', prometheus:'prometheus', docker:'docker' };
 function platformIcon(panel){
   const name = (window._lastData?.icons||{})[panel.id] || DEFAULT_ICON[panel.id];
   const url = iconUrl(name);
@@ -2456,7 +2607,7 @@ function overviewKpi(metric, label, data, ids, panels){
   const options = overviewKpiOptions(metric, ids, panels);
   const current = options.some(o => o.id === overviewKpiPlatforms[metric]) ? overviewKpiPlatforms[metric] : 'all';
   const stat = overviewKpiMetric(data, metric, current);
-  return `<div class="overview-kpi">
+  return `<div class="overview-kpi" data-kpi="${metric}">
     <div class="overview-kpi-head"><span>${label}</span>${drawOverviewKpiSelect(metric, current, options)}</div>
     <div class="overview-kpi-value" style="color:${stat.color||'var(--text)'}">${stat.value}</div>
     <div class="overview-kpi-sub">${stat.sub||''}</div>
@@ -2542,6 +2693,14 @@ function overviewRows(id, data){
       return overviewRow('uptimekuma', m.name, sub, cls, m.status||'unknown', dot, null, `<div class="overview-uk-bars">${uptimeBars(m.history, m.status)}</div>`);
     }).join('');
   }
+  if(id === 'prometheus'){
+    return (data.prometheus?.targets||[]).map(t => {
+      const cls = t.health==='up'?'green':t.health==='down'?'red':'yellow';
+      const dot = t.health==='up'?'md-green':t.health==='down'?'md-red':'md-yellow';
+      const sub = [t.sourceName, t.job || t.scrapePool, t.lastScrape?`Last ${relTime(t.lastScrape)}`:'No scrape', t.lastError].filter(Boolean).join(' · ');
+      return overviewRow('prometheus', t.name, sub, cls, t.health||'unknown', dot);
+    }).join('');
+  }
   if(id === 'kubernetes'){
     const k = data.kubernetes || {};
     const sortedPods = [
@@ -2595,6 +2754,9 @@ function activeAlerts(data){
   (hc?.checks||[]).filter(c=>c.status==='down'||c.status==='grace').forEach(c=>out.push([c.status==='grace'?'Healthcheck grace':'Healthcheck down', c.name || c.slug]));
   const uk = data.uptimekuma;
   (uk?.monitors||[]).filter(m=>m.status==='down').forEach(m=>out.push(['Uptime Kuma down', m.name || m.id]));
+  const prom = data.prometheus;
+  (prom?.instances||[]).filter(i=>!i.online).forEach(i=>out.push(['Prometheus unreachable', i.name || i.url]));
+  (prom?.targets||[]).filter(t=>t.health==='down').forEach(t=>out.push(['Prometheus target down', [t.sourceName, t.name || t.scrapeUrl].filter(Boolean).join(' / ')]));
   (data.database||[]).forEach(d => { if(!d._connecting && !d.online) out.push(['Database offline', d.name]); });
   const k = data.kubernetes;
   if(k?.online && (k.pods||[]).some(p=>p.failed)) out.push(['Kubernetes pod issue', `${(k.pods||[]).filter(p=>p.failed).length} failed`]);
@@ -2686,7 +2848,7 @@ function toggleOverviewCard(id, event, headerEl){
   }
   requestAnimationFrame(layoutOverviewMasonry);
 }
-function renderDashboardOverview(data, ids, panels){
+function renderDashboardOverview(data, ids, panels, opts = {}){
   const cards = ids.map(id => {
     const panel = panels[id];
     const iconSvg = platformIcon(panel);
@@ -2708,6 +2870,11 @@ function renderDashboardOverview(data, ids, panels){
   document.querySelectorAll('.sb-card.active').forEach(c=>c.classList.remove('active'));
   const detail = document.getElementById('detail');
   initOverviewScrollHold(detail);
+  const key = ids.join('|');
+  if(opts.soft && detail.dataset.overviewIds === key && detail.querySelector('.overview')){
+    updateOverviewKpis(data, ids, panels);
+    return;
+  }
   const scrollState = captureOverviewScroll(detail);
   const html = `<section class="overview">
     <div class="overview-kpis">
@@ -2724,6 +2891,7 @@ function renderDashboardOverview(data, ids, panels){
   if(detail.dataset.overviewHtml !== html && !overviewScrollLocked(detail)){
     detail.innerHTML = html;
     detail.dataset.overviewHtml = html;
+    detail.dataset.overviewIds = key;
     initOverviewScrollHold(detail);
     initOverviewDrag();
     requestAnimationFrame(() => {
@@ -2731,14 +2899,37 @@ function renderDashboardOverview(data, ids, panels){
       restoreOverviewScroll(detail, scrollState);
     });
   }
-  loadRecentLogs();
+  if(!opts.soft) loadRecentLogs();
 }
 function clearOverviewCache(){
   const detail = document.getElementById('detail');
-  if(detail) detail.dataset.overviewHtml = '';
+  if(detail) {
+    detail.dataset.overviewHtml = '';
+    detail.dataset.overviewIds = '';
+  }
+}
+function updateOverviewKpis(data, ids, panels){
+  document.querySelectorAll('.overview-kpi[data-kpi]').forEach(el => {
+    const metric = el.dataset.kpi;
+    const options = overviewKpiOptions(metric, ids, panels);
+    const current = options.some(o => o.id === overviewKpiPlatforms[metric]) ? overviewKpiPlatforms[metric] : 'all';
+    const stat = overviewKpiMetric(data, metric, current);
+    const val = el.querySelector('.overview-kpi-value');
+    const sub = el.querySelector('.overview-kpi-sub');
+    if(val){
+      const next = stat.value == null ? '' : String(stat.value);
+      if(val.textContent !== next) val.textContent = next;
+      val.style.color = stat.color || 'var(--text)';
+    }
+    if(sub){
+      const nextSub = stat.sub || '';
+      if(sub.textContent !== nextSub) sub.textContent = nextSub;
+    }
+  });
 }
 
 function selectPanel(id){
+  const wasEmbedOpen = embedOpen;
   embedOpen = false;
   dashboardOpen = false;
   clearOverviewCache();
@@ -2755,11 +2946,13 @@ function selectPanel(id){
     <div class="det-hdr">
       <div class="det-icon">${iconSvg}</div>
       <span class="det-title">${panel.title}</span>
-      ${panel.meta?`<span class="det-meta">${panel.meta}</span>`:''}
-      ${panel.badge}
+      <div class="det-summary">
+        ${panel.meta?`<span class="det-meta">${panel.meta}</span>`:''}
+        ${panel.badge}
+      </div>
     </div>
     <div class="det-body">${panel.body}</div>`;
-  if(detail.dataset.panelId !== id || detail.dataset.panelHtml !== html){
+  if(wasEmbedOpen || detail.dataset.panelId !== id || detail.dataset.panelHtml !== html){
     detail.innerHTML = html;
     detail.dataset.panelId = id;
     detail.dataset.panelHtml = html;
@@ -2858,7 +3051,7 @@ function toggleOverviewGroup(grpId){
 }
 
 /* ── Render ── */
-function render(data){
+function render(data, opts = {}){
   const pageScroll = capturePageScroll();
   window._lastData = data;
   if(Array.isArray(data.configured)) configuredIds = data.configured;
@@ -2883,6 +3076,8 @@ function render(data){
   if(hc && (hc._connecting || hc.online!==undefined)){ platforms.push(hc._connecting?'connecting':(!hc.online?'down':((hc.summary?.down||0)>0||(hc.summary?.grace||0)>0?'degraded':'ok'))); }
   const uk=data.uptimekuma;
   if(uk && (uk._connecting || uk.online!==undefined)){ platforms.push(uptimeKumaHealth(uk).state); }
+  const prom=data.prometheus;
+  if(prom && (prom._connecting || prom.online!==undefined)){ platforms.push(prometheusHealth(prom).state); }
   if((data.docker||[]).length){ if(data.docker.some(h=>h._connecting)) platforms.push('connecting'); else { const o=data.docker.filter(h=>h.online).length; const stopped=data.docker.some(h=>h.online&&(h.summary?.stopped||0)>0); platforms.push(o===0?'down':(o<data.docker.length||stopped)?'degraded':'ok'); } }
   if((data.database||[]).length){ if(data.database.some(d=>d._connecting)) platforms.push('connecting'); }
 
@@ -2893,7 +3088,7 @@ function render(data){
   setFavicon(anyOff);
   setLogoDot(anyOff);
 
-  const dataHas={ proxmox:!!(data.proxmox?.nodes?.length), linux:!!((data.linux||[]).length), kubernetes:!!data.kubernetes, snmp:!!((data.snmp||[]).length), healthchecks:!!data.healthchecks, uptimekuma:!!data.uptimekuma, docker:!!((data.docker||[]).length), database:!!((data.database||[]).length) };
+  const dataHas={ proxmox:!!(data.proxmox?.nodes?.length), linux:!!((data.linux||[]).length), kubernetes:!!data.kubernetes, snmp:!!((data.snmp||[]).length), healthchecks:!!data.healthchecks, uptimekuma:!!data.uptimekuma, prometheus:!!data.prometheus, docker:!!((data.docker||[]).length), database:!!((data.database||[]).length) };
   const connectingCount=platformConnectingCount + configuredIds.filter(id=>id!=='linux'&&!dataHas[id]).length;
   window._connecting = connectingCount;
 
@@ -2925,6 +3120,7 @@ function render(data){
     snmp:         () => buildSynology(data.snmp),
     healthchecks: () => buildHealthchecks(data.healthchecks),
     uptimekuma:   () => buildUptimeKuma(data.uptimekuma),
+    prometheus:   () => buildPrometheus(data.prometheus),
     docker:       () => buildDocker(data.docker),
     database:     () => buildDatabase(data.database),
   };
@@ -2957,7 +3153,7 @@ function render(data){
 
   renderSidebar(ids, panels, !dashboardOpen ? activePanel : null);
   if(dashboardOpen){
-    renderDashboardOverview(data, ids, panels);
+    renderDashboardOverview(data, ids, panels, opts);
     restorePageScroll(pageScroll);
     return;
   }
@@ -3218,7 +3414,7 @@ async function pollOnce(){
   if(paused) return;
   try{
     const data = await fetchStatus();
-    render(data);
+    render(data, { soft: true });
     if(data.loading){
       clearTimeout(timer);
       timer = setTimeout(pollOnce, 1500);

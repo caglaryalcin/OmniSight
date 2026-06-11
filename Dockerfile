@@ -2,7 +2,7 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-RUN apk add --no-cache openssh-client sshpass tzdata
+RUN apk add --no-cache openssh-client tzdata
 
 COPY package*.json ./
 RUN npm install --omit=dev --no-optional && npm cache clean --force

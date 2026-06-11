@@ -26,6 +26,24 @@ fi
 
 json_escape() { printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' | tr -d '\n\r\t'; }
 
+docker_cmd() {
+  if docker "$@" 2>/dev/null; then return 0; fi
+  command -v sudo >/dev/null 2>&1 || return 1
+  sudo docker "$@"
+}
+
+docker_cmd_capture() {
+  local out rc
+  out=$(docker "$@" 2>&1)
+  rc=$?
+  if [ "$rc" -ne 0 ] && command -v sudo >/dev/null 2>&1; then
+    out=$(sudo docker "$@" 2>&1)
+    rc=$?
+  fi
+  printf '%s' "$out"
+  return "$rc"
+}
+
 detect_type() {
   case "$AGENT_ROLE" in
     proxmox) echo proxmox; return ;;
@@ -119,12 +137,12 @@ services_json() {
 
 docker_json() {
   command -v docker >/dev/null 2>&1 || return 0
-  docker info >/dev/null 2>&1 || return 0
+  docker_cmd info >/dev/null 2>&1 || return 0
   local unused rows statsf
-  unused=$(docker images -f dangling=true -q 2>/dev/null | wc -l | tr -d ' ')
+  unused=$(docker_cmd images -f dangling=true -q 2>/dev/null | wc -l | tr -d ' ')
   statsf=$(mktemp)
-  docker stats --no-stream --no-trunc --format '{{.ID}}|{{.CPUPerc}}|{{.MemPerc}}|{{.NetIO}}|{{.BlockIO}}' > "$statsf" 2>/dev/null || true
-  rows=$(docker ps -a --no-trunc --format '{{.ID}}|{{.Names}}|{{.Image}}|{{.State}}|{{.Status}}|{{.Ports}}' 2>/dev/null)
+  docker_cmd stats --no-stream --no-trunc --format '{{.ID}}|{{.CPUPerc}}|{{.MemPerc}}|{{.NetIO}}|{{.BlockIO}}' > "$statsf" 2>/dev/null || true
+  rows=$(docker_cmd ps -a --no-trunc --format '{{.ID}}|{{.Names}}|{{.Image}}|{{.State}}|{{.Status}}|{{.Ports}}' 2>/dev/null)
   printf '"docker":{"unused":%s,"containers":[' "${unused:-0}"
   [ -n "$rows" ] && printf '%s\n' "$rows" | awk -F'|' -v statsf="$statsf" '
   BEGIN {
@@ -235,9 +253,9 @@ run_command() {
     start|stop|restart)
       out=$(systemctl "$action" "$target" 2>&1; echo "[exit $?]"; echo "state: $(systemctl is-active "$target" 2>&1)") ;;
     docker_logs)
-      out=$(docker logs --tail 300 "$target" 2>&1 | tail -c 200000) ;;
+      out=$(docker_cmd_capture logs --tail 300 "$target" | tail -c 200000) ;;
     docker_prune)
-      out=$(docker image prune -f 2>&1) ;;
+      out=$(docker_cmd_capture image prune -f) ;;
     *) return ;;
   esac
   b64=$(printf '%s' "$out" | base64 2>/dev/null | tr -d '\n')

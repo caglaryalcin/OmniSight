@@ -8,7 +8,7 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%230B0E14' stroke='%2334D399' stroke-width='2'/><circle cx='16' cy='16' r='6' fill='%2334D399'/><circle cx='16' cy='16' r='10' fill='none' stroke='%2334D399' stroke-width='1.5' stroke-opacity='.4'/></svg>">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-:root{--bg:#0B0E14;--panel:#12161F;--row:#1A202C;--border:#242C3B;--text:#E2E8F2;--muted:#7D8AA3;--green:#34D399;--red:#F87171;--yellow:#FBBF24}
+:root{--bg:#141617;--panel:#181A1B;--row:#1A202C;--border:#242C3B;--text:#E2E8F2;--muted:#7D8AA3;--green:#34D399;--red:#F87171;--yellow:#FBBF24}
 body{background:var(--bg);color:var(--text);font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;display:flex;flex-direction:column;height:100vh}
 header{background:var(--panel);border-bottom:1px solid var(--border);height:64px;padding:0 24px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
 .logo{font-size:19px;font-weight:700;display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit}
@@ -85,6 +85,7 @@ html.embed header{display:none}
   <button class="filter-btn info on" onclick="toggleFilter('info',this)">INFO</button>
   <button class="filter-btn warn on" onclick="toggleFilter('warn',this)">WARN</button>
   <button class="filter-btn error on" onclick="toggleFilter('error',this)">ERROR</button>
+  <button class="btn" id="copy-btn" onclick="copyLogs()">Copy all</button>
   <input id="search" type="text" placeholder="Filter…" oninput="applyFilter()">
 </div>
 <div id="log-wrap"><div class="empty-msg">No logs yet…</div></div>
@@ -116,17 +117,21 @@ function toggleFilter(level, btn){
 
 function applyFilter(){ renderLogs(); }
 
+function visibleLogs(){
+  const search = document.getElementById('search').value.toLowerCase();
+  return allLogs
+    .filter(l => l.t > cleared && filters[l.level] && (!search || l.msg.toLowerCase().includes(search)))
+    .sort((a,b) => b.t - a.t);
+}
+
 function fmt(ts){
   const d = new Date(ts);
   return d.toLocaleTimeString('en-GB',{hour12:false}) + '.' + String(d.getMilliseconds()).padStart(3,'0');
 }
 
 function renderLogs(){
-  const search = document.getElementById('search').value.toLowerCase();
   const wrap = document.getElementById('log-wrap');
-  const visible = allLogs
-    .filter(l => l.t > cleared && filters[l.level] && (!search || l.msg.toLowerCase().includes(search)))
-    .sort((a,b) => b.t - a.t);
+  const visible = visibleLogs();
   document.getElementById('count').textContent = `${visible.length} entries`;
   if(!visible.length){ wrap.innerHTML='<div class="empty-msg">No matching logs</div>'; return; }
   wrap.innerHTML = visible.map(l => `
@@ -136,6 +141,22 @@ function renderLogs(){
       <span class="log-msg ${l.level}">${highlightLog(l.msg)}</span>
     </div>`).join('');
   if(follow) scrollToBottom();
+}
+
+async function copyLogs(){
+  const logs = visibleLogs();
+  const text = logs.map(l => `${fmt(l.t)} ${String(l.level || '').toUpperCase().padEnd(5)} ${l.msg || ''}`).join('\n');
+  const btn = document.getElementById('copy-btn');
+  try {
+    await navigator.clipboard.writeText(text);
+    const old = btn.textContent;
+    btn.textContent = 'Copied';
+    setTimeout(() => { btn.textContent = old; }, 1200);
+  } catch {
+    const old = btn.textContent;
+    btn.textContent = 'Copy failed';
+    setTimeout(() => { btn.textContent = old; }, 1200);
+  }
 }
 
 function escHtml(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }

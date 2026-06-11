@@ -1,6 +1,9 @@
 const http = require('http');
 const https = require('https');
+const fs = require('fs');
+const os = require('os');
 const { execFile } = require('child_process');
+const { Client } = require('ssh2');
 
 function reqJson(host, path, opts = {}) {
   return new Promise((resolve, reject) => {
@@ -96,33 +99,78 @@ function cleanSshError(message) {
   return cleaned || 'SSH command failed';
 }
 
+function expandPath(p) {
+  return p ? String(p).replace(/^~(?=$|[\\/])/, os.homedir()) : p;
+}
+
+function shQuote(value) {
+  return `'${String(value || '').replace(/'/g, `'\\''`)}'`;
+}
+
+function execSshNode(host, command) {
+  return new Promise((resolve, reject) => {
+    const conn = new Client();
+    let settled = false;
+    const done = (err, value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      conn.end();
+      err ? reject(err) : resolve(value);
+    };
+    const timer = setTimeout(() => done(new Error('SSH command timed out')), 20000);
+    const cfg = {
+      host: host.sshHost,
+      port: Number(host.sshPort) || 22,
+      username: host.sshUser || 'root',
+      readyTimeout: 15000,
+      tryKeyboard: true,
+    };
+    if (host.sshPassword) cfg.password = String(host.sshPassword);
+    if (host.sshKey) {
+      try { cfg.privateKey = fs.readFileSync(expandPath(host.sshKey)); } catch {}
+    }
+    conn.on('ready', () => {
+      conn.exec(command, (err, stream) => {
+        if (err) return done(new Error(cleanSshError(err.message)));
+        let stdout = '', stderr = '';
+        if (/sudo\s+-S/.test(command) && host.sshPassword) stream.write(`${host.sshPassword}\n`);
+        stream.on('data', d => { stdout += d.toString('utf8'); });
+        stream.stderr.on('data', d => { stderr += d.toString('utf8'); });
+        stream.on('close', code => {
+          if (code === 0) return done(null, stdout);
+          done(new Error(cleanSshError(stderr || stdout || `SSH command failed (${code})`)));
+        });
+      });
+    });
+    conn.on('keyboard-interactive', (name, instructions, lang, prompts, finish) => {
+      finish(prompts.map(() => String(host.sshPassword || '')));
+    });
+    conn.on('error', err => done(new Error(cleanSshError(err.message))));
+    conn.connect(cfg);
+  });
+}
+
 function execSsh(host, command) {
+  if (host.sshPassword || host.sshMode === 'synology') return execSshNode(host, command);
   return new Promise((resolve, reject) => {
     const port = Number(host.sshPort) || 22;
     const user = host.sshUser || 'root';
     const target = `${user}@${host.sshHost}`;
-    const password = host.sshPassword == null ? '' : String(host.sshPassword);
-    const hasPassword = !!password;
     const sshArgs = [
       '-o', 'ConnectTimeout=10',
       '-o', 'StrictHostKeyChecking=accept-new',
       '-p', String(port),
     ];
-    if (hasPassword) {
-      sshArgs.unshift('-o', 'PreferredAuthentications=password,keyboard-interactive');
-    } else {
-      sshArgs.unshift('-o', 'BatchMode=yes');
-    }
-    if (host.sshKey) sshArgs.push('-i', host.sshKey);
+    sshArgs.unshift('-o', 'BatchMode=yes');
+    if (host.sshKey) sshArgs.push('-i', expandPath(host.sshKey));
     sshArgs.push(target, command);
-    const bin = hasPassword ? 'sshpass' : 'ssh';
-    const args = hasPassword ? ['-e', 'ssh', ...sshArgs] : sshArgs;
+    const bin = 'ssh';
+    const args = sshArgs;
     const opts = { timeout: 20000, maxBuffer: 1024 * 1024 * 3 };
-    if (hasPassword) opts.env = { ...process.env, SSHPASS: password };
     execFile(bin, args, opts, (err, stdout, stderr) => {
       if (err) {
         const msg = cleanSshError(stderr || err.message || '');
-        if (hasPassword && err.code === 'ENOENT') return reject(new Error('sshpass is required for SSH password authentication'));
         return reject(new Error(msg));
       }
       resolve(stdout);
@@ -145,13 +193,44 @@ function parsePortsText(raw) {
   return out;
 }
 
+function dockerCli(args) {
+  return `PATH=$PATH:/usr/bin:/usr/local/bin:/snap/bin docker ${args}`;
+}
+
+async function execDockerCli(host, args) {
+  const base = dockerCli(args);
+  const attempts = host.sudo === true ? [true] : host.sudo === false ? [false] : [false, true];
+  let lastErr;
+  for (const useSudo of attempts) {
+    const command = useSudo ? `sudo -S -p '' sh -c ${shQuote(base)}` : base;
+    try { return await execSsh(host, command); } catch (err) { lastErr = err; }
+  }
+  throw lastErr;
+}
+
+function dockerCliCaptured(args, tailBytes = 200000) {
+  const base = dockerCli(args);
+  return `out=$(${base} 2>&1); rc=$?; printf '%s' "$out" | tail -c ${Number(tailBytes) || 200000}; exit $rc`;
+}
+
+async function execDockerCliCaptured(host, args, tailBytes) {
+  const base = dockerCliCaptured(args, tailBytes);
+  const attempts = host.sudo === true ? [true] : host.sudo === false ? [false] : [false, true];
+  let lastErr;
+  for (const useSudo of attempts) {
+    const command = useSudo ? `sudo -S -p '' sh -c ${shQuote(base)}` : base;
+    try { return await execSsh(host, command); } catch (err) { lastErr = err; }
+  }
+  throw lastErr;
+}
+
 async function getDockerSshHost(host) {
   const name = host.name || host.sshHost || 'docker';
   try {
     const [psTxt, statsTxt, danglingTxt] = await Promise.all([
-      execSsh(host, "docker ps -a --no-trunc --format '{{json .}}'"),
-      execSsh(host, "docker stats --no-stream --no-trunc --format '{{json .}}'").catch(() => ''),
-      execSsh(host, "docker images -f dangling=true -q | wc -l").catch(() => '0'),
+      execDockerCli(host, "ps -a --no-trunc --format '{{json .}}'"),
+      execDockerCli(host, "stats --no-stream --no-trunc --format '{{json .}}'").catch(() => ''),
+      execDockerCli(host, 'images -f dangling=true -q').then(txt => String(txt || '').trim().split(/\r?\n/).filter(Boolean).length).catch(() => 0),
     ]);
     const stats = new Map(parseJsonLines(statsTxt).map(s => [String(s.ID || '').slice(0, 12), s]));
     const containers = parseJsonLines(psTxt).slice(0, 200).map(c => {
@@ -178,6 +257,7 @@ async function getDockerSshHost(host) {
     const cpuVals = containers.filter(c => c.cpu != null).map(c => c.cpu);
     const memVals = containers.filter(c => c.memPercent != null).map(c => c.memPercent);
     return {
+      source: 'configured',
       name,
       host: `${host.sshUser || 'root'}@${host.sshHost}:${Number(host.sshPort) || 22}`,
       online: true,
@@ -185,14 +265,14 @@ async function getDockerSshHost(host) {
         total: containers.length,
         running,
         stopped,
-        unused: Number(String(danglingTxt || '0').trim()) || 0,
+        unused: Number(danglingTxt) || 0,
         cpu: cpuVals.length ? Math.round(cpuVals.reduce((a, b) => a + b, 0) * 10) / 10 : 0,
         memPercent: memVals.length ? Math.round((memVals.reduce((a, b) => a + b, 0) / memVals.length) * 10) / 10 : 0,
       },
       containers,
     };
   } catch (err) {
-    return { name, host: host.sshHost || '', online: false, error: err.message, summary: { total: 0, running: 0, stopped: 0, unused: 0 }, containers: [] };
+    return { source: 'configured', name, host: host.sshHost || '', online: false, error: err.message, summary: { total: 0, running: 0, stopped: 0, unused: 0 }, containers: [] };
   }
 }
 
@@ -227,6 +307,7 @@ async function getDockerHost(host) {
     const cpuVals = detailed.filter(c => c.cpu != null).map(c => c.cpu);
     const memVals = detailed.filter(c => c.memPercent != null).map(c => c.memPercent);
     return {
+      source: 'configured',
       name,
       host: host.url || host.socketPath || '',
       online: true,
@@ -241,7 +322,7 @@ async function getDockerHost(host) {
       containers: detailed,
     };
   } catch (err) {
-    return { name, host: host.url || host.socketPath || '', online: false, error: err.message, summary: { total: 0, running: 0, stopped: 0, unused: 0 }, containers: [] };
+    return { source: 'configured', name, host: host.url || host.socketPath || '', online: false, error: err.message, summary: { total: 0, running: 0, stopped: 0, unused: 0 }, containers: [] };
   }
 }
 
@@ -254,14 +335,17 @@ async function getDockerApiData(cfg = {}) {
 async function dockerLogs(cfg = {}, hostName, id) {
   const host = (cfg.hosts || []).find(h => h.name === hostName);
   if (!host) throw new Error('docker host not configured');
-  if (host.sshHost) return execSsh(host, `docker logs --tail 300 ${String(id || '').replace(/[^a-zA-Z0-9_.-]/g, '')} 2>&1 | tail -c 200000`);
+  if (host.sshHost) {
+    const safeId = String(id || '').replace(/[^a-zA-Z0-9_.-]/g, '');
+    return execDockerCliCaptured(host, `logs --tail 300 ${safeId}`, 200000);
+  }
   return reqJson(host, `/containers/${encodeURIComponent(id)}/logs?stdout=1&stderr=1&tail=300`, { text: true });
 }
 
 async function dockerPrune(cfg = {}, hostName) {
   const host = (cfg.hosts || []).find(h => h.name === hostName);
   if (!host) throw new Error('docker host not configured');
-  if (host.sshHost) return execSsh(host, 'docker image prune -f 2>&1');
+  if (host.sshHost) return execDockerCli(host, 'image prune -f');
   return reqJson(host, '/images/prune', { method: 'POST' });
 }
 

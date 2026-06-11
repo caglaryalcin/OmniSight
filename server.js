@@ -9,6 +9,7 @@ const { getAllKubernetesData, getPodLogs } = require('./src/kubernetes');
 const { getAllSynologyData } = require('./src/snmp');
 const { getAllHealthchecks } = require('./src/healthchecks');
 const { getAllUptimeKuma } = require('./src/uptimekuma');
+const { getPrometheusData } = require('./src/prometheus');
 const { getAllDatabaseData } = require('./src/database');
 const { getProxmoxApiData } = require('./src/proxmox');
 const { getDockerApiData, dockerLogs: dockerApiLogs, dockerPrune: dockerApiPrune } = require('./src/docker');
@@ -208,6 +209,7 @@ function dockerConfigHostTarget(h = {}) {
 function dockerConfigRows() {
   const hosts = Array.isArray(config.docker?.hosts) ? config.docker.hosts : [];
   return hosts.map(h => ({
+    source: 'configured',
     name: dockerConfigHostName(h),
     host: dockerConfigHostTarget(h),
     online: false,
@@ -222,7 +224,7 @@ function mergeDockerConfiguredRows(currentRows = [], agentRows = []) {
   const currentByName = new Map((currentRows || []).map(h => [h.name, h]));
   const configured = dockerConfigRows().map(row => {
     const prev = currentByName.get(row.name);
-    return prev ? { ...row, ...prev, name: row.name, host: prev.host || row.host } : row;
+    return prev ? { ...row, ...prev, source: row.source, name: row.name, host: prev.host || row.host } : row;
   });
   const configuredNames = new Set(configured.map(h => h.name));
   return [...configured, ...agentRows.filter(h => !configuredNames.has(h.name))];
@@ -247,13 +249,14 @@ function assignStatic(base) {
   base.timeFormat = config.timeFormat || '24h';
   base.icons = {
     proxmox: config.proxmox?.icon, linux: config.linux?.icon, kubernetes: config.kubernetes?.icon,
-    snmp: config.snmp?.icon, healthchecks: config.healthchecks?.icon, docker: config.docker?.icon,
+    snmp: config.snmp?.icon, healthchecks: config.healthchecks?.icon, prometheus: config.prometheus?.icon, docker: config.docker?.icon,
     database: config.database?.icon, uptimekuma: config.uptimekuma?.icon,
   };
 }
 
 function configuredList() {
   const en = c => c && c.enabled !== false;
+  const hasPrometheus = c => !!(c && (c.url || (Array.isArray(c.instances) && c.instances.length)));
   const ids = [];
   if (en(config.proxmox)      && (agents.hasPve() || (config.proxmox.url && config.proxmox.tokenId && config.proxmox.tokenSecret))) ids.push('proxmox');
   if (en(config.kubernetes)   && config.kubernetes.kubeconfig)          ids.push('kubernetes');
@@ -261,9 +264,70 @@ function configuredList() {
   if (en(config.snmp)         && (config.snmp.devices || []).length)    ids.push('snmp');
   if (en(config.healthchecks) && config.healthchecks.url)               ids.push('healthchecks');
   if (en(config.uptimekuma)   && config.uptimekuma.url)                 ids.push('uptimekuma');
+  if (en(config.prometheus)   && hasPrometheus(config.prometheus))       ids.push('prometheus');
   if (en(config.docker)       && (agents.hasDocker() || (config.docker.hosts || []).length)) ids.push('docker');
   if (en(config.database)     && (config.database.instances || []).length) ids.push('database');
   return ids;
+}
+
+function prometheusConfigInstances(c = {}) {
+  const src = Array.isArray(c.instances) && c.instances.length ? c.instances : (c.url ? [c] : []);
+  return src
+    .filter(i => i && (i.url || i.name))
+    .map((i, idx) => ({
+      name: String(i.name || i.label || i.url || `Prometheus ${idx + 1}`).trim(),
+      url: i.url || '',
+    }));
+}
+
+function promKeys(row = {}) {
+  return [row.url, row.sourceUrl, row.name, row.sourceName]
+    .filter(Boolean)
+    .map(v => String(v).trim().toLowerCase());
+}
+
+function findPromRow(rows, want) {
+  const keys = new Set(promKeys(want));
+  return rows.find(row => promKeys(row).some(k => keys.has(k)));
+}
+
+function recomputePrometheusSummary(instances, targets) {
+  const instanceUp = instances.filter(i => i.online).length;
+  const instanceConnecting = instances.filter(i => i._connecting).length;
+  return {
+    instances: instances.length,
+    instanceUp,
+    instanceConnecting,
+    instanceDown: instances.filter(i => !i.online && !i._connecting).length,
+    total: targets.length,
+    up: targets.filter(t => t.health === 'up').length,
+    down: targets.filter(t => t.health === 'down').length,
+    unknown: targets.filter(t => t.health === 'unknown').length,
+  };
+}
+
+function mergePrometheusConfigured(current, cfg) {
+  const wanted = prometheusConfigInstances(cfg);
+  if (!wanted.length) return null;
+  const cur = current && typeof current === 'object' ? current : {};
+  const oldInstances = Array.isArray(cur.instances) && cur.instances.length
+    ? cur.instances
+    : (cur.url || cur.online !== undefined ? [{ name: cur.name || cfg.name || 'Prometheus', url: cur.url || cfg.url, online: cur.online, error: cur.error, summary: cur.summary }] : []);
+  const instances = wanted.map(w => {
+    const prev = findPromRow(oldInstances, w);
+    if (prev) return { ...prev, name: w.name, url: w.url };
+    return { name: w.name, url: w.url, online: false, _connecting: true, summary: { total: 0, up: 0, down: 0, unknown: 0 } };
+  });
+  const targets = (cur.targets || []).filter(t => findPromRow(wanted, t));
+  const summary = recomputePrometheusSummary(instances, targets);
+  return {
+    online: summary.instanceUp > 0,
+    _connecting: summary.instanceUp === 0 && summary.instanceConnecting > 0,
+    error: instances.find(i => !i.online && !i._connecting)?.error || '',
+    summary,
+    instances,
+    targets,
+  };
 }
 
 function extractChecks(data) {
@@ -311,6 +375,17 @@ function extractChecks(data) {
   if (uk && Array.isArray(uk.monitors)) uk.monitors.forEach(m => {
     const nm = m.name || m.id;
     add('uk:' + nm, m.status !== 'down', 'Uptime Kuma ' + nm, m.status);
+  });
+  const prom = data.prometheus;
+  if (prom && Array.isArray(prom.instances)) prom.instances.forEach(i => {
+    if (i._connecting) return;
+    const nm = i.name || i.url || 'Prometheus';
+    add('prom:instance:' + nm, !!i.online, 'Prometheus ' + nm, i.error || 'unreachable');
+  });
+  if (prom && Array.isArray(prom.targets)) prom.targets.forEach(t => {
+    const nm = t.name || t.scrapeUrl || 'target';
+    const key = [t.sourceName || t.sourceUrl || 'default', nm].join(':');
+    add('prom:' + key, t.health === 'up', 'Prometheus target ' + nm, t.lastError || t.health);
   });
   (data.database || []).forEach(d => add('db:' + d.name, !!d.online, 'Database ' + d.name, 'unreachable'));
   return m;
@@ -364,7 +439,7 @@ function preserveProxmoxOnTransient(next, err) {
 function backgroundRefresh() {
   if (refreshPromise) return refreshPromise;
   const enabled = c => c && c.enabled !== false;
-  if (!cache.data) cache.data = { timestamp: new Date().toISOString(), proxmox: { clusterSummary: null, nodes: [] }, linux: [], kubernetes: null, snmp: [], healthchecks: null, uptimekuma: null, docker: [], database: [], publicStatus: false, loading: true };
+  if (!cache.data) cache.data = { timestamp: new Date().toISOString(), proxmox: { clusterSummary: null, nodes: [] }, linux: [], kubernetes: null, snmp: [], healthchecks: null, uptimekuma: null, prometheus: null, docker: [], database: [], publicStatus: false, loading: true };
   const base = cache.data;
   assignStatic(base);
   const tasks = [
@@ -374,6 +449,7 @@ function backgroundRefresh() {
     ['snmp',         enabled(config.snmp)         ? getAllSynologyData(config.snmp)          : Promise.resolve([]),   []],
     ['healthchecks', enabled(config.healthchecks) ? getAllHealthchecks(config.healthchecks) : Promise.resolve(null), null],
     ['uptimekuma',   enabled(config.uptimekuma)   ? getAllUptimeKuma(config.uptimekuma)     : Promise.resolve(null), null],
+    ['prometheus',   enabled(config.prometheus)   ? getPrometheusData(config.prometheus)    : Promise.resolve(null), null],
     ['docker',       enabled(config.docker)       ? getDockerData()  : Promise.resolve([]),   []],
     ['database',     enabled(config.database)     ? getAllDatabaseData(config.database)      : Promise.resolve([]),   []],
   ];
@@ -420,6 +496,7 @@ const EMPTY = {
   snmp: [],
   healthchecks: null,
   uptimekuma: null,
+  prometheus: null,
   docker: [],
   database: [],
   publicStatus: false,
@@ -587,6 +664,10 @@ app.post('/api/config', (req, res) => {
           cache.data.uptimekuma = { _connecting: true, online: false, summary: { total: 0, up: 0, down: 0, pending: 0, maintenance: 0, unknown: 0 }, monitors: [] };
         }
       } else { cache.data.uptimekuma = null; }
+
+      if (en(config.prometheus)) {
+        cache.data.prometheus = mergePrometheusConfigured(cache.data.prometheus, config.prometheus);
+      } else { cache.data.prometheus = null; }
 
       if (en(config.docker)) {
         cache.data.docker = mergeDockerConfiguredRows(cache.data.docker, agents.getDockerData());
@@ -795,6 +876,8 @@ function mergePreservingSecrets(incoming, existing) {
   for (const [k, v] of Object.entries(incoming)) {
     if (SENSITIVE_KEYS.has(k) && (v === '__encrypted__' || v === '__set__')) {
       out[k] = existing?.[k] ?? v;
+    } else if (k === 'instances' && Array.isArray(v) && existing && !Array.isArray(existing.instances) && existing.url) {
+      out[k] = mergePreservingSecrets(v, [existing]);
     } else if (typeof v === 'object' && v !== null) {
       out[k] = mergePreservingSecrets(v, existing?.[k]);
     } else {
@@ -1021,6 +1104,17 @@ function buildPublicSummary(data) {
     const status = !uk.online ? 'down' : (down > 0 ? (up > 0 ? 'warn' : 'down') : (warn > 0 ? 'warn' : 'ok'));
     out.push({ id: 'uptimekuma', title: 'Uptime Kuma', status, meta: uk.online ? `${up}/${sm.total || 0} up` : 'unreachable' });
   }
+  const prom = data.prometheus;
+  if (prom && prom.online !== undefined) {
+    const sm = prom.summary || {};
+    const up = sm.up || 0;
+    const down = sm.down || 0;
+    const unknown = sm.unknown || 0;
+    const instanceDown = sm.instanceDown || 0;
+    const status = !prom.online ? 'down' : (down > 0 ? (up > 0 ? 'warn' : 'down') : ((unknown > 0 || instanceDown > 0) ? 'warn' : 'ok'));
+    const instanceMeta = sm.instances ? ` · ${sm.instanceUp || 0}/${sm.instances} servers` : '';
+    out.push({ id: 'prometheus', title: 'Prometheus', status, meta: prom.online ? `${up}/${sm.total || 0} targets up${instanceMeta}` : 'unreachable' });
+  }
   if ((data.docker || []).length) {
     const dockerRows = data.docker.filter(h => !h._connecting);
     const connecting = data.docker.length - dockerRows.length;
@@ -1044,7 +1138,7 @@ app.get('/api/public/status', (req, res) => {
   const data = cache.data || EMPTY;
   const services = buildPublicSummary(data);
   const present = new Set(services.map(s => s.id));
-  const titles = { proxmox: 'Proxmox', linux: 'Linux Servers', kubernetes: 'Kubernetes', snmp: 'SNMP', healthchecks: 'Healthchecks', uptimekuma: 'Uptime Kuma', docker: 'Docker', database: 'Databases' };
+  const titles = { proxmox: 'Proxmox', linux: 'Linux Servers', kubernetes: 'Kubernetes', snmp: 'SNMP', healthchecks: 'Healthchecks', uptimekuma: 'Uptime Kuma', prometheus: 'Prometheus', docker: 'Docker', database: 'Databases' };
   (data.configured || configuredList()).forEach(id => {
     if (!present.has(id)) services.push({ id, title: titles[id] || id, status: 'connecting', meta: 'connecting…' });
   });

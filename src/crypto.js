@@ -52,7 +52,7 @@ function isEncrypted(value) {
 
 const SENSITIVE_KEYS = new Set([
   'password', 'privateKey', 'authPassword', 'privPassword',
-  'tokenSecret', 'apiKey', 'token', 'sshPassword', 'sshKey', 'botToken',
+  'tokenSecret', 'apiKey', 'token', 'bearerToken', 'sshPassword', 'sshKey', 'botToken',
 ]);
 
 function decryptConfig(obj) {
