@@ -1,11 +1,12 @@
 const https = require('https');
 const http = require('http');
 
-function httpGet(url, headers) {
+function httpGet(url, headers, opts = {}) {
   return new Promise((resolve, reject) => {
     const parsed = new URL(url);
+    if (!['http:', 'https:'].includes(parsed.protocol)) return reject(new Error('Only HTTP(S) URLs are supported'));
     const lib = parsed.protocol === 'https:' ? https : http;
-    const req = lib.get(url, { headers, rejectUnauthorized: false }, (res) => {
+    const req = lib.get(url, { headers, rejectUnauthorized: opts.insecureTLS ? false : undefined }, (res) => {
       let data = '';
       res.on('data', d => { data += d; });
       res.on('end', () => {
@@ -23,7 +24,7 @@ const STATUS_ORDER = { down: 0, grace: 1, new: 2, up: 3, paused: 4 };
 async function getAllHealthchecks(config) {
   try {
     const url = config.url.replace(/\/$/, '') + '/api/v3/checks/';
-    const data = await httpGet(url, { 'X-Api-Key': config.apiKey });
+    const data = await httpGet(url, { 'X-Api-Key': config.apiKey }, { insecureTLS: config.insecureTLS === true });
     const checks = (data.checks || []).map(c => ({
       name: c.name,
       status: c.status,

@@ -84,8 +84,8 @@ async function submitForm(){
     const r = await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,password,remember})});
     const d = await r.json();
     if(!r.ok || !d.ok){ err.textContent = d.error || 'Login failed'; return; }
-    if(remember){ const exp = new Date(Date.now()+30*864e5).toUTCString(); document.cookie = `session=${d.token}; path=/; SameSite=Strict; expires=${exp}`; localStorage.setItem('os_token', d.token); }
-    else { document.cookie = `session=${d.token}; path=/; SameSite=Strict`; sessionStorage.setItem('os_token', d.token); }
+    sessionStorage.removeItem('os_token');
+    localStorage.removeItem('os_token');
     window.location.href = '/';
   } catch { err.textContent = 'Network error'; } finally { btn.disabled = false; }
 }

@@ -25,11 +25,12 @@ function parseStatusPage(inputUrl, slug) {
   return out;
 }
 
-function httpGetJson(url, headers = {}) {
+function httpGetJson(url, headers = {}, opts = {}) {
   return new Promise((resolve, reject) => {
     const parsed = new URL(url);
+    if (!['http:', 'https:'].includes(parsed.protocol)) return reject(new Error('Only HTTP(S) URLs are supported'));
     const lib = parsed.protocol === 'https:' ? https : http;
-    const req = lib.get(url, { headers, rejectUnauthorized: false }, (res) => {
+    const req = lib.get(url, { headers, rejectUnauthorized: opts.insecureTLS ? false : undefined }, (res) => {
       let data = '';
       res.on('data', d => { data += d; });
       res.on('end', () => {
@@ -85,8 +86,8 @@ async function getAllUptimeKuma(config = {}) {
     const pageUrl = joinUrl(parsed.baseUrl, `/api/status-page/${encodeURIComponent(parsed.slug)}`);
     const hbUrl = joinUrl(parsed.baseUrl, `/api/status-page/heartbeat/${encodeURIComponent(parsed.slug)}`);
     const [page, heartbeat] = await Promise.all([
-      httpGetJson(pageUrl, headers),
-      httpGetJson(hbUrl, headers).catch(() => ({})),
+      httpGetJson(pageUrl, headers, { insecureTLS: config.insecureTLS === true }),
+      httpGetJson(hbUrl, headers, { insecureTLS: config.insecureTLS === true }).catch(() => ({})),
     ]);
 
     const monitors = [];

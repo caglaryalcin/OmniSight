@@ -43,7 +43,8 @@ function saveAgents() {
         };
       }
       fs.mkdirSync(path.dirname(AGENTS_PATH), { recursive: true });
-      fs.writeFileSync(AGENTS_PATH, yaml.dump(out), 'utf8');
+      fs.writeFileSync(AGENTS_PATH, yaml.dump(out), { encoding: 'utf8', mode: 0o600 });
+      try { fs.chmodSync(AGENTS_PATH, 0o600); } catch {}
     } catch (e) { console.warn('agents save failed:', e.message); }
   }, 2000);
 }

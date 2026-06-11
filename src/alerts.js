@@ -4,12 +4,13 @@ const https = require('https');
 let nodemailer = null;
 try { nodemailer = require('nodemailer'); } catch {}
 
-function httpRequest(urlStr, { method = 'POST', headers = {}, body = null, timeout = 9000 } = {}) {
+function httpRequest(urlStr, { method = 'POST', headers = {}, body = null, timeout = 9000, insecureTLS = false } = {}) {
   return new Promise((resolve, reject) => {
     let u;
     try { u = new URL(urlStr); } catch (e) { return reject(e); }
+    if (!['http:', 'https:'].includes(u.protocol)) return reject(new Error('Only HTTP(S) URLs are supported'));
     const lib = u.protocol === 'https:' ? https : http;
-    const req = lib.request(u, { method, headers, rejectUnauthorized: false }, res => {
+    const req = lib.request(u, { method, headers, rejectUnauthorized: insecureTLS ? false : undefined }, res => {
       let d = '';
       res.on('data', c => { d += c; });
       res.on('end', () => {
@@ -35,7 +36,7 @@ async function sendNtfy(cfg, alert) {
   if (alert.tags) headers['Tags'] = alert.tags;
   if (cfg.token) headers['Authorization'] = 'Bearer ' + cfg.token;
   else if (cfg.username) headers['Authorization'] = 'Basic ' + Buffer.from(`${cfg.username}:${cfg.password || ''}`).toString('base64');
-  return httpRequest(`${base}/${cfg.topic}`, { headers, body: alert.message || '' });
+  return httpRequest(`${base}/${cfg.topic}`, { headers, body: alert.message || '', insecureTLS: cfg.insecureTLS === true });
 }
 
 async function sendTelegram(cfg, alert) {

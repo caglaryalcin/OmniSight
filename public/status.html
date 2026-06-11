@@ -135,7 +135,7 @@ async function load() {
     _fast = !!d.refreshing || svcs.some(s => s.status === 'connecting');
   } catch (e) {
     setFavicon('gray');
-    document.getElementById('overall').innerHTML = '<span class="dot d-gray"></span><span>' + e.message + '</span>';
+    document.getElementById('overall').innerHTML = '<span class="dot d-gray"></span><span>' + escHtml(e.message) + '</span>';
     document.getElementById('list').innerHTML = '';
     _fast = false;
   }

@@ -18,6 +18,15 @@ const { decryptConfig, encryptConfigValue, isEncrypted, SENSITIVE_KEYS, encrypti
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+app.set('trust proxy', 1);
+
+const SVC_NAME = /^[a-zA-Z0-9@._:-]+$/;
+const K8S_NAME = /^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$/i;
+const ONE_MB = 1024 * 1024;
+const MAX_ICON_BYTES = 512 * 1024;
+const MAX_CERT_BYTES = 5 * ONE_MB;
+const MAX_KUBECONFIG_BYTES = ONE_MB;
+const DEBUG_ENABLED = ['1', 'true', 'yes', 'on'].includes(String(process.env.OMNISIGHT_DEBUG || '').toLowerCase());
 
 const LOG_BUFFER = [];
 const LOG_MAX = 500;
@@ -60,13 +69,22 @@ reloadExtraCA();
 const CONFIG_PATH = path.join(__dirname, 'data', 'config.yaml');
 const AUTH_PATH  = path.join(__dirname, 'data', 'auth.yaml');
 
+function writePrivateText(file, text) {
+  fs.writeFileSync(file, text, { encoding: 'utf8', mode: 0o600 });
+  try { fs.chmodSync(file, 0o600); } catch {}
+}
+
+function writePrivateYaml(file, obj) {
+  writePrivateText(file, yaml.dump(obj, { lineWidth: -1 }));
+}
+
 const NOTIFY_PATH = path.join(__dirname, 'data', 'notifications.yaml');
 function loadNotify() {
   try { const a = yaml.load(fs.readFileSync(NOTIFY_PATH, 'utf8')); return new Set(Array.isArray(a) ? a : (a?.disabled || [])); }
   catch { return new Set(); }
 }
 function saveNotify() {
-  try { fs.writeFileSync(NOTIFY_PATH, yaml.dump(Array.from(notifyDisabled))); }
+  try { writePrivateYaml(NOTIFY_PATH, Array.from(notifyDisabled)); }
   catch (e) { console.warn('notifications save failed:', e.message); }
 }
 let notifyDisabled = loadNotify();
@@ -87,11 +105,38 @@ function saveSessions(map) {
   try {
     const obj = {};
     for (const [k, v] of map) obj[k] = v;
-    fs.writeFileSync(SESSIONS_PATH, yaml.dump(obj), 'utf8');
+    writePrivateYaml(SESSIONS_PATH, obj);
   } catch {}
 }
 
 const sessions = loadSessions();
+const loginAttempts = new Map();
+
+function loginRateKey(req, username) {
+  const ip = String(req.ip || req.socket?.remoteAddress || 'unknown');
+  return `${ip}:${String(username || '').toLowerCase().slice(0, 128)}`;
+}
+
+function loginRateCheck(req, username) {
+  const key = loginRateKey(req, username);
+  const now = Date.now();
+  const windowMs = 15 * 60 * 1000;
+  const maxAttempts = 10;
+  const rec = loginAttempts.get(key) || { count: 0, first: now };
+  if (now - rec.first > windowMs) {
+    loginAttempts.set(key, { count: 0, first: now });
+    return { ok: true, key };
+  }
+  if (rec.count >= maxAttempts) return { ok: false, key, retryAfter: Math.ceil((windowMs - (now - rec.first)) / 1000) };
+  return { ok: true, key };
+}
+
+function loginRateFail(key) {
+  const now = Date.now();
+  const rec = loginAttempts.get(key) || { count: 0, first: now };
+  rec.count += 1;
+  loginAttempts.set(key, rec);
+}
 
 function loadAuth() {
   if (!fs.existsSync(AUTH_PATH)) return null;
@@ -117,6 +162,75 @@ function verifyPassword(password, hash, salt) {
 
 function genToken() {
   return crypto.randomBytes(32).toString('hex');
+}
+
+function isSecureRequest(req) {
+  return !!(req.secure || String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim() === 'https');
+}
+
+function sessionCookieOptions(req, remember = false) {
+  const opts = {
+    httpOnly: true,
+    sameSite: 'strict',
+    secure: isSecureRequest(req),
+    path: '/',
+  };
+  if (remember) opts.maxAge = THIRTY_DAYS;
+  return opts;
+}
+
+function securityHeaders(req, res, next) {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  res.setHeader('Content-Security-Policy', [
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline'",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "font-src 'self' https://fonts.gstatic.com",
+    "img-src 'self' data: https:",
+    "connect-src 'self'",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+  ].join('; '));
+  next();
+}
+
+function sameOriginGuard(req, res, next) {
+  if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return next();
+  const fetchSite = String(req.headers['sec-fetch-site'] || '').toLowerCase();
+  if (fetchSite && !['same-origin', 'same-site', 'none'].includes(fetchSite)) {
+    return res.status(403).json({ error: 'cross-site request blocked' });
+  }
+  const origin = req.headers.origin;
+  if (!origin) return next();
+  try {
+    const got = new URL(origin);
+    const expectedHost = String(req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].trim();
+    const expectedProto = String(req.headers['x-forwarded-proto'] || (req.secure ? 'https' : 'http')).split(',')[0].trim();
+    if (got.host === expectedHost && got.protocol === `${expectedProto}:`) return next();
+  } catch {}
+  return res.status(403).json({ error: 'cross-origin request blocked' });
+}
+
+function readBase64Payload(dataUrl, maxBytes) {
+  if (!dataUrl || typeof dataUrl !== 'string') throw new Error('No file content');
+  const m = dataUrl.match(/^data:[^;]+;base64,([A-Za-z0-9+/=\s]+)$/);
+  const b64 = (m ? m[1] : dataUrl).replace(/\s/g, '');
+  if (!/^[A-Za-z0-9+/]*={0,2}$/.test(b64)) throw new Error('Invalid base64 content');
+  const approx = Math.floor((b64.length * 3) / 4);
+  if (approx > maxBytes) throw new Error(`File is too large. Maximum size is ${Math.round(maxBytes / 1024)} KB`);
+  return Buffer.from(b64, 'base64');
+}
+
+function isSafeSvg(buf) {
+  const s = buf.toString('utf8', 0, Math.min(buf.length, 256 * 1024)).toLowerCase();
+  return !/<\s*(script|foreignobject|iframe|object|embed|link|base)\b/.test(s)
+    && !/\son[a-z]+\s*=/.test(s)
+    && !/(javascript:|data:text\/html|<!doctype|<!entity)/.test(s);
 }
 
 function authMiddleware(req, res, next) {
@@ -433,7 +547,7 @@ function extractChecks(data) {
   const hc = data.healthchecks;
   if (hc && Array.isArray(hc.checks)) hc.checks.forEach(c => {
     const nm = c.name || c.slug;
-    add('hc:' + nm, c.status !== 'down' && c.status !== 'grace', 'Healthcheck ' + nm, c.status);
+    add('hc:' + nm, c.status !== 'down', 'Healthcheck ' + nm, c.status);
   });
   const uk = data.uptimekuma;
   if (uk && Array.isArray(uk.monitors)) uk.monitors.forEach(m => {
@@ -582,8 +696,10 @@ function getCachedData() {
 backgroundRefresh();
 setInterval(backgroundRefresh, REFRESH_INTERVAL);
 
+app.use(securityHeaders);
 app.use(express.json({ limit: '5mb' }));
 app.use(parseCookies);
+app.use(sameOriginGuard);
 
 function isLoopbackRequest(req) {
   const addr = String(req.ip || req.socket?.remoteAddress || '').replace(/^::ffff:/, '');
@@ -591,7 +707,7 @@ function isLoopbackRequest(req) {
 }
 
 app.get('/api/debug/docker', async (req, res, next) => {
-  if (!isLoopbackRequest(req)) return next();
+  if (!DEBUG_ENABLED || !isLoopbackRequest(req)) return next();
   try {
     const started = Date.now();
     const live = await getDockerData();
@@ -611,7 +727,7 @@ app.get('/api/debug/docker', async (req, res, next) => {
       live: normalizeDockerRows(live),
     });
   } catch (err) {
-    res.status(500).json({ ok: false, error: err.message, stack: err.stack });
+    res.status(500).json({ ok: false, error: err.message });
   }
 });
 
@@ -623,21 +739,26 @@ app.post('/api/login', (req, res) => {
   if (!auth) return res.json({ ok: true });
   const { username, password } = req.body || {};
   if (!username || !password) return res.status(400).json({ error: 'Missing credentials' });
-  if (username !== auth.username) return res.status(401).json({ error: 'Invalid credentials' });
+  const rate = loginRateCheck(req, username);
+  if (!rate.ok) return res.status(429).json({ error: 'Too many login attempts. Try again later.', retryAfter: rate.retryAfter });
+  if (username !== auth.username) { loginRateFail(rate.key); return res.status(401).json({ error: 'Invalid credentials' }); }
   try {
-    if (!verifyPassword(password, auth.hash, auth.salt)) return res.status(401).json({ error: 'Invalid credentials' });
-  } catch { return res.status(401).json({ error: 'Invalid credentials' }); }
+    if (!verifyPassword(password, auth.hash, auth.salt)) { loginRateFail(rate.key); return res.status(401).json({ error: 'Invalid credentials' }); }
+  } catch { loginRateFail(rate.key); return res.status(401).json({ error: 'Invalid credentials' }); }
   const token = genToken();
   const remember = req.body.remember === true;
   const expires = Date.now() + (remember ? THIRTY_DAYS : 24 * 60 * 60 * 1000);
   sessions.set(token, { username, created: Date.now(), expires });
   saveSessions(sessions);
+  loginAttempts.delete(rate.key);
+  res.cookie('session', token, sessionCookieOptions(req, remember));
   res.json({ ok: true, token });
 });
 
 app.post('/api/logout', (req, res) => {
   const token = req.headers['x-session-token'] || req.cookies?.session;
   if (token) { sessions.delete(token); saveSessions(sessions); }
+  res.clearCookie('session', sessionCookieOptions(req));
   res.json({ ok: true });
 });
 
@@ -666,7 +787,7 @@ app.post('/api/set-password', (req, res) => {
   const finalUsername = (username === '__current__' && auth?.username) ? auth.username : username;
   const salt = password ? crypto.randomBytes(16).toString('hex') : auth.salt;
   const hash = password ? hashPassword(password, salt) : auth.hash;
-  fs.writeFileSync(AUTH_PATH, yaml.dump({ username: finalUsername, hash, salt }), 'utf8');
+  writePrivateYaml(AUTH_PATH, { username: finalUsername, hash, salt });
   res.json({ ok: true });
 });
 
@@ -719,7 +840,7 @@ app.post('/api/config', (req, res) => {
     const merged = mergePreservingSecrets(incoming, existing);
 	if (merged.timezone) process.env.TZ = merged.timezone;
     const toSave = encryptionEnabled() ? encryptConfigObj(merged) : merged;
-    fs.writeFileSync(CONFIG_PATH, yaml.dump(toSave, { lineWidth: -1 }), 'utf8');
+    writePrivateYaml(CONFIG_PATH, toSave);
     config = loadConfig();
 
     if (cache.data) {
@@ -823,7 +944,7 @@ app.post('/api/services/exclude', (req, res) => {
     if (!existing.excludedServices[platform][host].includes(service)) {
       existing.excludedServices[platform][host].push(service);
       const toSave = encryptionEnabled() ? encryptConfigObj(existing) : existing;
-      fs.writeFileSync(CONFIG_PATH, yaml.dump(toSave, { lineWidth: -1 }), 'utf8');
+      writePrivateYaml(CONFIG_PATH, toSave);
       config = loadConfig();
     }
     patchCacheExclude(platform, host, service, true);
@@ -841,7 +962,7 @@ app.post('/api/services/include', (req, res) => {
     if (existing.excludedServices?.[platform]?.[host]) {
       existing.excludedServices[platform][host] = existing.excludedServices[platform][host].filter(s => s !== service);
       const toSave = encryptionEnabled() ? encryptConfigObj(existing) : existing;
-      fs.writeFileSync(CONFIG_PATH, yaml.dump(toSave, { lineWidth: -1 }), 'utf8');
+      writePrivateYaml(CONFIG_PATH, toSave);
       config = loadConfig();
     }
     patchCacheExclude(platform, host, service, false);
@@ -855,6 +976,7 @@ app.post('/api/upload/kubeconfig', (req, res) => {
   try {
     const { name, content } = req.body || {};
     if (!content || typeof content !== 'string') return res.status(400).json({ error: 'No file content' });
+    if (Buffer.byteLength(content, 'utf8') > MAX_KUBECONFIG_BYTES) return res.status(400).json({ error: 'Kubeconfig is too large' });
     let base = path.basename(String(name || 'kube.bin')).replace(/[^a-zA-Z0-9._-]/g, '_');
     if (!base || base === '.' || base === '..') base = 'kube.bin';
     fs.mkdirSync(path.join(__dirname, 'data'), { recursive: true });
@@ -869,16 +991,15 @@ app.post('/api/upload/kubeconfig', (req, res) => {
 app.post('/api/upload/icon', (req, res) => {
   try {
     const { name, dataUrl } = req.body || {};
-    if (!dataUrl || typeof dataUrl !== 'string') return res.status(400).json({ error: 'No file content' });
-    const m = dataUrl.match(/^data:[^;]+;base64,(.+)$/);
-    const b64 = m ? m[1] : dataUrl;
+    const buf = readBase64Payload(dataUrl, MAX_ICON_BYTES);
     let base = path.basename(String(name || 'icon')).replace(/[^a-zA-Z0-9._-]/g, '_');
     if (!/\.(png|svg|webp|jpg|jpeg|gif|ico)$/i.test(base)) base += '.png';
+    if (/\.svg$/i.test(base) && !isSafeSvg(buf)) return res.status(400).json({ error: 'SVG contains unsafe active content' });
     const dir = path.join(__dirname, 'data', 'icons');
     fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(path.join(dir, base), Buffer.from(b64, 'base64'));
+    fs.writeFileSync(path.join(dir, base), buf, { mode: 0o600 });
     res.json({ path: '/api/icons/' + base });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) { res.status(400).json({ error: err.message }); }
 });
 
 app.get('/api/certificates', (req, res) => {
@@ -895,15 +1016,13 @@ app.get('/api/certificates', (req, res) => {
 app.post('/api/upload/certificate', (req, res) => {
   try {
     const { name, dataUrl, password } = req.body || {};
-    if (!dataUrl || typeof dataUrl !== 'string') return res.status(400).json({ error: 'No file content' });
-    const m = dataUrl.match(/^data:[^;]+;base64,(.+)$/);
-    const b64 = m ? m[1] : dataUrl;
+    const buf = readBase64Payload(dataUrl, MAX_CERT_BYTES);
     let base = path.basename(String(name || 'ca.crt')).replace(/[^a-zA-Z0-9._-]/g, '_');
     if (!/\.(crt|pem|cer|pfx|p12)$/i.test(base)) return res.status(400).json({ error: 'Use .crt, .pem, .cer, .pfx or .p12' });
     const dir = path.join(__dirname, 'data', 'certs');
     fs.mkdirSync(dir, { recursive: true });
     const dest = path.join(dir, base);
-    fs.writeFileSync(dest, Buffer.from(b64, 'base64'), { mode: 0o600 });
+    fs.writeFileSync(dest, buf, { mode: 0o600 });
     if (/\.(pfx|p12)$/i.test(base)) {
       const out = path.join(dir, base.replace(/\.(pfx|p12)$/i, '.pem'));
       try {
@@ -934,9 +1053,12 @@ app.delete('/api/certificates/:name', (req, res) => {
 });
 
 app.get('/api/icons/:file', (req, res) => {
-  const dir = path.join(__dirname, 'data', 'icons');
-  const fp = path.join(dir, path.basename(req.params.file));
-  if (!fp.startsWith(dir) || !fs.existsSync(fp)) return res.status(404).end();
+  const dir = path.resolve(__dirname, 'data', 'icons');
+  const fp = path.resolve(dir, path.basename(req.params.file));
+  if (fp === dir || !fp.startsWith(dir + path.sep) || !fs.existsSync(fp)) return res.status(404).end();
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Content-Security-Policy', "default-src 'none'; img-src data:; style-src 'unsafe-inline'; sandbox");
+  res.setHeader('Cache-Control', 'public, max-age=3600');
   res.sendFile(fp);
 });
 
@@ -989,17 +1111,17 @@ function mergePreservingSecrets(incoming, existing) {
 
 app.get('/api/debug/docker', async (req, res) => {
   try { res.json(await getDockerData()); }
-  catch (err) { res.status(500).json({ error: err.message, stack: err.stack }); }
+  catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.get('/api/debug/kubernetes', async (req, res) => {
   try { res.json(await getAllKubernetesData(config.kubernetes)); }
-  catch (err) { res.status(500).json({ error: err.message, stack: err.stack }); }
+  catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.get('/api/debug/snmp', async (req, res) => {
   try { res.json(await getAllSynologyData(config.snmp)); }
-  catch (err) { res.status(500).json({ error: err.message, stack: err.stack }); }
+  catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.get('/api/debug/snmp-probe', async (req, res) => {
@@ -1150,7 +1272,7 @@ app.post('/api/agent/token', (req, res) => {
     existing.linux.agentToken = token;
     if (existing.linux.enabled === undefined) existing.linux.enabled = true;
     const toSave = encryptionEnabled() ? encryptConfigObj(existing) : existing;
-    fs.writeFileSync(CONFIG_PATH, yaml.dump(toSave, { lineWidth: -1 }), 'utf8');
+    writePrivateYaml(CONFIG_PATH, toSave);
     config = loadConfig();
     res.json({ ok: true, token });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -1329,6 +1451,7 @@ app.post('/api/proxmox/service', async (req, res) => {
   try {
     const { node, service, action } = req.query;
     if (!['status', 'start', 'stop', 'restart'].includes(action)) return res.status(400).json({ error: 'invalid action' });
+    if (!SVC_NAME.test(String(node || '')) || !SVC_NAME.test(String(service || ''))) return res.status(400).json({ error: 'invalid node or service' });
     if (!agents.findAgent(node)) return res.status(404).json({ error: 'node agent not found' });
     const output = await agents.queueCommand(node, action, service);
     if (action !== 'status') {
@@ -1350,6 +1473,7 @@ app.post('/api/linux/service', async (req, res) => {
   try {
     const { host, service, action } = req.query;
     if (!['status', 'start', 'stop', 'restart'].includes(action)) return res.status(400).json({ error: 'invalid action' });
+    if (!SVC_NAME.test(String(host || '')) || !SVC_NAME.test(String(service || ''))) return res.status(400).json({ error: 'invalid host or service' });
     if (!agents.findAgent(host)) return res.status(404).json({ error: 'agent not found' });
     const output = await agents.queueCommand(host, action, service);
     if (action !== 'status') {
@@ -1401,6 +1525,9 @@ app.get('/api/kubernetes/logs', async (req, res) => {
   try {
     const { namespace, pod, container } = req.query;
     if (!namespace || !pod) return res.status(400).json({ error: 'namespace and pod required' });
+    if (!K8S_NAME.test(String(namespace)) || !K8S_NAME.test(String(pod)) || (container && !K8S_NAME.test(String(container)))) {
+      return res.status(400).json({ error: 'invalid kubernetes resource name' });
+    }
     const logs = await getPodLogs(config.kubernetes, namespace, pod, container, req.query.tail);
     res.type('text/plain; charset=utf-8').send(logs || '');
   } catch (err) { res.status(500).json({ error: err.message }); }

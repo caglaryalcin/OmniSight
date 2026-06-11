@@ -72,11 +72,9 @@ main{padding:20px;max-width:1100px;margin:0 auto;display:flex;flex-direction:col
 }
 .form-group input:focus,.form-group select:focus{outline:none;border-color:var(--blue)}
 .form-group select option{background:var(--row)}
-input.dkssh-port,input.db-port{-moz-appearance:textfield;appearance:textfield}
-input.dkssh-port::-webkit-outer-spin-button,
-input.dkssh-port::-webkit-inner-spin-button,
-input.db-port::-webkit-outer-spin-button,
-input.db-port::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+input[type=number]{-moz-appearance:textfield;appearance:textfield}
+input[type=number]::-webkit-outer-spin-button,
+input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 
 .tag-list{display:flex;flex-wrap:wrap;gap:6px;min-height:30px;padding:4px 0}
 .tag-list:empty{display:none}

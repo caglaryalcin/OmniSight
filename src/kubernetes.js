@@ -32,7 +32,7 @@ async function getPods(kc, namespaces) {
   } catch {
     for (const ns of namespaces) {
       try {
-        const res = await coreV1.listNamespacedPod(ns);
+        const res = await coreV1.listNamespacedPod({ namespace: ns });
         items.push(...extractItems(res));
       } catch {}
     }
@@ -65,7 +65,7 @@ async function getServices(kc, namespaces) {
   } catch {
     for (const ns of namespaces) {
       try {
-        const res = await coreV1.listNamespacedService(ns);
+        const res = await coreV1.listNamespacedService({ namespace: ns });
         items.push(...extractItems(res));
       } catch {}
     }
@@ -90,7 +90,7 @@ async function getDeployments(kc, namespaces) {
   } catch {
     for (const ns of namespaces) {
       try {
-        const res = await appsV1.listNamespacedDeployment(ns);
+        const res = await appsV1.listNamespacedDeployment({ namespace: ns });
         items.push(...extractItems(res));
       } catch {}
     }
@@ -155,10 +155,15 @@ async function getPodLogs(config, namespace, pod, container, tail) {
   const kc = createK8sClient(config.kubeconfig);
   const coreV1 = kc.makeApiClient(k8s.CoreV1Api);
   const t = Math.min(2000, Math.max(1, parseInt(tail) || 300));
-  const res = await coreV1.readNamespacedPodLog(
-    pod, namespace, container || undefined, false, undefined, undefined,
-    undefined, false, undefined, t, true
-  );
+  const res = await coreV1.readNamespacedPodLog({
+    name: pod,
+    namespace,
+    container: container || undefined,
+    follow: false,
+    previous: false,
+    tailLines: t,
+    timestamps: true,
+  });
   const body = res && res.body !== undefined ? res.body : res;
   return typeof body === 'string' ? body : JSON.stringify(body);
 }

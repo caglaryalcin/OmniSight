@@ -15,7 +15,7 @@ async function probePostgres(db) {
     database: db.database || 'postgres',
     connectionTimeoutMillis: 8000,
     statement_timeout: 8000,
-    ssl: db.ssl ? { rejectUnauthorized: false } : undefined,
+    ssl: db.ssl ? { rejectUnauthorized: db.rejectUnauthorized !== false } : undefined,
   });
   await client.connect();
   try {
@@ -43,7 +43,7 @@ async function probeMysql(db) {
     password: db.password,
     database: db.database || undefined,
     connectTimeout: 8000,
-    ssl: db.ssl ? { rejectUnauthorized: false } : undefined,
+    ssl: db.ssl ? { rejectUnauthorized: db.rejectUnauthorized !== false } : undefined,
   });
   try {
     const [tc] = await conn.query("SHOW STATUS LIKE 'Threads_connected'").catch(() => [[]]);
