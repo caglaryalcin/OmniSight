@@ -28,6 +28,8 @@ h1{font-size:22px;font-weight:800;letter-spacing:-.02em}
 .svc .name{font-size:15px;font-weight:600;width:130px;flex-shrink:0}
 .svc .chart{flex:1;min-width:90px;height:26px;background:rgba(0,0,0,0.15);border-radius:3px;overflow:hidden}
 .svc .meta{font-size:13px;color:var(--muted);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.svc .meta.multi{display:flex;flex-direction:column;gap:2px;white-space:normal;line-height:1.25}
+.svc .meta-part{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .svc .status-lbl{font-size:13px;font-weight:600;width:95px;text-align:right;flex-shrink:0}
 .d-ok{background:var(--green)}.d-warn{background:var(--yellow)}.d-down{background:var(--red)}.d-gray{background:var(--muted)}
 .t-ok{color:var(--green)}.t-warn{color:var(--yellow)}.t-down{color:var(--red)}
@@ -81,6 +83,14 @@ function genChart(data, status) {
 const dotCls = s => s === 'ok' ? 'd-ok' : s === 'warn' ? 'd-warn' : s === 'down' ? 'd-down' : 'd-gray';
 const txtCls = s => s === 'ok' ? 't-ok' : s === 'warn' ? 't-warn' : s === 'down' ? 't-down' : '';
 const label  = s => s === 'ok' ? 'Operational' : s === 'warn' ? 'Degraded' : s === 'down' ? 'Down' : s === 'connecting' ? 'Connecting…' : 'Unknown';
+function escHtml(s) {
+  return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+function metaHtml(meta) {
+  const parts = String(meta || '').split(/\s*[·•]\s*/g).filter(Boolean);
+  if (parts.length <= 1) return { cls: '', html: escHtml(meta || '') };
+  return { cls: ' multi', html: parts.map(p => '<span class="meta-part">' + escHtml(p) + '</span>').join('') };
+}
 let faviconTimer = null;
 function setFavicon(status) {
   const favicon = document.getElementById('favicon');
@@ -114,13 +124,14 @@ async function load() {
     document.getElementById('overall').innerHTML =
       '<span class="dot ' + dotCls(worst) + '"></span><span class="' + txtCls(worst) + '">' +
       (worst === 'ok' ? 'All systems operational' : worst === 'warn' ? 'Partial degradation' : worst === 'down' ? 'Major outage' : worst === 'connecting' ? 'Connecting…' : 'No data') + '</span>';
-    document.getElementById('list').innerHTML = svcs.length ? svcs.map(s =>
-      '<div class="svc"><span class="dot ' + dotCls(s.status) + '"></span>' +
-      '<span class="name">' + s.title + '</span>' +
-      '<div class="chart">' + genChart(s.history, s.status) + '</div>' +
-      '<span class="meta">' + s.meta + '</span>' +
-      '<span class="status-lbl ' + txtCls(s.status) + '">' + label(s.status) + '</span></div>'
-    ).join('') : '<div class="empty">No services configured</div>';
+    document.getElementById('list').innerHTML = svcs.length ? svcs.map(s => {
+      const meta = metaHtml(s.meta);
+      return '<div class="svc"><span class="dot ' + dotCls(s.status) + '"></span>' +
+        '<span class="name">' + escHtml(s.title) + '</span>' +
+        '<div class="chart">' + genChart(s.history, s.status) + '</div>' +
+        '<span class="meta' + meta.cls + '">' + meta.html + '</span>' +
+        '<span class="status-lbl ' + txtCls(s.status) + '">' + label(s.status) + '</span></div>';
+    }).join('') : '<div class="empty">No services configured</div>';
     _fast = !!d.refreshing || svcs.some(s => s.status === 'connecting');
   } catch (e) {
     setFavicon('gray');

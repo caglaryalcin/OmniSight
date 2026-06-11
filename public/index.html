@@ -103,7 +103,8 @@ header{
 .sb-icon > .sec-glyph{width:100%;height:100%;display:grid;place-items:center;line-height:1}
 .sb-title{font-size:15px;font-weight:650;letter-spacing:-.01em;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sb-main{min-width:0;display:flex;flex-direction:column;gap:2px}
-.sb-meta{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sb-meta{font-size:11px;color:var(--muted);display:flex;flex-wrap:wrap;gap:0 6px;min-width:0;line-height:1.25;overflow:hidden}
+.sb-meta-part{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sb-summary{border-top:1px solid var(--border);overflow:hidden;background:rgba(0,0,0,.12)}
 
 /* Detail header */
@@ -445,6 +446,7 @@ html[data-theme="light"] .topbar{background:rgba(255,255,255,.78)}
 .shell .sb-hdr{display:contents;padding:0}
 .shell .sb-icon{width:26px;height:26px;border-radius:8px;background:var(--panel2);border:1px solid var(--border);padding:5px}
 .shell .sb-title{font-size:13px;font-weight:650;letter-spacing:0}
+.shell .sb-meta{max-height:28px}
 .shell .sb-summary{display:none}
 .shell .menu-btn{width:36px;height:36px;border-radius:8px}
 .shell .sb-csum{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;padding:8px}
@@ -2495,6 +2497,13 @@ function platformIcon(panel){
   if(url) return `<img src="${url}" alt="" style="width:100%;height:100%;object-fit:contain" onerror="iconFallback(this,'${panel.iconKey}','${panel.color}')">`;
   return SEC_ICONS[panel.iconKey] ? SEC_ICONS[panel.iconKey](panel.color) : '';
 }
+function sidebarMetaHtml(meta){
+  return String(meta || '')
+    .split(/\s*[·•]\s*/g)
+    .filter(Boolean)
+    .map(part => `<span class="sb-meta-part">${escHtml(part)}</span>`)
+    .join('');
+}
 
 /* ── Sidebar card ── */
 function sidebarCard(panel, isActive){
@@ -2506,7 +2515,7 @@ function sidebarCard(panel, isActive){
       <div class="sb-icon">${iconSvg}</div>
       <div class="sb-main">
         <span class="sb-title">${panel.title}</span>
-        <span class="sb-meta" style="${meta?'':'display:none'}">${meta}</span>
+        <span class="sb-meta" style="${meta?'':'display:none'}">${sidebarMetaHtml(meta)}</span>
       </div>
       <span class="sb-badge-wrap" style="flex-shrink:0;margin-left:4px">${panel.badge}</span>
     </div>
@@ -2522,7 +2531,8 @@ function updateSidebarCard(card, panel, isActive){
   const meta = card.querySelector('.sb-meta');
   if(meta){
     meta.style.display = metaText ? '' : 'none';
-    if(meta.textContent !== metaText) meta.textContent = metaText;
+    const html = sidebarMetaHtml(metaText);
+    if(meta.innerHTML !== html) meta.innerHTML = html;
   }
   const badge = card.querySelector('.sb-badge-wrap');
   if(badge && badge.innerHTML !== panel.badge) badge.innerHTML = panel.badge;
