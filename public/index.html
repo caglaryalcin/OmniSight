@@ -544,6 +544,10 @@ html[data-theme="light"] .overview-card .sb-csum-item{background:transparent!imp
 .overview-group-body{display:none;max-height:260px;overflow-y:auto}
 .overview-group.open .overview-group-body{display:block}
 .overview-group .overview-row:first-of-type{border-top:1px solid var(--border)}
+.overview-nested-title{padding:9px 14px 6px;color:var(--muted);font-size:11px;font-weight:800;background:rgba(0,0,0,.06);border-top:1px solid var(--border);display:flex;align-items:center;gap:8px}
+.overview-nested-title:first-child{border-top:0}
+.overview-nested-title .mon-dot{width:7px;height:7px;margin:0}
+.overview-nested-title span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 @media (max-width:1100px){
   .shell{grid-template-columns:78px 1fr}
@@ -695,7 +699,7 @@ const linuxOpen = {};
 const hcOpen = {};
 const snmpOpen = {};
 const k8sGrpOpen = {};
-const overviewK8sOpen = { pods:true, deps:false, svcs:false };
+const overviewK8sOpen = { pods:true, deps:false, svcs:false, dockerHosts:true, dockerContainers:true };
 const dockerOpen = {};
 let overviewCardCollapsed = {};
 try { overviewCardCollapsed = JSON.parse(localStorage.getItem('os_overview_card_collapsed') || '{}'); } catch {}
@@ -2668,12 +2672,12 @@ function overviewRow(panelId, name, sub, badgeCls, badgeTxt, dotCls, action, ext
 }
 function overviewGroup(gid, title, rows, emptyText){
   const open = !!overviewK8sOpen[gid];
-  return `<div class="overview-group ${open?'open':''}" id="ov-k8s-${gid}">
+  return `<div class="overview-group ${open?'open':''}" id="ov-grp-${gid}">
     <div class="overview-group-title" onclick="event.stopPropagation();toggleOverviewGroup('${gid}')">
       <span>${title}</span>
       <span class="chevron">&rsaquo;</span>
     </div>
-    <div class="overview-group-body" data-scroll-key="k8s-${gid}">${rows || `<div class="overview-empty">${emptyText}</div>`}</div>
+    <div class="overview-group-body" data-scroll-key="overview-group-${gid}">${rows || `<div class="overview-empty">${emptyText}</div>`}</div>
   </div>`;
 }
 function overviewRows(id, data){
@@ -2697,14 +2701,32 @@ function overviewRows(id, data){
     return rows.join('');
   }
   if(id === 'docker'){
-    const rows = (data.docker||[]).slice(0,6).map(host => {
+    const hosts = data.docker || [];
+    const hostRows = hosts.map(host => {
+      const connecting = host._connecting && !host.online;
       const stopped = (host.containers||[]).filter(c=>c.state==='exited'||c.state==='dead').length;
-      const sub = host._connecting ? (host.host||'Connecting') :
+      const sub = connecting ? (host.host||'Connecting') :
         host.online ? [`${host.summary?.running||0} running`, `${host.summary?.total||0} total`, hasNum(host.summary?.cpu)?`CPU ${host.summary.cpu}%`:'', hasNum(host.summary?.memPercent)?`Mem ${host.summary.memPercent}%`:'' ].filter(Boolean).join(' · ') :
         (host.error || 'Connection failed');
-      return overviewRow('docker', host.name, sub, host._connecting?'gray':!host.online?'red':stopped?'yellow':'green', host._connecting?'connecting':!host.online?'offline':stopped?`${stopped} stopped`:'healthy', host._connecting?'md-gray':!host.online?'md-red':stopped?'md-yellow':'md-green');
-    });
-    return rows.join('');
+      return overviewRow('docker', host.name, sub, connecting?'gray':!host.online?'red':stopped?'yellow':'green', connecting?'connecting':!host.online?'offline':stopped?`${stopped} stopped`:'healthy', connecting?'md-gray':!host.online?'md-red':stopped?'md-yellow':'md-green');
+    }).join('');
+    const stateOrder = { running: 0, restarting: 1, paused: 2, created: 3, exited: 4, dead: 5 };
+    const containerRows = hosts.filter(host => host.online).map(host => {
+      const rows = [...(host.containers || [])].sort((a,b) => {
+        const ao = stateOrder[a.state] ?? 9, bo = stateOrder[b.state] ?? 9;
+        return ao === bo ? String(a.name || '').localeCompare(String(b.name || '')) : ao - bo;
+      }).map(c => {
+        const dotCls = c.color==='green'?'md-green':c.color==='yellow'?'md-yellow':c.color==='red'?'md-red':'md-gray';
+        const badgeCls = c.color==='green'?'green':c.color==='yellow'?'yellow':c.color==='red'?'red':'gray';
+        const sub = [c.imageShort || c.image, hasNum(c.cpu)?`CPU ${c.cpu}%`:'', hasNum(c.memPercent)?`Mem ${c.memPercent}%`:''].filter(Boolean).join(' · ');
+        return overviewRow('docker', c.name, sub, badgeCls, c.state || 'unknown', dotCls, `showDockerLogs(${jsStr(host.name)},${jsStr(c.id)},${jsStr(c.name || c.id)})`);
+      }).join('');
+      return `<div class="overview-nested-title"><div class="mon-dot ${host.online?'md-green':'md-gray'}"></div><span>${escHtml(host.name)}</span></div>${rows || '<div class="overview-empty">No containers</div>'}`;
+    }).join('');
+    return [
+      overviewGroup('dockerHosts', 'Hosts', hostRows, 'No Docker hosts found'),
+      overviewGroup('dockerContainers', 'Containers', containerRows, 'No containers found'),
+    ].join('');
   }
   if(id === 'proxmox'){
     return (data.proxmox?.nodes||[]).slice(0,6).map(({node, services=[]}) => {
@@ -3109,8 +3131,9 @@ function selectPanelGroup(id, grpId){
 }
 function toggleOverviewGroup(grpId){
   overviewK8sOpen[grpId] = !overviewK8sOpen[grpId];
-  const grp = document.getElementById(`ov-k8s-${grpId}`);
+  const grp = document.getElementById(`ov-grp-${grpId}`);
   if(grp) grp.classList.toggle('open', overviewK8sOpen[grpId]);
+  requestAnimationFrame(layoutOverviewMasonry);
 }
 
 /* ── Render ── */

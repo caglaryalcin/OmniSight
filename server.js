@@ -1115,6 +1115,22 @@ function versionCompare(a, b) {
   return 0;
 }
 
+function manualAgentUpdateCommand() {
+  return `sudo sh -c 'set -a
+for f in /etc/omnisight-agent/agent.env /etc/default/omnisight-agent /etc/sysconfig/omnisight-agent; do [ -f "$f" ] && . "$f"; done
+if [ -z "\${OMNISIGHT_URL:-}" ] || [ -z "\${OMNISIGHT_TOKEN:-}" ]; then
+  pid="$(systemctl show -p MainPID --value omnisight-agent 2>/dev/null || true)"
+  if [ -n "$pid" ] && [ "$pid" != "0" ] && [ -r "/proc/$pid/environ" ]; then
+    tr "\\0" "\\n" < "/proc/$pid/environ" | grep "^OMNISIGHT_" > /tmp/omnisight-agent.env || true
+    [ -s /tmp/omnisight-agent.env ] && . /tmp/omnisight-agent.env
+  fi
+fi
+set +a
+: "\${OMNISIGHT_URL:?OMNISIGHT_URL missing}"
+: "\${OMNISIGHT_TOKEN:?OMNISIGHT_TOKEN missing}"
+curl -fsS \${OMNISIGHT_INSECURE_TLS:+--insecure} "$OMNISIGHT_URL/agent/install.sh" -o /tmp/omnisight-install.sh && bash /tmp/omnisight-install.sh && systemctl restart omnisight-agent'`;
+}
+
 app.get('/api/agents', (req, res) => {
   res.json({ latestVersion: agentLatestVersion(), agents: agents.listAgents() });
 });
@@ -1128,7 +1144,7 @@ app.post('/api/agent/update', async (req, res) => {
     if (versionCompare(agent.agentVersion, '1.2.1') < 0) {
       return res.status(409).json({
         error: 'This agent needs a one-time manual update before remote updates are available.',
-        manualCommand: "sudo sh -c 'set -a; . /etc/omnisight-agent/agent.env; set +a; curl -fsS ${OMNISIGHT_INSECURE_TLS:+--insecure} \"$OMNISIGHT_URL/agent/install.sh\" -o /tmp/omnisight-install.sh && bash /tmp/omnisight-install.sh && systemctl restart omnisight-agent'",
+        manualCommand: manualAgentUpdateCommand(),
       });
     }
     const output = await agents.queueCommand(id, 'agent_update', 'self');

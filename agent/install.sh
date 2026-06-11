@@ -40,6 +40,12 @@ if [ -z "$AGENT_ID" ] && [ -f "$ENVDIR/agent.env" ]; then
   AGENT_ID="$(sed -n 's/^OMNISIGHT_AGENT_ID=//p' "$ENVDIR/agent.env" | head -n1)"
 fi
 if [ -z "$AGENT_ID" ]; then
+  PID="$(systemctl show -p MainPID --value omnisight-agent 2>/dev/null || true)"
+  if [ -n "$PID" ] && [ "$PID" != "0" ] && [ -r "/proc/$PID/environ" ]; then
+    AGENT_ID="$(tr '\0' '\n' < "/proc/$PID/environ" | sed -n 's/^OMNISIGHT_AGENT_ID=//p' | head -n1)"
+  fi
+fi
+if [ -z "$AGENT_ID" ]; then
   HOST_ID="$(hostname -s 2>/dev/null || hostname)"
   RAND_ID="$(od -An -N4 -tx1 /dev/urandom 2>/dev/null | tr -d ' \n')"
   [ -z "$RAND_ID" ] && RAND_ID="$(date +%s)"
@@ -65,6 +71,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
+EnvironmentFile=$ENVDIR/agent.env
 ExecStart=$BIN
 Restart=always
 RestartSec=5
