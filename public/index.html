@@ -619,9 +619,9 @@ html[data-theme="light"] .overview-card .sb-csum-item{background:transparent!imp
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h8"/><path d="M8 9h2"/></svg>
         <span>Logs</span>
       </button>
-      <button id="nav-profile" onclick="openEmbed('/profile')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
-        <span>Profile</span>
+      <button id="nav-agents" onclick="openEmbed('/agents')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><path d="M7 7h.01"/><path d="M7 17h.01"/><path d="M11 7h6"/><path d="M11 17h6"/></svg>
+        <span>Agents</span>
       </button>
     </nav>
     <div class="rail-section">Live platforms</div>
@@ -1995,6 +1995,7 @@ function buildPrometheus(prom){
 /* ── Docker ── */
 function buildDocker(docker){
   if(!docker?.length) return null;
+  const anyConnecting = docker.some(h => h._connecting);
   const allOk = docker.every(h=>h.online);
   const onlineHosts = docker.filter(h=>h.online).length;
   const totalRunning = docker.reduce((a,h)=>a+(h.summary?.running||0),0);
@@ -2076,9 +2077,11 @@ function buildDocker(docker){
     title: 'Docker',
     iconKey: 'docker',
     color: '#2496ed',
-    meta: `${totalRunning}/${totalAll} running`,
-    badge: bdg(allOk&&totalStopped===0?'green':onlineHosts===0?'red':totalStopped>0?'yellow':'red',
-               allOk&&totalStopped===0?'healthy':onlineHosts===0?'offline':`${totalStopped} stopped`),
+    meta: anyConnecting ? `${onlineHosts}/${docker.length} hosts · connecting...` : `${totalRunning}/${totalAll} running`,
+    badge: anyConnecting
+      ? bdg('gray','connecting...')
+      : bdg(allOk&&totalStopped===0?'green':onlineHosts===0?'red':totalStopped>0?'yellow':'red',
+            allOk&&totalStopped===0?'healthy':onlineHosts===0?'offline':`${totalStopped} stopped`),
     sbSummary: sbSummaryHtml,
     summary: '',
     body,
@@ -3276,7 +3279,7 @@ function setNavActive(id){
 function navIdForUrl(url){
   if(url.includes('/settings')) return 'nav-settings';
   if(url.includes('/logs')) return 'nav-logs';
-  if(url.includes('/profile')) return 'nav-profile';
+  if(url.includes('/agents')) return 'nav-agents';
   return null;
 }
 function returnDashboard(){

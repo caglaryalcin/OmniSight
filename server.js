@@ -230,6 +230,47 @@ function mergeDockerConfiguredRows(currentRows = [], agentRows = []) {
   return [...configured, ...agentRows.filter(h => !configuredNames.has(h.name))];
 }
 
+function dockerRowKeys(row = {}) {
+  return [row.name, row.host, row.url, row.socketPath, row.sshHost]
+    .filter(Boolean)
+    .map(v => String(v).trim().toLowerCase());
+}
+
+function sameDockerRow(a, b) {
+  const keys = new Set(dockerRowKeys(a));
+  return dockerRowKeys(b).some(k => keys.has(k));
+}
+
+function preserveDockerOnTransient(nextRows) {
+  const prevRows = Array.isArray(cache.data?.docker) ? cache.data.docker : [];
+  if (!Array.isArray(nextRows) || !prevRows.length) return nextRows;
+  const configured = dockerConfigRows();
+  if (!nextRows.length && configured.length) {
+    const now = Date.now();
+    const kept = prevRows.filter(row => row?.online && configured.some(cfg => sameDockerRow(cfg, row))).map(row => {
+      const staleSince = row._staleSince || now;
+      if (now - staleSince > STALE_KEEP_MS) return null;
+      return { ...row, _stale: true, _staleSince: staleSince, error: 'temporary Docker refresh failure' };
+    }).filter(Boolean);
+    if (kept.length) return kept;
+  }
+  const now = Date.now();
+  return nextRows.map(next => {
+    if (!next || next.online || next._connecting) return next;
+    if (!configured.some(row => sameDockerRow(row, next))) return next;
+    const prev = prevRows.find(row => row?.online && sameDockerRow(row, next));
+    if (!prev) return next;
+    const staleSince = prev._staleSince || now;
+    if (now - staleSince > STALE_KEEP_MS) return next;
+    return {
+      ...prev,
+      _stale: true,
+      _staleSince: staleSince,
+      error: next.error || 'temporary Docker refresh failure',
+    };
+  });
+}
+
 async function getProxmoxData() {
   if (hasProxmoxApi()) return getProxmoxApiData({ ...config.proxmox, excludedServices: config.excludedServices });
   return agents.getProxmoxData({ excludedServices: config.excludedServices });
@@ -456,13 +497,18 @@ function backgroundRefresh() {
   const ps = tasks.map(([key, p, fb]) =>
     p.then(v => {
       const next = (v == null ? fb : v);
-      base[key] = key === 'proxmox' ? preserveProxmoxOnTransient(next) : next;
+      base[key] = key === 'proxmox' ? preserveProxmoxOnTransient(next)
+        : key === 'docker' ? preserveDockerOnTransient(next)
+        : next;
       base.timestamp = new Date().toISOString();
     })
      .catch(err => {
        if (key === 'proxmox') {
          base[key] = preserveProxmoxOnTransient(fb, err);
          if (base[key]?._stale) console.warn(`Proxmox refresh failed; keeping last data: ${err.message}`);
+       } else if (key === 'docker') {
+         base[key] = preserveDockerOnTransient(fb);
+         if ((base[key] || []).some(h => h._stale)) console.warn(`Docker refresh failed; keeping last data: ${err.message}`);
        } else {
          base[key] = fb;
        }
@@ -990,6 +1036,52 @@ app.get('/api/agent/commands', async (req, res) => {
 app.post('/api/agent/result', (req, res) => {
   if (!agentAuth(req, res)) return;
   res.json({ ok: agents.handleResult(req.body || {}) });
+});
+
+function appVersion() {
+  try { return require('./package.json').version || '1.0.0'; }
+  catch { return '1.0.0'; }
+}
+
+function agentLatestVersion() {
+  try {
+    const txt = fs.readFileSync(path.join(__dirname, 'agent', 'omnisight-agent.sh'), 'utf8');
+    return (txt.match(/^VERSION="([^"]+)"/m) || [])[1] || appVersion();
+  } catch {
+    return appVersion();
+  }
+}
+
+function versionCompare(a, b) {
+  const pa = String(a || '0').split('.').map(n => Number(n) || 0);
+  const pb = String(b || '0').split('.').map(n => Number(n) || 0);
+  for (let i = 0; i < 3; i++) {
+    if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) - (pb[i] || 0);
+  }
+  return 0;
+}
+
+app.get('/api/agents', (req, res) => {
+  res.json({ latestVersion: agentLatestVersion(), agents: agents.listAgents() });
+});
+
+app.post('/api/agent/update', async (req, res) => {
+  try {
+    const id = String(req.body?.id || '').replace(/[^\w.-]/g, '').slice(0, 128);
+    if (!id) return res.status(400).json({ error: 'id required' });
+    const agent = agents.findAgent(id);
+    if (!agent) return res.status(404).json({ error: 'agent not found' });
+    if (versionCompare(agent.agentVersion, '1.2.1') < 0) {
+      return res.status(409).json({
+        error: 'This agent needs a one-time manual update before remote updates are available.',
+        manualCommand: "sudo sh -c 'set -a; . /etc/omnisight-agent/agent.env; set +a; curl -fsS ${OMNISIGHT_INSECURE_TLS:+--insecure} \"$OMNISIGHT_URL/agent/install.sh\" -o /tmp/omnisight-install.sh && bash /tmp/omnisight-install.sh && systemctl restart omnisight-agent'",
+      });
+    }
+    const output = await agents.queueCommand(id, 'agent_update', 'self');
+    res.json({ ok: true, output });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.post('/api/agent/token', (req, res) => {

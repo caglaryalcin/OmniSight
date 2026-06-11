@@ -471,7 +471,7 @@ function queueCommand(hostOrName, action, service) {
     const agent = findAgent(hostOrName);
     if (!agent) return reject(new Error('agent not found'));
     if (!SVC_NAME.test(service)) return reject(new Error('invalid target name'));
-    if (!['status', 'start', 'stop', 'restart', 'docker_logs', 'docker_prune'].includes(action)) return reject(new Error('invalid action'));
+    if (!['status', 'start', 'stop', 'restart', 'docker_logs', 'docker_prune', 'agent_update'].includes(action)) return reject(new Error('invalid action'));
     const id = crypto.randomBytes(8).toString('hex');
     const list = pending.get(agent.id) || [];
     list.push({ id, action, service });
@@ -483,6 +483,25 @@ function queueCommand(hostOrName, action, service) {
     const pw = pollWaiters.get(agent.id);
     if (pw) { pollWaiters.delete(agent.id); pw(); }
   });
+}
+
+function listAgents() {
+  const now = Date.now();
+  return [...agents.values()].map(a => ({
+    id: a.id,
+    name: a.hostname,
+    ip: a.ip || '',
+    os: a.os || '',
+    kernel: a.kernel || '',
+    platform: a.platform || 'linux',
+    role: a.role || 'auto',
+    agentVersion: a.agentVersion || '',
+    interval: a.interval || null,
+    lastSeen: a.lastSeen || null,
+    online: isOnline(a, now),
+    hasDocker: !!a.docker,
+    pveNode: a.pve?.node || a.pveNode || null,
+  })).sort((a, b) => (a.online === b.online ? a.name.localeCompare(b.name) : a.online ? -1 : 1));
 }
 
 function waitForCommands(agentId, waitMs) {
@@ -516,4 +535,4 @@ function removeAgent(id) {
   return true;
 }
 
-module.exports = { handleReport, getAllAgentData, getDockerData, getProxmoxData, hasPve, hasDocker, queueCommand, takeCommands, waitForCommands, handleResult, removeAgent, findAgent, commandLines, addPendingInstall };
+module.exports = { handleReport, getAllAgentData, getDockerData, getProxmoxData, hasPve, hasDocker, queueCommand, takeCommands, waitForCommands, handleResult, removeAgent, findAgent, listAgents, commandLines, addPendingInstall };

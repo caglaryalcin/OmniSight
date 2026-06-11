@@ -9,7 +9,7 @@ URL="${URL%/}"
 TOKEN="${OMNISIGHT_TOKEN:?OMNISIGHT_TOKEN required}"
 INTERVAL="${OMNISIGHT_INTERVAL:-15}"
 AGENT_ROLE="${OMNISIGHT_AGENT_ROLE:-auto}"
-VERSION="1.2.0"
+VERSION="1.2.1"
 HOST_ROOT="${OMNISIGHT_HOST_ROOT:-/}"
 INSECURE_TLS="${OMNISIGHT_INSECURE_TLS:-}"
 CURL_TLS_ARGS=""
@@ -245,7 +245,7 @@ EOF
 }
 
 run_command() {
-  local cid="$1" action="$2" target="$3" out b64
+  local cid="$1" action="$2" target="$3" out b64 restart_agent
   printf '%s' "$target" | grep -Eq '^[a-zA-Z0-9@._:-]+$' || return
   case "$action" in
     status)
@@ -256,11 +256,27 @@ run_command() {
       out=$(docker_cmd_capture logs --tail 300 "$target" | tail -c 200000) ;;
     docker_prune)
       out=$(docker_cmd_capture image prune -f) ;;
+    agent_update)
+      tmp="$(mktemp)"
+      if curl -fsS $CURL_TLS_ARGS -m 30 "$URL/agent/omnisight-agent.sh" -o "$tmp"; then
+        chmod 755 "$tmp"
+        install -m 755 "$tmp" /usr/local/bin/omnisight-agent
+        rm -f "$tmp"
+        out="omnisight-agent updated; restart scheduled"
+        restart_agent=1
+      else
+        rc=$?
+        rm -f "$tmp"
+        out="agent update failed (curl exit $rc)"
+      fi ;;
     *) return ;;
   esac
   b64=$(printf '%s' "$out" | base64 2>/dev/null | tr -d '\n')
   curl -fsS $CURL_TLS_ARGS -m 10 -X POST -H "X-Agent-Token: $TOKEN" -H "Content-Type: application/json" \
     -d "{\"id\":\"$cid\",\"output\":\"$b64\"}" "$URL/api/agent/result" >/dev/null 2>&1
+  if [ "${restart_agent:-}" = "1" ]; then
+    ( sleep 1; if command -v systemctl >/dev/null 2>&1; then systemctl restart omnisight-agent >/dev/null 2>&1 || true; else kill "$$" >/dev/null 2>&1 || true; fi ) &
+  fi
 }
 
 process_commands() {

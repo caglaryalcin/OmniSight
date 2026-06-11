@@ -202,7 +202,7 @@ html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#dd
 <div class="card">
   <div class="card-hdr" style="cursor:default">
     <div class="card-left">
-      <div class="card-icon" style="background:var(--blue)"></div>
+      <div class="card-icon" id="dot-certificates" style="background:var(--blue)"></div>
       <span class="card-title">Certificates</span>
     </div>
   </div>
@@ -1623,11 +1623,13 @@ function uploadIcon(input, targetId) {
 async function loadCertificates() {
   const el = document.getElementById('cert-list');
   if (!el) return;
+  const dot = document.getElementById('dot-certificates');
   try {
     const r = await fetch('/api/certificates', { headers: authHeaders() });
     handleUnauth(r);
     const b = await r.json();
     const files = b.files || [];
+    if (dot) dot.style.background = files.length ? 'var(--green)' : 'var(--blue)';
     el.innerHTML = files.length ? files.map(f => `
       <div class="agent-row">
         <span style="font-weight:600">${escHtml(f.name)}</span>
@@ -1636,6 +1638,7 @@ async function loadCertificates() {
         <button class="btn-rm" type="button" onclick="deleteCertificate('${escHtml(f.name)}',this)">✕</button>
       </div>`).join('') : '<div class="sys-empty">No certificates uploaded.</div>';
   } catch {
+    if (dot) dot.style.background = 'var(--red)';
     el.innerHTML = '<div class="sys-empty">Could not load certificates.</div>';
   }
 }
