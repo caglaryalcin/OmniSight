@@ -220,9 +220,15 @@ function dockerCli(args) {
   return `PATH=$PATH:/usr/bin:/usr/local/bin:/snap/bin docker ${args}`;
 }
 
+function dockerSudoAttempts(host) {
+  if (host.sudo === true) return [true];
+  if (host.sudo === false) return [false];
+  return host.sshMode === 'synology' ? [true, false] : [false, true];
+}
+
 async function execDockerCli(host, args) {
   const base = dockerCli(args);
-  const attempts = host.sudo === true ? [true] : host.sudo === false ? [false] : [false, true];
+  const attempts = dockerSudoAttempts(host);
   let lastErr;
   for (const useSudo of attempts) {
     const command = useSudo ? `sudo -S -p '' sh -c ${shQuote(base)}` : base;
@@ -238,7 +244,7 @@ function dockerCliCaptured(args, tailBytes = 200000) {
 
 async function execDockerCliCaptured(host, args, tailBytes) {
   const base = dockerCliCaptured(args, tailBytes);
-  const attempts = host.sudo === true ? [true] : host.sudo === false ? [false] : [false, true];
+  const attempts = dockerSudoAttempts(host);
   let lastErr;
   for (const useSudo of attempts) {
     const command = useSudo ? `sudo -S -p '' sh -c ${shQuote(base)}` : base;
