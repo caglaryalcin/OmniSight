@@ -241,33 +241,44 @@ function sameDockerRow(a, b) {
   return dockerRowKeys(b).some(k => keys.has(k));
 }
 
+function findPreviousOnlineDockerRow(prevRows, next) {
+  return prevRows.find(row => row?.online && sameDockerRow(row, next))
+    || prevRows.find(row => row?.online && row?.name && next?.name && String(row.name).toLowerCase() === String(next.name).toLowerCase());
+}
+
+function keepPreviousDockerRow(prev, next, now) {
+  if (!prev) return null;
+  const staleSince = prev._staleSince || now;
+  if (now - staleSince > STALE_KEEP_MS) return null;
+  return {
+    ...prev,
+    _stale: true,
+    _staleSince: staleSince,
+    error: next?._connecting ? 'refresh in progress' : (next?.error || 'temporary Docker refresh failure'),
+  };
+}
+
 function preserveDockerOnTransient(nextRows) {
   const prevRows = Array.isArray(cache.data?.docker) ? cache.data.docker : [];
   if (!Array.isArray(nextRows) || !prevRows.length) return nextRows;
+  const prevOnline = prevRows.filter(row => row?.online);
+  if (!prevOnline.length) return nextRows;
   const configured = dockerConfigRows();
   if (!nextRows.length && configured.length) {
     const now = Date.now();
-    const kept = prevRows.filter(row => row?.online && configured.some(cfg => sameDockerRow(cfg, row))).map(row => {
-      const staleSince = row._staleSince || now;
-      if (now - staleSince > STALE_KEEP_MS) return null;
-      return { ...row, _stale: true, _staleSince: staleSince, error: 'temporary Docker refresh failure' };
-    }).filter(Boolean);
+    const kept = prevOnline
+      .filter(row => configured.some(cfg => sameDockerRow(cfg, row)))
+      .map(row => keepPreviousDockerRow(row, { error: 'temporary Docker refresh failure' }, now))
+      .filter(Boolean);
     if (kept.length) return kept;
   }
   const now = Date.now();
   return nextRows.map(next => {
     if (!next || next.online) return next;
-    if (!configured.some(row => sameDockerRow(row, next))) return next;
-    const prev = prevRows.find(row => row?.online && sameDockerRow(row, next));
-    if (!prev) return next;
-    const staleSince = prev._staleSince || now;
-    if (now - staleSince > STALE_KEEP_MS) return next;
-    return {
-      ...prev,
-      _stale: true,
-      _staleSince: staleSince,
-      error: next._connecting ? 'refresh in progress' : (next.error || 'temporary Docker refresh failure'),
-    };
+    const isKnownConfigured = configured.some(row => sameDockerRow(row, next));
+    const prev = findPreviousOnlineDockerRow(prevOnline, next);
+    if (!isKnownConfigured && !prev) return next;
+    return keepPreviousDockerRow(prev, next, now) || next;
   });
 }
 
