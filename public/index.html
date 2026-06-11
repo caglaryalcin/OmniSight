@@ -320,7 +320,7 @@ html[data-theme="light"] .topbar{background:rgba(255,255,255,.78)}
 .pubstatus.on:hover{color:var(--green);background:rgba(52,211,153,.18)}
 #thbtn{background:var(--row);border:1px solid var(--border);color:var(--text);width:34px;height:33px;border-radius:9px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:border-color .15s,background .15s}
 #thbtn:hover{border-color:var(--border2);background:var(--panel2)}
-.logmodal{display:none;position:fixed;inset:0;background:rgba(4,6,10,.66);backdrop-filter:blur(4px);z-index:1000;align-items:center;justify-content:center}
+.logmodal{display:none;position:fixed;inset:0;background:rgba(4,6,10,.66);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);z-index:7000;align-items:center;justify-content:center}
 .logmodal.open{display:flex}
 .logbox{background:var(--panel);border:1px solid var(--border2);border-radius:16px;width:min(900px,92vw);height:80vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,.5);animation:cardin .18s ease}
 .loghdr{display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid var(--border);font-size:14px;font-weight:650}
@@ -3436,7 +3436,6 @@ async function pollOnce(){
       return;
     }
   }catch{}
-  if(window._connecting>0){ clearTimeout(timer); timer=setTimeout(pollOnce, 2000); return; }
   resetPbar();
   scheduleRefresh();
 }
@@ -3465,7 +3464,6 @@ async function initialLoad(){
     const data = await fetchStatus();
     render(data);
     if(data.loading){ setTimeout(initialLoad, 1500); return; }
-    if(data.loading || window._connecting>0){ setTimeout(initialLoad, 2000); return; }
     startPbar();
     scheduleRefresh();
     if(!document.querySelector('.sb-card')) openEmbed('/settings');

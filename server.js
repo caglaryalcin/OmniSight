@@ -256,7 +256,7 @@ function preserveDockerOnTransient(nextRows) {
   }
   const now = Date.now();
   return nextRows.map(next => {
-    if (!next || next.online || next._connecting) return next;
+    if (!next || next.online) return next;
     if (!configured.some(row => sameDockerRow(row, next))) return next;
     const prev = prevRows.find(row => row?.online && sameDockerRow(row, next));
     if (!prev) return next;
@@ -266,7 +266,7 @@ function preserveDockerOnTransient(nextRows) {
       ...prev,
       _stale: true,
       _staleSince: staleSince,
-      error: next.error || 'temporary Docker refresh failure',
+      error: next._connecting ? 'refresh in progress' : (next.error || 'temporary Docker refresh failure'),
     };
   });
 }
