@@ -184,8 +184,8 @@ function tempLabel(label) {
 function tempScore(label) {
   const s = String(label || '').toLowerCase();
   if (/fan|rpm|volt|power|watt|freq|clock|load|usage|critical|crit|max|high|limit|alarm|cpuinfo|cpus/.test(s)) return -100;
-  if (/(^|[\s._:-])cpu($|[\s._:-])|coretemp|package|(^|[\s._:-])core($|[\s._:-]|\d)/.test(s)) return 80;
-  if (/nvme|ssd|disk|drive/.test(s)) return 70;
+  if (/(^|[\s._:-])cpu($|[\s._:-])|coretemp|package|(^|[\s._:-])core($|[\s._:-]|\d)/.test(s)) return 100;
+  if (/nvme|ssd|disk|drive/.test(s)) return 40;
   if (/gpu/.test(s)) return 60;
   if (/pch|acpi|motherboard|mainboard|board|system|thermal/.test(s)) return 50;
   if (/temp|temperature|sensor|core/.test(s)) return 30;
@@ -262,7 +262,14 @@ const SSH_METRICS_SCRIPT = [
   '    printf "TEMP\\t%s\\t%s\\t%s\\n" "$n" "$label" "$val"',
   '  done',
   'done',
-  'awk \'$3 ~ /^(sd[a-z]+|vd[a-z]+|xvd[a-z]+|hd[a-z]+|nvme[0-9]+n[0-9]+|mmcblk[0-9]+|md[0-9]+)$/ {print "DISK\\t"$3"\\t"$6"\\t"$10}\' /proc/diskstats 2>/dev/null',
+  'for b in /sys/block/*; do',
+  '  [ -e "$b/stat" ] || continue',
+  '  dev=${b##*/}',
+  '  case "$dev" in loop*|ram*|zram*|fd*|sr*|nbd*) continue;; esac',
+  '  set -- $(cat "$b/stat" 2>/dev/null || true)',
+  '  [ $# -ge 7 ] || continue',
+  '  printf "DISK\\t%s\\t%s\\t%s\\n" "$dev" "$3" "$7"',
+  'done',
 ].join('\n');
 
 function parseSshMetrics(text, key) {
@@ -312,6 +319,18 @@ async function readSshMetrics(cfg, nodeName) {
   return parseSshMetrics(text, key);
 }
 
+async function readSshMetricsSafe(cfg, nodeName) {
+  const host = findSshMetricHost(cfg, nodeName);
+  if (!host?.sshHost) return null;
+  try {
+    return await readSshMetrics(cfg, nodeName);
+  } catch (err) {
+    const message = err?.message || String(err);
+    console.warn(`[Proxmox ${nodeName}] SSH metrics fallback failed: ${message}`);
+    return { error: message, configured: true };
+  }
+}
+
 function svcName(s) {
   return String(s.name || s.service || s.id || '').replace(/\.service$/, '');
 }
@@ -340,10 +359,11 @@ async function nodeData(cfg, node, excluded, resource = null) {
     const bandwidth = ratePairFrom(metricSources, RATE_KEYS.netIn, RATE_KEYS.netOut, 'rxBps', 'txBps');
     const diskIOTotal = diskIO ? (Number(diskIO.readBps) || 0) + (Number(diskIO.writeBps) || 0) : null;
     const bandwidthTotal = bandwidth ? (Number(bandwidth.rxBps) || 0) + (Number(bandwidth.txBps) || 0) : null;
-    const sshMetrics = await readSshMetrics(cfg, name).catch(err => ({ error: err.message }));
+    const sshMetrics = await readSshMetricsSafe(cfg, name);
     const finalDiskIO = diskIO || sshMetrics?.diskIO || null;
     const finalDiskIOTotal = finalDiskIO ? (Number(finalDiskIO.readBps) || 0) + (Number(finalDiskIO.writeBps) || 0) : null;
-    const tempInfo = sshMetrics?.tempInfo ?? extractTemperature(sensors) ?? extractTemperature(status) ?? extractTemperature(resource) ?? extractTemperature(node);
+    const apiTempInfo = extractTemperature(sensors) ?? extractTemperature(status) ?? extractTemperature(resource) ?? extractTemperature(node);
+    const tempInfo = sshMetrics?.tempInfo ?? (sshMetrics?.error ? null : apiTempInfo);
     const temp = tempInfo?.value ?? null;
     const hist = pveHistory.get(name) || [];
     hist.push({ time: Date.now(), cpu, mem: mem.percent || 0, temp, diskIO: finalDiskIOTotal, bandwidth: bandwidthTotal });

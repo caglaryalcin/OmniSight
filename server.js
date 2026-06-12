@@ -538,6 +538,52 @@ async function getProxmoxData() {
   return agents.getProxmoxData({ excludedServices: config.excludedServices });
 }
 
+function normalizedHostKeys(value) {
+  const raw = String(value || '').trim().toLowerCase();
+  if (!raw) return [];
+  const keys = new Set([raw]);
+  const withoutProto = raw.replace(/^[a-z]+:\/\//, '');
+  keys.add(withoutProto);
+  const hostPart = withoutProto.split('/')[0];
+  if (hostPart) keys.add(hostPart);
+  if (hostPart.includes(':')) keys.add(hostPart.replace(/:\d+$/, ''));
+  return [...keys].filter(Boolean);
+}
+
+function addProxmoxLinuxKeys(keys, value) {
+  normalizedHostKeys(value).forEach(k => keys.add(k));
+}
+
+function proxmoxLinuxKeys(proxmoxData = cache.data?.proxmox) {
+  const keys = new Set();
+  (config.proxmox?.sshMetrics || []).forEach(h => {
+    addProxmoxLinuxKeys(keys, h.node || h.name);
+    addProxmoxLinuxKeys(keys, h.sshHost);
+  });
+  (proxmoxData?.nodes || []).forEach(n => {
+    addProxmoxLinuxKeys(keys, n.node?.name || n.name);
+    addProxmoxLinuxKeys(keys, n.host);
+  });
+  return keys;
+}
+
+function filterLinuxProxmoxRows(rows = [], proxmoxData = cache.data?.proxmox) {
+  const keys = proxmoxLinuxKeys(proxmoxData);
+  if (!keys.size) return rows;
+  return rows.filter(row => {
+    if (row._connecting) return true;
+    const vals = [row.id, row.name, row.host, row.ip].flatMap(normalizedHostKeys);
+    return !vals.some(v => keys.has(v));
+  });
+}
+
+function getLinuxData(proxmoxData = cache.data?.proxmox) {
+  return filterLinuxProxmoxRows(
+    agents.getAllAgentData({ ...config.linux, excludedServices: config.excludedServices }),
+    proxmoxData,
+  );
+}
+
 async function getDockerData() {
   const apiData = hasDockerApi() ? await getDockerApiData(config.docker) : [];
   const agentData = agents.getDockerData();
@@ -934,7 +980,7 @@ function backgroundRefresh(opts = {}) {
   assignStatic(base);
   const tasks = [
     ['proxmox',      enabled(config.proxmox)      ? getProxmoxData() : Promise.resolve({ clusterSummary: null, nodes: [] }), { clusterSummary: null, nodes: [] }],
-    ['linux',        enabled(config.linux)        ? Promise.resolve(agents.getAllAgentData({ ...config.linux, excludedServices: config.excludedServices })) : Promise.resolve([]),   []],
+    ['linux',        enabled(config.linux)        ? Promise.resolve(getLinuxData()) : Promise.resolve([]),   []],
     ['kubernetes',   enabled(config.kubernetes)   ? getAllKubernetesData(config.kubernetes)  : Promise.resolve(null), null],
     ['snmp',         enabled(config.snmp)         ? getAllSynologyData(config.snmp)          : Promise.resolve([]),   []],
     ['healthchecks', enabled(config.healthchecks) ? getAllHealthchecks(config.healthchecks) : Promise.resolve(null), null],
@@ -972,6 +1018,7 @@ function backgroundRefresh(opts = {}) {
   refreshPromise = Promise.allSettled(ps)
     .then(() => { 
       if (generation !== refreshGeneration) return;
+      base.linux = filterLinuxProxmoxRows(base.linux, base.proxmox);
       base.loading = false; 
       base.timestamp = new Date().toISOString(); 
       runAlertChecks(base); 
@@ -1320,7 +1367,7 @@ app.post('/api/config', async (req, res) => {
       } else { cache.data.proxmox = { clusterSummary: null, nodes: [] }; }
 
       if (en(config.linux)) {
-        cache.data.linux = agents.getAllAgentData({ ...config.linux, excludedServices: config.excludedServices });
+        cache.data.linux = getLinuxData(cache.data.proxmox);
       } else { cache.data.linux = []; }
 
       if (en(config.kubernetes)) {
@@ -1732,12 +1779,13 @@ app.post('/api/agent/report', (req, res) => {
     const a = agents.handleReport(req.body || {});
     if (cache.data) {
       const en = c => c && c.enabled !== false;
-      cache.data.linux = en(config.linux) ? agents.getAllAgentData({ ...config.linux, excludedServices: config.excludedServices }) : [];
+      cache.data.linux = en(config.linux) ? getLinuxData(cache.data.proxmox) : [];
       if (en(config.proxmox) && !hasProxmoxApi()) {
         cache.data.proxmox = preserveProxmoxOnTransient(agents.getProxmoxData({ excludedServices: config.excludedServices }));
       } else if (!en(config.proxmox)) {
         cache.data.proxmox = { clusterSummary: null, nodes: [] };
       }
+      cache.data.linux = en(config.linux) ? getLinuxData(cache.data.proxmox) : [];
       cache.data.docker = en(config.docker) ? mergeDockerHistory(mergeDockerConfiguredRows(cache.data.docker, agents.getDockerData())) : [];
       assignStatic(cache.data);
     }
@@ -1835,7 +1883,7 @@ app.post('/api/agent/pending', (req, res) => {
     const pending = agents.addPendingInstall(kind);
     if (cache.data) {
       if (kind === 'linux') {
-        cache.data.linux = agents.getAllAgentData({ ...config.linux, excludedServices: config.excludedServices });
+        cache.data.linux = getLinuxData(cache.data.proxmox);
       }
       if (kind === 'proxmox') {
         cache.data.proxmox = preserveProxmoxOnTransient(agents.getProxmoxData({ excludedServices: config.excludedServices }));
@@ -1855,10 +1903,10 @@ app.post('/api/agent/remove', (req, res) => {
     if (!id) return res.status(400).json({ error: 'id required' });
     const ok = agents.removeAgent(id);
     if (cache.data) {
-      cache.data.linux = agents.getAllAgentData({ ...config.linux, excludedServices: config.excludedServices });
       cache.data.proxmox = hasProxmoxApi()
         ? cache.data.proxmox
         : preserveProxmoxOnTransient(agents.getProxmoxData({ excludedServices: config.excludedServices }));
+      cache.data.linux = getLinuxData(cache.data.proxmox);
       cache.data.docker = mergeDockerHistory(mergeDockerConfiguredRows(cache.data.docker, agents.getDockerData()));
       assignStatic(cache.data);
     }

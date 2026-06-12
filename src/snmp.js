@@ -102,6 +102,16 @@ function buildMap(items) {
   return map;
 }
 
+function clampPercent(n) {
+  if (!Number.isFinite(n)) return null;
+  return Math.max(0, Math.min(100, Math.round(n)));
+}
+
+function clampMemoryFree(totalKB, freeKB) {
+  if (totalKB == null || freeKB == null) return freeKB;
+  return Math.max(0, Math.min(Number(totalKB), Number(freeKB)));
+}
+
 async function getHrMemory(session) {
   const rows = await snmpWalk(session, '1.3.6.1.2.1.25.2.3.1');
   const BASE = '1.3.6.1.2.1.25.2.3.1.';
@@ -195,23 +205,30 @@ async function getSystemInfo(session, deviceKey) {
     } catch (e) { console.error('[SNMP sysInfo hrCPU]', e.message); }
   }
 
-  if (memTotalKB == null) {
-    try {
-      const ucd = await snmpGet(session, [
-        '1.3.6.1.4.1.2021.4.5.0',
-        '1.3.6.1.4.1.2021.4.6.0',
-        '1.3.6.1.4.1.2021.4.14.0',
-        '1.3.6.1.4.1.2021.4.15.0',
-      ]);
-      const uTotal  = toNum(ucd['1.3.6.1.4.1.2021.4.5.0']);
-      const uFree   = toNum(ucd['1.3.6.1.4.1.2021.4.6.0']);
-      const uBuf    = toNum(ucd['1.3.6.1.4.1.2021.4.14.0']) || 0;
-      const uCached = toNum(ucd['1.3.6.1.4.1.2021.4.15.0']) || 0;
-      if (uTotal && uFree != null) {
-        memTotalKB = uTotal;
-        memFreeKB  = uFree + uBuf + uCached;
-      }
-    } catch (e) { console.error('[SNMP ucd-mem]', e.message); }
+  let ucdMem = null;
+  try {
+    const ucd = await snmpGet(session, [
+      '1.3.6.1.4.1.2021.4.5.0',
+      '1.3.6.1.4.1.2021.4.6.0',
+      '1.3.6.1.4.1.2021.4.14.0',
+      '1.3.6.1.4.1.2021.4.15.0',
+    ]);
+    const uTotal  = toNum(ucd['1.3.6.1.4.1.2021.4.5.0']);
+    const uFree   = toNum(ucd['1.3.6.1.4.1.2021.4.6.0']);
+    const uBuf    = toNum(ucd['1.3.6.1.4.1.2021.4.14.0']) || 0;
+    const uCached = toNum(ucd['1.3.6.1.4.1.2021.4.15.0']) || 0;
+    if (uTotal && uFree != null) {
+      ucdMem = { totalKB: uTotal, freeKB: clampMemoryFree(uTotal, uFree + uBuf + uCached) };
+    }
+  } catch (e) { console.error('[SNMP ucd-mem]', e.message); }
+
+  if (ucdMem) {
+    const synTotal = toNum(memTotalKB);
+    const closeEnough = !synTotal || Math.abs(synTotal - ucdMem.totalKB) / Math.max(synTotal, ucdMem.totalKB) < 0.25;
+    if (closeEnough) {
+      memTotalKB = ucdMem.totalKB;
+      memFreeKB = ucdMem.freeKB;
+    }
   }
 
   if (memTotalKB == null) {
@@ -223,14 +240,14 @@ async function getSystemInfo(session, deviceKey) {
 
   const memTotal = memTotalKB != null ? memTotalKB * 1024 : null;
   const memFree  = memFreeKB  != null ? memFreeKB  * 1024 : null;
-  const memUsed  = memTotal != null && memFree != null ? memTotal - memFree : null;
+  const memUsed  = memTotal != null && memFree != null ? Math.max(0, Math.min(memTotal, memTotal - memFree)) : null;
 
   return {
     cpu: cpuUser != null ? cpuUser + (cpuSystem || 0) : null,
     systemTemp: systemTemp != null ? systemTemp : null,
     systemTempLabel: systemTemp != null ? 'CPU temperature' : null,
     ram: memTotal ? {
-      percent: Math.round((memUsed / memTotal) * 100),
+      percent: clampPercent((memUsed / memTotal) * 100),
       usedBytes: memUsed,
       totalBytes: memTotal,
       usedGB: (memUsed / 1024 ** 3).toFixed(1),

@@ -1596,7 +1596,7 @@ function buildProxmox(px){
     </div>`;
   }
 
-  const nodesHtml = px.nodes.map(({node,services=[],vms,history,host,backup,storage=[],metrics,_connecting})=>{
+  const nodesHtml = px.nodes.map(({node,services=[],vms,history,host,backup,storage=[],metrics,metricsError,_connecting})=>{
     if(_connecting) return `
     <div class="node-hdr" style="cursor:default">
       <div class="mon-dot md-gray"></div>
@@ -1649,6 +1649,7 @@ function buildProxmox(px){
     </div>
     <div class="node-body ${isOpen?'open':''}" id="nd-${node.name}">
       ${node.online ? `
+        ${metricsError ? `<div class="offline-err" style="margin:0 0 8px">SSH metrics fallback: ${escHtml(metricsError)}</div>` : ''}
         ${(()=>{ const lim=historyLimitFor('px:'+node.name); return `<div style="display:flex; justify-content:flex-end; margin-bottom:4px;">
           ${drawTimeSelect('px:'+node.name, lim)}
         </div><div class="chart-row">

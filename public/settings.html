@@ -1034,6 +1034,7 @@ function addPveSshMetricHost(data = {}) {
   const fallbackTitle = String(trText('Proxmox SSH metrics')).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\r/g,'').replace(/\n/g,' ');
   item.innerHTML = `
     <div class="arr-hdr" onclick="toggleArr('${id}')">
+      <div class="pvessh-dot" style="width:9px;height:9px;border-radius:50%;background:var(--muted);flex-shrink:0"></div>
       <span class="arr-hdr-name">${title}</span>
       <button class="btn-rm" type="button" onclick="event.stopPropagation();this.closest('.arr-item').remove()">✕</button>
     </div>
@@ -2085,6 +2086,23 @@ async function refreshDots(cfg, newData){
   const en=c=>!!(c && c.enabled!==false);
   const pxNodes = d.proxmox?.nodes || [];
   setDot('dot-proxmox', platformDot(en(cfg.proxmox), pxNodes.length, pxNodes.filter(n=>n.node?.online).length, !!d.proxmox?._connecting || pxNodes.some(n=>n._connecting), pxNodes.some(n => n.node?.online && (n.services||[]).some(s=>!s.active&&!s.excluded))));
+  document.querySelectorAll('#px-ssh-list .arr-item').forEach(item => {
+    const dot = item.querySelector('.pvessh-dot');
+    if (!dot) return;
+    const norm = v => String(v || '').trim().toLowerCase().replace(/^[a-z]+:\/\//, '').split('/')[0].replace(/:\d+$/, '');
+    const nodeVal = norm(item.querySelector('.pvessh-node')?.value);
+    const hostVal = norm(item.querySelector('.pvessh-host')?.value);
+    const match = pxNodes.find(n => {
+      const vals = [n.node?.name, n.name, n.host].map(norm);
+      return (nodeVal && vals.includes(nodeVal)) || (hostVal && vals.includes(hostVal));
+    }) || (pxNodes.length === 1 ? pxNodes[0] : null);
+    dot.style.background = !nodeVal && !hostVal ? 'var(--muted)'
+      : !match || match._connecting ? 'var(--muted)'
+      : match.metricsError ? 'var(--red)'
+      : match.node?.online ? 'var(--green)'
+      : 'var(--red)';
+    dot.style.boxShadow = match?.node?.online && !match.metricsError ? '0 0 8px rgba(52,211,153,.6)' : 'none';
+  });
   const linuxRows = d.linux || [];
   setDot('dot-linux', platformDot(en(cfg.linux), linuxRows.length, linuxRows.filter(l=>l.online).length, linuxRows.some(l=>l._connecting), linuxRows.some(l=>l.online&&(l.services||[]).some(s=>!s.active&&!s.excluded))));
   const kOnline = !!(d.kubernetes && d.kubernetes.online);
