@@ -40,6 +40,7 @@ input:focus{border-color:#4a5568}
 .remember{display:flex;align-items:center;gap:8px;margin-bottom:16px;cursor:pointer;user-select:none}
 .remember input{width:auto;margin:0;cursor:pointer}
 .remember span{font-size:13px;color:var(--muted)}
+.otp-note{font-size:12px;color:var(--muted);margin:-8px 0 14px;line-height:1.45}
 </style>
 </head>
 <body>
@@ -49,6 +50,11 @@ input:focus{border-color:#4a5568}
   <input id="u" type="text" autocomplete="username" autofocus>
   <label for="p">Password</label>
   <input id="p" type="password" autocomplete="current-password">
+  <div id="totp-wrap" style="display:none">
+    <label for="code">Two-factor code</label>
+    <input id="code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456">
+    <div class="otp-note">Enter the 6-digit code from your authenticator app.</div>
+  </div>
   <div id="confirm-wrap" style="display:none">
     <label for="p2">Confirm password</label>
     <input id="p2" type="password" autocomplete="new-password">
@@ -59,10 +65,16 @@ input:focus{border-color:#4a5568}
 </div>
 <script>
 let mode = 'login';
+let twoFactorVisible = false;
+function showTwoFactor(){
+  twoFactorVisible = true;
+  document.getElementById('totp-wrap').style.display = '';
+}
 function setMode(m){
   mode = m;
   const reg = m === 'register';
   document.getElementById('confirm-wrap').style.display = reg ? '' : 'none';
+  document.getElementById('totp-wrap').style.display = (!reg && twoFactorVisible) ? '' : 'none';
   document.getElementById('rem-wrap').style.display = reg ? 'none' : 'flex';
   document.getElementById('btn').textContent = reg ? 'Register' : 'Sign in';
   document.getElementById('title').textContent = reg ? 'Create account' : 'OmniSight';
@@ -81,8 +93,15 @@ async function submitForm(){
       if(!rr.ok || !dd.ok){ err.textContent = dd.error || 'Registration failed'; btn.disabled = false; return; }
     }
     const remember = document.getElementById('rem').checked;
-    const r = await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,password,remember})});
+    const code = document.getElementById('code').value.trim();
+    const r = await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,password,remember,code})});
     const d = await r.json();
+    if(d.twoFactorRequired){
+      showTwoFactor();
+      document.getElementById('code').focus();
+      err.textContent = d.error || 'Two-factor code required';
+      return;
+    }
     if(!r.ok || !d.ok){ err.textContent = d.error || 'Login failed'; return; }
     sessionStorage.removeItem('os_token');
     localStorage.removeItem('os_token');
@@ -91,10 +110,21 @@ async function submitForm(){
 }
 
 document.getElementById('u').addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('p').focus(); });
-document.getElementById('p').addEventListener('keydown', e => { if(e.key==='Enter') submitForm(); });
+document.getElementById('p').addEventListener('keydown', e => {
+  if(e.key==='Enter'){
+    if(twoFactorVisible) document.getElementById('code').focus();
+    else submitForm();
+  }
+});
+document.getElementById('code').addEventListener('keydown', e => { if(e.key==='Enter') submitForm(); });
 
 (async () => {
-  try { const r = await fetch('/api/auth-status'); const d = await r.json(); if(r.ok && !d.required) setMode('register'); } catch {}
+  try {
+    const r = await fetch('/api/auth-status');
+    const d = await r.json();
+    if(r.ok && !d.required) setMode('register');
+    else if(d.twoFactorEnabled) showTwoFactor();
+  } catch {}
 })();
 </script>
 </body>

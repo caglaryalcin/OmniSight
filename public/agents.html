@@ -67,6 +67,61 @@ html.embed header{display:none}
   <div class="msg" id="msg"></div>
 </main>
 <script>
+const I18N_TR = {
+  'Agents':'Ajanlar',
+  'Connected push agents and their installed versions.':'Bağlı push ajanları ve kurulu sürümleri.',
+  'Latest':'Güncel',
+  'Refresh':'Yenile',
+  'Agent':'Ajan',
+  'Role':'Rol',
+  'System':'Sistem',
+  'Status':'Durum',
+  'Version':'Sürüm',
+  'Action':'İşlem',
+  'Loading agents...':'Ajanlar yükleniyor...',
+  'No agents have reported yet.':'Henüz raporlayan ajan yok.',
+  'unknown':'bilinmiyor',
+  'online':'çevrimiçi',
+  'offline':'çevrimdışı',
+  'Update':'Güncelle',
+  'Offline':'Çevrimdışı',
+  'Current':'Güncel',
+  'Updating...':'Güncelleniyor...',
+  'Copied':'Kopyalandı',
+  'Copy':'Kopyala',
+  'Manual update required.':'Manuel güncelleme gerekli.',
+  'Update command sent. Waiting for next report...':'Güncelleme komutu gönderildi. Sonraki rapor bekleniyor...',
+  'never':'hiç',
+  'ago':'önce'
+};
+const I18N_ATTRS = ['placeholder','title','aria-label'];
+function currentLang(){ try { return localStorage.getItem('os_lang') || 'en'; } catch { return 'en'; } }
+function t(text){ return currentLang() === 'tr' ? (I18N_TR[text] || text) : text; }
+function applyLanguage(){
+  const lang = currentLang();
+  document.documentElement.lang = lang;
+  document.querySelectorAll('*').forEach(el => I18N_ATTRS.forEach(attr => {
+    if(!el.hasAttribute(attr)) return;
+    const key = `_osOrig_${attr}`;
+    if(el[key] === undefined) el[key] = el.getAttribute(attr);
+    el.setAttribute(attr, t(el[key]));
+  }));
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+    acceptNode(node){
+      const p = node.parentElement;
+      if(!p || ['SCRIPT','STYLE','PRE','CODE','TEXTAREA'].includes(p.tagName)) return NodeFilter.FILTER_REJECT;
+      return node.nodeValue.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+    }
+  });
+  let node;
+  while((node = walker.nextNode())){
+    if(node._osOrigText === undefined) node._osOrigText = node.nodeValue;
+    const original = node._osOrigText;
+    const trimmed = original.trim();
+    node.nodeValue = original.replace(trimmed, t(trimmed));
+  }
+  document.title = currentLang() === 'tr' ? 'OmniSight - Ajanlar' : 'OmniSight - Agents';
+}
 function authHeaders(){ const t=sessionStorage.getItem('os_token')||localStorage.getItem('os_token'); return t?{'x-session-token':t}:{}; }
 function handleUnauth(r){ if(r.status===401 || (r.redirected && r.url.includes('/login'))){ sessionStorage.removeItem('os_token'); localStorage.removeItem('os_token'); document.cookie='session=; path=/; max-age=0'; window.location.href='/login'; throw new Error('Unauthorized'); } }
 async function readJson(r){
@@ -75,7 +130,15 @@ async function readJson(r){
   catch { throw new Error(`Unexpected response from server (${r.status}): ${text.slice(0,120) || r.statusText}`); }
 }
 function esc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-function rel(ts){ if(!ts) return 'never'; const s=Math.max(0,Math.round((Date.now()-Number(ts))/1000)); if(s<60)return s+'s ago'; const m=Math.round(s/60); if(m<60)return m+'m ago'; const h=Math.round(m/60); if(h<48)return h+'h ago'; return Math.round(h/24)+'d ago'; }
+function rel(ts){
+  if(!ts) return t('never');
+  const tr = currentLang() === 'tr';
+  const s=Math.max(0,Math.round((Date.now()-Number(ts))/1000));
+  if(s<60)return tr ? `${s}sn önce` : s+'s ago';
+  const m=Math.round(s/60); if(m<60)return tr ? `${m}dk önce` : m+'m ago';
+  const h=Math.round(m/60); if(h<48)return tr ? `${h}sa önce` : h+'h ago';
+  const d=Math.round(h/24); return tr ? `${d}g önce` : d+'d ago';
+}
 function cmpVer(a,b){
   const pa=String(a||'0').split('.').map(n=>parseInt(n,10)||0), pb=String(b||'0').split('.').map(n=>parseInt(n,10)||0);
   for(let i=0;i<3;i++){ if((pa[i]||0)!==(pb[i]||0)) return (pa[i]||0)-(pb[i]||0); }
@@ -88,7 +151,7 @@ function roleText(a){
 }
 function badge(cls, text){ return `<span class="badge bg-${cls}">${esc(text)}</span>`; }
 function copyText(text, btn){
-  navigator.clipboard?.writeText(text).then(()=>{ const o=btn.textContent; btn.textContent='Copied'; setTimeout(()=>btn.textContent=o,1200); });
+  navigator.clipboard?.writeText(text).then(()=>{ const o=btn.textContent; btn.textContent=t('Copied'); setTimeout(()=>btn.textContent=o,1200); });
 }
 let msgHoldUntil = 0;
 function clearMsg(force = false){
@@ -102,34 +165,40 @@ function showManualCommand(message, command){
   const msg = document.getElementById('msg');
   msg.className = 'msg err';
   msgHoldUntil = Date.now() + 60000;
-  msg.innerHTML = `${esc(message)}<div class="cmd">${esc(command)}<button class="btn" onclick="copyText(this.parentElement.childNodes[0].textContent,this)">Copy</button></div>`;
+  msg.innerHTML = `${esc(message)}<div class="cmd">${esc(command)}<button class="btn" onclick="copyText(this.parentElement.childNodes[0].textContent,this)">${t('Copy')}</button></div>`;
   setTimeout(() => clearMsg(), 60050);
+}
+function agentHeaderHtml(){
+  return `<div class="row hdr">
+    <div></div><div>${t('Agent')}</div><div>${t('Role')}</div><div class="hide-sm">${t('System')}</div><div>${t('Status')}</div><div class="hide-sm">${t('Version')}</div><div>${t('Action')}</div>
+  </div>`;
 }
 function renderAgents(data){
   const latest = data.latestVersion || '1.0.0';
-  document.getElementById('latest').textContent = 'Latest v' + latest;
+  document.getElementById('latest').textContent = t('Latest') + ' v' + latest;
   const rows = data.agents || [];
   const card = document.getElementById('agents-card');
-  const header = card.querySelector('.hdr').outerHTML;
-  if(!rows.length){ card.innerHTML = header + '<div class="empty">No agents have reported yet.</div>'; return; }
+  const header = agentHeaderHtml();
+  if(!rows.length){ card.innerHTML = header + `<div class="empty">${t('No agents have reported yet.')}</div>`; applyLanguage(); return; }
   card.innerHTML = header + rows.map(a => {
     const ver = a.agentVersion || 'unknown';
     const outdated = ver === 'unknown' || cmpVer(ver, latest) < 0;
     const newer = ver !== 'unknown' && cmpVer(ver, latest) > 0;
-    const versionBadge = ver === 'unknown' ? badge('gray','unknown') : outdated ? badge('yellow','v'+ver) : newer ? badge('yellow','v'+ver) : badge('green','v'+ver);
+    const versionBadge = ver === 'unknown' ? badge('gray',t('unknown')) : outdated ? badge('yellow','v'+ver) : newer ? badge('yellow','v'+ver) : badge('green','v'+ver);
     const action = outdated && a.online
-      ? `<button class="btn primary" onclick="updateAgent('${esc(a.id)}',this)">Update</button>`
-      : outdated ? '<button class="btn" disabled>Offline</button>' : '<button class="btn" disabled>Current</button>';
+      ? `<button class="btn primary" onclick="updateAgent('${esc(a.id)}',this)">${t('Update')}</button>`
+      : outdated ? `<button class="btn" disabled>${t('Offline')}</button>` : `<button class="btn" disabled>${t('Current')}</button>`;
     return `<div class="row">
       <div class="dot ${a.online?'ok':'bad'}"></div>
       <div class="cell"><div class="name">${esc(a.name||a.id)}</div><div class="meta">${esc(a.id)}${a.ip?' · '+esc(a.ip):''}</div></div>
       <div>${esc(roleText(a))}</div>
       <div class="cell hide-sm"><div>${esc(a.os||a.platform||'')}</div><div class="meta">${esc(a.kernel||'')}</div></div>
-      <div>${a.online?badge('green','online'):badge('red','offline')}<div class="meta">${rel(a.lastSeen)}</div></div>
+      <div>${a.online?badge('green',t('online')):badge('red',t('offline'))}<div class="meta">${rel(a.lastSeen)}</div></div>
       <div class="hide-sm">${versionBadge}</div>
       <div>${action}</div>
     </div>`;
   }).join('');
+  applyLanguage();
 }
 async function loadAgents(){
   clearMsg();
@@ -144,22 +213,23 @@ async function loadAgents(){
 async function updateAgent(id, btn){
   const msg = document.getElementById('msg');
   clearMsg(true);
-  const old = btn.textContent; btn.disabled = true; btn.textContent = 'Updating...';
+  const old = btn.textContent; btn.disabled = true; btn.textContent = t('Updating...');
   try{
     const r = await fetch('/api/agent/update',{method:'POST',headers:{'Content-Type':'application/json',...authHeaders()},body:JSON.stringify({id})});
     handleUnauth(r);
     const d = await readJson(r).catch(e=>({ error:e.message }));
     if(r.status === 409 && d.manualCommand){
-      showManualCommand(d.error || 'Manual update required.', d.manualCommand);
+      showManualCommand(d.error || t('Manual update required.'), d.manualCommand);
       btn.disabled = false; btn.textContent = old;
       return;
     }
     if(!r.ok) throw new Error(d.error||r.statusText);
-    msg.textContent = d.output || 'Update command sent. Waiting for next report...';
+    msg.textContent = d.output || t('Update command sent. Waiting for next report...');
     msg.className = 'msg ok';
     setTimeout(loadAgents, 2500);
   }catch(e){ msg.textContent = e.message; msg.className = 'msg err'; btn.disabled = false; btn.textContent = old; }
 }
+applyLanguage();
 loadAgents();
 setInterval(loadAgents, 15000);
 </script>

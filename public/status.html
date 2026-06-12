@@ -82,7 +82,36 @@ function genChart(data, status) {
 }
 const dotCls = s => s === 'ok' ? 'd-ok' : s === 'warn' ? 'd-warn' : s === 'down' ? 'd-down' : 'd-gray';
 const txtCls = s => s === 'ok' ? 't-ok' : s === 'warn' ? 't-warn' : s === 'down' ? 't-down' : '';
-const label  = s => s === 'ok' ? 'Operational' : s === 'warn' ? 'Degraded' : s === 'down' ? 'Down' : s === 'connecting' ? 'Connecting…' : 'Unknown';
+let pageLang = 'en';
+try { pageLang = localStorage.getItem('os_lang') || 'en'; } catch {}
+const I18N_TR = {
+  'Status':'Durum',
+  'Status page':'Durum Sayfası',
+  'Status Page':'Durum Sayfası',
+  'SYSTEMS':'Sunucular',
+  'Systems':'Sunucular',
+  'NAME':'İsim',
+  'Name':'İsim',
+  'Operational':'Çalışıyor',
+  'Degraded':'Sorunlu',
+  'Down':'Kapalı',
+  'Connecting…':'Bağlanıyor…',
+  'Unknown':'Bilinmiyor',
+  'Loading…':'Yükleniyor…',
+  'Last updated':'Son güncelleme',
+  'All systems operational':'Tüm sunucular çalışıyor',
+  'Partial degradation':'Kısmi sorun var',
+  'Major outage':'Büyük kesinti',
+  'No data':'Veri yok',
+  'No services configured':'Yapılandırılmış servis yok',
+  'Status page is not enabled':'Durum sayfası etkin değil',
+  'Auto-refreshes every 15s':'Her 15 saniyede otomatik yenilenir',
+  'Powered by OmniSight':'OmniSight ile çalışır'
+};
+function t(text) {
+  return pageLang === 'tr' ? (I18N_TR[text] || text) : text;
+}
+const label  = s => s === 'ok' ? t('Operational') : s === 'warn' ? t('Degraded') : s === 'down' ? t('Down') : s === 'connecting' ? t('Connecting…') : t('Unknown');
 function escHtml(s) {
   return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
@@ -110,11 +139,16 @@ function setFavicon(status) {
 async function load() {
   try {
     const r = await fetch('/api/public/status');
-    if (!r.ok) throw new Error('Status page is not enabled');
+    if (!r.ok) throw new Error(t('Status page is not enabled'));
     const d = await r.json();
+    try { pageLang = localStorage.getItem('os_lang') || d.preferredLanguage || 'en'; } catch { pageLang = d.preferredLanguage || 'en'; }
+    document.documentElement.lang = pageLang;
+    document.querySelector('.foot').innerHTML = pageLang === 'tr'
+      ? 'Her 15 saniyede otomatik yenilenir · <a href="https://github.com/caglaryalcin/OmniSight" target="_blank" rel="noopener" style="color:var(--green);text-decoration:none;font-weight:700">OmniSight</a> ile çalışır'
+      : 'Auto-refreshes every 15s · Powered by <a href="https://github.com/caglaryalcin/OmniSight" target="_blank" rel="noopener" style="color:var(--green);text-decoration:none;font-weight:700">OmniSight</a>';
     document.getElementById('title').textContent = d.title || 'OmniSight Status';
-    document.title = (d.title || 'OmniSight') + ' — Status';
-    document.getElementById('updated').textContent = 'Last updated ' + new Date(d.timestamp).toLocaleString();
+    document.title = (d.title || 'OmniSight') + ' — ' + t('Status');
+    document.getElementById('updated').textContent = t('Last updated') + ' ' + new Date(d.timestamp).toLocaleString();
     const svcs = d.services || [];
     const real = svcs.filter(s => s.status !== 'connecting');
     const worst = svcs.some(s => s.status === 'down') ? 'down' : svcs.some(s => s.status === 'warn') ? 'warn' : real.length ? 'ok' : svcs.length ? 'connecting' : 'gray';
@@ -123,7 +157,7 @@ async function load() {
       worst === 'ok' ? 'var(--green)' : worst === 'warn' ? 'var(--yellow)' : worst === 'down' ? 'var(--red)' : 'var(--muted)';
     document.getElementById('overall').innerHTML =
       '<span class="dot ' + dotCls(worst) + '"></span><span class="' + txtCls(worst) + '">' +
-      (worst === 'ok' ? 'All systems operational' : worst === 'warn' ? 'Partial degradation' : worst === 'down' ? 'Major outage' : worst === 'connecting' ? 'Connecting…' : 'No data') + '</span>';
+      (worst === 'ok' ? t('All systems operational') : worst === 'warn' ? t('Partial degradation') : worst === 'down' ? t('Major outage') : worst === 'connecting' ? t('Connecting…') : t('No data')) + '</span>';
     document.getElementById('list').innerHTML = svcs.length ? svcs.map(s => {
       const meta = metaHtml(s.meta);
       return '<div class="svc"><span class="dot ' + dotCls(s.status) + '"></span>' +
@@ -131,7 +165,7 @@ async function load() {
         '<div class="chart">' + genChart(s.history, s.status) + '</div>' +
         '<span class="meta' + meta.cls + '">' + meta.html + '</span>' +
         '<span class="status-lbl ' + txtCls(s.status) + '">' + label(s.status) + '</span></div>';
-    }).join('') : '<div class="empty">No services configured</div>';
+    }).join('') : '<div class="empty">' + t('No services configured') + '</div>';
     _fast = !!d.refreshing || svcs.some(s => s.status === 'connecting');
   } catch (e) {
     setFavicon('gray');

@@ -118,6 +118,11 @@ header{
 .det-summary{display:flex;align-items:center;gap:12px;margin-right:16px}
 .det-summary .badge{font-size:12.5px;padding:4px 11px;font-weight:700}
 .det-meta{font-size:13.5px;color:var(--muted);font-weight:600}
+.det-platform-summary{flex:1 1 0;min-width:0;margin-left:auto;overflow:hidden}
+.det-platform-summary .sb-csum{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(62px,1fr);grid-template-columns:none;gap:6px;padding:0;background:transparent;text-align:center;overflow:hidden}
+.det-platform-summary .sb-csum-item{min-width:0;max-width:none;min-height:56px;padding:0 6px;margin:0;border-radius:8px;background:transparent!important;display:flex;flex-direction:column;align-items:center!important;justify-content:center!important;gap:3px}
+.det-platform-summary .sb-csum-val{font-size:clamp(15px,1.15vw,19px);line-height:1;font-weight:850;white-space:nowrap;overflow:visible;text-overflow:clip}
+.det-platform-summary .sb-csum-lbl{font-size:clamp(8px,.65vw,10px);line-height:1;margin:0;letter-spacing:.04em;white-space:nowrap}
 .det-body{padding:0 0 24px}
 
 /* Monitor rows */
@@ -146,15 +151,19 @@ header{
 .hb{display:flex;gap:2px;align-items:center;flex:1}
 .hb-bar{width:7px;height:22px;border-radius:2px;flex-shrink:0}
 .uk-bars{display:flex;align-items:center;gap:4px;min-width:0;overflow:hidden}
-.uk-bar{width:5px;height:18px;border-radius:4px;flex:0 0 5px;background:var(--muted);opacity:.95}
+.uk-bar{width:5px;height:18px;border-radius:4px;flex:0 0 5px;background:var(--muted);opacity:.95;cursor:help}
 .uk-bar.up{background:var(--green)}
 .uk-bar.down{background:var(--red)}
 .uk-bar.warn{background:var(--yellow)}
 .uk-bar.maintenance,.uk-bar.unknown{background:var(--muted);opacity:.7}
 .uk-mon-row{display:block;padding:10px 16px}
 .uk-mon-top{display:flex;align-items:center;gap:10px;min-width:0}
-.uk-mon-bars{margin:9px 34px 0 19px}
-.overview-uk-bars{margin-top:8px;max-width:280px}
+.uk-mon-bars{margin:8px 34px 0 19px}
+.uk-mon-bars .uk-bars{width:100%;gap:2px}
+.uk-mon-bars .uk-bar{flex:1 1 5px;width:auto;min-width:4px;height:16px;border-radius:4px}
+.overview-uk-bars{margin-top:8px;width:100%;padding-right:2px}
+.overview-uk-bars .uk-bars{width:100%;gap:2px}
+.overview-uk-bars .uk-bar{flex:1 1 5px;width:auto;min-width:3px;height:16px;border-radius:4px}
 .hst{display:flex;gap:1px;align-items:flex-end;height:32px;flex:1}
 .hst-bar{flex:1;min-width:2px;border-radius:1px 1px 0 0}
 
@@ -172,6 +181,7 @@ html[data-theme="light"] .hist-bg{fill:rgba(0,0,0,.04)}
 .chart-row{margin-bottom:18px}
 .chart-row:last-child{margin-bottom:0}
 .chart-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;padding:0 1px}
+.chart-foot{font-size:16px;color:var(--muted);margin-top:5px;text-align:center;font-variant-numeric:tabular-nums}
 
 #os-tooltip {
   position: fixed; background: var(--panel); border: 1px solid var(--border2);
@@ -179,6 +189,13 @@ html[data-theme="light"] .hist-bg{fill:rgba(0,0,0,.04)}
   transition: opacity 0.1s; z-index: 9999; box-shadow: var(--shadow);
   font-size: 13px; color: var(--text); min-width: 130px;
 }
+#os-hover-dot {
+  position: fixed; width: 8px; height: 8px; border-radius: 50%;
+  pointer-events: none; opacity: 0; z-index: 9998;
+  transform: translate(-50%, -50%); box-shadow: 0 0 0 3px rgba(15,16,16,.9);
+  transition: opacity .08s;
+}
+html[data-theme="light"] #os-hover-dot{box-shadow:0 0 0 3px rgba(255,255,255,.9)}
 .tt-time { font-size: 12px; color: var(--muted); margin-bottom: 6px; font-weight: 600; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
 .tt-val { font-weight: 700; font-variant-numeric:tabular-nums; }
 
@@ -204,13 +221,15 @@ html[data-theme="light"] .hist-bg{fill:rgba(0,0,0,.04)}
 .node-hdr:last-of-type{border-bottom:none}
 .node-name{font-size:14.5px;font-weight:650;width:110px;flex-shrink:0;letter-spacing:-.01em}
 .node-info{font-size:12.5px;color:var(--muted);flex:1;font-variant-numeric:tabular-nums}
+.node-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.node-main .node-name{width:auto;max-width:none;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.node-main .node-info{flex:none;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .node-body{display:none;border-bottom:1px solid var(--border);background:rgba(0,0,0,.16);padding:14px 18px}
 .node-body.open{display:block}
 .node-body .row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
 .node-body .row:last-child{margin-bottom:0}
 .nb-label{font-size:12px;color:var(--muted);font-weight:550}
 .nb-pct{font-size:13px;font-weight:700;flex-shrink:0;font-variant-numeric:tabular-nums}
-
 .vm-chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
 .vm-chip{
   display:flex;align-items:center;gap:6px;
@@ -235,7 +254,26 @@ html[data-theme="light"] .hist-bg{fill:rgba(0,0,0,.04)}
 .k8s-grp-body{display:none;background:rgba(0,0,0,.16)}
 .k8s-grp-body.open{display:block;border-top:1px solid var(--border)}
 .k8s-grp-body .mon-row{padding-left:34px}
-.k8s-colhdr{display:flex;align-items:center;gap:10px;padding:7px 16px 7px 34px;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);border-bottom:1px solid var(--border)}
+.k8s-colhdr{display:flex;align-items:center;gap:10px;padding:7px 16px 7px 34px;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);border-bottom:1px solid var(--border)}
+.k8s-colhdr.k8s-pod-row,.mon-row.k8s-pod-row{display:grid;grid-template-columns:10px minmax(360px,2.25fr) minmax(160px,1fr) minmax(96px,.55fr) minmax(110px,.6fr) minmax(130px,.72fr) minmax(120px,.65fr);align-items:center;gap:22px}
+.k8s-grp-body .mon-row.k8s-pod-row{padding-left:34px;padding-right:16px}
+.k8s-pod-cell{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+.k8s-pod-cell.muted{color:var(--muted);font-size:12.5px}
+.k8s-pod-cell.metric{font-size:12.5px;color:var(--muted)}
+.k8s-pod-row > :nth-child(n+3):not(:last-child){text-align:center;justify-self:center}
+.k8s-pod-row > :nth-child(2){justify-self:stretch}
+.k8s-pod-row .mon-name{width:auto;max-width:none}
+.k8s-colhdr.k8s-pod-row > :nth-child(2){justify-self:start;margin-left:126px}
+.k8s-colhdr.k8s-pod-row > :nth-child(2) .docker-sort-btn{font-size:inherit;font-weight:inherit;letter-spacing:inherit}
+.k8s-pod-row > :nth-child(7){width:76px}
+.k8s-pod-row .docker-sort-btn{justify-content:center}
+.k8s-colhdr.k8s-deploy-row,.mon-row.k8s-deploy-row{display:grid;grid-template-columns:10px minmax(360px,2.2fr) minmax(170px,.9fr) minmax(120px,.55fr);align-items:center;gap:22px}
+.k8s-colhdr.k8s-service-row,.mon-row.k8s-service-row{display:grid;grid-template-columns:10px minmax(360px,2.2fr) minmax(170px,.9fr) minmax(150px,.7fr) minmax(110px,.55fr);align-items:center;gap:22px}
+.k8s-grp-body .mon-row.k8s-deploy-row,.k8s-grp-body .mon-row.k8s-service-row{padding-left:34px;padding-right:16px}
+.k8s-detail-cell{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+.k8s-detail-cell.muted{color:var(--muted);font-size:12.5px}
+.k8s-deploy-row > :nth-child(n+4),.k8s-service-row > :nth-child(n+4){text-align:center;justify-self:center}
+.k8s-service-row > :nth-child(5){width:86px}
 
 .syn-bar{display:flex;align-items:center;gap:8px;margin-bottom:6px}
 .syn-bl{font-size:13px;color:var(--muted);width:44px;flex-shrink:0}
@@ -354,8 +392,32 @@ html[data-theme="light"] .topbar{background:rgba(255,255,255,.78)}
 .docker-cell{min-width:0;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
 .docker-cell.name{color:var(--text);font-size:14px;font-weight:650}
 .docker-cell.ports{font-size:13px}
+.docker-sort-row{cursor:default;background:rgba(0,0,0,.08);padding-top:7px;padding-bottom:7px}
+.docker-sort-row:hover{background:rgba(0,0,0,.08)}
+.docker-head-cell{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:750;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.docker-sort-btn{width:100%;display:flex;align-items:center;justify-content:flex-start;gap:5px;background:none;border:none;color:var(--muted);font:inherit;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;font-weight:800;cursor:pointer;padding:0}
+.docker-sort-btn:hover,.docker-sort-btn.active{color:var(--green)}
+.docker-sort-arrow{font-size:11px;line-height:1;color:currentColor;opacity:.7}
+.docker-host-history{margin-bottom:12px}
+.pve-node-hdr{align-items:center;gap:12px}
+.pve-head-main{flex:1;min-width:0;display:flex;flex-wrap:wrap;align-items:stretch}
+.pve-head-title,.pve-head-stat{min-width:0;min-height:48px;margin:-1px 0 0 -1px;border:1px solid var(--border);background:transparent;padding:7px 10px;display:flex;flex-direction:column;justify-content:center}
+.pve-head-title{flex:.95 1 112px}
+.pve-head-stat{flex:1 1 86px}
+.pve-head-stat.has-spark{flex:1.55 1 150px;display:grid;grid-template-columns:minmax(52px,auto) minmax(70px,1fr);align-items:center;column-gap:10px}
+.pve-head-text{min-width:0}
+.pve-head-title .node-name{width:auto;max-width:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pve-head-sub,.pve-head-lbl{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.055em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pve-head-val{font-size:14px;font-weight:800;color:var(--text);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mini-hist{width:100%;height:24px;display:block;opacity:.9}
+.mini-hist-bg{fill:rgba(255,255,255,.025)}
+html[data-theme="light"] .mini-hist-bg{fill:rgba(15,23,42,.035)}
+.snmp-head-main{display:grid;grid-template-columns:minmax(135px,.62fr) minmax(150px,.78fr) minmax(190px,1fr) minmax(190px,1fr) minmax(190px,1fr)}
+.docker-head-main{display:grid;grid-template-columns:minmax(120px,.55fr) minmax(260px,1.25fr) minmax(110px,.5fr) minmax(180px,.9fr) minmax(180px,.9fr) minmax(110px,.55fr)}
 @media (max-width:1200px){
   .docker-row{grid-template-columns:9px minmax(130px,1.2fr) minmax(140px,1fr) 62px 70px minmax(110px,1fr) minmax(90px,1fr) minmax(110px,1fr) auto}
+  .snmp-head-main{grid-template-columns:minmax(120px,.62fr) minmax(130px,.78fr) minmax(150px,1fr) minmax(150px,1fr) minmax(150px,1fr)}
+  .docker-head-main{grid-template-columns:minmax(110px,.55fr) minmax(220px,1.2fr) minmax(96px,.5fr) minmax(150px,.9fr) minmax(150px,.9fr) minmax(96px,.55fr)}
 }
 .lg-ts{color:var(--muted)}
 .lg-err{color:var(--red);font-weight:600}
@@ -374,13 +436,6 @@ html[data-theme="light"] .topbar{background:rgba(255,255,255,.78)}
   border-color: var(--yellow);
   color: var(--yellow);
   background: rgba(251,191,36,.08);
-}
-
-#os-hover-dot {
-  position: fixed; width: 10px; height: 10px; border-radius: 50%;
-  border: 2.5px solid var(--panel); pointer-events: none; opacity: 0;
-  transition: opacity 0.1s; z-index: 9998; box-shadow: 0 0 4px rgba(0,0,0,0.5);
-  transform: translate(-50%, -50%);
 }
 
 .os-sel { position: relative; display: inline-block; font-size: 13px; font-weight: 500; cursor: pointer; }
@@ -453,6 +508,10 @@ html[data-theme="light"] .topbar{background:rgba(255,255,255,.78)}
 .shell .sb-csum-item{min-width:0;padding:7px 3px;border-radius:8px}
 .shell .sb-csum-val{font-size:18px;white-space:nowrap;overflow:hidden;text-overflow:clip}
 .shell .sb-csum-lbl{font-size:9px;line-height:1.05;letter-spacing:.035em;min-height:19px;display:flex;align-items:flex-start;justify-content:center}
+.shell .det-platform-summary .sb-csum{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(62px,1fr);grid-template-columns:none;gap:6px;padding:0;background:transparent;text-align:center;overflow:hidden;align-items:stretch}
+.shell .det-platform-summary .sb-csum-item{min-width:0;max-width:none;min-height:56px;padding:0 6px;margin:0;border-radius:8px;background:transparent!important;display:grid!important;align-content:center!important;justify-items:center!important;gap:3px}
+.shell .det-platform-summary .sb-csum-val{font-size:clamp(15px,1.15vw,19px);line-height:1;font-weight:850;white-space:nowrap;overflow:visible;text-overflow:clip;margin:0}
+.shell .det-platform-summary .sb-csum-lbl{font-size:clamp(8px,.65vw,10px);line-height:1;margin:0;min-height:0!important;display:block!important;letter-spacing:.04em;white-space:nowrap}
 body.rail-collapsed .shell{grid-template-columns:78px minmax(0,1fr)}
 body.rail-collapsed .brand{justify-content:center;padding:0}
 body.rail-collapsed .brand > div:nth-child(2),body.rail-collapsed .nav span,body.rail-collapsed .rail-section,body.rail-collapsed .rail-foot{display:none}
@@ -480,6 +539,7 @@ html[data-theme="light"] body.rail-collapsed .shell .sb-card.active{background:#
 
 .overview{padding:22px;min-height:100%;background:transparent}
 .overview-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) minmax(280px,340px);gap:12px;margin-bottom:14px}
+.overview-kpis.no-side{grid-template-columns:repeat(4,minmax(0,1fr))}
 .overview-kpi{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:14px;min-width:0;box-shadow:var(--shadow)}
 .overview-kpi-head{display:flex;align-items:center;justify-content:space-between;gap:8px;color:var(--muted);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.045em}
 .overview-kpi .os-sel{font-size:11px;font-weight:650;text-transform:none;letter-spacing:0;flex-shrink:0}
@@ -490,8 +550,10 @@ html[data-theme="light"] body.rail-collapsed .shell .sb-card.active{background:#
 .overview-kpi-value{font-size:28px;font-weight:800;letter-spacing:0;margin-top:12px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .overview-kpi-sub{font-size:12px;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .overview-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;align-items:start}
+.overview-layout.no-side .overview-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
 .overview-col{display:flex;flex-direction:column;gap:14px;min-width:0}
 .overview-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,340px);gap:14px;align-items:start}
+.overview-layout.no-side{grid-template-columns:1fr}
 .overview-side{display:grid;gap:14px}
 .overview-side-card{background:var(--panel);border:1px solid var(--border);border-radius:8px;overflow:hidden;box-shadow:var(--shadow)}
 .overview-side-h{padding:12px 14px;border-bottom:1px solid var(--border);font-size:13px;font-weight:750}
@@ -569,15 +631,18 @@ html[data-theme="light"] .overview-card .sb-csum-item{background:transparent!imp
   .shell .sb-icon svg{width:20px;height:20px;display:block;margin:auto}
   .shell .sb-main,.shell .sb-badge-wrap{display:none}
   .overview-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .overview-kpis.no-side{grid-template-columns:repeat(2,minmax(0,1fr))}
   .overview-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .overview-layout.no-side .overview-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media (max-width:760px){
   .topbar{padding:0 14px;gap:8px}
   .search,#lupd,#pbtn-lbl,.pubstatus span{display:none}
   .pubstatus{padding:0;width:36px;height:36px;justify-content:center}
   .overview{padding:14px}
-  .overview-kpis,.overview-layout{grid-template-columns:1fr}
+  .overview-kpis,.overview-kpis.no-side,.overview-layout{grid-template-columns:1fr}
   .overview-grid{grid-template-columns:1fr}
+  .overview-layout.no-side .overview-grid{grid-template-columns:1fr}
 }
 
 </style>
@@ -713,6 +778,116 @@ let recentLogsSig = '';
 let recentLogsRequest = null;
 let recentLogsLoaded = false;
 let notifyOff = new Set();
+const I18N_TR = {
+  'Dashboard':'Panel',
+  'Settings':'Ayarlar',
+  'Logs':'Kayıtlar',
+  'Agents':'Ajanlar',
+  'Profile':'Profil',
+  'About':'Hakkında',
+  'Help':'Yardım',
+  'Sign out':'Çıkış yap',
+  'Public status':'Durum Sayfası',
+  'Status Page':'Durum Sayfası',
+  'Public status page is enabled':'Durum Sayfası açık',
+  'Open public status page':'Durum Sayfasını aç',
+  'Live platforms':'Canlı platformlar',
+  'Search host, service, container':'Host, servis, container ara',
+  'Theme':'Tema',
+  'Account':'Hesap',
+  'Pause':'Duraklat',
+  'Resume':'Sürdür',
+  'Refresh':'Yenile',
+  'All healthy':'Tümü sağlıklı',
+  'degraded':'sorunlu',
+  'healthy':'sağlıklı',
+  'connecting...':'bağlanıyor...',
+  'connecting…':'bağlanıyor…',
+  'Unconfigured':'Yapılandırılmamış',
+  'No data configured':'Veri yapılandırılmadı',
+  'Loading…':'Yükleniyor…',
+  'Loading logs...':'Kayıtlar yükleniyor...',
+  'No rows to show yet':'Henüz satır yok',
+  'No monitors found':'Monitör bulunamadı',
+  'Uptime Kuma unreachable':'Uptime Kuma erişilemiyor',
+  'Recent logs':'Son kayıtlar',
+  'Active alerts':'Aktif bildirimler',
+  'No active alerts':'Aktif bildirim yok',
+  'CPU usage':'CPU kullanımı',
+  'Memory usage':'Bellek kullanımı',
+  'Disk I/O':'Disk I/O',
+  'Bandwidth':'Bant genişliği',
+  'Temperature':'Sıcaklık',
+  'CPU temperature':'CPU sıcaklığı',
+  'CPU temp':'CPU sıcaklığı',
+  'System temperature':'Sistem sıcaklığı',
+  'System temp':'Sistem sıcaklığı',
+  'Disk temp':'Disk sıcaklığı',
+  'Sort by':'Sıralama',
+  'Name':'İsim',
+  'Memory':'Bellek',
+  'RAM':'RAM',
+  'Network':'Ağ',
+  'Disk':'Disk',
+  'Image':'İmaj',
+  'Ports':'Portlar',
+  'State':'Durum',
+  'Network I/O':'Ağ I/O',
+  'All platforms':'Tüm platformlar',
+  'Network devices':'Ağ cihazları',
+  'Linux Servers':'Linux Sunucuları',
+  'Not reported':'Raporlanmadı',
+  'Read and write combined':'Okuma ve yazma toplamı',
+  'Inbound plus outbound':'Gelen ve giden toplamı',
+  'Monitor':'Monitör',
+  'Last Heartbeat':'Son heartbeat',
+  'Ping':'Ping',
+  'Status':'Durum',
+  'Total':'Toplam',
+  'Up':'Up',
+  'Down':'Down',
+  'Pending':'Bekleyen',
+  'Maint':'Bakım',
+  'Unreachable':'Erişilemiyor',
+  'Expand sidebar':'Sidebar genişlet',
+  'Collapse sidebar':'Sidebar daralt',
+  'Resize sidebar':'Sidebar boyutlandır',
+  'Collapse':'Kapat',
+  'Expand':'Aç'
+};
+const I18N_ATTRS = ['placeholder','title','aria-label'];
+function currentLang(data = window._lastData) {
+  try { return localStorage.getItem('os_lang') || data?.preferredLanguage || 'en'; }
+  catch { return data?.preferredLanguage || 'en'; }
+}
+function trText(text, lang = currentLang()) {
+  return lang === 'tr' ? (I18N_TR[text] || text) : text;
+}
+window.applyLanguage = function(lang = currentLang()) {
+  try { localStorage.setItem('os_lang', lang); } catch {}
+  document.documentElement.lang = lang;
+  if (!document.body) return;
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      const p = node.parentElement;
+      if (!p || ['SCRIPT','STYLE','PRE','CODE','TEXTAREA'].includes(p.tagName)) return NodeFilter.FILTER_REJECT;
+      return node.nodeValue.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+    }
+  });
+  let node;
+  while ((node = walker.nextNode())) {
+    if (node._osOrigText === undefined) node._osOrigText = node.nodeValue;
+    const original = node._osOrigText;
+    const trimmed = original.trim();
+    node.nodeValue = original.replace(trimmed, trText(trimmed, lang));
+  }
+  document.querySelectorAll('*').forEach(el => I18N_ATTRS.forEach(attr => {
+    if (!el.hasAttribute(attr)) return;
+    const key = `_osOrig_${attr}`;
+    if (el[key] === undefined) el[key] = el.getAttribute(attr);
+    el.setAttribute(attr, trText(el[key], lang));
+  }));
+};
 const BELL_ON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>';
 const BELL_OFF = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13.73 21a2 2 0 0 1-3.46 0"/><path d="M18.63 13A17.89 17.89 0 0 1 18 8"/><path d="M6.26 6.26A5.86 5.86 0 0 0 6 8c0 7-3 9-3 9h14"/><path d="M18 8a6 6 0 0 0-9.33-5"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
 function notifyBell(key){
@@ -735,8 +910,32 @@ document.addEventListener('click', e => {
   if(!e.target.closest('.os-sel')) document.querySelectorAll('.os-sel').forEach(d => d.classList.remove('open'));
 });
 
+function periodHoursValue(value) {
+  const n = Number(value || 1);
+  if (!Number.isFinite(n) || n <= 0) return 1;
+  return Math.min(Math.max(n, 0.333333), 24);
+}
+function periodHoursToLimit(hours) {
+  return Math.max(1, Math.round(periodHoursValue(hours) * 60 * 4));
+}
+function defaultPeriodHours(data = window._lastData) {
+  return periodHoursValue(data?.defaultTimePeriodHours || 1);
+}
+function defaultHistoryLimit(data = window._lastData) {
+  return periodHoursToLimit(defaultPeriodHours(data));
+}
+function historyLimitFor(id) {
+  return Number(timeLimits[id]) || defaultHistoryLimit();
+}
 function drawTimeSelect(id, currentLimit) {
-  const opts = [ { v: 80, l: '20 Mins' }, { v: 240, l: '1 Hour' }, { v: 1440, l: '6 Hours' } ];
+  const opts = [
+    { v: 80, l: '20 Mins' },
+    { v: 240, l: '1 Hour' },
+    { v: 720, l: '3 Hours' },
+    { v: 1440, l: '6 Hours' },
+    { v: 2880, l: '12 Hours' },
+    { v: 5760, l: '24 Hours' },
+  ];
   const curLbl = opts.find(o => o.v === currentLimit)?.l || '20 Mins';
   const optsHtml = opts.map(o => `<div class="os-sel-opt ${currentLimit === o.v ? 'active' : ''}" onclick="setTimeLimit('${id}', ${o.v})">${o.l}</div>`).join('');
   return `<div class="os-sel" onclick="event.stopPropagation()">
@@ -749,11 +948,142 @@ function drawTimeSelect(id, currentLimit) {
 
 let timeLimits = {};
 try { timeLimits = JSON.parse(localStorage.getItem('os_time_limits') || '{}'); } catch {}
+function syncDefaultPeriodOverride(data) {
+  const current = String(defaultPeriodHours(data));
+  let previous = '';
+  try { previous = localStorage.getItem('os_default_period_hours') || ''; } catch {}
+  if (previous && previous !== current) {
+    timeLimits = {};
+    try { localStorage.removeItem('os_time_limits'); } catch {}
+  }
+  try { localStorage.setItem('os_default_period_hours', current); } catch {}
+}
 window.setTimeLimit = function(id, val) {
   timeLimits[id] = Number(val);
   try { localStorage.setItem('os_time_limits', JSON.stringify(timeLimits)); } catch {}
   if (window._lastData) render(window._lastData);
 };
+
+let dockerContainerSort = 'state';
+try { dockerContainerSort = localStorage.getItem('os_docker_container_sort') || 'state'; } catch {}
+const DOCKER_SORT_OPTIONS = [
+  ['state', 'Status'],
+  ['name', 'Name'],
+  ['cpu', 'CPU'],
+  ['memory', 'Memory'],
+  ['disk', 'Disk I/O'],
+  ['network', 'Network I/O'],
+];
+window.setDockerContainerSort = function(mode) {
+  dockerContainerSort = DOCKER_SORT_OPTIONS.some(([id]) => id === mode) ? mode : 'state';
+  try { localStorage.setItem('os_docker_container_sort', dockerContainerSort); } catch {}
+  if (window._lastData) render(window._lastData);
+};
+function dockerIoBytes(text) {
+  const scale = { b:1, kb:1024, mb:1024**2, gb:1024**3, tb:1024**4, kib:1024, mib:1024**2, gib:1024**3, tib:1024**4 };
+  let total = 0;
+  String(text || '').replace(/([\d.]+)\s*([kmgt]?i?b)\b/gi, (_, n, unit) => {
+    const v = Number(n);
+    if (Number.isFinite(v)) total += v * (scale[String(unit).toLowerCase()] || 1);
+    return '';
+  });
+  return total;
+}
+function sortDockerContainers(containers) {
+  const list = [...(containers || [])];
+  const mode = DOCKER_SORT_OPTIONS.some(([id]) => id === dockerContainerSort) ? dockerContainerSort : 'state';
+  const stateOrder = { running: 0, restarting: 1, paused: 2, created: 3, removing: 4, exited: 5, dead: 6 };
+  const byName = (a, b) => String(a.name || '').localeCompare(String(b.name || ''));
+  if (mode === 'name') return list.sort(byName);
+  if (mode === 'state') return list.sort((a, b) => {
+    const ao = stateOrder[a.state] ?? 9, bo = stateOrder[b.state] ?? 9;
+    return ao === bo ? byName(a, b) : ao - bo;
+  });
+  const val = c => mode === 'cpu' ? Number(c.cpu) || 0
+    : mode === 'memory' ? Number(c.memPercent) || 0
+    : mode === 'disk' ? dockerIoBytes(c.blockIO)
+    : dockerIoBytes(c.netIO);
+  return list.sort((a, b) => {
+    const d = val(b) - val(a);
+    return d || byName(a, b);
+  });
+}
+function dockerSortButton(mode, label) {
+  const active = dockerContainerSort === mode;
+  return `<button type="button" class="docker-sort-btn ${active ? 'active' : ''}" onclick="event.stopPropagation();setDockerContainerSort('${mode}')">${trText(label)}<span class="docker-sort-arrow">${active ? '↓' : '↕'}</span></button>`;
+}
+function dockerContainerHeader() {
+  return `<div class="mon-row docker-row docker-sort-row">
+    <div></div>
+    <div class="docker-head-cell">${trText('Name')}</div>
+    <div class="docker-head-cell">${trText('Image')}</div>
+    <div class="docker-head-cell">${dockerSortButton('cpu','CPU')}</div>
+    <div class="docker-head-cell">${dockerSortButton('memory','RAM')}</div>
+    <div class="docker-head-cell">${dockerSortButton('network','Network')}</div>
+    <div class="docker-head-cell">${dockerSortButton('disk','Disk')}</div>
+    <div class="docker-head-cell">${trText('Ports')}</div>
+    <div class="docker-head-cell">${trText('State')}</div>
+  </div>`;
+}
+
+let k8sPodSort = 'status';
+try { k8sPodSort = localStorage.getItem('os_k8s_pod_sort') || 'status'; } catch {}
+const K8S_POD_SORT_OPTIONS = [
+  ['status', 'Status'],
+  ['name', 'Name'],
+  ['cpu', 'CPU'],
+  ['memory', 'RAM'],
+  ['restarts', 'Restarts'],
+];
+function validK8sPodSort(mode) {
+  return K8S_POD_SORT_OPTIONS.some(([id]) => id === mode) ? mode : 'status';
+}
+window.setK8sPodSort = function(mode) {
+  k8sPodSort = validK8sPodSort(mode);
+  try { localStorage.setItem('os_k8s_pod_sort', k8sPodSort); } catch {}
+  if (window._lastData) render(window._lastData);
+};
+function k8sPodStatusRank(p) {
+  if (p.failed || p.phase === 'Failed') return 0;
+  if (p.phase === 'Pending') return 1;
+  if (p.phase === 'Running' && !p.ready) return 2;
+  if (p.phase === 'Running') return 3;
+  if (p.phase === 'Succeeded') return 4;
+  return 5;
+}
+function sortK8sPods(pods) {
+  const list = [...(pods || [])];
+  const mode = validK8sPodSort(k8sPodSort);
+  const byName = (a, b) => String(a.name || '').localeCompare(String(b.name || ''));
+  if (mode === 'name') return list.sort(byName);
+  if (mode === 'status') return list.sort((a, b) => {
+    const d = k8sPodStatusRank(a) - k8sPodStatusRank(b);
+    return d || byName(a, b);
+  });
+  if (mode === 'restarts') return list.sort((a, b) => (Number(b.restarts) || 0) - (Number(a.restarts) || 0) || byName(a, b));
+  const val = p => mode === 'cpu' ? Number(p.cpuMilli) : Number(p.memoryBytes);
+  return list.sort((a, b) => {
+    const av = Number.isFinite(val(a)) ? val(a) : null;
+    const bv = Number.isFinite(val(b)) ? val(b) : null;
+    if (av == null && bv == null) return byName(a, b);
+    if (av == null) return 1;
+    if (bv == null) return -1;
+    return bv - av || byName(a, b);
+  });
+}
+function k8sSortButton(mode, label) {
+  const active = validK8sPodSort(k8sPodSort) === mode;
+  return `<button type="button" class="docker-sort-btn ${active ? 'active' : ''}" onclick="event.stopPropagation();setK8sPodSort('${mode}')">${trText(label)}<span class="docker-sort-arrow">${active ? '↓' : '↕'}</span></button>`;
+}
+function fmtK8sCpu(milli) {
+  if (!hasNum(milli)) return '--';
+  const n = Number(milli);
+  if (n >= 1000) return `${(n / 1000).toFixed(n >= 10000 ? 0 : 1).replace(/\.0$/, '')} cores`;
+  return `${Math.round(n * 10) / 10}m`;
+}
+function fmtK8sMemory(bytes) {
+  return hasNum(bytes) ? fmtBytes(Number(bytes)) : '--';
+}
 
 let overviewKpiPlatforms = {};
 try { overviewKpiPlatforms = JSON.parse(localStorage.getItem('os_overview_kpi_platforms') || '{}'); } catch {}
@@ -790,10 +1120,16 @@ const SEC_ICONS = {
 
 function bc(v){ return v>=90?'var(--red)':v>=70?'var(--yellow)':'var(--green)' }
 function bchex(v){ return v>=90?'#F87171':v>=70?'#FBBF24':'#34D399' }
+function tempColor(v){ return v>=60?'var(--red)':v>=50?'var(--yellow)':'var(--green)' }
+function tempHex(v){ return v>=60?'#F87171':v>=50?'#FBBF24':'#34D399' }
 function dc(ok){ return ok?'md-green':'md-red' }
 function bdg(cls,txt){ return `<span class="badge bg-${cls}">${txt}</span>` }
 function hasNum(v){ return v !== null && v !== undefined && v !== '' && Number.isFinite(Number(v)); }
 function fmtRate(v){ return hasNum(v) ? `${fmtBytes(Number(v))}/s` : ''; }
+function fmtBytePair(usedBytes, totalBytes, usedGB, totalGB){
+  if(hasNum(usedBytes) && hasNum(totalBytes)) return `${fmtBytes(Number(usedBytes))} / ${fmtBytes(Number(totalBytes))}`;
+  return usedGB ? `${usedGB}/${totalGB} GB` : '';
+}
 function metricSpan(label, value){
   if(value==null || value==='') return '';
   return `<span style="font-size:12px;color:var(--muted)">${label} <span style="color:var(--text);font-weight:600">${value}</span></span>`;
@@ -894,7 +1230,7 @@ function applyConfigured(ids, cfg){
 function showChartTooltip(e, el, clr) {
   const tt = document.getElementById('os-tooltip');
   const hDot = document.getElementById('os-hover-dot');
-  if (!tt || !hDot) return;
+  if (!tt) return;
   
   const rect = el.getBoundingClientRect();
   const x = e.clientX - rect.left;
@@ -903,17 +1239,31 @@ function showChartTooltip(e, el, clr) {
   const raw = el.getAttribute('data-pts');
   if (!raw) return;
   const pts = JSON.parse(raw);
-  const idx = Math.round(pct * (pts.length - 1));
-  if (!pts[idx]) return;
+  const targetIdx = Math.round(pct * (pts.length - 1));
+  let idx = targetIdx;
+  if (!pts[idx]) {
+    let best = -1, bestDist = Infinity;
+    pts.forEach((p, i) => {
+      if (!p) return;
+      const dist = Math.abs(i - targetIdx);
+      if (dist < bestDist) { best = i; bestDist = dist; }
+    });
+    idx = best;
+  }
+  if (idx < 0 || !pts[idx]) { hideChartTooltip(); return; }
   const pt = pts[idx];
+  const unit = el.dataset.unit || '%';
+  const label = el.dataset.label || 'Usage';
   
   const dotX = rect.left + (idx / (pts.length - 1)) * rect.width;
   const dotY = rect.top + (pt.y / 50) * rect.height;
   
-  hDot.style.background = clr;
-  hDot.style.left = dotX + 'px';
-  hDot.style.top = dotY + 'px';
-  hDot.style.opacity = 1;
+  if (hDot) {
+    hDot.style.background = clr;
+    hDot.style.left = dotX + 'px';
+    hDot.style.top = dotY + 'px';
+    hDot.style.opacity = 1;
+  }
   
   const d = new Date(pt.t);
   const dStr = d.toLocaleDateString([], { month: 'short', day: 'numeric' });
@@ -930,9 +1280,9 @@ function showChartTooltip(e, el, clr) {
                   <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
                     <div style="display:flex;align-items:center;gap:6px">
                       <div style="width:10px;height:10px;border-radius:2px;background:${clr}"></div>
-                      <span>Usage</span>
+                      <span>${escHtml(label)}</span>
                     </div>
-                    <span class="tt-val" style="color:${clr}">${pt.v}%</span>
+                    <span class="tt-val" style="color:${clr}">${pt.v}${escHtml(unit)}</span>
                   </div>`;
   
   let tx = e.clientX + 15;
@@ -952,8 +1302,37 @@ function hideChartTooltip() {
   if (hDot) hDot.style.opacity = 0;
 }
 
-function histChart(data, key, pct, limit = 80) {
-  const W = 300, H = 50, clr = bchex(pct);
+function showUptimeTooltip(e, el) {
+  const tt = document.getElementById('os-tooltip');
+  if (!tt) return;
+  const st = el.dataset.status || 'unknown';
+  const time = el.dataset.time || '';
+  const endTime = el.dataset.endTime || '';
+  const count = Number(el.dataset.count || 0);
+  const ping = el.dataset.ping || '';
+  const msg = el.dataset.message || '';
+  const color = st === 'up' ? 'var(--green)' : st === 'down' ? 'var(--red)' : (st === 'pending' || st === 'unknown') ? 'var(--yellow)' : 'var(--muted)';
+  const startText = time ? new Date(time).toLocaleString([], { hour12: false }) : '';
+  const endText = endTime && endTime !== time ? new Date(endTime).toLocaleTimeString([], { hour12: false }) : '';
+  const timeText = startText ? `${startText}${endText ? ' - ' + endText : ''}` : 'No heartbeat data';
+  tt.innerHTML = `<div class="tt-time">${escHtml(timeText)}</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:18px">
+      <span style="font-weight:800;color:${color};text-transform:uppercase">${escHtml(st)}</span>
+      ${ping ? `<span class="tt-val">${escHtml(ping)} ms</span>` : ''}
+    </div>
+    ${count > 1 ? `<div style="margin-top:6px;color:var(--muted);font-size:12px">${count} checks in this segment</div>` : ''}
+    ${msg ? `<div style="margin-top:8px;padding-top:7px;border-top:1px solid var(--border);color:var(--text);max-width:320px;white-space:normal">${escHtml(msg)}</div>` : ''}`;
+  let tx = e.clientX + 14;
+  let ty = e.clientY + 14;
+  if (tx + 260 > window.innerWidth) tx = e.clientX - 260;
+  if (ty + 130 > window.innerHeight) ty = e.clientY - 130;
+  tt.style.left = tx + 'px';
+  tt.style.top = ty + 'px';
+  tt.style.opacity = 1;
+}
+
+function histChart(data, key, pct, limit = 80, colorFn = bchex, maxScale = 100, unit = '%', label = 'Usage') {
+  const W = 300, H = 50, clr = colorFn(pct);
   const now = Date.now();
   
   const is12h = !!(window._lastData && window._lastData.timeFormat === '12h');
@@ -979,24 +1358,26 @@ function histChart(data, key, pct, limit = 80) {
   const emptySvg = `<svg class="hist-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><rect width="${W}" height="${H}" class="hist-bg" rx="3"/><line x1="0" y1="${H}" x2="${W}" y2="${H}" stroke="${clr}" stroke-width="1.5" stroke-opacity=".3"/></svg>`;
   const empty = `<div>${emptySvg}${axisHtml.replace(/<span/g, '<span style="opacity:0.3"')}</div>`;
   
-  if (!data || data.length < 2) return empty;
-  
-  const ptsRaw = data.slice(-limit);
-  const vals = ptsRaw.map(d => Math.min(100, Math.max(0, Number(d[key]) || 0)));
-  if (vals.length < 2) return empty;
+  let ptsRaw = Array.isArray(data) ? data.slice(-limit) : [];
+  if (!ptsRaw.length && hasNum(pct)) ptsRaw = [{ time: now, [key]: pct }];
+  let rawVals = ptsRaw.map(d => hasNum(d?.[key]) ? Math.min(maxScale, Math.max(0, Number(d[key]))) : null);
+  const vals = rawVals.filter(v => v !== null);
+  if (!vals.length) return empty;
 
-  const actualVals = vals.length < limit ? [...Array(limit - vals.length).fill(null), ...vals] : vals;
+  const firstKnown = vals[0];
+  rawVals = rawVals.map(v => v === null ? firstKnown : v);
+  const actualVals = rawVals.length < limit ? [...Array(limit - rawVals.length).fill(firstKnown), ...rawVals] : rawVals;
   const actualPtsRaw = ptsRaw.length < limit ? [...Array(limit - ptsRaw.length).fill(null), ...ptsRaw] : ptsRaw;
 
   let minV = Math.min(...vals);
   let maxV = Math.max(...vals);
   if (maxV - minV < 5) {
     minV = Math.max(0, minV - 5);
-    maxV = Math.min(100, maxV + 5);
+    maxV = Math.min(maxScale, maxV + 5);
   } else {
     const pad = (maxV - minV) * 0.2;
     minV = Math.max(0, minV - pad);
-    maxV = Math.min(100, maxV + pad);
+    maxV = Math.min(maxScale, maxV + pad);
   }
   const range = maxV - minV || 1;
   
@@ -1006,8 +1387,9 @@ function histChart(data, key, pct, limit = 80) {
   const linePts = actualVals.map((v, i) => v === null ? null : [i * xStep, H - ((v - minV) / range) * H]);
 
   const pts = actualPtsRaw.map((d, i) => {
-    if (d === null) return null;
-    let t = d.time ? (d.time > 1e11 ? d.time : d.time * 1000) : (now - (n - 1 - i) * 15000);
+    if (actualVals[i] === null) return null;
+    if (!d || !hasNum(d?.[key])) return null;
+    let t = d?.time ? (d.time > 1e11 ? d.time : d.time * 1000) : (now - (n - 1 - i) * 15000);
     return { t, v: actualVals[i], y: linePts[i][1].toFixed(2) };
   });
   const ptsJson = JSON.stringify(pts).replace(/'/g, "&#39;");
@@ -1027,7 +1409,7 @@ function histChart(data, key, pct, limit = 80) {
   
   const svgHtml = `<svg class="hist-svg" style="cursor:default" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" 
     onmousemove="showChartTooltip(event, this, '${clr}')" onmouseleave="hideChartTooltip()" 
-    data-pts='${ptsJson}'>
+    data-pts='${ptsJson}' data-unit="${escAttr(unit)}" data-label="${escAttr(label)}">
     <defs>
       <linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
         <stop offset="0%" stop-color="${clr}" stop-opacity="0.35"/>
@@ -1127,6 +1509,38 @@ function toggleHC(){
 }
 
 /* ── Proxmox ── */
+function miniSparkline(data, key, current, colorFn = bchex, maxScale = 100) {
+  let vals = Array.isArray(data)
+    ? data.slice(-28).map(d => hasNum(d?.[key]) ? Math.min(maxScale, Math.max(0, Number(d[key]))) : null).filter(v => v !== null)
+    : [];
+  if (vals.length < 2 && hasNum(current)) vals = [Number(current), Number(current)];
+  if (vals.length < 2) return '';
+  let minV = Math.min(...vals), maxV = Math.max(...vals);
+  if (maxV - minV < 2) {
+    minV = Math.max(0, minV - 2);
+    maxV = Math.min(maxScale, maxV + 2);
+  }
+  const W = 94, H = 24, range = maxV - minV || 1;
+  const pts = vals.map((v, i) => {
+    const x = vals.length === 1 ? W : (i / (vals.length - 1)) * W;
+    const y = H - ((v - minV) / range) * H;
+    return [x.toFixed(2), y.toFixed(2)];
+  });
+  const line = pts.map((p, i) => `${i ? 'L' : 'M'}${p[0]},${p[1]}`).join('');
+  const clr = colorFn(hasNum(current) ? Number(current) : vals[vals.length - 1]);
+  return `<svg class="mini-hist" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
+    <rect width="${W}" height="${H}" class="mini-hist-bg" rx="3"/>
+    <path d="M0,12 L${W},12" stroke="var(--border)" stroke-width="1" opacity=".55" vector-effect="non-scaling-stroke"/>
+    <path d="${line}" fill="none" stroke="${clr}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+  </svg>`;
+}
+function pveHeadStat(label, value, color = 'var(--text)', spark = '') {
+  if (value === null || value === undefined || value === '') return '';
+  return `<div class="pve-head-stat ${spark ? 'has-spark' : ''}">
+    <div class="pve-head-text"><div class="pve-head-val" style="color:${color}">${escHtml(value)}</div><div class="pve-head-lbl">${escHtml(label)}</div></div>
+    ${spark}
+  </div>`;
+}
 function buildProxmox(px){
   if(!px?.nodes?.length) return null;
   const cs = px.clusterSummary || {};
@@ -1204,6 +1618,15 @@ function buildProxmox(px){
     const isOpen = userOverride['node:'+node.name] !== undefined
       ? userOverride['node:'+node.name]
       : false;
+    const nodeVms = vms || [];
+    const pveStats = node.online ? [
+      pveHeadStat('Host', host || '-'),
+      pveHeadStat('CPU', `${cpuPct}%`, bc(cpuPct), miniSparkline(history, 'cpu', cpuPct)),
+      pveHeadStat('RAM', `${ramPct}%`, bc(ramPct), miniSparkline(history, 'mem', ramPct)),
+      node.temp != null ? pveHeadStat('Temp', `${node.temp}°C`, tempColor(node.temp)) : '',
+      pveHeadStat('VMs', `${nodeVms.filter(v=>v.running).length}/${nodeVms.length}`),
+      node.uptime ? pveHeadStat('Uptime', fmtUptime(node.uptime)) : '',
+    ].filter(Boolean).join('') : pveHeadStat('Status', 'Unreachable', 'var(--muted)');
 
     const sortedVms = [...(vms||[])].sort((a,b) => {
       if (a.running !== b.running) return a.running ? -1 : 1;
@@ -1213,18 +1636,21 @@ function buildProxmox(px){
     const lxc = sortedVms.filter(v => v.type === 'lxc');
 
     return `
-    <div class="node-hdr" onclick="toggleNode('${node.name}')">
+    <div class="node-hdr pve-node-hdr" onclick="toggleNode(${jsStr(node.name)})">
       <div class="mon-dot ${dc(node.online)}"></div>
-      <div class="node-name">${node.name}</div>
-      ${node.online
-        ? `<div class="node-info">${host?host+' &nbsp;·&nbsp; ':''}CPU ${cpuPct}% &nbsp;·&nbsp; RAM ${ramPct}% &nbsp;·&nbsp; ${vms.filter(v=>v.running).length}/${vms.length} VMs${node.uptime?' &nbsp;·&nbsp; Uptime - '+fmtUptime(node.uptime):''}</div>`
-        : `<div class="node-info" style="color:var(--muted)">Unreachable</div>`}
+      <div class="pve-head-main">
+        <div class="pve-head-title">
+          <div class="node-name">${escHtml(node.name)}</div>
+          <div class="pve-head-sub">${node.online ? 'online' : 'offline'}</div>
+        </div>
+        ${pveStats}
+      </div>
       ${bdg(node.online?'green':'red', node.online?'online':'offline')}
       ${notifyBell('px:'+node.name)}
     </div>
     <div class="node-body ${isOpen?'open':''}" id="nd-${node.name}">
       ${node.online ? `
-        ${(()=>{ const lim=timeLimits['px:'+node.name]||80; return `<div style="display:flex; justify-content:flex-end; margin-bottom:4px;">
+        ${(()=>{ const lim=historyLimitFor('px:'+node.name); return `<div style="display:flex; justify-content:flex-end; margin-bottom:4px;">
           ${drawTimeSelect('px:'+node.name, lim)}
         </div><div class="chart-row">
           <div class="chart-hdr"><span class="nb-label">CPU</span><span class="nb-pct" style="color:${bc(cpuPct)}">${cpuPct}%</span></div>
@@ -1233,11 +1659,16 @@ function buildProxmox(px){
         <div class="chart-row">
           <div class="chart-hdr">
             <span class="nb-label">RAM</span>
-            <span style="font-size:16px;color:var(--muted)">${node.ram?.usedGB?`${node.ram.usedGB}/${node.ram.totalGB} GB`:''}</span>
             <span class="nb-pct" style="color:${bc(ramPct)}">${ramPct}%</span>
           </div>
           ${histChart(history,'mem',ramPct,lim)}
+          ${node.ram?.usedGB?`<div class="chart-foot">${node.ram.usedGB}/${node.ram.totalGB} GB</div>`:''}
         </div>` })()}
+        ${(()=>{ const lim=historyLimitFor('px:'+node.name); return node.temp!=null ? `
+        <div class="chart-row">
+          <div class="chart-hdr"><span class="nb-label">Temperature</span><span class="nb-pct" style="color:${tempColor(node.temp)}">${node.temp}°C</span></div>
+          ${histChart(history,'temp',node.temp,lim,tempHex,100,'°C','Temperature')}
+        </div>` : '' })()}
         ${backup?`<div class="row" style="padding:8px 0;margin-top:6px;border-top:1px solid var(--border)">
           <span class="nb-label" style="flex:1">Last backup</span>
           ${backup.endtime?`<span style="font-size:12px;color:var(--muted);margin-right:8px">${relTime(new Date(backup.endtime*1000).toISOString())}</span>`:''}
@@ -1378,37 +1809,42 @@ function buildLinux(linux){
       <div class="node-hdr" onclick="toggleLinux('${lkey}')">
         <div class="mon-dot ${svcFailed?'md-yellow':'md-green'}"></div>
         <div class="node-name" style="width:auto;min-width:110px">${srv.name}${ptag}</div>
-        <div class="node-info">${srv.ip||srv.host||''}${cpuPct!=null?' · CPU '+cpuPct+'%':''}${ramPct!=null?' · Memory '+ramPct+'%':''}${srv.temp!=null?' · '+srv.temp+'°C':''}${srv.uptime?' · Uptime - '+fmtUptime(srv.uptime):''}</div>
+        <div class="node-info">${srv.ip||srv.host||''}${cpuPct!=null?' · CPU '+cpuPct+'%':''}${ramPct!=null?' · Memory '+ramPct+'%':''}${srv.temp!=null?' · Temp '+srv.temp+'°C':''}${srv.uptime?' · Uptime - '+fmtUptime(srv.uptime):''}</div>
         ${bdg(svcFailed?'red':'green', svcFailed?`${svcFailed} failed`:'all ok')}
         ${notifyBell('lx:'+srv.name)}
         <span class="chevron ${linuxOpen[lkey]?'open':''}" style="margin-left:4px">▼</span>
       </div>
       <div class="node-body ${linuxOpen[lkey]?'open':''}" id="lx-${lkey}">
-        ${(()=>{ const lim=timeLimits['lx:'+lkey]||80; return (cpuPct!=null||srv.ram!=null)?`<div style="display:flex; justify-content:flex-end; margin-bottom:4px;">
+        ${(()=>{ const lim=historyLimitFor('lx:'+lkey); return (cpuPct!=null||srv.ram!=null||srv.disk!=null||srv.temp!=null)?`<div style="display:flex; justify-content:flex-end; margin-bottom:4px;">
           ${drawTimeSelect('lx:'+lkey, lim)}
         </div>`:'' })()}
-        ${(()=>{ const lim=timeLimits['lx:'+lkey]||80; return cpuPct!=null?`
+        ${(()=>{ const lim=historyLimitFor('lx:'+lkey); return cpuPct!=null?`
           <div class="chart-row">
             <div class="chart-hdr"><span class="nb-label">CPU</span><span class="nb-pct" style="color:${bc(cpuPct)}">${cpuPct}%</span></div>
-            ${srv.history?.length>1 ? histChart(srv.history,'cpu',cpuPct,lim) : ''}
+            ${histChart(srv.history,'cpu',cpuPct,lim)}
           </div>` : '' })()}
-        ${(()=>{ const lim=timeLimits['lx:'+lkey]||80; return srv.ram!=null?`
+        ${(()=>{ const lim=historyLimitFor('lx:'+lkey); return srv.ram!=null?`
           <div class="chart-row">
             <div class="chart-hdr">
               <span class="nb-label">Memory</span>
-              <span style="font-size:12px;color:var(--muted)">${srv.ram.usedGB}/${srv.ram.totalGB} GB</span>
               <span class="nb-pct" style="color:${bc(ramPct)}">${ramPct}%</span>
             </div>
-            ${srv.history?.length>1 ? histChart(srv.history,'ram',ramPct,lim) : ''}
+            ${histChart(srv.history,'ram',ramPct,lim)}
+            <div class="chart-foot">${srv.ram.usedGB}/${srv.ram.totalGB} GB</div>
           </div>` : '' })()}
-        ${(()=>{ const lim=timeLimits['lx:'+lkey]||80; const diskPct=srv.disk?.percent ?? null; return srv.disk!=null?`
+        ${(()=>{ const lim=historyLimitFor('lx:'+lkey); const diskPct=srv.disk?.percent ?? null; return srv.disk!=null?`
           <div class="chart-row">
             <div class="chart-hdr">
               <span class="nb-label">Disk</span>
               <span style="font-size:12px;color:var(--muted)">${srv.disk.usedGB}/${srv.disk.totalGB} GB</span>
               <span class="nb-pct" style="color:${bc(diskPct)}">${diskPct}%</span>
             </div>
-            ${srv.history?.length>1 ? histChart(srv.history,'disk',diskPct,lim) : ''}
+            ${histChart(srv.history,'disk',diskPct,lim)}
+          </div>` : '' })()}
+        ${(()=>{ const lim=historyLimitFor('lx:'+lkey); return srv.temp!=null?`
+          <div class="chart-row">
+            <div class="chart-hdr"><span class="nb-label">Temperature</span><span class="nb-pct" style="color:${tempColor(srv.temp)}">${srv.temp}°C</span></div>
+            ${histChart(srv.history,'temp',srv.temp,lim,tempHex,100,'°C','Temperature')}
           </div>` : '' })()}
         ${srv.os||srv.kernel||srv.disk||srv.load||diskIO||bw?`
           <div class="row" style="padding:8px 0;margin-top:6px;border-top:1px solid var(--border);flex-wrap:wrap;gap:14px">
@@ -1499,7 +1935,7 @@ function buildKubernetes(k8s){
     </div>`,
   };
 
-  const sortedPods = [...pods.filter(p=>p.failed||p.phase==='Failed'),...pods.filter(p=>!p.failed&&p.phase!=='Failed')];
+  const sortedPods = sortK8sPods(pods);
 
   const sbSummaryHtml = `<div class="sb-csum">
     <div class="sb-csum-item"><div class="sb-csum-val">${s.total??0}</div><div class="sb-csum-lbl">Pods</div></div>
@@ -1517,20 +1953,27 @@ function buildKubernetes(k8s){
     <div class="k8s-stat"><div class="k8s-n" style="color:${failed>0?'var(--red)':'var(--muted)'}">${failed}</div><div class="k8s-l">Failed</div></div>
   </div>`;
 
-  const colHdr = `<div class="k8s-colhdr">
-    <div style="width:10px;flex-shrink:0"></div>
-    <span style="flex:0 1 300px;min-width:0">Name</span>
-    <span style="width:150px;flex-shrink:0;text-align:left">Namespace</span>
-    <div style="flex:1"></div>
-    <span style="flex-shrink:0">Status</span>
+  const colHdrPods = `<div class="k8s-colhdr k8s-pod-row">
+    <div></div>
+    <div>${k8sSortButton('name','Name')}</div>
+    <div>Namespace</div>
+    <div>${k8sSortButton('cpu','CPU')}</div>
+    <div>${k8sSortButton('memory','RAM')}</div>
+    <div>${k8sSortButton('restarts','Restarts')}</div>
+    <div>${k8sSortButton('status','Status')}</div>
   </div>`;
-  const colHdrPods = `<div class="k8s-colhdr">
-    <div style="width:10px;flex-shrink:0"></div>
-    <span style="flex:0 1 300px;min-width:0">Name</span>
-    <span style="width:150px;flex-shrink:0;text-align:left">Namespace</span>
-    <div style="flex:1"></div>
-    <span style="width:120px;flex-shrink:0;text-align:left">Restart Count</span>
-    <span style="width:90px;flex-shrink:0">Status</span>
+  const colHdrDeployments = `<div class="k8s-colhdr k8s-deploy-row">
+    <div></div>
+    <div>Name</div>
+    <div>Namespace</div>
+    <div>Ready</div>
+  </div>`;
+  const colHdrServices = `<div class="k8s-colhdr k8s-service-row">
+    <div></div>
+    <div>Name</div>
+    <div>Namespace</div>
+    <div>Port</div>
+    <div>Type</div>
   </div>`;
 
   const body = `
@@ -1547,13 +1990,16 @@ function buildKubernetes(k8s){
         ${sortedPods.map(p=>{
           const dc2 = p.running?'md-green':p.phase==='Pending'?'md-yellow':p.phase==='Succeeded'?'md-blue':'md-red';
           const rc  = p.restarts>10?'bg-red':p.restarts>3?'bg-yellow':'bg-gray';
-          return `<div class="mon-row clickable" onclick="showPodLogs('${p.namespace}','${p.name}')" title="View logs">
+          const cpuText = fmtK8sCpu(p.cpuMilli);
+          const memText = fmtK8sMemory(p.memoryBytes);
+          return `<div class="mon-row k8s-pod-row clickable" onclick="showPodLogs(${jsStr(p.namespace)},${jsStr(p.name)})" title="View logs">
             <div class="mon-dot ${dc2}"></div>
-            <div class="mon-name" style="flex:0 1 300px;min-width:0" title="${p.name}">${p.name}</div>
-            <div class="mon-sub" style="width:150px;text-align:left">${p.namespace}</div>
-            <div style="flex:1"></div>
-            <div style="width:120px;flex-shrink:0;text-align:left">${p.restarts>0?`<span class="badge ${rc}" style="font-size:12px">↺${p.restarts}</span>`:`<span style="color:var(--muted);font-size:13px">0</span>`}</div>
-            <span style="width:90px;flex-shrink:0">${bdg(p.running?'green':p.phase==='Succeeded'?'blue':p.phase==='Pending'?'yellow':'red', p.phase)}</span>
+            <div class="mon-name k8s-pod-cell" title="${escAttr(p.name)}">${escHtml(p.name)}</div>
+            <div class="k8s-pod-cell muted" title="${escAttr(p.namespace)}">${escHtml(p.namespace)}</div>
+            <div class="k8s-pod-cell metric" title="${escAttr(cpuText)}">${cpuText}</div>
+            <div class="k8s-pod-cell metric" title="${escAttr(memText)}">${memText}</div>
+            <div class="k8s-pod-cell">${p.restarts>0?`<span class="badge ${rc}" style="font-size:12px">↺${p.restarts}</span>`:`<span style="color:var(--muted);font-size:13px">0</span>`}</div>
+            <div class="k8s-pod-cell">${bdg(p.running?'green':p.phase==='Succeeded'?'blue':p.phase==='Pending'?'yellow':'red', p.phase)}</div>
           </div>`;
         }).join('')}
         ${!pods.length?'<div class="empty">No pods found</div>':''}
@@ -1567,14 +2013,13 @@ function buildKubernetes(k8s){
         <span class="chevron">▼</span>
       </div>
       <div class="k8s-grp-body" id="kg-deps">
-        ${colHdr}
+        ${colHdrDeployments}
         ${deployments.map(d=>`
-          <div class="mon-row">
+          <div class="mon-row k8s-deploy-row">
             <div class="mon-dot ${d.healthy?'md-green':'md-yellow'}"></div>
-            <div class="mon-name" style="flex:0 1 300px;min-width:0">${d.name}</div>
-            <div class="mon-sub" style="width:150px;text-align:left">${d.namespace}</div>
-            <div style="flex:1"></div>
-            <span style="font-size:15px;font-weight:600;color:${d.healthy?'var(--green)':'var(--yellow)'}">${d.ready}/${d.desired}</span>
+            <div class="mon-name k8s-detail-cell" title="${escAttr(d.name)}">${escHtml(d.name)}</div>
+            <div class="k8s-detail-cell muted" title="${escAttr(d.namespace)}">${escHtml(d.namespace)}</div>
+            <div class="k8s-detail-cell" style="font-size:15px;font-weight:600;color:${d.healthy?'var(--green)':'var(--yellow)'}">${d.ready}/${d.desired}</div>
           </div>`).join('')}
         ${!deployments.length?'<div class="empty">No deployments</div>':''}
       </div>
@@ -1587,16 +2032,15 @@ function buildKubernetes(k8s){
         <span class="chevron">▼</span>
       </div>
       <div class="k8s-grp-body" id="kg-svcs">
-        ${colHdr}
+        ${colHdrServices}
         ${services.map(sv=>{
           const portStr = (sv.ports||[]).map(p=>p.nodePort?`${p.port}:${p.nodePort}`:`${p.port}`).join(', ');
-          return `<div class="mon-row">
+          return `<div class="mon-row k8s-service-row">
             <div class="mon-dot md-green"></div>
-            <div class="mon-name" style="flex:0 1 300px;min-width:0">${sv.name}</div>
-            <div class="mon-sub" style="width:150px;text-align:left">${sv.namespace}</div>
-            <div style="flex:1"></div>
-            ${portStr?`<span style="font-size:13px;color:var(--muted);margin-right:8px">${portStr}</span>`:''}
-            <span class="badge bg-gray" style="font-size:13px">${sv.type}</span>
+            <div class="mon-name k8s-detail-cell" title="${escAttr(sv.name)}">${escHtml(sv.name)}</div>
+            <div class="k8s-detail-cell muted" title="${escAttr(sv.namespace)}">${escHtml(sv.namespace)}</div>
+            <div class="k8s-detail-cell muted" title="${escAttr(portStr || '--')}">${escHtml(portStr || '--')}</div>
+            <div class="k8s-detail-cell"><span class="badge bg-gray" style="font-size:13px">${escHtml(sv.type)}</span></div>
           </div>`;
         }).join('')}
         ${!services.length?'<div class="empty">No services</div>':''}
@@ -1630,28 +2074,27 @@ function buildSynology(syn){
   const ramVals = onlineDevs.filter(d=>d.ram).map(d=>d.ram.percent);
   const tempVals = onlineDevs.filter(d=>d.systemTemp!=null).map(d=>d.systemTemp);
   const volCount = onlineDevs.reduce((s,d)=>s+(d.volumes?.length||0),0);
-  const tcol = t => t>=60?'var(--red)':t>=50?'var(--yellow)':'var(--green)';
   const metric = (vals, unit, colorFn, limit) => {
     if(!vals.length) return null;
     if(vals.length === 1){ const v=vals[0]; return { val:v+unit, color:colorFn(v) }; }
     const ok = vals.every(v=>v<limit);
     return { val: ok?'healthy':'high', color: ok?'var(--green)':'var(--red)' };
   };
-  const cpuM = metric(cpuVals,'%',bc,90), ramM = metric(ramVals,'%',bc,90), tempM = metric(tempVals,'°C',tcol,60);
+  const cpuM = metric(cpuVals,'%',bc,90), ramM = metric(ramVals,'%',bc,90), tempM = metric(tempVals,'°C',tempColor,60);
   const cell = (m,lbl,sb) => m ? `<div class="${sb?'sb-csum-item':'csum-item'}"><div class="${sb?'sb-csum-val':'csum-val'}" style="color:${m.color}">${m.val}</div><div class="${sb?'sb-csum-lbl':'csum-lbl'}">${lbl}</div></div>` : '';
 
   const sbSummaryHtml = `<div class="sb-csum">
     <div class="sb-csum-item"><div class="sb-csum-val">${onlineDevs.length}/${syn.length}</div><div class="sb-csum-lbl">Devices</div></div>
     ${cell(cpuM,'CPU usage',true)}
     ${cell(ramM,'RAM usage',true)}
-    ${cell(tempM,'Temp',true)}
+    ${cell(tempM,'CPU temp',true)}
   </div>`;
 
   const summaryHtml = `<div class="csum">
     <div class="csum-item"><div class="csum-val">${onlineDevs.length}/${syn.length}</div><div class="csum-lbl">Devices</div></div>
     ${cell(cpuM,'CPU',false)}
     ${cell(ramM,'RAM',false)}
-    ${cell(tempM,'Temp',false)}
+    ${cell(tempM,'CPU temp',false)}
     ${volCount?`<div class="csum-item"><div class="csum-val">${volCount}</div><div class="csum-lbl">Volumes</div></div>`:''}
   </div>`;
 
@@ -1669,7 +2112,7 @@ function buildSynology(syn){
         <div>${dev.name} — SNMP unreachable<div class="offline-err">${dev.error||''}</div></div>
       </div>`;
 
-    const bars = (label, pct, sub) => {
+    const volumeBar = (label, pct, sub) => {
       if(pct==null) return '';
       const cls = pct>=90?'var(--red)':pct>=70?'var(--yellow)':'var(--green)';
       return `<div class="syn-bar">
@@ -1680,28 +2123,52 @@ function buildSynology(syn){
     };
 
     const skey = 'd'+i;
+    const snmpStats = [
+      pveHeadStat('Host', dev.host || '-'),
+      dev.cpu != null ? pveHeadStat('CPU', `${dev.cpu}%`, bc(dev.cpu), miniSparkline(dev.history, 'cpu', dev.cpu)) : pveHeadStat('CPU', '--', 'var(--muted)'),
+      dev.ram ? pveHeadStat('RAM', `${dev.ram.percent}%`, bc(dev.ram.percent), miniSparkline(dev.history, 'ram', dev.ram.percent)) : pveHeadStat('RAM', '--', 'var(--muted)'),
+      dev.systemTemp != null ? pveHeadStat('CPU temp', `${dev.systemTemp}°C`, tempColor(dev.systemTemp), miniSparkline(dev.history, 'temp', dev.systemTemp, tempHex, 100)) : pveHeadStat('CPU temp', '--', 'var(--muted)'),
+    ].join('');
     return `
-      <div class="node-hdr" onclick="toggleSnmp('${skey}')">
+      <div class="node-hdr pve-node-hdr" onclick="toggleSnmp('${skey}')">
         <div class="mon-dot md-green"></div>
-        <div class="node-name">${dev.name}</div>
-        <div class="node-info">${dev.host}${dev.cpu!=null?' · CPU '+dev.cpu+'%':''}${dev.ram?' · RAM '+dev.ram.percent+'%':''}${dev.systemTemp!=null?' · '+dev.systemTemp+'°C':''}</div>
+        <div class="pve-head-main snmp-head-main">
+          <div class="pve-head-title">
+          <div class="node-name">${escHtml(dev.name)}</div>
+            <div class="pve-head-sub">online</div>
+          </div>
+          ${snmpStats}
+        </div>
         ${bdg('green','healthy')}
         ${notifyBell('snmp:'+dev.name)}
       </div>
       <div class="node-body ${snmpOpen[skey]?'open':''}" id="snmp-${skey}">
-        ${(()=>{ const lim=timeLimits['snmp:'+skey]||80; return (dev.cpu!=null||dev.ram!=null)?`<div style="display:flex; justify-content:flex-end; margin-bottom:4px;">
+        ${(()=>{ const lim=historyLimitFor('snmp:'+skey); return (dev.cpu!=null||dev.ram!=null||dev.systemTemp!=null)?`<div style="display:flex; justify-content:flex-end; margin-bottom:4px;">
           ${drawTimeSelect('snmp:'+skey, lim)}
         </div>`:'' })()}
-        ${bars('CPU', dev.cpu)}
-        ${(()=>{ const lim=timeLimits['snmp:'+skey]||80; return dev.cpu!=null && dev.history?.length>1 ? `<div style="margin:-2px 0 16px 44px">${histChart(dev.history,'cpu',dev.cpu,lim)}</div>` : '' })()}
-        ${bars('RAM', dev.ram?.percent, dev.ram ? `${dev.ram.usedGB} / ${dev.ram.totalGB} GB` : '')}
-        ${(()=>{ const lim=timeLimits['snmp:'+skey]||80; return dev.ram && dev.history?.length>1 ? `<div style="margin:-2px 0 16px 44px">${histChart(dev.history,'ram',dev.ram.percent,lim)}</div>` : '' })()}
+        ${(()=>{ const lim=historyLimitFor('snmp:'+skey); return dev.cpu!=null ? `<div class="chart-row">
+          <div class="chart-hdr"><span class="nb-label">CPU</span><span class="nb-pct" style="color:${bc(dev.cpu)}">${dev.cpu}%</span></div>
+          ${histChart(dev.history,'cpu',dev.cpu,lim)}
+        </div>` : '' })()}
+        ${(()=>{ const lim=historyLimitFor('snmp:'+skey); return dev.ram ? `<div class="chart-row">
+          <div class="chart-hdr">
+            <span class="nb-label">RAM</span>
+            <span class="nb-pct" style="color:${bc(dev.ram.percent)}">${dev.ram.percent}%</span>
+          </div>
+          ${histChart(dev.history,'ram',dev.ram.percent,lim)}
+          ${dev.ram.usedGB ? `<div class="chart-foot">${fmtBytePair(dev.ram.usedBytes, dev.ram.totalBytes, dev.ram.usedGB, dev.ram.totalGB)}</div>` : ''}
+        </div>` : '' })()}
+        ${(()=>{ const lim=historyLimitFor('snmp:'+skey); return dev.systemTemp!=null ? `
+          <div class="chart-row">
+            <div class="chart-hdr"><span class="nb-label">${dev.systemTempLabel || 'CPU temperature'}</span><span class="nb-pct" style="color:${tempColor(dev.systemTemp)}">${dev.systemTemp}°C</span></div>
+            ${histChart(dev.history,'temp',dev.systemTemp,lim,tempHex,100,'°C','Temperature')}
+          </div>` : '' })()}
         ${dev.volumes?.length ? `
           <div class="syn-section" style="margin-top:6px">Volumes</div>
           ${dev.volumes.map(v => {
             const fmt = gb => { const g = parseFloat(gb); return g >= 1000 ? (g/1024).toFixed(1)+' TB' : g+' GB'; };
             const sub = v.usedGB ? `${fmt(v.usedGB)} / ${fmt(v.totalGB)}${!v.healthy ? ' ⚠ '+v.status : ''}` : '';
-            return bars(v.name, v.percent, sub);
+            return volumeBar(v.name, v.percent, sub);
           }).join('')}
         ` : ''}
         ${dev.disks?.length ? `
@@ -1713,7 +2180,7 @@ function buildSynology(syn){
               <span style="width:150px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.name}</span>
               <span style="color:var(--muted)">${d.status}</span>
               <span style="flex:1"></span>
-              ${d.temp!=null?`<span style="color:${tc};min-width:50px;text-align:right">${d.temp}°C</span>`:''}
+              ${d.temp!=null?`<span style="color:${tc};min-width:86px;text-align:right">Disk temp ${d.temp}°C</span>`:''}
             </div>`;
           }).join('')}
         ` : ''}
@@ -1765,9 +2232,10 @@ function buildHealthchecks(hc){
   const hcColHdr = `<div style="display:flex;align-items:center;gap:10px;padding:7px 16px;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);border-bottom:1px solid var(--border)">
     <div style="width:10px;flex-shrink:0"></div>
     <span style="flex:1;min-width:0">Name</span>
-    <span style="width:100px;flex-shrink:0">Last Ping</span>
-    <span style="width:130px;flex-shrink:0">Period / Grace</span>
-    <span style="width:74px;flex-shrink:0">Status</span>
+    <span style="width:100px;flex-shrink:0;text-align:center">Last Ping</span>
+    <span style="width:130px;flex-shrink:0;text-align:center">Period / Grace</span>
+    <span style="width:74px;flex-shrink:0;text-align:center">Status</span>
+    <span style="width:24px;flex-shrink:0"></span>
   </div>`;
   const body = !online
     ? `<div class="offline-row">
@@ -1782,9 +2250,9 @@ function buildHealthchecks(hc){
           return `<div class="mon-row">
             <div class="mon-dot ${dc2}"></div>
             <div class="mon-name" style="flex:1;width:0;min-width:0">${c.name}</div>
-            <span style="width:100px;flex-shrink:0;font-size:13px;color:var(--muted)">${c.lastPing?relTime(c.lastPing):'—'}</span>
-            <span style="width:130px;flex-shrink:0;font-size:13px;color:var(--muted)">${fmtDur(c.periodSec)} / ${fmtDur(c.graceSec)}</span>
-            <span style="width:74px;flex-shrink:0"><span class="badge bg-${bc2}" style="font-size:13px">${c.status}</span></span>
+            <span style="width:100px;flex-shrink:0;font-size:13px;color:var(--muted);text-align:center">${c.lastPing?relTime(c.lastPing):'—'}</span>
+            <span style="width:130px;flex-shrink:0;font-size:13px;color:var(--muted);text-align:center">${fmtDur(c.periodSec)} / ${fmtDur(c.graceSec)}</span>
+            <span style="width:74px;flex-shrink:0;display:flex;justify-content:center"><span class="badge bg-${bc2}" style="font-size:13px">${c.status}</span></span>
             ${notifyBell('hc:'+c.name)}
           </div>`;
         }).join('')}
@@ -1805,15 +2273,73 @@ function buildHealthchecks(hc){
 }
 
 /* ── Uptime Kuma ── */
-function uptimeBars(history, currentStatus){
-  const source = Array.isArray(history) && history.length
-    ? history.slice(-36)
-    : Array.from({ length: 36 }, () => ({ status: currentStatus || 'unknown' }));
+function uptimeStatusWeight(status){
+  const st = status || 'unknown';
+  if(st === 'down') return 4;
+  if(st === 'pending' || st === 'unknown') return 3;
+  if(st === 'maintenance') return 2;
+  if(st === 'up') return 1;
+  return 0;
+}
+function compactUptimeHistory(history, currentStatus, maxPoints = 180, limit = 6000, alreadyBucketed = false, minuteLimit = 0){
+  const raw = Array.isArray(history) && history.length
+    ? history.slice(-limit)
+    : Array.from({ length: 60 }, () => ({ status: currentStatus || 'unknown' }));
+  if(!alreadyBucketed && raw.length && raw.some(h => h?.time)){
+    const byMinute = new Map();
+    raw.forEach(h => {
+      const ms = new Date(h?.time || 0).getTime();
+      if(!Number.isFinite(ms)) return;
+      const minute = Math.floor(ms / 60000) * 60000;
+      if(!byMinute.has(minute)) byMinute.set(minute, []);
+      byMinute.get(minute).push(h);
+    });
+    if(byMinute.size){
+      let bucketed = [...byMinute.entries()].sort((a,b)=>a[0]-b[0]).map(([minute, chunk]) => {
+        const picked = [...chunk].sort((a,b) => uptimeStatusWeight(b?.status || currentStatus) - uptimeStatusWeight(a?.status || currentStatus))[0] || chunk[chunk.length - 1] || {};
+        const pingVals = chunk.map(h => Number(h?.ping)).filter(Number.isFinite);
+        const avgPing = pingVals.length ? Math.round(pingVals.reduce((a,b)=>a+b,0) / pingVals.length) : picked.ping;
+        const message = [...chunk].reverse().map(h => h?.message).find(Boolean) || picked.message || '';
+        return {
+          ...picked,
+          time: new Date(minute).toISOString(),
+          endTime: new Date(minute + 59999).toISOString(),
+          ping: avgPing,
+          message,
+          count: chunk.length,
+        };
+      });
+      if(minuteLimit > 0) bucketed = bucketed.slice(-minuteLimit);
+      return compactUptimeHistory(bucketed, currentStatus, maxPoints, bucketed.length, true, 0);
+    }
+  }
+  if(raw.length <= maxPoints) return raw.map(h => ({ ...h, count: 1 }));
+  const step = Math.ceil(raw.length / maxPoints);
+  const out = [];
+  for(let i = 0; i < raw.length; i += step){
+    const chunk = raw.slice(i, i + step);
+    const picked = [...chunk].sort((a,b) => uptimeStatusWeight(b?.status || currentStatus) - uptimeStatusWeight(a?.status || currentStatus))[0] || chunk[chunk.length - 1] || {};
+    const start = chunk.find(h => h?.time)?.time || '';
+    const end = [...chunk].reverse().find(h => h?.time)?.time || start;
+    const pingVals = chunk.map(h => Number(h?.ping)).filter(Number.isFinite);
+    const avgPing = pingVals.length ? Math.round(pingVals.reduce((a,b)=>a+b,0) / pingVals.length) : picked.ping;
+    const message = [...chunk].reverse().map(h => h?.message).find(Boolean) || picked.message || '';
+    const count = chunk.reduce((sum,h)=>sum + Number(h?.count || 1), 0);
+    out.push({ ...picked, time: start || picked.time, endTime: end || start || picked.time, ping: avgPing, message, count });
+  }
+  return out;
+}
+function uptimeBars(history, currentStatus, options = {}){
+  const hours = Number(options.hours || 0);
+  const minuteLimit = options.minuteLimit || (Number.isFinite(hours) && hours > 0 ? Math.ceil(hours * 60) : 0);
+  const source = compactUptimeHistory(history, currentStatus, options.maxPoints || 180, options.limit || 6000, false, minuteLimit);
   return `<div class="uk-bars">${source.map(h => {
     const st = h?.status || currentStatus || 'unknown';
     const cls = st === 'up' ? 'up' : st === 'down' ? 'down' : (st === 'pending' || st === 'unknown') ? 'warn' : st;
-    const title = [st, h?.time ? new Date(h.time).toLocaleString() : '', h?.ping != null ? `${h.ping} ms` : ''].filter(Boolean).join(' · ');
-    return `<span class="uk-bar ${cls}" title="${escAttr(title)}"></span>`;
+    const titleTime = h?.time ? new Date(h.time).toLocaleString() : '';
+    const titleEnd = h?.endTime && h.endTime !== h.time ? new Date(h.endTime).toLocaleTimeString([], { hour12:false }) : '';
+    const title = [st, titleEnd ? `${titleTime} - ${titleEnd}` : titleTime, h?.ping != null ? `${h.ping} ms` : '', h?.count > 1 ? `${h.count} checks` : '', h?.message || ''].filter(Boolean).join(' · ');
+    return `<span class="uk-bar ${cls}" aria-label="${escAttr(title)}" data-title="${escAttr(title)}" data-status="${escAttr(st)}" data-time="${escAttr(h?.time || '')}" data-end-time="${escAttr(h?.endTime || '')}" data-count="${escAttr(h?.count || '')}" data-ping="${escAttr(h?.ping ?? '')}" data-message="${escAttr(h?.message || '')}" onmousemove="showUptimeTooltip(event,this)" onmouseleave="hideChartTooltip()"></span>`;
   }).join('')}</div>`;
 }
 function uptimeKumaHealth(uk){
@@ -1858,9 +2384,10 @@ function buildUptimeKuma(uk){
   const colHdr = `<div style="display:flex;align-items:center;gap:10px;padding:7px 16px;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);border-bottom:1px solid var(--border)">
     <div style="width:10px;flex-shrink:0"></div>
     <span style="flex:1;min-width:0">Monitor</span>
-    <span style="width:120px;flex-shrink:0">Last Heartbeat</span>
-    <span style="width:70px;flex-shrink:0">Ping</span>
-    <span style="width:96px;flex-shrink:0">Status</span>
+    <span style="width:120px;flex-shrink:0;text-align:center">Last Heartbeat</span>
+    <span style="width:70px;flex-shrink:0;text-align:center">Ping</span>
+    <span style="width:96px;flex-shrink:0;text-align:center">Status</span>
+    <span style="width:24px;flex-shrink:0"></span>
   </div>`;
   const statusColor = st => st==='up'?'green':st==='down'?'red':(st==='pending'||st==='unknown')?'yellow':'gray';
   const dotColor = st => st==='up'?'md-green':st==='down'?'md-red':(st==='pending'||st==='unknown')?'md-yellow':'md-gray';
@@ -1875,12 +2402,12 @@ function buildUptimeKuma(uk){
           <div class="uk-mon-top">
             <div class="mon-dot ${dotColor(m.status)}"></div>
             <div class="mon-name" style="flex:1;width:0;min-width:0" title="${escAttr(m.name)}">${escHtml(m.name)}</div>
-            <span style="width:120px;flex-shrink:0;font-size:13px;color:var(--muted)">${m.lastPing?relTime(m.lastPing):'—'}</span>
-            <span style="width:70px;flex-shrink:0;font-size:13px;color:var(--muted)">${m.ping!=null?`${m.ping} ms`:'—'}</span>
-            <span style="width:96px;flex-shrink:0"><span class="badge bg-${statusColor(m.status)}" style="font-size:13px">${m.status}</span></span>
+            <span style="width:120px;flex-shrink:0;font-size:13px;color:var(--muted);text-align:center">${m.lastPing?relTime(m.lastPing):'—'}</span>
+            <span style="width:70px;flex-shrink:0;font-size:13px;color:var(--muted);text-align:center">${m.ping!=null?`${m.ping} ms`:'—'}</span>
+            <span style="width:96px;flex-shrink:0;display:flex;justify-content:center"><span class="badge bg-${statusColor(m.status)}" style="font-size:13px">${m.status}</span></span>
             ${notifyBell('uk:'+m.name)}
           </div>
-          <div class="uk-mon-bars">${uptimeBars(m.history, m.status)}</div>
+          <div class="uk-mon-bars">${uptimeBars(m.history, m.status, { hours: uk.historyHours || 1 })}</div>
         </div>`).join('')}
         ${!monitors.length?'<div class="empty">No monitors found</div>':''}
       </div>`;
@@ -1934,10 +2461,11 @@ function buildPrometheus(prom){
   const colHdr = `<div style="display:flex;align-items:center;gap:10px;padding:7px 16px;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);border-bottom:1px solid var(--border)">
     <div style="width:10px;flex-shrink:0"></div>
     <span style="flex:1;min-width:0">Target</span>
-    <span style="width:140px;flex-shrink:0">Prometheus</span>
-    <span style="width:140px;flex-shrink:0">Job</span>
-    <span style="width:130px;flex-shrink:0">Last Scrape</span>
-    <span style="width:90px;flex-shrink:0">Status</span>
+    <span style="width:140px;flex-shrink:0;text-align:center">Prometheus</span>
+    <span style="width:140px;flex-shrink:0;text-align:center">Job</span>
+    <span style="width:130px;flex-shrink:0;text-align:center">Last Scrape</span>
+    <span style="width:90px;flex-shrink:0;text-align:center">Status</span>
+    <span style="width:24px;flex-shrink:0"></span>
   </div>`;
   const statusColor = st => st==='up'?'green':st==='down'?'red':'yellow';
   const dotColor = st => st==='up'?'md-green':st==='down'?'md-red':'md-yellow';
@@ -1954,10 +2482,10 @@ function buildPrometheus(prom){
   const targetRows = (rows) => rows.map(t=>`<div class="mon-row">
     <div class="mon-dot ${dotColor(t.health)}"></div>
     <div class="mon-name" style="flex:1;width:0;min-width:0" title="${escAttr(t.scrapeUrl || t.name)}">${escHtml(t.name)}</div>
-    <span style="width:140px;flex-shrink:0;font-size:13px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escAttr(t.sourceUrl || t.sourceName || '')}">${escHtml(t.sourceName || '—')}</span>
-    <span style="width:140px;flex-shrink:0;font-size:13px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escAttr(t.job || t.scrapePool || '')}">${escHtml(t.job || t.scrapePool || '—')}</span>
-    <span style="width:130px;flex-shrink:0;font-size:13px;color:var(--muted)">${t.lastScrape?relTime(t.lastScrape):'—'}</span>
-    <span style="width:90px;flex-shrink:0"><span class="badge bg-${statusColor(t.health)}" style="font-size:13px">${t.health}</span></span>
+    <span style="width:140px;flex-shrink:0;font-size:13px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center" title="${escAttr(t.sourceUrl || t.sourceName || '')}">${escHtml(t.sourceName || '—')}</span>
+    <span style="width:140px;flex-shrink:0;font-size:13px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center" title="${escAttr(t.job || t.scrapePool || '')}">${escHtml(t.job || t.scrapePool || '—')}</span>
+    <span style="width:130px;flex-shrink:0;font-size:13px;color:var(--muted);text-align:center">${t.lastScrape?relTime(t.lastScrape):'—'}</span>
+    <span style="width:90px;flex-shrink:0;display:flex;justify-content:center"><span class="badge bg-${statusColor(t.health)}" style="font-size:13px">${t.health}</span></span>
     ${notifyBell('prom:'+(t.sourceName || t.sourceUrl || 'default')+':'+t.name)}
     ${t.lastError?`<span style="width:240px;flex-shrink:0;font-size:12px;color:var(--red);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escAttr(t.lastError)}">${escHtml(t.lastError)}</span>`:''}
   </div>`).join('');
@@ -2009,6 +2537,27 @@ function buildPrometheus(prom){
 }
 
 /* ── Docker ── */
+function dockerHistoryKey(name) {
+  return 'docker:' + String(name || 'host').replace(/[^A-Za-z0-9_.:-]/g, '_');
+}
+function dockerHostCharts(host, key) {
+  const hasCpu = hasNum(host.summary?.cpu);
+  const hasMem = hasNum(host.summary?.memPercent);
+  if (!hasCpu && !hasMem) return '';
+  const hkey = dockerHistoryKey(key || host.name);
+  const lim = historyLimitFor(hkey);
+  return `<div class="docker-host-history">
+    <div style="display:flex; justify-content:flex-end; margin-bottom:4px;">${drawTimeSelect(hkey, lim)}</div>
+    ${hasCpu ? `<div class="chart-row">
+      <div class="chart-hdr"><span class="nb-label">CPU</span><span class="nb-pct" style="color:${bc(host.summary.cpu)}">${host.summary.cpu}%</span></div>
+      ${histChart(host.history, 'cpu', host.summary.cpu, lim)}
+    </div>` : ''}
+    ${hasMem ? `<div class="chart-row">
+      <div class="chart-hdr"><span class="nb-label">${trText('Memory')}</span><span class="nb-pct" style="color:${bc(host.summary.memPercent)}">${host.summary.memPercent}%</span></div>
+      ${histChart(host.history, 'mem', host.summary.memPercent, lim)}
+    </div>` : ''}
+  </div>`;
+}
 function buildDocker(docker){
   if(!docker?.length) return null;
   const isConnectingHost = h => h._connecting && !h.online;
@@ -2040,42 +2589,65 @@ function buildDocker(docker){
 
   const body = docker.map(host=>{
     if(isConnectingHost(host)) return `
-      <div class="node-hdr" style="cursor:default">
+      <div class="node-hdr pve-node-hdr" style="cursor:default">
         <div class="mon-dot md-gray"></div>
-        <div class="node-name">${host.name}</div>
-        <div class="node-info">${host.host||''}</div>
+        <div class="pve-head-main docker-head-main">
+          <div class="pve-head-title">
+            <div class="node-name">${escHtml(host.name)}</div>
+            <div class="pve-head-sub">connecting</div>
+          </div>
+          ${pveHeadStat('Host', host.host || '-')}
+          ${pveHeadStat('Status', 'Connecting', 'var(--muted)')}
+        </div>
         ${bdg('gray','connecting…')}
         ${host.id ? `<button class="btn-act" onclick="event.stopPropagation();removePendingAgent(${jsStr(host.id)},this)">Remove</button>` : ''}
       </div>`;
     if(!host.online) return `
-      <div class="offline-row">
-        <div class="mon-dot md-red" style="margin-top:2px"></div>
-        <div><div>${host.name}</div><div class="offline-err">${host.error||'Connection failed'}</div></div>
+      <div class="node-hdr pve-node-hdr" style="cursor:default">
+        <div class="mon-dot md-red"></div>
+        <div class="pve-head-main docker-head-main">
+          <div class="pve-head-title">
+            <div class="node-name">${escHtml(host.name)}</div>
+            <div class="pve-head-sub">offline</div>
+          </div>
+          ${pveHeadStat('Host', host.host || '-')}
+          ${pveHeadStat('Error', host.error || 'Connection failed', 'var(--red)')}
+        </div>
         ${bdg('red','offline')}
       </div>`;
 
     const dkey = host.name;
-    const stopped = host.containers.filter(c=>c.state==='exited'||c.state==='dead').length;
-    const dockerBits = [
-      `${host.summary.running} running`,
-      `${host.summary.total} total`,
-      hasNum(host.summary?.cpu) ? `CPU ${host.summary.cpu}%` : '',
-      hasNum(host.summary?.memPercent) ? `Mem ${host.summary.memPercent}%` : '',
-    ].filter(Boolean).join(' · ');
+    const hostContainers = host.containers || [];
+    const stopped = hostContainers.filter(c=>c.state==='exited'||c.state==='dead').length;
+    const containers = sortDockerContainers(hostContainers);
+    const dockerStats = [
+      pveHeadStat('Host', host.host || '-'),
+      pveHeadStat('Containers', `${host.summary.running}/${host.summary.total}`),
+      hasNum(host.summary?.cpu) ? pveHeadStat('CPU', `${host.summary.cpu}%`, bc(host.summary.cpu), miniSparkline(host.history, 'cpu', host.summary.cpu)) : '',
+      hasNum(host.summary?.memPercent) ? pveHeadStat('Memory', `${host.summary.memPercent}%`, bc(host.summary.memPercent), miniSparkline(host.history, 'mem', host.summary.memPercent)) : '',
+      host.summary?.unused ? pveHeadStat('Unused img', host.summary.unused, 'var(--muted)') : '',
+    ].filter(Boolean).join('');
     return `
-      <div class="node-hdr" onclick="toggleDocker('${dkey}')">
+      <div class="node-hdr pve-node-hdr" onclick="toggleDocker(${jsStr(dkey)})">
         <div class="mon-dot ${stopped?'md-yellow':'md-green'}"></div>
-        <div class="node-name">${host.name}</div>
-        <div class="node-info">${dockerBits}</div>
+        <div class="pve-head-main docker-head-main">
+          <div class="pve-head-title">
+            <div class="node-name">${escHtml(host.name)}</div>
+            <div class="pve-head-sub">online</div>
+          </div>
+          ${dockerStats}
+        </div>
         ${bdg(stopped?'yellow':'green', stopped?`${stopped} stopped`:'all running')}
         ${notifyBell('dk:'+host.name)}
       </div>
       <div class="node-body ${dockerOpen[dkey]?'open':''}" id="dk-${dkey}" style="${dockerOpen[dkey]!==undefined?'':''}">
-        ${host.summary?.unused>0?`<div class="mon-row" style="justify-content:space-between"><span style="color:var(--muted)">${host.summary.unused} unused image${host.summary.unused>1?'s':''}</span><button class="btn-act" onclick="event.stopPropagation();dockerPrune('${host.name.replace(/'/g,"\\'")}',this)">Prune</button></div>`:''}
-        ${host.containers.map(c=>{
+        ${dockerHostCharts(host, dkey)}
+        ${host.summary?.unused>0?`<div class="mon-row" style="justify-content:space-between"><span style="color:var(--muted)">${host.summary.unused} unused image${host.summary.unused>1?'s':''}</span><button class="btn-act" onclick="event.stopPropagation();dockerPrune(${jsStr(host.name)},this)">Prune</button></div>`:''}
+        ${hostContainers.length ? dockerContainerHeader() : ''}
+        ${containers.map(c=>{
           const dotCls = c.color==='green'?'md-green':c.color==='yellow'?'md-yellow':c.color==='red'?'md-red':'md-gray';
           const portsTxt = (c.ports || []).join(' ');
-          return `<div class="mon-row docker-row clickable" onclick="showDockerLogs('${host.name}','${c.id}','${(c.name||'').replace(/'/g,"\\'")}')" title="View logs">
+          return `<div class="mon-row docker-row clickable" onclick="showDockerLogs(${jsStr(host.name)},${jsStr(c.id)},${jsStr(c.name||'')})" title="View logs">
             <div class="mon-dot ${dotCls}"></div>
             <div class="docker-cell name" title="${c.name}">${c.name}</div>
             <div class="docker-cell image" title="${c.image}">${c.imageShort}</div>
@@ -2087,7 +2659,7 @@ function buildDocker(docker){
             ${bdg(c.color, c.state)}
           </div>`;
         }).join('')}
-        ${!host.containers.length?'<div class="empty">No containers</div>':''}
+        ${!hostContainers.length?'<div class="empty">No containers</div>':''}
       </div>`;
   }).join('');
 
@@ -2135,23 +2707,57 @@ function buildDatabase(dbs){
 
   const body = dbs.map(d=>{
     if(d._connecting) return `
-      <div class="node-hdr" style="cursor:default">
+      <div class="node-hdr pve-node-hdr" style="cursor:default">
         <div class="mon-dot md-gray"></div>
-        <div class="node-name">${d.name}</div>
-        <div class="node-info">${d.type||''}${d.host?' · '+d.host:''}</div>
+        <div class="pve-head-main">
+          <div class="pve-head-title">
+            <div class="node-name">${escHtml(d.name)}</div>
+            <div class="pve-head-sub">connecting</div>
+          </div>
+          ${pveHeadStat('Type', d.type || 'db')}
+          ${pveHeadStat('Host', d.host || '-')}
+          ${pveHeadStat('Status', 'Connecting', 'var(--muted)')}
+        </div>
         ${bdg('gray','connecting…')}
       </div>`;
     if(!d.online) return `
-      <div class="offline-row">
+      <div class="node-hdr pve-node-hdr" style="cursor:default">
         <div class="mon-dot md-red"></div>
-        <div>${d.name} — ${d.type||'db'} unreachable<div class="offline-err">${d.error||''}</div></div>
+        <div class="pve-head-main">
+          <div class="pve-head-title">
+            <div class="node-name">${escHtml(d.name)}</div>
+            <div class="pve-head-sub">offline</div>
+          </div>
+          ${pveHeadStat('Type', d.type || 'db')}
+          ${pveHeadStat('Host', d.host || '-')}
+          ${pveHeadStat('Error', d.error || 'Unreachable', 'var(--red)')}
+        </div>
+        ${bdg('red','offline')}
       </div>`;
-    const conns = d.connections!=null ? d.connections+(d.maxConnections?'/'+d.maxConnections:'')+' conns' : '';
+    const dbStats = [
+      pveHeadStat('Type', d.type || 'db'),
+      pveHeadStat('Host', d.host || '-'),
+      d.connections != null ? pveHeadStat('Conns', `${d.connections}${d.maxConnections?`/${d.maxConnections}`:''}`) : '',
+      d.activeConnections != null ? pveHeadStat('Active', d.activeConnections) : '',
+      d.idleConnections != null ? pveHeadStat('Idle', d.idleConnections) : '',
+      d.sizeBytes != null ? pveHeadStat('Size', fmtBytes(d.sizeBytes)) : '',
+      d.uptimeSeconds != null ? pveHeadStat('Uptime', fmtUptime(d.uptimeSeconds)) : '',
+      d.databaseCount != null ? pveHeadStat('Databases', d.databaseCount) : '',
+      (d.collectionCount ?? d.tableCount) != null ? pveHeadStat(d.type === 'mongodb' || d.type === 'mongo' ? 'Collections' : 'Tables', d.collectionCount ?? d.tableCount) : '',
+      d.queryCount != null ? pveHeadStat('Queries', d.queryCount) : '',
+      d.slowQueries != null ? pveHeadStat('Slow queries', d.slowQueries) : '',
+      d.version ? pveHeadStat('Version', d.version) : '',
+    ].filter(Boolean).join('');
     return `
-      <div class="node-hdr" style="cursor:default">
+      <div class="node-hdr pve-node-hdr" style="cursor:default">
         <div class="mon-dot md-green"></div>
-        <div class="node-name" style="width:auto;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.name}</div>
-        <div class="node-info" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.type}${d.host?' · '+d.host:''}${conns?' · '+conns:''}${d.sizeBytes!=null?' · '+fmtBytes(d.sizeBytes):''}${d.version?' · v'+d.version:''}</div>
+        <div class="pve-head-main">
+          <div class="pve-head-title">
+            <div class="node-name">${escHtml(d.name)}</div>
+            <div class="pve-head-sub">online</div>
+          </div>
+          ${dbStats}
+        </div>
         ${bdg('green','online')}
         ${notifyBell('db:'+d.name)}
       </div>`;
@@ -2577,8 +3183,8 @@ function avgPct(vals){
   return Math.round(vals.reduce((a,b)=>a+b,0) / vals.length);
 }
 function platformKpiLabel(id, panels){
-  if(id === 'all') return 'All platforms';
-  if(id === 'snmp') return 'Network devices';
+  if(id === 'all') return trText('All platforms');
+  if(id === 'snmp') return trText('Network devices');
   return panels?.[id]?.title || id;
 }
 function overviewKpiOptions(metric, ids, panels){
@@ -2609,7 +3215,7 @@ function kpiPct(label, vals){
   const avg = avgPct(nums);
   return {
     value: avg == null ? '--' : `${avg}%`,
-    sub: nums.length ? `${nums.length} ${label}${nums.length===1?'':'s'}` : 'Not reported',
+    sub: nums.length ? `${nums.length} ${label}${nums.length===1?'':'s'}` : trText('Not reported'),
     color: avg == null ? 'var(--muted)' : bc(avg),
   };
 }
@@ -2618,7 +3224,7 @@ function kpiRate(label, vals){
   const total = nums.reduce((a,b)=>a+b,0);
   return {
     value: total ? fmtRate(total) : '--',
-    sub: nums.length ? label : 'Not reported',
+    sub: nums.length ? label : trText('Not reported'),
     color: nums.length ? 'var(--cyan)' : 'var(--muted)',
   };
 }
@@ -2649,8 +3255,8 @@ function overviewKpiMetric(data, metric, platform){
   const allVals = obj => Object.values(obj).flat();
   if(metric === 'cpu') return kpiPct('reporting source', platform === 'all' ? allVals(cpu) : (cpu[platform] || []));
   if(metric === 'mem') return kpiPct('reporting source', platform === 'all' ? allVals(mem) : (mem[platform] || []));
-  if(metric === 'disk') return kpiRate('Read and write combined', platform === 'all' ? allVals(disk) : (disk[platform] || []));
-  if(metric === 'bandwidth') return { ...kpiRate('Inbound plus outbound', platform === 'all' ? allVals(bandwidth) : (bandwidth[platform] || [])), color: 'var(--green)' };
+  if(metric === 'disk') return kpiRate(trText('Read and write combined'), platform === 'all' ? allVals(disk) : (disk[platform] || []));
+  if(metric === 'bandwidth') return { ...kpiRate(trText('Inbound plus outbound'), platform === 'all' ? allVals(bandwidth) : (bandwidth[platform] || [])), color: 'var(--green)' };
   return { value:'--', sub:'Not reported', color:'var(--muted)' };
 }
 function overviewKpi(metric, label, data, ids, panels){
@@ -2658,7 +3264,7 @@ function overviewKpi(metric, label, data, ids, panels){
   const current = options.some(o => o.id === overviewKpiPlatforms[metric]) ? overviewKpiPlatforms[metric] : 'all';
   const stat = overviewKpiMetric(data, metric, current);
   return `<div class="overview-kpi" data-kpi="${metric}">
-    <div class="overview-kpi-head"><span>${label}</span>${drawOverviewKpiSelect(metric, current, options)}</div>
+    <div class="overview-kpi-head"><span>${trText(label)}</span>${drawOverviewKpiSelect(metric, current, options)}</div>
     <div class="overview-kpi-value" style="color:${stat.color||'var(--text)'}">${stat.value}</div>
     <div class="overview-kpi-sub">${stat.sub||''}</div>
   </div>`;
@@ -2694,7 +3300,7 @@ function overviewRows(id, data){
     const rows = (data.linux||[]).slice(0,6).map(srv => {
       const failed = (srv.services||[]).filter(s=>!s.active&&s.state!=='unknown'&&!s.excluded).length;
       const sub = srv._connecting ? (srv.host||'Waiting for agent') :
-        srv.online ? [srv.ip||srv.host, hasNum(srv.cpu)?`CPU ${srv.cpu}%`:'', srv.ram?`Memory ${srv.ram.percent}%`:'', srv.temp!=null?`${srv.temp}°C`:'' ].filter(Boolean).join(' · ') :
+        srv.online ? [srv.ip||srv.host, hasNum(srv.cpu)?`CPU ${srv.cpu}%`:'', srv.ram?`Memory ${srv.ram.percent}%`:'', srv.temp!=null?`Temp ${srv.temp}°C`:'' ].filter(Boolean).join(' · ') :
         (srv.error || 'Agent offline');
       return overviewRow('linux', srv.name, sub, srv._connecting?'gray':!srv.online?'red':failed?'yellow':'green', srv._connecting?'connecting':!srv.online?'offline':failed?`${failed} failed`:'healthy', srv._connecting?'md-gray':!srv.online?'md-red':failed?'md-yellow':'md-green');
     });
@@ -2703,7 +3309,7 @@ function overviewRows(id, data){
   if(id === 'snmp'){
     const rows = (data.snmp||[]).slice(0,6).map(dev => {
       const sub = dev._connecting ? (dev.host||'Connecting') :
-        dev.online ? [dev.host, dev.cpu!=null?`CPU ${dev.cpu}%`:'', dev.ram?`RAM ${dev.ram.percent}%`:'', dev.systemTemp!=null?`${dev.systemTemp}°C`:'' ].filter(Boolean).join(' · ') :
+        dev.online ? [dev.host, dev.cpu!=null?`CPU ${dev.cpu}%`:'', dev.ram?`RAM ${dev.ram.percent}%`:'', dev.systemTemp!=null?`CPU temp ${dev.systemTemp}°C`:'' ].filter(Boolean).join(' · ') :
         (dev.error || 'SNMP unreachable');
       return overviewRow('snmp', dev.name, sub, dev._connecting?'gray':dev.online?'green':'red', dev._connecting?'connecting':dev.online?'online':'offline', dev._connecting?'md-gray':dev.online?'md-green':'md-red');
     }).join('');
@@ -2741,7 +3347,7 @@ function overviewRows(id, data){
     return (data.proxmox?.nodes||[]).slice(0,6).map(({node, services=[]}) => {
       const failed = services.filter(s=>!s.active&&!s.excluded).length;
       const ramPct = node.ram?.percent ?? node.memPct;
-      const sub = node.online ? [node.ip, node.cpu!=null?`CPU ${node.cpu}%`:'', ramPct!=null?`RAM ${ramPct}%`:'' ].filter(Boolean).join(' · ') : 'Node offline';
+      const sub = node.online ? [node.ip, node.cpu!=null?`CPU ${node.cpu}%`:'', ramPct!=null?`RAM ${ramPct}%`:'', node.temp!=null?`Temp ${node.temp}°C`:'' ].filter(Boolean).join(' · ') : 'Node offline';
       return overviewRow('proxmox', node.name, sub, node.online?(failed?'yellow':'green'):'red', node.online?(failed?`${failed} failed`:'healthy'):'offline', node.online?(failed?'md-yellow':'md-green'):'md-red');
     }).join('');
   }
@@ -2758,7 +3364,7 @@ function overviewRows(id, data){
       const cls = m.status==='up'?'green':m.status==='down'?'red':m.status==='pending'||m.status==='unknown'?'yellow':'gray';
       const dot = m.status==='up'?'md-green':m.status==='down'?'md-red':m.status==='pending'||m.status==='unknown'?'md-yellow':'md-gray';
       const sub = [m.group, m.lastPing?`Last ${relTime(m.lastPing)}`:'No heartbeat', m.ping!=null?`${m.ping} ms`:'' ].filter(Boolean).join(' · ');
-      return overviewRow('uptimekuma', m.name, sub, cls, m.status||'unknown', dot, null, `<div class="overview-uk-bars">${uptimeBars(m.history, m.status)}</div>`);
+      return overviewRow('uptimekuma', m.name, sub, cls, m.status||'unknown', dot, null, `<div class="overview-uk-bars">${uptimeBars(m.history, m.status, { hours: defaultPeriodHours(data), maxPoints: Math.min(180, Math.ceil(defaultPeriodHours(data) * 60)) })}</div>`);
     }).join('');
   }
   if(id === 'prometheus'){
@@ -2873,6 +3479,9 @@ function overviewSide(data){
     <section class="overview-side-card"><div class="overview-side-h">Recent logs</div><div id="recent-logs" class="overview-log-list" data-scroll-key="recent-logs" data-sig="${escAttr(recentLogsSig)}">${recentLogsHtml}</div></section>
   </aside>`;
 }
+function dashboardSidePanelVisible(data = window._lastData){
+  return data?.appearance?.dashboardSidePanel !== false;
+}
 function overviewLogTime(ts){
   try{ return new Date(ts).toLocaleTimeString('en-GB', { hour12:false }); }
   catch(e){ return ''; }
@@ -2973,6 +3582,7 @@ function toggleOverviewCard(id, event, headerEl){
   requestAnimationFrame(layoutOverviewMasonry);
 }
 function renderDashboardOverview(data, ids, panels, opts = {}){
+  const showSide = dashboardSidePanelVisible(data);
   const cards = ids.map(id => {
     const panel = panels[id];
     const iconSvg = platformIcon(panel);
@@ -2995,23 +3605,25 @@ function renderDashboardOverview(data, ids, panels, opts = {}){
   }).join('');
   document.querySelectorAll('.sb-card.active').forEach(c=>c.classList.remove('active'));
   const detail = document.getElementById('detail');
+  detail.dataset.panelId = '';
+  detail.dataset.panelHtml = '';
   initOverviewScrollHold(detail);
-  const key = ids.join('|');
+  const key = ids.join('|') + '|side:' + (showSide ? '1' : '0');
   if(opts.soft && detail.dataset.overviewIds === key && detail.querySelector('.overview')){
     updateOverviewKpis(data, ids, panels);
     return;
   }
   const scrollState = captureOverviewScroll(detail);
   const html = `<section class="overview">
-    <div class="overview-kpis">
+    <div class="overview-kpis ${showSide?'':'no-side'}">
       ${overviewKpi('cpu', 'CPU usage', data, ids, panels)}
       ${overviewKpi('mem', 'Memory usage', data, ids, panels)}
       ${overviewKpi('disk', 'Disk I/O', data, ids, panels)}
       ${overviewKpi('bandwidth', 'Bandwidth', data, ids, panels)}
     </div>
-    <div class="overview-layout">
+    <div class="overview-layout ${showSide?'':'no-side'}">
       <div class="overview-grid">${cards}</div>
-      ${overviewSide(data)}
+      ${showSide ? overviewSide(data) : ''}
     </div>
   </section>`;
   if(detail.dataset.overviewHtml !== html && !overviewScrollLocked(detail)){
@@ -3025,7 +3637,7 @@ function renderDashboardOverview(data, ids, panels, opts = {}){
       restoreOverviewScroll(detail, scrollState);
     });
   }
-  if(!opts.soft) loadRecentLogs();
+  if(!opts.soft && showSide) loadRecentLogs();
 }
 function clearOverviewCache(){
   const detail = document.getElementById('detail');
@@ -3092,10 +3704,14 @@ function selectPanel(id){
   }
   const iconSvg = platformIcon(panel);
   const detail = document.getElementById('detail');
+  const headerSummary = panel.sbSummary && panel.sbSummary.includes('sb-csum')
+    ? `<div class="det-platform-summary">${panel.sbSummary}</div>`
+    : '';
   const html = `
     <div class="det-hdr">
       <div class="det-icon">${iconSvg}</div>
       <span class="det-title">${panel.title}</span>
+      ${headerSummary}
       <div class="det-summary">
         ${panel.meta?`<span class="det-meta">${panel.meta}</span>`:''}
         ${panel.badge}
@@ -3206,6 +3822,7 @@ function toggleOverviewGroup(grpId){
 /* ── Render ── */
 function render(data, opts = {}){
   const pageScroll = capturePageScroll();
+  syncDefaultPeriodOverride(data);
   window._lastData = data;
   if(Array.isArray(data.configured)) configuredIds = data.configured;
   if(Array.isArray(data.notifyDisabled)) notifyOff = new Set(data.notifyDisabled);
@@ -3247,6 +3864,7 @@ function render(data, opts = {}){
   const degradedCount=platforms.filter(p=>p==='degraded').length;
   const platformConnectingCount=platforms.filter(p=>p==='connecting').length;
   const anyOff = downCount>0;
+  const lang = currentLang(data);
   setFavicon(anyOff);
   setLogoDot(anyOff);
 
@@ -3257,20 +3875,22 @@ function render(data, opts = {}){
   const gh=document.getElementById('ghealth');
   if(gh){
     let cls,txt;
-    if(!platforms.length && !connectingCount){ cls='gray'; txt='Unconfigured'; }
+    if(!platforms.length && !connectingCount){ cls='gray'; txt=trText('Unconfigured', lang); }
     else if(downCount>0){ cls='red'; txt=downCount+' down'; }
-    else if(connectingCount>0){ cls='yellow'; txt='connecting…'; }
-    else if(degradedCount>0){ cls='yellow'; txt=degradedCount+' degraded'; }
-    else { cls='green'; txt='All healthy'; }
+    else if(connectingCount>0){ cls='yellow'; txt=trText('connecting…', lang); }
+    else if(degradedCount>0){ cls='yellow'; txt=lang === 'tr' ? degradedCount+' sorunlu' : degradedCount+' degraded'; }
+    else { cls='green'; txt=trText('All healthy', lang); }
     gh.className='ghealth gh-'+cls;
     gh.innerHTML='<span class="gh-dot"></span>'+txt;
   }
   const ps=document.getElementById('pubstatus');
   if(ps) {
     ps.classList.toggle('on', !!data.publicStatus);
-    ps.title = data.publicStatus ? 'Public status page is enabled' : 'Open public status page';
+    ps.title = trText(data.publicStatus ? 'Public status page is enabled' : 'Open public status page', lang);
   }
-  const updatedText = `Updated ${new Date(data.timestamp).toLocaleTimeString('en-GB')}`;
+  const updatedText = lang === 'tr'
+    ? `Son yenileme ${new Date(data.timestamp).toLocaleTimeString('en-GB')}`
+    : `Updated ${new Date(data.timestamp).toLocaleTimeString('en-GB')}`;
   document.getElementById('lupd').textContent = updatedText;
   const railUpd = document.getElementById('rail-upd');
   if(railUpd) railUpd.textContent = updatedText;
@@ -3283,6 +3903,7 @@ function render(data, opts = {}){
 
   if(embedOpen){
     renderSidebar(ids, panels, null);
+    applyLanguage(currentLang(data));
     restorePageScroll(pageScroll);
     return;
   }
@@ -3293,6 +3914,7 @@ function render(data, opts = {}){
     sidebar.dataset.html = '';
     sidebar.dataset.ids = '';
     document.getElementById('detail').innerHTML = '<div class="empty" style="padding:48px">No data configured</div>';
+    applyLanguage(currentLang(data));
     restorePageScroll(pageScroll);
     return;
   }
@@ -3300,11 +3922,13 @@ function render(data, opts = {}){
   renderSidebar(ids, panels, !dashboardOpen ? activePanel : null);
   if(dashboardOpen){
     renderDashboardOverview(data, ids, panels, opts);
+    applyLanguage(currentLang(data));
     restorePageScroll(pageScroll);
     return;
   }
   if(!activePanel || !panels[activePanel]) activePanel = ids[0];
   selectPanel(activePanel);
+  applyLanguage(currentLang(data));
   restorePageScroll(pageScroll);
 }
 
@@ -3362,6 +3986,23 @@ function resetPbar(){
   const b=document.getElementById('pbar');
   b.style.transition='none';b.style.width='0%';
   setTimeout(startPbar,50);
+}
+function manualPbarStart(){
+  const b=document.getElementById('pbar');
+  b.style.transition='none';
+  b.style.width='0%';
+  requestAnimationFrame(()=>{ b.style.transition='width .7s ease-out'; b.style.width='82%'; });
+}
+function manualPbarDone(){
+  const b=document.getElementById('pbar');
+  b.style.transition='width .18s ease';
+  b.style.width='100%';
+  setTimeout(()=>{
+    if(typeof paused !== 'undefined' && paused){
+      b.style.transition='none';
+      b.style.width='0%';
+    } else resetPbar();
+  }, 220);
 }
 
 let faviconTimer = null;
@@ -3548,7 +4189,7 @@ function togglePause(){
   const lbl = document.getElementById('pbtn-lbl');
   const icon = document.getElementById('pbtn-icon');
   btn.classList.toggle('paused', paused);
-  lbl.textContent = paused ? 'Resume' : 'Pause';
+  lbl.textContent = trText(paused ? 'Resume' : 'Pause', currentLang());
   icon.innerHTML = paused
     ? '<polygon points="5 3 19 12 5 21 5 3"/>'
     : '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>';
@@ -3576,18 +4217,31 @@ function scheduleRefresh(){
   timer = setTimeout(pollOnce, INTERVAL);
 }
 
+let refreshBusy = false;
 async function doRefresh(){
   const btn = document.getElementById('rbtn');
-  btn.classList.add('spin'); clearTimeout(timer);
-  resetPbar();
+  if(refreshBusy) return;
+  refreshBusy = true;
+  btn?.classList.add('spin'); clearTimeout(timer);
+  manualPbarStart();
+  const ctrl = new AbortController();
+  const to = setTimeout(() => ctrl.abort(), 1000);
   try{
-    const r = await fetch('/api/refresh',{headers:authHeaders()});
+    const r = await fetch('/api/refresh?wait=700',{headers:authHeaders(), cache:'no-store', signal:ctrl.signal});
     handleUnauth(r);
     render(await r.json());
-    resetPbar();
     try{ document.querySelector('#detail iframe')?.contentWindow?.refreshDots?.(); }catch(e){}
-  }catch(e){ if(e.message!=='Unauthorized') console.error(e); }
-  btn.classList.remove('spin'); scheduleRefresh();
+  }catch(e){
+    if(e.name === 'AbortError'){
+      try { render(await fetchStatus()); } catch {}
+    } else if(e.message!=='Unauthorized') console.error(e);
+  } finally {
+    clearTimeout(to);
+    manualPbarDone();
+    btn?.classList.remove('spin');
+    refreshBusy = false;
+    scheduleRefresh();
+  }
 }
 
 async function initialLoad(){

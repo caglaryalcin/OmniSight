@@ -28,7 +28,7 @@ header{background:var(--panel);border-bottom:1px solid var(--border);height:64px
 .menu-item{display:block;padding:10px 16px;font-size:13px;color:var(--text);text-decoration:none;cursor:pointer;border:none;background:none;width:100%;text-align:left}
 .menu-item:hover{background:rgba(255,255,255,.05)}
 .menu-item.danger{color:var(--red)}
-main{max-width:1100px;margin:40px auto;padding:0 24px}
+main{max-width:760px;margin:40px auto;padding:0 24px}
 h1{font-size:18px;font-weight:700;margin-bottom:24px}
 .card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:24px;margin-bottom:16px}
 .card-title{font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:16px}
@@ -37,6 +37,7 @@ input{width:100%;background:var(--row);border:1px solid var(--border);border-rad
 input:focus{border-color:#4a5568}
 input:last-of-type{margin-bottom:0}
 .btn{background:var(--green);color:#000;border:none;border-radius:7px;padding:9px 20px;font-size:13px;font-weight:600;cursor:pointer;margin-top:16px}
+.btn.secondary{background:var(--row);color:var(--text);border:1px solid var(--border)}
 .btn:hover{filter:brightness(1.1)}
 .btn:disabled{opacity:.5;cursor:not-allowed}
 .msg{font-size:13px;margin-top:12px;min-height:18px}
@@ -44,6 +45,11 @@ input:last-of-type{margin-bottom:0}
 .msg.ok{color:var(--green)}
 .msg.err{color:var(--red)}
 .no-auth{color:var(--muted);font-size:13px;line-height:1.6}
+.muted{color:var(--muted);font-size:13px;line-height:1.6}
+.status-pill{display:inline-flex;align-items:center;border:1px solid var(--border);border-radius:999px;padding:2px 8px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-left:8px}
+.status-pill.on{color:var(--green);border-color:rgba(52,211,153,.35);background:rgba(52,211,153,.11)}
+.status-pill.off{color:var(--muted);background:var(--row)}
+.secret-box{background:var(--row);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin:10px 0 14px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;word-break:break-all;user-select:text;-webkit-user-select:text}
 .user-row{display:flex;align-items:center;gap:10px;padding:4px 0 8px}
 .user-name{font-size:16px;font-weight:600;flex:1}
 .edit-btn{background:none;border:none;color:var(--muted);cursor:pointer;padding:4px;border-radius:5px;display:flex;align-items:center;transition:color .15s}
@@ -115,6 +121,35 @@ html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#dd
     <button class="btn" onclick="savePassword()">Update password</button>
     <div class="msg" id="msg-change"></div>
   </div>
+
+  <div class="card" id="card-2fa" style="display:none">
+    <div class="card-title">Two-factor authentication <span class="status-pill off" id="twofa-status">Off</span></div>
+    <p class="muted" id="twofa-desc">Protect sign-in with a 6-digit code from an authenticator app.</p>
+
+    <button class="btn secondary" id="twofa-start" onclick="setup2FA()">Set up 2FA</button>
+
+    <div id="twofa-setup" style="display:none">
+      <p class="muted" style="margin-top:12px">Add this secret manually in your authenticator app, then enter the generated code.</p>
+      <div class="secret-box" id="twofa-secret"></div>
+      <label>Authenticator URI</label>
+      <div class="secret-box" id="twofa-uri"></div>
+      <label>Current password</label>
+      <input id="twofa-current" type="password" autocomplete="current-password">
+      <label>Two-factor code</label>
+      <input id="twofa-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456">
+      <button class="btn" onclick="enable2FA()">Enable 2FA</button>
+    </div>
+
+    <div id="twofa-enabled" style="display:none">
+      <label>Current password</label>
+      <input id="twofa-disable-current" type="password" autocomplete="current-password">
+      <label>Two-factor code</label>
+      <input id="twofa-disable-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456">
+      <button class="btn secondary" onclick="disable2FA()">Disable 2FA</button>
+    </div>
+
+    <div class="msg" id="msg-2fa"></div>
+  </div>
 </main>
 
 <script>
@@ -123,10 +158,79 @@ document.addEventListener('click', e => { if(!e.target.closest('.menu-wrap')) do
 
 function authHeaders(){ const t=sessionStorage.getItem('os_token')||localStorage.getItem('os_token'); return t?{'x-session-token':t}:{}; }
 function handleUnauth(r){ if(r.status===401){ sessionStorage.removeItem('os_token'); localStorage.removeItem('os_token'); document.cookie='session=; path=/; max-age=0'; window.location.href='/login'; throw new Error('Unauthorized'); } }
+function escHtml(s){ return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 async function doLogout(){
   await fetch('/api/logout',{method:'POST',headers:authHeaders()}).catch(()=>{});
   sessionStorage.removeItem('os_token'); localStorage.removeItem('os_token');
   window.location.href='/login';
+}
+
+let pending2FASecret = '';
+function set2FAState(enabled){
+  const status = document.getElementById('twofa-status');
+  const start = document.getElementById('twofa-start');
+  const setup = document.getElementById('twofa-setup');
+  const enabledBox = document.getElementById('twofa-enabled');
+  pending2FASecret = '';
+  status.textContent = enabled ? 'On' : 'Off';
+  status.className = 'status-pill ' + (enabled ? 'on' : 'off');
+  start.style.display = enabled ? 'none' : '';
+  setup.style.display = 'none';
+  enabledBox.style.display = enabled ? '' : 'none';
+  document.getElementById('msg-2fa').textContent = '';
+}
+function twoFAMsg(text, cls){
+  const el = document.getElementById('msg-2fa');
+  el.textContent = text || '';
+  el.className = 'msg ' + (cls || '');
+}
+async function setup2FA(){
+  twoFAMsg('');
+  try{
+    const r = await fetch('/api/2fa/setup', { method:'POST', headers:authHeaders() });
+    handleUnauth(r);
+    const d = await r.json();
+    if(!r.ok) throw new Error(d.error || r.statusText);
+    pending2FASecret = d.secret;
+    document.getElementById('twofa-secret').textContent = d.secret;
+    document.getElementById('twofa-uri').textContent = d.otpauth;
+    document.getElementById('twofa-setup').style.display = '';
+    document.getElementById('twofa-start').style.display = 'none';
+    document.getElementById('twofa-current').focus();
+  }catch(e){ twoFAMsg(e.message, 'err'); }
+}
+async function enable2FA(){
+  twoFAMsg('');
+  const currentPassword = document.getElementById('twofa-current').value;
+  const code = document.getElementById('twofa-code').value.trim();
+  if(!pending2FASecret){ twoFAMsg('Start setup first', 'err'); return; }
+  if(!currentPassword || !code){ twoFAMsg('Current password and code are required', 'err'); return; }
+  try{
+    const r = await fetch('/api/2fa/enable', { method:'POST', headers:{'Content-Type':'application/json', ...authHeaders()}, body:JSON.stringify({ currentPassword, code, secret: pending2FASecret }) });
+    handleUnauth(r);
+    const d = await r.json();
+    if(!r.ok) throw new Error(d.error || r.statusText);
+    document.getElementById('twofa-current').value = '';
+    document.getElementById('twofa-code').value = '';
+    set2FAState(true);
+    twoFAMsg('Two-factor authentication enabled.', 'ok');
+  }catch(e){ twoFAMsg(e.message, 'err'); }
+}
+async function disable2FA(){
+  twoFAMsg('');
+  const currentPassword = document.getElementById('twofa-disable-current').value;
+  const code = document.getElementById('twofa-disable-code').value.trim();
+  if(!currentPassword || !code){ twoFAMsg('Current password and code are required', 'err'); return; }
+  try{
+    const r = await fetch('/api/2fa/disable', { method:'POST', headers:{'Content-Type':'application/json', ...authHeaders()}, body:JSON.stringify({ currentPassword, code }) });
+    handleUnauth(r);
+    const d = await r.json();
+    if(!r.ok) throw new Error(d.error || r.statusText);
+    document.getElementById('twofa-disable-current').value = '';
+    document.getElementById('twofa-disable-code').value = '';
+    set2FAState(false);
+    twoFAMsg('Two-factor authentication disabled.', 'ok');
+  }catch(e){ twoFAMsg(e.message, 'err'); }
 }
 
 function toggleUserEdit(){
@@ -206,6 +310,8 @@ async function setPassword(hasExisting){
     if(!r.ok) throw new Error(d.error||r.statusText);
     document.getElementById('card-setup').style.display='none';
     document.getElementById('card-change').style.display='';
+    document.getElementById('card-2fa').style.display='';
+    set2FAState(false);
     document.getElementById('user-display').textContent = username;
   } catch(e){ msgEl.textContent=e.message; msgEl.className='msg err'; }
 }
@@ -217,7 +323,9 @@ async function setPassword(hasExisting){
   const d = await r.json().catch(()=>({}));
   if(d.required){
     document.getElementById('card-change').style.display='';
+    document.getElementById('card-2fa').style.display='';
     if(d.username) document.getElementById('user-display').textContent = d.username;
+    set2FAState(!!d.twoFactorEnabled);
   } else {
     document.getElementById('card-setup').style.display='';
   }

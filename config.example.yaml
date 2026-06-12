@@ -7,6 +7,11 @@
 # Optional timezone for server-side timestamps/notifications.
 # Can also be set with TZ=Europe/Istanbul (or TIMEZONE=Europe/Istanbul).
 timezone: "${TZ:-UTC}"
+timeFormat: "24h"
+defaultTimePeriodHours: 1
+preferredLanguage: "en"
+appearance:
+  dashboardSidePanel: true
 
 # Linux servers, Proxmox nodes and Docker hosts are all monitored by the
 # OmniSight agent (push). Use Settings -> "+ Add System / Node / Host" to get
@@ -44,6 +49,9 @@ healthchecks:
 uptimekuma:
   url: "https://kuma.yourdomain.com"
   slug: "default"
+  username: ""
+  password: ""
+  historyHours: 1
 
 # Docker containers are reported by the same agent when docker is present on
 # the host (or run the agent itself as a container - see Settings -> Docker).
@@ -52,6 +60,16 @@ docker:
 
 alerts:
   enabled: true
+  thresholds:
+    cpu:
+      warning: 80
+      critical: 90
+    ram:
+      warning: 80
+      critical: 90
+    disk:
+      warning: 80
+      critical: 90
   ntfy:
     url: "https://ntfy.sh"
     topic: "omnisight-CHANGE-ME"

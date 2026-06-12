@@ -1,21 +1,21 @@
 <img src="./public/assets/omnisight-wordmark.svg" width="512" alt="Omnisight Logo" />
 
-![Status](https://img.shields.io/badge/status-stable-brightgreen) [![Version](https://img.shields.io/badge/version-1.4.2-blue)](https://github.com/caglaryalcin/OmniSight/releases) [![Latest Release](https://img.shields.io/github/v/release/caglaryalcin/OmniSight?include_prereleases&color=blue)](https://github.com/caglaryalcin/OmniSight/releases)
+![Status](https://img.shields.io/badge/status-stable-brightgreen) [![Version](https://img.shields.io/badge/version-1.5.0-blue)](https://github.com/caglaryalcin/OmniSight/releases) [![Latest Release](https://img.shields.io/github/v/release/caglaryalcin/OmniSight?include_prereleases&color=blue)](https://github.com/caglaryalcin/OmniSight/releases)
 
 A simple, single-glance monitoring dashboard for Proxmox, Linux servers, Kubernetes, SNMP devices, Docker, databases, Healthchecks, Uptime Kuma and Prometheus.
 
 ## Features
 
-- **Modern UI** — fully redesigned interface: glass header, soft-glow status indicators, card-grid summaries, Inter typography, refined dark & light themes and subtle micro-animations
+- **Modern UI** — fully redesigned interface: glass header, soft-glow status indicators, card-grid summaries, draggable/collapsible dashboard cards, compact platform summaries in detail headers, Inter typography, refined dark & light themes and subtle micro-animations
 - **One agent, one command** — Linux servers, Proxmox nodes and Docker hosts can be monitored by a single tiny push agent (one bash script + systemd, nothing beyond `curl`). In Settings just click **+ Add System / Node / Host**, pick **Binary**, **Docker** or **Stack**, copy the pre-filled command, run it on the server — the system self-registers and pops up online within seconds. No inbound firewall rules, NAT-friendly (see [The agent](#the-agent))
-- **Proxmox** — node CPU/RAM/temperature/uptime, VM/LXC, per-node service status with **start/stop/restart/exclude** actions, **last backup** (vzdump) status, **Ceph cluster storage health** with active alert summaries, and **node storage status** (NFS, Local, ZFS, LVM, etc.) with utilization — collected via API token or locally by the agent via `pvesh`
-- **Linux servers** — CPU/RAM/disk/swap/load/temperature/uptime/OS plus disk I/O and bandwidth, with **auto-discovered** running/failed services and near-instant **status/start/stop/restart/exclude** actions over the agent's command long-poll. Works on any systemd Linux incl. NAS devices (e.g. Synology)
-- **Kubernetes** — pod / deployment / service status and live pod log viewer (kubeconfig)
-- **SNMP** — status of any SNMP v2c/v3 device (Synology, UniFi, switches, routers, …) with CPU/RAM/temperature where exposed
-- **Docker** — container status, ports, CPU/memory, network I/O, block I/O, unused (dangling) image count with a **Prune** action and live container log viewer — via agent, Docker API host or SSH host (Linux/Synology, key or password)
+- **Proxmox** — node CPU/RAM/temperature/uptime, VM/LXC, per-node service status with **start/stop/restart/exclude** actions, **last backup** (vzdump) status, **Ceph cluster storage health** with active alert summaries, node storage utilization and CPU/RAM history charts — collected via API token or locally by the agent via `pvesh`
+- **Linux servers** — CPU/RAM/disk/swap/load/temperature/uptime/OS plus disk I/O and bandwidth history, with **auto-discovered** running/failed services and near-instant **status/start/stop/restart/exclude** actions over the agent's command long-poll. Works on any systemd Linux incl. NAS devices (e.g. Synology)
+- **Kubernetes** — pod / deployment / service status, expandable groups, live pod log viewer and optional pod CPU/RAM sorting when the Kubernetes metrics API is available
+- **SNMP** — status of any SNMP v2c/v3 device (Synology, UniFi, switches, routers, …) with CPU/RAM/system or CPU temperature, dynamic MB/GB memory display and history charts where exposed
+- **Docker** — container status, ports, CPU/memory, network I/O, block I/O, host-level CPU/RAM history, unused (dangling) image count with a **Prune** action, sortable container columns and live container log viewer — via agent, Docker API host or SSH host (Linux/Synology, key or password)
 - **Databases** — **PostgreSQL**, **MySQL/MariaDB** and **MongoDB**: up/down, active/max connections, total size and version
-- **Uptime Kuma** — import monitors from a public status page slug and show up/down/pending/maintenance state alongside the rest of your platforms
-- **Prometheus** — monitor one or more Prometheus instances and track active target health
+- **Uptime Kuma** — import monitors from a public status page slug, show up/down/pending/maintenance state, configurable history range and interactive heartbeat bars
+- **Prometheus** — monitor one or more Prometheus instances, group targets by server and track active target health with expandable target lists
 
 ![](https://raw.githubusercontent.com/caglaryalcin/OmniSight/refs/heads/main/screenshots/dashboard.png)
 
@@ -24,11 +24,12 @@ A simple, single-glance monitoring dashboard for Proxmox, Linux servers, Kuberne
 ![](https://raw.githubusercontent.com/caglaryalcin/OmniSight/refs/heads/main/screenshots/container-logs.png)
 
 - **Healthchecks** — cron monitoring status with last-ping and period/grace
-- **Alerts** — notifications on state changes (down/up) via **ntfy**, **Telegram** and **SMTP**, with a **per-device bell** to mute/enable notifications for individual platforms/devices
+- **Alerts** — notifications on state changes (down/up) and resource thresholds via **ntfy**, **Telegram** and **SMTP**, with warning/critical percentages and a **per-device bell** to mute/enable notifications for individual platforms/devices
 - **Custom icons** — set any platform's icon from [dashboard-icons](https://github.com/homarr-labs/dashboard-icons) by name/URL or upload your own (see [Platform icons](#platform-icons))
 - **Custom CA** — trust private/self-signed CAs (see [Custom CA certificates](#custom-ca-certificates))
 - **Public status** — Read-only public summary page (`/status`)
 - **Agents** — connected agent inventory, installed versions and update actions
+- **Appearance** — dashboard side panel toggle, default history period, 12/24 hour time format and English/Turkish UI language preference
 
 ![](https://raw.githubusercontent.com/caglaryalcin/OmniSight/refs/heads/main/screenshots/public-page.png)
 
@@ -36,13 +37,22 @@ A simple, single-glance monitoring dashboard for Proxmox, Linux servers, Kuberne
 
 ![](https://raw.githubusercontent.com/caglaryalcin/OmniSight/refs/heads/main/screenshots/logs.png)
 
-- Dark / light theme, global health badge in the header, live configuration from the Settings page
+- Dark / light theme, global health badge in the header, smooth manual refresh, live configuration from the Settings page
 
 ![](https://raw.githubusercontent.com/caglaryalcin/OmniSight/refs/heads/main/screenshots/light-dark.png)
 
 ## Stack
 
 Node.js + Express backend · single-file vanilla HTML/CSS/JS frontend (no framework).
+
+## Dashboard
+
+- Platform cards can be reordered with drag-and-drop and collapsed/expanded in place.
+- CPU, memory, disk I/O and bandwidth overview cards can be filtered by platform.
+- Active alerts and recent logs can be shown or hidden from **Settings → Appearance**; when hidden, the platform grid expands to use the available space.
+- Platform detail pages include the same compact summary counters as the dashboard card header.
+- CPU, RAM and temperature history charts are available where the integration exposes those metrics.
+- Uptime monitor history bars include hover details for status, time range, ping and message data when available.
 
 ## Quick start (Node.js)
 
@@ -238,10 +248,11 @@ The live config is `data/config.yaml` (created automatically on first save). Eas
 - `linux` — `enabled` + `agentToken` (auto-generated from the Settings UI). Systems self-register via the [agent](#the-agent); no per-server entries needed. Services are auto-discovered and Exclude/Include is managed from the UI
 - `proxmox` — `enabled`, optional `url` / `tokenId` / `tokenSecret` / `insecureTLS` for API mode, plus optional `icon`. Without API settings, data can come from agents running on the nodes (`pvesh`)
 - `docker` — `enabled`, optional `hosts[]` for Docker API or SSH hosts (`sshHost`, `sshUser`, `sshPassword`/`sshKey`, `sshMode`, `sudo`, `insecureTLS`), plus optional `icon`. Agent-reported Docker hosts also appear automatically
-- `kubernetes` — kubeconfig, namespaces[] (the Settings UI has a **Browse…** button that uploads a kubeconfig from your machine into `data/` and fills in the container path automatically)
+- `kubernetes` — kubeconfig, namespaces[] (the Settings UI has a **Browse…** button that uploads a kubeconfig from your machine into `data/` and fills in the container path automatically). Pod CPU/RAM sorting uses the Kubernetes metrics API when it is available to the configured account
 - `snmp.devices[]` — SNMP v2c (community) or v3 (username, authPassword, privPassword, …)
 - `healthchecks` — url, apiKey
-- `uptimekuma` — url, status page `slug`, optional apiKey
+- `defaultTimePeriodHours`, `timeFormat`, `preferredLanguage` and `appearance.dashboardSidePanel` — dashboard-wide history period, 12/24 hour time format, UI language and dashboard side-panel visibility
+- `uptimekuma` — url, status page `slug`, optional apiKey, username/password and historyHours
 - `prometheus` — one or more `instances[]` with name, url, optional bearerToken and `insecureTLS`
 - `database.instances[]` — `type: postgresql | mysql | mariadb | mongodb`, name, host, port, user, password, optional `database`
 - `alerts` — `enabled` + `ntfy` / `telegram` / `smtp` channels
@@ -274,6 +285,16 @@ If a chosen icon fails to load, the card falls back to the built-in default auto
 ```yaml
 alerts:
   enabled: true
+  thresholds:
+    cpu:
+      warning: 80
+      critical: 90
+    ram:
+      warning: 80
+      critical: 90
+    disk:
+      warning: 80
+      critical: 90
   ntfy:
     url: "https://ntfy.sh"
     topic: "omnisight-xxxx"
@@ -291,7 +312,7 @@ alerts:
     to: ["alerts@domain.com"]
 ```
 
-Notifications are sent only on **state changes** (running→down = DOWN, down→running = UP). Pre-existing problems at startup do not trigger a flood. Healthchecks `grace` is treated as degraded/warning; the DOWN notification is sent only after the check becomes `down`. Each channel can be tested individually from the Settings page.
+Notifications are sent on **state changes** (running→down = DOWN, down→running = UP) and resource threshold changes (CPU/RAM/disk crossing the configured percentages). Pre-existing problems at startup do not trigger a flood. Healthchecks `grace` is treated as degraded/warning; the DOWN notification is sent only after the check becomes `down`. Each channel can be tested individually from the Settings page.
 
 ## Pages
 
@@ -301,7 +322,7 @@ Notifications are sent only on **state changes** (running→down = DOWN, down→
 | `/status` | Public read-only summary (only when `publicStatus: true`) |
 | `/settings` | Configuration |
 | `/agents` | Connected agents, versions and update actions |
-| `/profile` | Username / password |
+| `/profile` | Username / password and two-factor authentication |
 | `/logs` | Live log / warning / error stream |
 | `/about` | Version info and GitHub |
 
@@ -312,6 +333,7 @@ The sidebar footer also links to GitHub and opens a new issue form for help/bug 
 - The `data/` folder and `.env` are git-ignored.
 - All state lives in `./data/` (`config.yaml`, `secret.key`, `kube.bin`, `auth.yaml`, `sessions.yaml`, SSH keys) — it never leaves your machine.
 - Login password is set on first run. Passwords must be at least 8 characters and contain both an uppercase and a lowercase letter.
+- Optional TOTP two-factor authentication can be enabled from the Profile page.
 - Sessions use `HttpOnly`, `SameSite=Strict` cookies; login attempts are rate-limited.
 - Mutating API requests are protected by same-origin checks, and browser security headers are enabled.
 - Uploaded icons, kubeconfigs and certificates are size-limited; uploaded SVG icons are checked for active content.

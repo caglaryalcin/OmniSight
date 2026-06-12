@@ -181,13 +181,14 @@ function handleReport(r) {
   const reportKinds = (a.pve || a.platform === 'proxmox' || a.role === 'proxmox') ? ['proxmox'] : (a.role === 'docker' ? ['docker'] : ['linux']);
   clearPendingForKinds(reportKinds);
 
-  if (cpu != null) {
+  if (cpu != null || a.temp != null) {
     const hist = history.get(id) || [];
     hist.push({
       time: Date.now(),
-      cpu,
+      cpu: cpu ?? null,
       ram: memTotal ? Math.round((memUsed / memTotal) * 100) : 0,
       disk: diskTotal ? Math.round((diskUsed / diskTotal) * 100) : 0,
+      temp: a.temp ?? null,
     });
     if (hist.length > HISTORY_MAX) hist.shift();
     history.set(id, hist);
@@ -360,7 +361,7 @@ function getProxmoxData(config) {
     const nodeName = a.pve?.node || a.pveNode || a.hostname;
     const online = isOnline(a, now) && !!a.pve;
     if (!online) {
-      return { node: { name: nodeName, online: false, cpuCores: 0, cpuRaw: 0, ram: { used: 0, total: 0 } }, host: a.ip, services: [], vms: [], history: [...(history.get(a.id) || [])].map(h => ({ time: h.time, cpu: h.cpu, mem: h.ram })), backup: null, storage: [] };
+      return { node: { name: nodeName, online: false, cpuCores: 0, cpuRaw: 0, ram: { used: 0, total: 0 }, temp: a.temp ?? null }, host: a.ip, services: [], vms: [], history: [...(history.get(a.id) || [])].map(h => ({ time: h.time, cpu: h.cpu, mem: h.ram, temp: h.temp })), backup: null, storage: [] };
     }
     const res = a.pve.resources || [];
     const ne = res.find(r => r.type === 'node' && r.node === nodeName) || {};
@@ -414,12 +415,13 @@ function getProxmoxData(config) {
           used: memUsed,
           total: memTotal,
         },
+        temp: a.temp ?? null,
         uptime: ne.uptime || a.uptime || null,
       },
       host: a.ip,
       services,
       vms,
-      history: [...(history.get(a.id) || [])].map(h => ({ time: h.time, cpu: h.cpu, mem: h.ram })),
+      history: [...(history.get(a.id) || [])].map(h => ({ time: h.time, cpu: h.cpu, mem: h.ram, temp: h.temp })),
       backup,
       storage,
     };

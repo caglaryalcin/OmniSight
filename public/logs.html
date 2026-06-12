@@ -8,7 +8,7 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%230B0E14' stroke='%2334D399' stroke-width='2'/><circle cx='16' cy='16' r='6' fill='%2334D399'/><circle cx='16' cy='16' r='10' fill='none' stroke='%2334D399' stroke-width='1.5' stroke-opacity='.4'/></svg>">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-:root{--bg:#141617;--panel:#181A1B;--row:#1A202C;--border:#242C3B;--text:#E2E8F2;--muted:#7D8AA3;--green:#34D399;--red:#F87171;--yellow:#FBBF24}
+:root{--bg:#141617;--panel:#181A1B;--row:#141617;--border:#242C3B;--text:#E2E8F2;--muted:#7D8AA3;--green:#34D399;--red:#F87171;--yellow:#FBBF24}
 body{background:var(--bg);color:var(--text);font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;display:flex;flex-direction:column;height:100vh}
 *{scrollbar-width:thin;scrollbar-color:var(--border) var(--bg)}
 ::-webkit-scrollbar{width:10px;height:10px}
@@ -97,6 +97,49 @@ html.embed header{display:none}
 <div id="log-wrap"><div class="empty-msg">No logs yet…</div></div>
 
 <script>
+const I18N_TR = {
+  'Logs':'Kayıtlar',
+  'Follow':'Takip et',
+  'Clear':'Temizle',
+  'Copy all':'Tümünü kopyala',
+  'Copied':'Kopyalandı',
+  'Copy failed':'Kopyalanamadı',
+  'Filter…':'Filtrele…',
+  'No logs yet…':'Henüz kayıt yok…',
+  'No matching logs':'Eşleşen kayıt yok',
+  'entries':'kayıt',
+  'Profile':'Profil',
+  'Settings':'Ayarlar',
+  'Sign out':'Çıkış yap'
+};
+const I18N_ATTRS = ['placeholder','title','aria-label'];
+function currentLang(){ try { return localStorage.getItem('os_lang') || 'en'; } catch { return 'en'; } }
+function t(text){ return currentLang() === 'tr' ? (I18N_TR[text] || text) : text; }
+function applyLanguage(){
+  const lang = currentLang();
+  document.documentElement.lang = lang;
+  document.querySelectorAll('*').forEach(el => I18N_ATTRS.forEach(attr => {
+    if(!el.hasAttribute(attr)) return;
+    const key = `_osOrig_${attr}`;
+    if(el[key] === undefined) el[key] = el.getAttribute(attr);
+    el.setAttribute(attr, t(el[key]));
+  }));
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+    acceptNode(node){
+      const p = node.parentElement;
+      if(!p || ['SCRIPT','STYLE','PRE','CODE','TEXTAREA'].includes(p.tagName)) return NodeFilter.FILTER_REJECT;
+      return node.nodeValue.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+    }
+  });
+  let node;
+  while((node = walker.nextNode())){
+    if(node._osOrigText === undefined) node._osOrigText = node.nodeValue;
+    const original = node._osOrigText;
+    const trimmed = original.trim();
+    node.nodeValue = original.replace(trimmed, t(trimmed));
+  }
+  document.title = currentLang() === 'tr' ? 'OmniSight — Kayıtlar' : 'OmniSight — Logs';
+}
 function toggleMenu(){ document.getElementById('menu-drop').classList.toggle('open'); }
 document.addEventListener('click', e => { if(!e.target.closest('.menu-wrap')) document.getElementById('menu-drop')?.classList.remove('open'); });
 function authHeaders(){ const t=sessionStorage.getItem('os_token'); return t?{'x-session-token':t}:{}; }
@@ -138,14 +181,15 @@ function fmt(ts){
 function renderLogs(){
   const wrap = document.getElementById('log-wrap');
   const visible = visibleLogs();
-  document.getElementById('count').textContent = `${visible.length} entries`;
-  if(!visible.length){ wrap.innerHTML='<div class="empty-msg">No matching logs</div>'; return; }
+  document.getElementById('count').textContent = `${visible.length} ${t('entries')}`;
+  if(!visible.length){ wrap.innerHTML=`<div class="empty-msg">${t('No matching logs')}</div>`; applyLanguage(); return; }
   wrap.innerHTML = visible.map(l => `
     <div class="log-line">
       <span class="log-time">${fmt(l.t)}</span>
       <span class="log-lvl ${l.level}">${l.level}</span>
       <span class="log-msg ${l.level}">${highlightLog(l.msg)}</span>
     </div>`).join('');
+  applyLanguage();
   if(follow) scrollToBottom();
 }
 
@@ -156,11 +200,11 @@ async function copyLogs(){
   try {
     await navigator.clipboard.writeText(text);
     const old = btn.textContent;
-    btn.textContent = 'Copied';
+    btn.textContent = t('Copied');
     setTimeout(() => { btn.textContent = old; }, 1200);
   } catch {
     const old = btn.textContent;
-    btn.textContent = 'Copy failed';
+    btn.textContent = t('Copy failed');
     setTimeout(() => { btn.textContent = old; }, 1200);
   }
 }
@@ -209,6 +253,7 @@ async function poll(){
   const r = await fetch('/api/auth-status').catch(()=>null);
   if(r?.status===401){ window.location.href='/login'; return; }
   document.getElementById('follow-btn').classList.add('active');
+  applyLanguage();
   poll();
 })();
 </script>

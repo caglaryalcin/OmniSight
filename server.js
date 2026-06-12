@@ -8,7 +8,7 @@ const agents = require('./src/agents');
 const { getAllKubernetesData, getPodLogs } = require('./src/kubernetes');
 const { getAllSynologyData } = require('./src/snmp');
 const { getAllHealthchecks } = require('./src/healthchecks');
-const { getAllUptimeKuma } = require('./src/uptimekuma');
+const { getAllUptimeKuma, debugUptimeKuma } = require('./src/uptimekuma');
 const { getPrometheusData } = require('./src/prometheus');
 const { getAllDatabaseData } = require('./src/database');
 const { getProxmoxApiData } = require('./src/proxmox');
@@ -164,6 +164,82 @@ function genToken() {
   return crypto.randomBytes(32).toString('hex');
 }
 
+function currentSessionToken(req) {
+  return req.headers['x-session-token'] || req.cookies?.session || null;
+}
+
+function keepOnlyCurrentSession(req) {
+  const token = currentSessionToken(req);
+  const current = token ? sessions.get(token) : null;
+  sessions.clear();
+  if (token && current && Date.now() < current.expires) sessions.set(token, current);
+  saveSessions(sessions);
+}
+
+const TOTP_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+function base32Encode(buf) {
+  let bits = 0, value = 0, out = '';
+  for (const byte of buf) {
+    value = (value << 8) | byte;
+    bits += 8;
+    while (bits >= 5) {
+      out += TOTP_ALPHABET[(value >>> (bits - 5)) & 31];
+      bits -= 5;
+    }
+  }
+  if (bits > 0) out += TOTP_ALPHABET[(value << (5 - bits)) & 31];
+  return out;
+}
+
+function base32Decode(str) {
+  const clean = String(str || '').toUpperCase().replace(/=|\s|-/g, '');
+  let bits = 0, value = 0;
+  const out = [];
+  for (const ch of clean) {
+    const idx = TOTP_ALPHABET.indexOf(ch);
+    if (idx < 0) throw new Error('Invalid 2FA secret');
+    value = (value << 5) | idx;
+    bits += 5;
+    if (bits >= 8) {
+      out.push((value >>> (bits - 8)) & 255);
+      bits -= 8;
+    }
+  }
+  return Buffer.from(out);
+}
+
+function hotp(secret, counter) {
+  const key = base32Decode(secret);
+  const buf = Buffer.alloc(8);
+  let n = BigInt(counter);
+  for (let i = 7; i >= 0; i--) { buf[i] = Number(n & 0xffn); n >>= 8n; }
+  const h = crypto.createHmac('sha1', key).update(buf).digest();
+  const off = h[h.length - 1] & 0x0f;
+  const bin = ((h[off] & 0x7f) << 24) | (h[off + 1] << 16) | (h[off + 2] << 8) | h[off + 3];
+  return String(bin % 1000000).padStart(6, '0');
+}
+
+function verifyTotp(secret, code, windowSteps = 1) {
+  const clean = String(code || '').replace(/\s/g, '');
+  if (!/^\d{6}$/.test(clean)) return false;
+  const counter = Math.floor(Date.now() / 30000);
+  for (let i = -windowSteps; i <= windowSteps; i++) {
+    const candidate = hotp(secret, counter + i);
+    if (crypto.timingSafeEqual(Buffer.from(candidate), Buffer.from(clean))) return true;
+  }
+  return false;
+}
+
+function totpEnabled(auth) {
+  return !!(auth?.totp?.enabled && auth.totp.secret);
+}
+
+function makeTotpUri(username, secret) {
+  const issuer = 'OmniSight';
+  const label = `${issuer}:${username || 'admin'}`;
+  return `otpauth://totp/${encodeURIComponent(label)}?secret=${encodeURIComponent(secret)}&issuer=${encodeURIComponent(issuer)}&algorithm=SHA1&digits=6&period=30`;
+}
+
 function isSecureRequest(req) {
   return !!(req.secure || String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim() === 'https');
 }
@@ -301,6 +377,7 @@ process.env.TZ = config.timezone || process.env.TZ || process.env.TIMEZONE || 'U
 
 let cache = { data: null };
 let refreshPromise = null;
+let refreshGeneration = 0;
 
 const PLATFORM_HISTORY = {};
 
@@ -408,6 +485,35 @@ function preserveDockerOnTransient(nextRows) {
   });
 }
 
+const DOCKER_HISTORY_MAX = 5760;
+function mergeDockerHistory(nextRows) {
+  const rows = normalizeDockerRows(nextRows);
+  if (!Array.isArray(rows)) return rows;
+  const prevRows = Array.isArray(cache.data?.docker) ? cache.data.docker : [];
+  const now = Date.now();
+  return rows.map(row => {
+    if (!row || !row.online) return row;
+    const prev = findPreviousOnlineDockerRow(prevRows, row);
+    let history = Array.isArray(row.history)
+      ? row.history.slice()
+      : (Array.isArray(prev?.history) ? prev.history.slice() : []);
+    if (!row._stale && !row._connecting) {
+      const point = { time: now };
+      if (Number.isFinite(Number(row.summary?.cpu))) point.cpu = Number(row.summary.cpu);
+      if (Number.isFinite(Number(row.summary?.memPercent))) point.mem = Number(row.summary.memPercent);
+      if (point.cpu != null || point.mem != null) {
+        const last = history[history.length - 1];
+        if (!last || now - Number(last.time || 0) > REFRESH_INTERVAL / 2) {
+          if (!history.length) history.push({ ...point, time: now - REFRESH_INTERVAL });
+          history.push(point);
+        }
+      }
+    }
+    if (history.length > DOCKER_HISTORY_MAX) history = history.slice(-DOCKER_HISTORY_MAX);
+    return { ...row, history };
+  });
+}
+
 async function getProxmoxData() {
   if (hasProxmoxApi()) return getProxmoxApiData({ ...config.proxmox, excludedServices: config.excludedServices });
   return agents.getProxmoxData({ excludedServices: config.excludedServices });
@@ -420,11 +526,28 @@ async function getDockerData() {
   return [...apiData, ...agentData.filter(h => !names.has(h.name))];
 }
 
+function defaultTimePeriodHours() {
+  return uptimeKumaHistoryHours(config.defaultTimePeriodHours || config.defaultPeriodHours || config.historyHours || 1);
+}
+
+function uptimeKumaConfig() {
+  if (!config.uptimekuma) return config.uptimekuma;
+  return {
+    ...config.uptimekuma,
+    historyHours: uptimeKumaHistoryHours(config.uptimekuma.historyHours || defaultTimePeriodHours()),
+  };
+}
+
 function assignStatic(base) {
   base.publicStatus = !!config.publicStatus;
   base.configured = configuredList();
   base.notifyDisabled = Array.from(notifyDisabled);
   base.timeFormat = config.timeFormat || '24h';
+  base.defaultTimePeriodHours = defaultTimePeriodHours();
+  base.preferredLanguage = config.preferredLanguage || 'en';
+  base.appearance = {
+    dashboardSidePanel: config.appearance?.dashboardSidePanel !== false,
+  };
   base.icons = {
     proxmox: config.proxmox?.icon, linux: config.linux?.icon, kubernetes: config.kubernetes?.icon,
     snmp: config.snmp?.icon, healthchecks: config.healthchecks?.icon, prometheus: config.prometheus?.icon, docker: config.docker?.icon,
@@ -510,12 +633,32 @@ function mergePrometheusConfigured(current, cfg) {
 
 function extractChecks(data) {
   const m = new Map();
-  const add = (key, ok, label, detail) => m.set(key, { ok, label, detail });
+  const add = (key, ok, label, detail, extra = {}) => m.set(key, { ok, label, detail, ...extra });
+  const thresholds = alertThresholds();
+  const addPct = (key, label, metric, value, threshold) => {
+    const pct = pctNumber(value);
+    if (pct == null || threshold == null) return;
+    const severity = thresholdSeverity(pct, threshold);
+    const thresholdValue = severity ? threshold[severity] : threshold.warning;
+    add(key, !severity, `${label} ${metric}`, severity ? `${pct}% (${severity} ${thresholdValue}%)` : `${pct}%`, {
+      kind: 'threshold',
+      value: pct,
+      threshold: thresholdValue,
+      thresholds: threshold,
+      severity: severity || 'normal',
+      metric,
+    });
+  };
   (data.proxmox?.nodes || []).forEach(n => {
     if (n._connecting) return;
     const nm = n.node?.name || n.name || 'node';
     add('px:' + nm, !!n.node?.online, 'Proxmox node ' + nm, 'offline');
     if (n.node?.online) {
+      addPct('px:' + nm + ':cpu', 'Proxmox node ' + nm, 'CPU usage', n.node?.cpu, thresholds.cpu);
+      addPct('px:' + nm + ':ram', 'Proxmox node ' + nm, 'RAM usage', n.node?.ram?.percent, thresholds.ram);
+      (n.storage || []).forEach(st => {
+        if (st && st.active !== false) addPct('px:' + nm + ':storage:' + (st.name || 'storage'), 'Proxmox node ' + nm + ' storage ' + (st.name || 'storage'), 'disk usage', st.percent, thresholds.disk);
+      });
       (n.services || []).forEach(s => {
         if (!s.excluded) add('px:' + nm + ':' + s.name, !!s.active, 'Proxmox ' + nm + ' / ' + s.name, 'inactive');
       });
@@ -525,6 +668,9 @@ function extractChecks(data) {
     if (l._connecting) return;
     add('lx:' + l.name, !!l.online, 'Server ' + l.name, 'unreachable');
     if (l.online) {
+      addPct('lx:' + l.name + ':cpu', 'Server ' + l.name, 'CPU usage', l.cpu, thresholds.cpu);
+      addPct('lx:' + l.name + ':ram', 'Server ' + l.name, 'memory usage', l.ram?.percent, thresholds.ram);
+      addPct('lx:' + l.name + ':disk', 'Server ' + l.name, 'disk usage', l.disk?.percent, thresholds.disk);
       (l.services || []).forEach(s => {
         if (!s.excluded) add('lx:' + l.name + ':' + s.name, !!s.active, l.name + ' / ' + s.name, 'inactive');
       });
@@ -533,14 +679,25 @@ function extractChecks(data) {
   const k = data.kubernetes;
   if (k && k.online !== undefined) {
     add('k8s', !!k.online, 'Kubernetes', 'unreachable');
-    if (k.online) (k.pods || []).forEach(p => add('k8s:' + p.namespace + '/' + p.name, !p.failed, 'Pod ' + p.namespace + '/' + p.name, p.phase));
+    if (k.online) (k.pods || []).forEach(p => {
+      const ok = p.running || p.phase === 'Succeeded';
+      const detail = [p.phase, p.ready === false ? 'not ready' : '', p.restarts ? `${p.restarts} restarts` : ''].filter(Boolean).join(' / ');
+      add('k8s:' + p.namespace + '/' + p.name, ok, 'Pod ' + p.namespace + '/' + p.name, detail || p.phase);
+    });
   }
-  (data.snmp || []).forEach(s => add('snmp:' + s.name, !!s.online, 'SNMP ' + s.name, 'unreachable'));
+  (data.snmp || []).forEach(s => {
+    add('snmp:' + s.name, !!s.online, 'SNMP ' + s.name, 'unreachable');
+    if (s.online) {
+      addPct('snmp:' + s.name + ':cpu', 'SNMP ' + s.name, 'CPU usage', s.cpu, thresholds.cpu);
+      addPct('snmp:' + s.name + ':ram', 'SNMP ' + s.name, 'RAM usage', s.ram?.percent, thresholds.ram);
+      (s.volumes || []).forEach(v => addPct('snmp:' + s.name + ':volume:' + (v.name || 'volume'), 'SNMP ' + s.name + ' volume ' + (v.name || 'volume'), 'disk usage', v.percent, thresholds.disk));
+    }
+  });
   (data.docker || []).forEach(h => {
     if (h._connecting) return;
     add('dk:' + h.name, !!h.online, 'Docker host ' + h.name, 'unreachable');
     if (h.online) (h.containers || []).forEach(c => {
-      const ok = c.state === 'running' || c.state === 'created' || c.state === 'paused' || c.state === 'restarting';
+      const ok = c.state === 'running';
       add('dk:' + h.name + ':' + c.name, ok, 'Container ' + c.name + ' @ ' + h.name, c.state);
     });
   });
@@ -570,6 +727,39 @@ function extractChecks(data) {
 }
 
 let prevChecks = null;
+function pctNumber(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return null;
+  return Math.max(0, Math.min(100, Math.round(n * 10) / 10));
+}
+function thresholdValue(value, fallback = 80) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return fallback;
+  return Math.max(1, Math.min(100, Math.round(n)));
+}
+function thresholdPair(value, warningFallback = 80, criticalFallback = 90) {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    const warning = thresholdValue(value.warning ?? value.warn ?? value.value, warningFallback);
+    const critical = thresholdValue(value.critical ?? value.crit, criticalFallback);
+    return { warning, critical: Math.max(warning, critical) };
+  }
+  const warning = thresholdValue(value, warningFallback);
+  return { warning, critical: Math.max(warning, criticalFallback) };
+}
+function thresholdSeverity(value, pair) {
+  if (!pair) return null;
+  if (value >= pair.critical) return 'critical';
+  if (value >= pair.warning) return 'warning';
+  return null;
+}
+function alertThresholds() {
+  const t = config.alerts?.thresholds || {};
+  return {
+    cpu: thresholdPair(t.cpu, 80, 90),
+    ram: thresholdPair(t.ram ?? t.memory, 80, 90),
+    disk: thresholdPair(t.disk, 80, 90),
+  };
+}
 function logAlertResult(rs) {
   (rs || []).forEach(r => { if (!r.ok) console.warn(`Alert ${r.channel} failed: ${r.error}`); });
 }
@@ -577,22 +767,40 @@ function runAlertChecks(data) {
   if (!config.alerts) return;
   const cur = extractChecks(data);
   if (prevChecks === null) { prevChecks = cur; return; }
+  const sendProblem = c => {
+    const threshold = c.kind === 'threshold';
+    const critical = !threshold || c.severity === 'critical';
+    dispatchAlert(config.alerts, {
+      title: threshold
+        ? `${critical ? '\u{1F534} CRITICAL' : '\u26A0\uFE0F WARNING'} \u2014 ${c.label}`
+        : `\u{1F534} DOWN \u2014 ${c.label}`,
+      message: threshold
+        ? `${c.label} is ${c.severity}: ${c.detail}\n${new Date().toLocaleString()}`
+        : `${c.label} is ${c.detail || 'down'}\n${new Date().toLocaleString()}`,
+      priority: critical ? 'high' : 'default', tags: critical ? 'rotating_light' : 'warning',
+    }).then(logAlertResult).catch(() => {});
+  };
+  const sendRecovery = c => {
+    const threshold = c.kind === 'threshold';
+    dispatchAlert(config.alerts, {
+      title: threshold ? `\u{1F7E2} NORMAL \u2014 ${c.label}` : `\u{1F7E2} UP \u2014 ${c.label}`,
+      message: threshold
+        ? `${c.label} is back below threshold\n${new Date().toLocaleString()}`
+        : `${c.label} recovered\n${new Date().toLocaleString()}`,
+      priority: 'default', tags: 'white_check_mark',
+    }).then(logAlertResult).catch(() => {});
+  };
   for (const [key, c] of cur) {
     if (notifyDisabled.has(key)) continue;
     const p = prevChecks.get(key);
-    if (!p) continue;
-    if (p.ok && !c.ok) {
-      dispatchAlert(config.alerts, {
-        title: `\u{1F534} DOWN \u2014 ${c.label}`,
-        message: `${c.label} is ${c.detail || 'down'}\n${new Date().toLocaleString()}`,
-        priority: 'high', tags: 'rotating_light',
-      }).then(logAlertResult).catch(() => {});
+    if (!p) {
+      if (!c.ok) sendProblem(c);
+      continue;
+    }
+    if (!c.ok && (p.ok || p.severity !== c.severity)) {
+      sendProblem(c);
     } else if (!p.ok && c.ok) {
-      dispatchAlert(config.alerts, {
-        title: `\u{1F7E2} UP \u2014 ${c.label}`,
-        message: `${c.label} recovered\n${new Date().toLocaleString()}`,
-        priority: 'default', tags: 'white_check_mark',
-      }).then(logAlertResult).catch(() => {});
+      sendRecovery(c);
     }
   }
   prevChecks = cur;
@@ -614,11 +822,86 @@ function preserveProxmoxOnTransient(next, err) {
   return { ...prev, _stale: true, _staleSince: staleSince, error: err?.message || 'temporary Proxmox refresh failure' };
 }
 
-function backgroundRefresh() {
-  if (refreshPromise) return refreshPromise;
+const UPTIME_KUMA_HISTORY_MAX = 6000;
+function heartbeatKey(h) {
+  return [h?.time || '', h?.status || '', h?.ping ?? '', h?.message || ''].join('|');
+}
+function uptimeKumaHistoryHours(value) {
+  const hours = Number(value || 1);
+  if (!Number.isFinite(hours) || hours <= 0) return 1;
+  return Math.min(Math.max(hours, 0.25), 24);
+}
+function mergeHeartbeatHistory(prevHistory = [], nextHistory = [], hours = 1) {
+  const cutoff = Date.now() - (uptimeKumaHistoryHours(hours) * 60 * 60 * 1000);
+  const byKey = new Map();
+  [...prevHistory, ...nextHistory].forEach(h => {
+    if (!h) return;
+    byKey.set(heartbeatKey(h), h);
+  });
+  const sorted = [...byKey.values()]
+    .sort((a, b) => new Date(a.time || 0) - new Date(b.time || 0));
+  const recent = sorted.filter(h => {
+    const t = new Date(h?.time || 0).getTime();
+    return Number.isFinite(t) && t >= cutoff;
+  });
+  return (recent.length ? recent : sorted)
+    .slice(-UPTIME_KUMA_HISTORY_MAX);
+}
+function uptimeKumaMonitorKeys(m = {}) {
+  return [m.id, m.name, m.url].filter(v => v !== undefined && v !== null && String(v).trim() !== '').map(v => String(v));
+}
+function mergeUptimeKumaHistory(next) {
+  const prev = cache.data?.uptimekuma;
+  if (!next?.monitors?.length) return next;
+  const hours = uptimeKumaHistoryHours(next.historyHours || uptimeKumaConfig()?.historyHours || defaultTimePeriodHours());
+  const prevByKey = new Map();
+  (prev?.monitors || []).forEach(m => {
+    uptimeKumaMonitorKeys(m).forEach(k => prevByKey.set(k, m));
+  });
+  const monitors = next.monitors.map(m => {
+    const keys = uptimeKumaMonitorKeys(m);
+    const old = keys.map(k => prevByKey.get(k)).find(Boolean);
+    const history = mergeHeartbeatHistory(old?.history || [], m.history || [], hours);
+    return { ...m, history };
+  });
+  return {
+    ...next,
+    historyHours: hours,
+    monitors,
+  };
+}
+function preserveUptimeKumaOnTransient(next, err) {
+  const prev = cache.data?.uptimekuma;
+  const hasPrevious = prev?.online && Array.isArray(prev.monitors) && prev.monitors.length;
+  if (!hasPrevious) return next;
+  if (!next && !err) return next;
+  if (next?._connecting) {
+    return { ...prev, _stale: true, _staleSince: prev._staleSince || Date.now(), error: 'refresh in progress' };
+  }
+  const looksTransient = !next?.online && (next?.error || err);
+  if (!looksTransient) return { ...next, _stale: false, _staleSince: null, error: undefined };
+  const now = Date.now();
+  const staleSince = prev._staleSince || now;
+  if (now - staleSince > STALE_KEEP_MS) return next;
+  return {
+    ...prev,
+    _stale: true,
+    _staleSince: staleSince,
+    error: next?.error || err?.message || 'temporary Uptime Kuma refresh failure',
+  };
+}
+
+function backgroundRefresh(opts = {}) {
+  const force = opts === true || opts.force === true;
+  if (refreshPromise && !force) return refreshPromise;
+  if (force) {
+    refreshGeneration += 1;
+    refreshPromise = null;
+  }
   const enabled = c => c && c.enabled !== false;
   if (!cache.data) cache.data = { timestamp: new Date().toISOString(), proxmox: { clusterSummary: null, nodes: [] }, linux: [], kubernetes: null, snmp: [], healthchecks: null, uptimekuma: null, prometheus: null, docker: [], database: [], publicStatus: false, loading: true };
   const base = cache.data;
+  const generation = refreshGeneration;
   assignStatic(base);
   const tasks = [
     ['proxmox',      enabled(config.proxmox)      ? getProxmoxData() : Promise.resolve({ clusterSummary: null, nodes: [] }), { clusterSummary: null, nodes: [] }],
@@ -626,26 +909,32 @@ function backgroundRefresh() {
     ['kubernetes',   enabled(config.kubernetes)   ? getAllKubernetesData(config.kubernetes)  : Promise.resolve(null), null],
     ['snmp',         enabled(config.snmp)         ? getAllSynologyData(config.snmp)          : Promise.resolve([]),   []],
     ['healthchecks', enabled(config.healthchecks) ? getAllHealthchecks(config.healthchecks) : Promise.resolve(null), null],
-    ['uptimekuma',   enabled(config.uptimekuma)   ? getAllUptimeKuma(config.uptimekuma)     : Promise.resolve(null), null],
+    ['uptimekuma',   enabled(config.uptimekuma)   ? getAllUptimeKuma(uptimeKumaConfig())     : Promise.resolve(null), null],
     ['prometheus',   enabled(config.prometheus)   ? getPrometheusData(config.prometheus)    : Promise.resolve(null), null],
     ['docker',       enabled(config.docker)       ? getDockerData()  : Promise.resolve([]),   []],
     ['database',     enabled(config.database)     ? getAllDatabaseData(config.database)      : Promise.resolve([]),   []],
   ];
   const ps = tasks.map(([key, p, fb]) =>
     p.then(v => {
+      if (generation !== refreshGeneration) return;
       const next = (v == null ? fb : v);
       base[key] = key === 'proxmox' ? preserveProxmoxOnTransient(next)
-        : key === 'docker' ? preserveDockerOnTransient(next)
+        : key === 'docker' ? mergeDockerHistory(preserveDockerOnTransient(next))
+        : key === 'uptimekuma' ? preserveUptimeKumaOnTransient(mergeUptimeKumaHistory(next))
         : next;
       base.timestamp = new Date().toISOString();
     })
      .catch(err => {
+       if (generation !== refreshGeneration) return;
        if (key === 'proxmox') {
          base[key] = preserveProxmoxOnTransient(fb, err);
          if (base[key]?._stale) console.warn(`Proxmox refresh failed; keeping last data: ${err.message}`);
        } else if (key === 'docker') {
-         base[key] = preserveDockerOnTransient(fb);
+         base[key] = mergeDockerHistory(preserveDockerOnTransient(fb));
          if ((base[key] || []).some(h => h._stale)) console.warn(`Docker refresh failed; keeping last data: ${err.message}`);
+       } else if (key === 'uptimekuma') {
+         base[key] = preserveUptimeKumaOnTransient(fb, err);
+         if (base[key]?._stale) console.warn(`Uptime Kuma refresh failed; keeping last data: ${err.message}`);
        } else {
          base[key] = fb;
        }
@@ -653,6 +942,7 @@ function backgroundRefresh() {
   );
   refreshPromise = Promise.allSettled(ps)
     .then(() => { 
+      if (generation !== refreshGeneration) return;
       base.loading = false; 
       base.timestamp = new Date().toISOString(); 
       runAlertChecks(base); 
@@ -667,7 +957,7 @@ function backgroundRefresh() {
       });
     })
     .catch(err => { console.error(err.message); })
-    .finally(() => { refreshPromise = null; });
+    .finally(() => { if (generation === refreshGeneration) refreshPromise = null; });
   return refreshPromise;
 }
 
@@ -691,6 +981,65 @@ function getCachedData() {
     return Promise.resolve(cache.data || { ...EMPTY, timestamp: new Date().toISOString(), configured: configuredList() });
   }
   return Promise.resolve(cache.data);
+}
+
+function uptimeKumaHistoryEmpty(data) {
+  const monitors = data?.uptimekuma?.monitors;
+  return Array.isArray(monitors) && monitors.length > 0 && monitors.every(m => !Array.isArray(m.history) || m.history.length === 0);
+}
+
+function applyUptimeKumaLive(live) {
+  if (!live?.monitors?.length) return false;
+  const merged = mergeUptimeKumaHistory(live);
+  const hasHistory = merged.monitors.some(m => Array.isArray(m.history) && m.history.length > 0);
+  if (!hasHistory) return false;
+  if (!cache.data) cache.data = { ...EMPTY, timestamp: new Date().toISOString() };
+  cache.data.uptimekuma = merged;
+  cache.data.timestamp = new Date().toISOString();
+  return true;
+}
+
+function uptimeKumaComparable(c = {}) {
+  if (!c) return null;
+  return {
+    enabled: c.enabled !== false,
+    url: c.url || '',
+    slug: c.slug || '',
+    apiKey: c.apiKey || '',
+    username: c.username || '',
+    password: c.password || '',
+    authToken: c.authToken || '',
+    historyHours: uptimeKumaHistoryHours(c.historyHours || 1),
+    insecureTLS: c.insecureTLS === true || String(c.insecureTLS || '').toLowerCase() === 'true',
+    socketPath: c.socketPath || '',
+    socketTransport: c.socketTransport || '',
+  };
+}
+
+function uptimeKumaConfigChanged(prev, next) {
+  return JSON.stringify(uptimeKumaComparable(prev)) !== JSON.stringify(uptimeKumaComparable(next));
+}
+
+async function refreshUptimeKumaNow() {
+  if (!config.uptimekuma || config.uptimekuma.enabled === false) return false;
+  const live = await getAllUptimeKuma(uptimeKumaConfig());
+  if (!cache.data) cache.data = { ...EMPTY, timestamp: new Date().toISOString() };
+  const merged = mergeUptimeKumaHistory(live);
+  cache.data.uptimekuma = merged;
+  cache.data.timestamp = new Date().toISOString();
+  assignStatic(cache.data);
+  return true;
+}
+
+async function healUptimeKumaHistoryIfEmpty() {
+  if (!cache.data || !config.uptimekuma) return;
+  if (!uptimeKumaHistoryEmpty(cache.data)) return;
+  try {
+    const live = await getAllUptimeKuma(uptimeKumaConfig());
+    applyUptimeKumaLive(live);
+  } catch (err) {
+    console.warn(`Uptime Kuma history self-heal failed: ${err.message}`);
+  }
 }
 
 backgroundRefresh();
@@ -737,7 +1086,7 @@ app.use(express.static(path.join(__dirname, 'public'), { extensions: ['html'] })
 app.post('/api/login', (req, res) => {
   const auth = loadAuth();
   if (!auth) return res.json({ ok: true });
-  const { username, password } = req.body || {};
+  const { username, password, code } = req.body || {};
   if (!username || !password) return res.status(400).json({ error: 'Missing credentials' });
   const rate = loginRateCheck(req, username);
   if (!rate.ok) return res.status(429).json({ error: 'Too many login attempts. Try again later.', retryAfter: rate.retryAfter });
@@ -745,6 +1094,12 @@ app.post('/api/login', (req, res) => {
   try {
     if (!verifyPassword(password, auth.hash, auth.salt)) { loginRateFail(rate.key); return res.status(401).json({ error: 'Invalid credentials' }); }
   } catch { loginRateFail(rate.key); return res.status(401).json({ error: 'Invalid credentials' }); }
+  if (totpEnabled(auth)) {
+    if (!code) return res.status(401).json({ error: 'Two-factor code required', twoFactorRequired: true });
+    let totpOk = false;
+    try { totpOk = verifyTotp(auth.totp.secret, code); } catch {}
+    if (!totpOk) { loginRateFail(rate.key); return res.status(401).json({ error: 'Invalid two-factor code', twoFactorRequired: true }); }
+  }
   const token = genToken();
   const remember = req.body.remember === true;
   const expires = Date.now() + (remember ? THIRTY_DAYS : 24 * 60 * 60 * 1000);
@@ -764,7 +1119,7 @@ app.post('/api/logout', (req, res) => {
 
 app.get('/api/auth-status', (req, res) => {
   const auth = loadAuth();
-  res.json({ required: !!auth, username: auth?.username || null });
+  res.json({ required: !!auth, username: auth?.username || null, twoFactorEnabled: totpEnabled(auth) });
 });
 
 app.post('/api/set-password', (req, res) => {
@@ -787,19 +1142,74 @@ app.post('/api/set-password', (req, res) => {
   const finalUsername = (username === '__current__' && auth?.username) ? auth.username : username;
   const salt = password ? crypto.randomBytes(16).toString('hex') : auth.salt;
   const hash = password ? hashPassword(password, salt) : auth.hash;
-  writePrivateYaml(AUTH_PATH, { username: finalUsername, hash, salt });
+  const nextAuth = { username: finalUsername, hash, salt };
+  if (auth?.totp) nextAuth.totp = auth.totp;
+  writePrivateYaml(AUTH_PATH, nextAuth);
   res.json({ ok: true });
 });
 
+app.post('/api/2fa/setup', (req, res) => {
+  const auth = loadAuth();
+  if (!auth) return res.status(400).json({ error: 'Password setup required first' });
+  const secret = base32Encode(crypto.randomBytes(20));
+  res.json({ ok: true, secret, otpauth: makeTotpUri(auth.username, secret), enabled: totpEnabled(auth) });
+});
+
+app.post('/api/2fa/enable', (req, res) => {
+  const auth = loadAuth();
+  const { currentPassword, code, secret } = req.body || {};
+  if (!auth) return res.status(400).json({ error: 'Password setup required first' });
+  if (!currentPassword || !secret || !code) return res.status(400).json({ error: 'Current password, secret and code are required' });
+  try {
+    if (!verifyPassword(currentPassword, auth.hash, auth.salt)) return res.status(401).json({ error: 'Wrong current password' });
+    if (!verifyTotp(secret, code)) return res.status(400).json({ error: 'Invalid two-factor code' });
+  } catch (err) {
+    return res.status(400).json({ error: err.message || 'Could not enable two-factor authentication' });
+  }
+  writePrivateYaml(AUTH_PATH, { ...auth, totp: { enabled: true, secret } });
+  keepOnlyCurrentSession(req);
+  res.json({ ok: true, enabled: true });
+});
+
+app.post('/api/2fa/disable', (req, res) => {
+  const auth = loadAuth();
+  const { currentPassword, code } = req.body || {};
+  if (!auth) return res.status(400).json({ error: 'Password setup required first' });
+  if (!totpEnabled(auth)) return res.json({ ok: true, enabled: false });
+  if (!currentPassword || !code) return res.status(400).json({ error: 'Current password and code are required' });
+  try {
+    if (!verifyPassword(currentPassword, auth.hash, auth.salt)) return res.status(401).json({ error: 'Wrong current password' });
+    if (!verifyTotp(auth.totp.secret, code)) return res.status(400).json({ error: 'Invalid two-factor code' });
+  } catch (err) {
+    return res.status(400).json({ error: err.message || 'Could not disable two-factor authentication' });
+  }
+  const nextAuth = { ...auth };
+  delete nextAuth.totp;
+  writePrivateYaml(AUTH_PATH, nextAuth);
+  res.json({ ok: true, enabled: false });
+});
+
 app.get('/api/status', async (req, res) => {
-  try { res.json(await getCachedData()); }
+  try {
+    res.setHeader('Cache-Control', 'no-store');
+    await healUptimeKumaHistoryIfEmpty();
+    res.json(await getCachedData());
+  }
   catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.get('/api/refresh', async (req, res) => {
   try {
-    await backgroundRefresh();
-    res.json(cache.data);
+    res.setHeader('Cache-Control', 'no-store');
+    const waitMs = Math.min(Math.max(Number(req.query.wait || 700), 0), 1000);
+    const refresh = backgroundRefresh({ force: true });
+    if (waitMs > 0) {
+      await Promise.race([
+        refresh.catch(() => {}),
+        new Promise(resolve => setTimeout(resolve, waitMs)),
+      ]);
+    }
+    res.json({ ...(await getCachedData()), refreshing: !!refreshPromise });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -828,10 +1238,11 @@ function maskConfig(obj) {
   return out;
 }
 
-app.post('/api/config', (req, res) => {
+app.post('/api/config', async (req, res) => {
   try {
     const incoming = req.body;
     const existing = fs.existsSync(CONFIG_PATH) ? yaml.load(fs.readFileSync(CONFIG_PATH, 'utf8')) || {} : {};
+    const previousConfig = config;
 
     if (existing.excludedServices) {
       incoming.excludedServices = existing.excludedServices;
@@ -842,6 +1253,9 @@ app.post('/api/config', (req, res) => {
     const toSave = encryptionEnabled() ? encryptConfigObj(merged) : merged;
     writePrivateYaml(CONFIG_PATH, toSave);
     config = loadConfig();
+    refreshGeneration += 1;
+    refreshPromise = null;
+    const uptimeKumaChanged = uptimeKumaConfigChanged(previousConfig?.uptimekuma, config.uptimekuma);
 
     if (cache.data) {
       const en = c => c && c.enabled !== false;
@@ -891,7 +1305,7 @@ app.post('/api/config', (req, res) => {
       } else { cache.data.prometheus = null; }
 
       if (en(config.docker)) {
-        cache.data.docker = mergeDockerConfiguredRows(cache.data.docker, agents.getDockerData());
+        cache.data.docker = mergeDockerHistory(mergeDockerConfiguredRows(cache.data.docker, agents.getDockerData()));
       } else { cache.data.docker = []; }
 
       if (en(config.database)) {
@@ -907,7 +1321,51 @@ app.post('/api/config', (req, res) => {
       assignStatic(cache.data);
     }
 
+    if (uptimeKumaChanged && config.uptimekuma && config.uptimekuma.enabled !== false) {
+      try {
+        await refreshUptimeKumaNow();
+      } catch (err) {
+        console.warn(`Uptime Kuma immediate refresh failed: ${err.message}`);
+      }
+    }
+
     if (!refreshPromise) backgroundRefresh();
+
+    res.json({ ok: true, data: cache.data });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/preferences', (req, res) => {
+  try {
+    const incoming = req.body || {};
+    const existing = fs.existsSync(CONFIG_PATH) ? yaml.load(fs.readFileSync(CONFIG_PATH, 'utf8')) || {} : {};
+
+    if (incoming.preferredLanguage !== undefined) {
+      const lang = String(incoming.preferredLanguage || 'en').toLowerCase();
+      existing.preferredLanguage = ['en', 'tr'].includes(lang) ? lang : 'en';
+    }
+
+    if (incoming.defaultTimePeriodHours !== undefined) {
+      existing.defaultTimePeriodHours = uptimeKumaHistoryHours(incoming.defaultTimePeriodHours);
+    }
+
+    if (incoming.appearance && typeof incoming.appearance === 'object') {
+      existing.appearance = {
+        ...(existing.appearance || {}),
+        dashboardSidePanel: incoming.appearance.dashboardSidePanel !== false,
+      };
+    }
+
+    writePrivateYaml(CONFIG_PATH, existing);
+    config = loadConfig();
+
+    if (cache.data) {
+      if (cache.data.uptimekuma) cache.data.uptimekuma.historyHours = uptimeKumaConfig().historyHours;
+      assignStatic(cache.data);
+      cache.data.timestamp = new Date().toISOString();
+    }
 
     res.json({ ok: true, data: cache.data });
   } catch (err) {
@@ -1124,6 +1582,28 @@ app.get('/api/debug/snmp', async (req, res) => {
   catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.get('/api/debug/uptimekuma', async (req, res) => {
+  try {
+    res.setHeader('Cache-Control', 'no-store');
+    const [debug, live] = await Promise.all([
+      debugUptimeKuma(uptimeKumaConfig()),
+      getAllUptimeKuma(uptimeKumaConfig()).catch(() => null),
+    ]);
+    debug.cacheUpdated = applyUptimeKumaLive(live);
+    debug.cacheHistorySource = cache.data?.uptimekuma?.historySource || null;
+    debug.cacheHistoryHours = cache.data?.uptimekuma?.historyHours || null;
+    debug.cacheHistoryCounts = (cache.data?.uptimekuma?.monitors || []).map(m => ({
+      name: m.name,
+      source: m.historySource || null,
+      count: Array.isArray(m.history) ? m.history.length : 0,
+      first: m.history?.[0]?.time || null,
+      last: m.history?.at(-1)?.time || null,
+    }));
+    res.json(debug);
+  }
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.get('/api/debug/snmp-probe', async (req, res) => {
   const snmp = require('net-snmp');
   const devices = config.snmp?.devices || [];
@@ -1192,7 +1672,7 @@ app.post('/api/agent/report', (req, res) => {
       } else if (!en(config.proxmox)) {
         cache.data.proxmox = { clusterSummary: null, nodes: [] };
       }
-      cache.data.docker = en(config.docker) ? mergeDockerConfiguredRows(cache.data.docker, agents.getDockerData()) : [];
+      cache.data.docker = en(config.docker) ? mergeDockerHistory(mergeDockerConfiguredRows(cache.data.docker, agents.getDockerData())) : [];
       assignStatic(cache.data);
     }
     const cmds = agents.takeCommands(a.id);
@@ -1295,7 +1775,7 @@ app.post('/api/agent/pending', (req, res) => {
         cache.data.proxmox = preserveProxmoxOnTransient(agents.getProxmoxData({ excludedServices: config.excludedServices }));
       }
       if (kind === 'docker') {
-        cache.data.docker = mergeDockerConfiguredRows(cache.data.docker, agents.getDockerData());
+        cache.data.docker = mergeDockerHistory(mergeDockerConfiguredRows(cache.data.docker, agents.getDockerData()));
       }
       assignStatic(cache.data);
     }
@@ -1313,7 +1793,7 @@ app.post('/api/agent/remove', (req, res) => {
       cache.data.proxmox = hasProxmoxApi()
         ? cache.data.proxmox
         : preserveProxmoxOnTransient(agents.getProxmoxData({ excludedServices: config.excludedServices }));
-      cache.data.docker = mergeDockerConfiguredRows(cache.data.docker, agents.getDockerData());
+      cache.data.docker = mergeDockerHistory(mergeDockerConfiguredRows(cache.data.docker, agents.getDockerData()));
       assignStatic(cache.data);
     }
     res.json({ ok, data: cache.data });
@@ -1426,6 +1906,7 @@ app.get('/api/public/status', (req, res) => {
   });
   res.json({
     title: config.publicTitle || 'OmniSight Status',
+    preferredLanguage: config.preferredLanguage || 'en',
     timestamp: data.timestamp || new Date().toISOString(),
     refreshing: !!refreshPromise,
     services,
@@ -1435,7 +1916,14 @@ app.get('/api/public/status', (req, res) => {
 app.get('/api/about', (req, res) => {
   let version = '1.0.0', author = 'caglaryalcin';
   try { const pkg = require('./package.json'); version = pkg.version; author = pkg.author || author; } catch {}
-  res.json({ name: 'OmniSight', version, author, github: 'https://github.com/caglaryalcin/OmniSight' });
+  res.json({
+    name: 'OmniSight',
+    version,
+    author,
+    github: 'https://github.com/caglaryalcin/OmniSight',
+    serverTime: new Date().toISOString(),
+    timezone: config.timezone || process.env.TZ || process.env.TIMEZONE || 'UTC',
+  });
 });
 
 app.post('/api/alerts/test', async (req, res) => {

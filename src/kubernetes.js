@@ -22,6 +22,91 @@ function inNs(namespaces, ns) {
   return namespaces.includes(ns);
 }
 
+function parseCpuToMilli(value) {
+  if (value == null) return null;
+  const raw = String(value).trim().toLowerCase();
+  if (!raw) return null;
+  const n = Number(raw.replace(/[a-z]+$/, ''));
+  if (!Number.isFinite(n)) return null;
+  if (raw.endsWith('n')) return Math.round((n / 1e6) * 10) / 10;
+  if (raw.endsWith('u')) return Math.round((n / 1000) * 10) / 10;
+  if (raw.endsWith('m')) return Math.round(n * 10) / 10;
+  return Math.round((n * 1000) * 10) / 10;
+}
+
+function parseMemoryBytes(value) {
+  if (value == null) return null;
+  const raw = String(value).trim();
+  if (!raw) return null;
+  const m = raw.match(/^([0-9.]+)\s*([a-zA-Z]+)?$/);
+  if (!m) return null;
+  const n = Number(m[1]);
+  if (!Number.isFinite(n)) return null;
+  const unit = (m[2] || '').toLowerCase();
+  const scale = {
+    ki: 1024,
+    mi: 1024 ** 2,
+    gi: 1024 ** 3,
+    ti: 1024 ** 4,
+    k: 1000,
+    m: 1000 ** 2,
+    g: 1000 ** 3,
+    t: 1000 ** 4,
+  };
+  return Math.round(n * (scale[unit] || 1));
+}
+
+function podMetricKey(ns, name) {
+  return `${ns || 'default'}/${name || ''}`;
+}
+
+async function getPodMetrics(kc, namespaces) {
+  const custom = kc.makeApiClient(k8s.CustomObjectsApi);
+  const group = 'metrics.k8s.io';
+  const version = 'v1beta1';
+  const plural = 'pods';
+
+  let items = [];
+  try {
+    const res = await custom.listClusterCustomObject({ group, version, plural });
+    items = extractItems(res);
+  } catch {
+    for (const ns of namespaces) {
+      try {
+        const res = await custom.listNamespacedCustomObject({ group, version, namespace: ns, plural });
+        items.push(...extractItems(res));
+      } catch {}
+    }
+  }
+
+  const out = new Map();
+  items.filter(m => inNs(namespaces, m.metadata?.namespace)).forEach(metric => {
+    let cpuMilli = 0;
+    let memoryBytes = 0;
+    let hasCpu = false;
+    let hasMemory = false;
+    const containers = (metric.containers || []).map(c => {
+      const cpu = parseCpuToMilli(c.usage?.cpu);
+      const memory = parseMemoryBytes(c.usage?.memory);
+      if (cpu != null) { cpuMilli += cpu; hasCpu = true; }
+      if (memory != null) { memoryBytes += memory; hasMemory = true; }
+      return {
+        name: c.name,
+        cpuMilli: cpu,
+        memoryBytes: memory,
+      };
+    });
+    out.set(podMetricKey(metric.metadata?.namespace, metric.metadata?.name), {
+      cpuMilli: hasCpu ? Math.round(cpuMilli * 10) / 10 : null,
+      memoryBytes: hasMemory ? memoryBytes : null,
+      containers,
+      timestamp: metric.timestamp,
+      window: metric.window,
+    });
+  });
+  return out;
+}
+
 async function getPods(kc, namespaces) {
   const coreV1 = kc.makeApiClient(k8s.CoreV1Api);
 
@@ -116,19 +201,31 @@ async function getAllKubernetesData(config) {
   try {
     const kc = createK8sClient(kubeconfigPath);
 
-    const [pods, services, deployments] = await Promise.allSettled([
+    const [pods, services, deployments, metrics] = await Promise.allSettled([
       getPods(kc, namespaces),
       getServices(kc, namespaces),
       getDeployments(kc, namespaces),
+      getPodMetrics(kc, namespaces),
     ]);
 
-    const podList = pods.value || [];
+    const metricMap = metrics.status === 'fulfilled' ? metrics.value : new Map();
+    const podList = (pods.value || []).map(pod => {
+      const usage = metricMap.get(podMetricKey(pod.namespace, pod.name));
+      if (!usage) return pod;
+      return {
+        ...pod,
+        cpuMilli: usage.cpuMilli,
+        memoryBytes: usage.memoryBytes,
+        metrics: usage,
+      };
+    });
     const summary = {
       total: podList.length,
       running: podList.filter(p => p.running).length,
       failed: podList.filter(p => p.failed).length,
       pending: podList.filter(p => p.phase === 'Pending').length,
       succeeded: podList.filter(p => p.phase === 'Succeeded').length,
+      metrics: podList.filter(p => p.cpuMilli != null || p.memoryBytes != null).length,
     };
 
     return {
@@ -137,6 +234,7 @@ async function getAllKubernetesData(config) {
       pods: podList,
       services: services.value || [],
       deployments: deployments.value || [],
+      metricsError: metrics.status === 'rejected' ? metrics.reason?.message : null,
     };
   } catch (err) {
     return {

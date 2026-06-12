@@ -63,6 +63,11 @@ main{padding:20px;max-width:1100px;margin:0 auto;display:flex;flex-direction:col
 
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .form-grid.g3{grid-template-columns:1fr 1fr 1fr}
+.appearance-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.inline-toggle{min-height:37px;background:var(--row);border:1px solid var(--border);border-radius:6px;padding:7px 10px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.inline-toggle span{font-size:13px;color:var(--text);line-height:1.25}
+@media (max-width:980px){.appearance-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:620px){.appearance-grid{grid-template-columns:1fr}}
 .form-group{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
 .form-group:last-child{margin-bottom:0}
 .form-group label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
@@ -170,26 +175,51 @@ html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#dd
 
 <main>
 
-<div class="settings-pair">
 <!-- Timezone -->
 <div class="card">
   <div class="card-hdr" style="cursor:default">
     <div class="card-left">
       <div class="card-icon" style="background:var(--blue)"></div>
-      <span class="card-title">System Settings</span>
+      <span class="card-title">Appearance</span>
     </div>
   </div>
   <div class="card-body" style="display:flex !important;flex-direction:column">
-    <div class="form-grid" style="grid-template-columns: 2fr 1fr; max-width: 450px;">
+    <div class="appearance-grid">
       <div class="form-group" style="margin-bottom:0;">
         <label>Timezone</label>
         <select id="cfg-timezone"></select>
+        <div id="host-clock" style="font-size:12px;color:var(--muted);margin-top:7px">Host time: loading...</div>
       </div>
       <div class="form-group" style="margin-bottom:0;">
         <label>Time Format</label>
         <select id="cfg-timeformat">
           <option value="24h">24 Hour (20:52)</option>
           <option value="12h">12 Hour (08:52 PM)</option>
+        </select>
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label>Default time period</label>
+        <select id="cfg-default-period" onchange="applySettingsPreview()">
+          <option value="0.333333">Last 20 minutes</option>
+          <option value="1">Last 1 hour</option>
+          <option value="3">Last 3 hours</option>
+          <option value="6">Last 6 hours</option>
+          <option value="12">Last 12 hours</option>
+          <option value="24">Last 24 hours</option>
+        </select>
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label>Dashboard side panel</label>
+        <div class="inline-toggle">
+          <span>Show Active alerts and Recent logs</span>
+          <label class="toggle"><input type="checkbox" id="cfg-dashboard-side" checked onchange="saveAppearanceSidePanel()"><span class="toggle-t"></span></label>
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label>Preferred language</label>
+        <select id="cfg-language" onchange="changeLanguageNow(this.value)">
+          <option value="en">🇬🇧 English</option>
+          <option value="tr">🇹🇷 Turkish</option>
         </select>
       </div>
     </div>
@@ -217,7 +247,6 @@ html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#dd
     <div id="cert-list" class="sys-list"><div class="sys-empty">No certificates uploaded.</div></div>
   </div>
 </div>
-</div>
 
 <!-- General -->
 <div class="card">
@@ -231,7 +260,7 @@ html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#dd
   <div class="card-body">
     <div class="form-group">
       <label style="text-transform:none;font-size:13px;color:var(--text)">Public status page</label>
-      <div style="font-size:12px;color:var(--muted);margin-top:3px">Read-only summary at <a href="/status" target="_blank" style="color:var(--blue)">/status</a>, no login required</div>
+      <div id="public-status-desc" style="font-size:12px;color:var(--muted);margin-top:3px">Read-only summary at <a href="/status" target="_blank" style="color:var(--blue)">/status</a>, no login required</div>
     </div>
     <div class="form-group"><label>Public page title</label><input type="text" id="public-title" placeholder="OmniSight Status"></div>
   </div>
@@ -409,6 +438,19 @@ html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#dd
       <div class="form-group"><label>URL</label><input type="text" id="uk-url" placeholder="https://kuma.yourdomain.com"></div>
       <div class="form-group"><label>Status page slug</label><input type="text" id="uk-slug" placeholder="default"></div>
       <div class="form-group"><label>API Key (optional)</label><input type="password" id="uk-apikey" placeholder="optional"></div>
+      <div class="form-group"><label>TLS</label><select id="uk-insecure"><option value="false">Verify certificate</option><option value="true">Allow self-signed</option></select></div>
+      <div class="form-group"><label>Username (optional)</label><input type="text" id="uk-username" placeholder="for private history"></div>
+      <div class="form-group"><label>Password (optional)</label><input type="password" id="uk-password" placeholder="leave blank to keep current password"></div>
+      <div class="form-group"><label>History range (default)</label>
+        <select id="uk-history-hours" onchange="applySettingsPreview()">
+          <option value="0.333333">Last 20 minutes</option>
+          <option value="1">Last 1 hour</option>
+          <option value="3">Last 3 hours</option>
+          <option value="6">Last 6 hours</option>
+          <option value="12">Last 12 hours</option>
+          <option value="24">Last 24 hours</option>
+        </select>
+      </div>
     </div>
   </div>
 </div>
@@ -515,6 +557,21 @@ html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#dd
     <label class="toggle"><input type="checkbox" id="en-alerts" onchange="toggleCard('alerts')"><span class="toggle-t"></span></label>
   </div>
   <div class="card-body hidden" id="cb-alerts">
+    <div class="arr-item">
+      <div class="arr-hdr" style="cursor:default">
+        <span class="arr-hdr-name">Resource thresholds</span>
+      </div>
+      <div class="arr-body">
+        <div class="form-grid g3">
+          <div class="form-group"><label>CPU Warning %</label><input type="number" id="al-th-cpu-warning" min="1" max="100" value="80"></div>
+          <div class="form-group"><label>RAM Warning %</label><input type="number" id="al-th-ram-warning" min="1" max="100" value="80"></div>
+          <div class="form-group"><label>Disk Warning %</label><input type="number" id="al-th-disk-warning" min="1" max="100" value="80"></div>
+          <div class="form-group"><label>CPU Critical %</label><input type="number" id="al-th-cpu-critical" min="1" max="100" value="90"></div>
+          <div class="form-group"><label>RAM Critical %</label><input type="number" id="al-th-ram-critical" min="1" max="100" value="90"></div>
+          <div class="form-group"><label>Disk Critical %</label><input type="number" id="al-th-disk-critical" min="1" max="100" value="90"></div>
+        </div>
+      </div>
+    </div>
 
     <div class="arr-item">
       <div class="arr-hdr">
@@ -702,6 +759,151 @@ function escHtml(s) {
   return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+const I18N_TR = {
+  'Profile':'Profil','Settings':'Ayarlar','Logs':'Kayıtlar','Sign out':'Çıkış yap',
+  'System Settings':'Sistem Ayarları','Appearance':'Görünüm','Timezone':'Saat dilimi','Time Format':'Saat formatı',
+  'Default time period':'Varsayılan zaman aralığı','Preferred language':'Tercih edilen dil',
+  'Dashboard side panel':'Dashboard sağ paneli','Show Active alerts and Recent logs':'Aktif bildirimler ve son kayıtları göster',
+  'English':'İngilizce','Turkish':'Türkçe','🇬🇧 English':'🇬🇧 İngilizce','🇹🇷 Turkish':'🇹🇷 Türkçe','Certificates':'Sertifikalar','CA certificates':'CA sertifikaları',
+  'Upload certificate':'Sertifika yükle','Status Page':'Durum Sayfası','Public status page':'Herkese açık durum sayfası',
+  'Read-only summary at':'Salt okunur özet','no login required':'Oturum açmaya gerek yok',
+  'Read-only summary at /status, no login required':'/status adresinde salt okunur özet, oturum açmaya gerek yok',
+  'Public page title':'Herkese açık sayfa başlığı',
+  'Resource thresholds':'Kaynak eşikleri','Alerts':'Bildirimler','CPU Warning %':'CPU Uyarı %',
+  'RAM Warning %':'RAM Uyarı %','Disk Warning %':'Disk Uyarı %','CPU Critical %':'CPU Kritik %',
+  'RAM Critical %':'RAM Kritik %','Disk Critical %':'Disk Kritik %','History range (default)':'Geçmiş aralığı (varsayılan)',
+  'Username (optional)':'Kullanıcı adı (opsiyonel)','Password (optional)':'Parola (opsiyonel)',
+  'API Key (optional)':'API anahtarı (opsiyonel)','Status page slug':'Durum sayfası slug',
+  'URL':'URL','TLS':'TLS','Verify certificate':'Sertifikayı doğrula','Allow self-signed':'Self-signed kabul et',
+  'Last 20 minutes':'Son 20 dakika','Last 1 hour':'Son 1 saat','Last 3 hours':'Son 3 saat',
+  'Last 6 hours':'Son 6 saat','Last 12 hours':'Son 12 saat','Last 24 hours':'Son 24 saat',
+  'Save & Apply':'Kaydet ve uygula','Browse…':'Göz at…','Icon (optional)':'İkon (opsiyonel)',
+  'Host time: loading...':'Host saati: yükleniyor...','No certificates uploaded.':'Yüklenmiş sertifika yok.',
+  'Could not load certificates.':'Sertifikalar yüklenemedi.'
+};
+const I18N_ATTRS = ['placeholder','title','aria-label'];
+function currentLang() {
+  return localStorage.getItem('os_lang') || document.getElementById('cfg-language')?.value || 'en';
+}
+function trText(text, lang = currentLang()) {
+  return lang === 'tr' ? (I18N_TR[text] || text) : text;
+}
+function renderLocalizedBlocks(lang = currentLang()) {
+  const statusDesc = document.getElementById('public-status-desc');
+  if (statusDesc) {
+    statusDesc.innerHTML = lang === 'tr'
+      ? '<a href="/status" target="_blank" style="color:var(--blue)">/status</a> adresinde salt okunur özet, oturum açmaya gerek yok'
+      : 'Read-only summary at <a href="/status" target="_blank" style="color:var(--blue)">/status</a>, no login required';
+  }
+}
+function applyLanguage(lang = currentLang()) {
+  localStorage.setItem('os_lang', lang);
+  document.documentElement.lang = lang;
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      const p = node.parentElement;
+      if (!p || ['SCRIPT','STYLE','PRE','CODE','TEXTAREA'].includes(p.tagName)) return NodeFilter.FILTER_REJECT;
+      return node.nodeValue.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+    }
+  });
+  let node;
+  while ((node = walker.nextNode())) {
+    if (node._osOrigText === undefined) node._osOrigText = node.nodeValue;
+    const original = node._osOrigText;
+    const trimmed = original.trim();
+    const translated = trText(trimmed, lang);
+    node.nodeValue = original.replace(trimmed, translated);
+  }
+  document.querySelectorAll('*').forEach(el => I18N_ATTRS.forEach(attr => {
+    if (!el.hasAttribute(attr)) return;
+    const key = `_osOrig_${attr}`;
+    if (el[key] === undefined) el[key] = el.getAttribute(attr);
+    const original = el[key];
+    el.setAttribute(attr, trText(original, lang));
+  }));
+  renderLocalizedBlocks(lang);
+}
+async function persistPreferencePatch(patch, throwOnError = false) {
+  try {
+    const r = await fetch('/api/preferences', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify(patch),
+    });
+    handleUnauth(r);
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(body.error || r.statusText);
+    return body;
+  } catch (e) {
+    if (throwOnError) throw e;
+    return null;
+  }
+}
+function changeLanguageNow(lang) {
+  localStorage.setItem('os_lang', lang || 'en');
+  applyLanguage(lang || 'en');
+  try {
+    const p = window.parent;
+    if (p && p !== window) {
+      if (typeof p.applyLanguage === 'function') p.applyLanguage(lang || 'en');
+      if (typeof p.clearOverviewCache === 'function') p.clearOverviewCache();
+      if (p.window?._lastData && typeof p.render === 'function') p.render(p.window._lastData);
+    }
+  } catch {}
+  persistPreferencePatch({ preferredLanguage: lang || 'en' });
+}
+function applySettingsPreview(cfgPayload = null) {
+  let payload = cfgPayload;
+  try { if (!payload) payload = collect(); } catch { payload = {}; }
+  const period = periodValue(payload.defaultTimePeriodHours || 1);
+  const ukPeriod = periodValue(payload.uptimekuma?.historyHours || period);
+  const lang = payload.preferredLanguage || currentLang();
+  localStorage.setItem('os_lang', lang);
+  try {
+    const p = window.parent;
+    if (!p || p === window) return;
+    if (p.window?._lastData && typeof p.render === 'function') {
+      const data = JSON.parse(JSON.stringify(p.window._lastData));
+      data.defaultTimePeriodHours = period;
+      data.preferredLanguage = lang;
+      data.appearance = { ...(data.appearance || {}), ...(payload.appearance || {}) };
+      if (data.uptimekuma) data.uptimekuma.historyHours = ukPeriod;
+      if (typeof p.clearOverviewCache === 'function') p.clearOverviewCache();
+      p.render(data);
+    }
+    if (typeof p.applyLanguage === 'function') p.applyLanguage(lang);
+  } catch {}
+}
+
+async function saveAppearanceSidePanel() {
+  const enabled = document.getElementById('cfg-dashboard-side')?.checked !== false;
+  const patch = { appearance: { dashboardSidePanel: enabled } };
+  try {
+    const p = window.parent;
+    if (p && p !== window && p.window?._lastData && typeof p.render === 'function') {
+      const data = JSON.parse(JSON.stringify(p.window._lastData));
+      data.appearance = { ...(data.appearance || {}), dashboardSidePanel: enabled };
+      if (typeof p.clearOverviewCache === 'function') p.clearOverviewCache();
+      p.render(data);
+    }
+  } catch {}
+  try {
+    const body = await persistPreferencePatch(patch, true);
+    window._settingsConfig = { ...(window._settingsConfig || {}), appearance: patch.appearance };
+    try {
+      const p = window.parent;
+      if (body?.data && p && p !== window && typeof p.render === 'function') {
+        if (typeof p.clearOverviewCache === 'function') p.clearOverviewCache();
+        p.render(body.data);
+      }
+    } catch {}
+    refreshDots(null, body?.data);
+    toast('Saved and applied!', 'ok');
+  } catch (e) {
+    toast('Error: ' + e.message, 'err');
+  }
+}
+
 const TZ_FALLBACK = [
   'UTC',
   'Europe/Istanbul',
@@ -735,10 +937,73 @@ function setTimezoneValue(value) {
   sel.value = val;
 }
 
+function periodValue(value) {
+  const n = Number(value || 1);
+  if (!Number.isFinite(n) || n <= 0) return 1;
+  return Math.min(Math.max(n, 0.333333), 24);
+}
+function periodSelectValue(value) {
+  const n = periodValue(value);
+  if (n < 0.5) return '0.333333';
+  if (n <= 1) return '1';
+  if (n <= 3) return '3';
+  if (n <= 6) return '6';
+  if (n <= 12) return '12';
+  return '24';
+}
+function syncDefaultPeriodFields() {
+  const src = document.getElementById('cfg-default-period');
+  const uk = document.getElementById('uk-history-hours');
+  if (src && uk) uk.value = src.value;
+}
+function thresholdInputValue(thresholds, metric, level, fallback) {
+  const value = thresholds?.[metric] ?? (metric === 'ram' ? thresholds?.memory : undefined);
+  if (value && typeof value === 'object') {
+    return value[level] ?? value[level === 'warning' ? 'warn' : 'crit'] ?? fallback;
+  }
+  if (value != null) return level === 'warning' ? value : fallback;
+  return fallback;
+}
+function clampedPercentInput(id, fallback) {
+  const n = parseInt(document.getElementById(id)?.value, 10);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(100, Math.max(1, n));
+}
+
+let hostClockTimer = null;
+let hostClockInfo = null;
+function renderHostClock(info = hostClockInfo) {
+  const el = document.getElementById('host-clock');
+  if (!el || !info?.serverTime) return;
+  hostClockInfo = info;
+  const tz = document.getElementById('cfg-timezone')?.value || info.timezone || 'UTC';
+  const base = new Date(info.serverTime).getTime();
+  const started = Date.now();
+  const tick = () => {
+    const now = new Date(base + (Date.now() - started));
+    try {
+      el.textContent = 'Host time: ' + now.toLocaleString([], { timeZone: tz, hour12: false }) + ' (' + tz + ')';
+    } catch {
+      el.textContent = 'Host time: ' + now.toLocaleString([], { hour12: false });
+    }
+  };
+  clearInterval(hostClockTimer);
+  tick();
+  hostClockTimer = setInterval(tick, 1000);
+}
+
+async function loadHostClock() {
+  try {
+    const r = await fetch('/api/about', { headers: authHeaders(), cache: 'no-store' });
+    if (r.ok) renderHostClock(await r.json());
+  } catch {}
+}
+
 function initTimezoneSelect() {
   const sel = document.getElementById('cfg-timezone');
   if (!sel) return;
   sel.innerHTML = timezoneOptions().map(tz => `<option value="${escHtml(tz)}">${escHtml(tz)}</option>`).join('');
+  sel.addEventListener('change', () => renderHostClock());
   setTimezoneValue('UTC');
 }
 
@@ -1023,11 +1288,11 @@ function renderAgentList(elId, list, emptyMsg) {
   if (!list.length) { el.innerHTML = `<div class="sys-empty">${emptyMsg}</div>`; return; }
   el.innerHTML = list.map(a => `
     <div class="agent-row">
-      <div style="width:9px;height:9px;border-radius:50%;background:${a.connecting ? 'var(--yellow)' : a.online ? 'var(--green)' : 'var(--red)'};flex-shrink:0;${a.online ? 'box-shadow:0 0 8px rgba(52,211,153,.6)' : ''}"></div>
+      <div style="width:9px;height:9px;border-radius:50%;background:${a.connecting ? 'var(--muted)' : a.online ? 'var(--green)' : 'var(--red)'};flex-shrink:0;${a.online ? 'box-shadow:0 0 8px rgba(52,211,153,.6)' : ''}"></div>
       <span style="font-weight:600">${escHtml(a.name || '')}</span>
       <span style="color:var(--muted);font-size:12px">${escHtml(a.ip || '')}${a.os ? ' · ' + escHtml(a.os) : ''}${a.meta ? ' · ' + escHtml(a.meta) : ''}${a.platform === 'synology' ? ' · synology' : ''}</span>
       <span style="flex:1"></span>
-      <span style="font-size:12px;font-weight:600;color:${a.connecting ? 'var(--yellow)' : a.online ? 'var(--green)' : 'var(--red)'}">${a.connecting ? 'connecting...' : a.online ? 'online' : 'offline'}</span>
+      <span style="font-size:12px;font-weight:600;color:${a.connecting ? 'var(--muted)' : a.online ? 'var(--green)' : 'var(--red)'}">${a.connecting ? 'connecting...' : a.online ? 'online' : 'offline'}</span>
       <button class="btn-rm" type="button" title="Remove" onclick="removeAgent('${escHtml(a.id || '')}',this)">✕</button>
     </div>`).join('');
 }
@@ -1229,6 +1494,15 @@ function populate(cfg) {
   if (document.getElementById('cfg-timeformat')) {
     document.getElementById('cfg-timeformat').value = cfg.timeFormat || '24h';
   }
+  if (document.getElementById('cfg-default-period')) {
+    document.getElementById('cfg-default-period').value = periodSelectValue(cfg.defaultTimePeriodHours || cfg.defaultPeriodHours || cfg.uptimekuma?.historyHours || 1);
+  }
+  if (document.getElementById('cfg-language')) {
+    document.getElementById('cfg-language').value = localStorage.getItem('os_lang') || cfg.preferredLanguage || 'en';
+  }
+  if (document.getElementById('cfg-dashboard-side')) {
+    document.getElementById('cfg-dashboard-side').checked = cfg.appearance?.dashboardSidePanel !== false;
+  }
   document.getElementById('en-public').checked = !!cfg.publicStatus;
   if (cfg.publicTitle) document.getElementById('public-title').value = cfg.publicTitle;
   if (cfg.proxmox) {
@@ -1273,6 +1547,10 @@ function populate(cfg) {
     document.getElementById('uk-url').value = cfg.uptimekuma.url || '';
     document.getElementById('uk-slug').value = cfg.uptimekuma.slug || '';
     secVal(cfg.uptimekuma.apiKey, document.getElementById('uk-apikey'));
+    document.getElementById('uk-insecure').value = cfg.uptimekuma.insecureTLS ? 'true' : 'false';
+    document.getElementById('uk-username').value = cfg.uptimekuma.username || '';
+    secVal(cfg.uptimekuma.password, document.getElementById('uk-password'));
+    document.getElementById('uk-history-hours').value = periodSelectValue(cfg.uptimekuma.historyHours || cfg.defaultTimePeriodHours || 1);
   }
   if (cfg.prometheus) {
     document.getElementById('en-prometheus').checked = cfg.prometheus.enabled !== false;
@@ -1309,6 +1587,12 @@ function populate(cfg) {
     document.getElementById('en-alerts').checked = cfg.alerts.enabled !== false;
     document.getElementById('cb-alerts').classList.remove('hidden');
     const a = cfg.alerts;
+    document.getElementById('al-th-cpu-warning').value = thresholdInputValue(a.thresholds, 'cpu', 'warning', 80);
+    document.getElementById('al-th-ram-warning').value = thresholdInputValue(a.thresholds, 'ram', 'warning', 80);
+    document.getElementById('al-th-disk-warning').value = thresholdInputValue(a.thresholds, 'disk', 'warning', 80);
+    document.getElementById('al-th-cpu-critical').value = thresholdInputValue(a.thresholds, 'cpu', 'critical', 90);
+    document.getElementById('al-th-ram-critical').value = thresholdInputValue(a.thresholds, 'ram', 'critical', 90);
+    document.getElementById('al-th-disk-critical').value = thresholdInputValue(a.thresholds, 'disk', 'critical', 90);
     if (a.ntfy) {
       document.getElementById('al-ntfy-en').checked = a.ntfy.enabled !== false;
       document.getElementById('al-ntfy-url').value = a.ntfy.url || '';
@@ -1352,6 +1636,15 @@ function collect() {
   if (tfEl && tfEl.value) {
     cfg.timeFormat = tfEl.value;
   }
+  const periodEl = document.getElementById('cfg-default-period');
+  const defaultPeriod = periodValue(periodEl?.value || 1);
+  cfg.defaultTimePeriodHours = defaultPeriod;
+  const ukHistoryPeriod = periodValue(document.getElementById('uk-history-hours')?.value || defaultPeriod);
+  const langEl = document.getElementById('cfg-language');
+  cfg.preferredLanguage = langEl?.value || 'en';
+  cfg.appearance = {
+    dashboardSidePanel: document.getElementById('cfg-dashboard-side')?.checked !== false,
+  };
 
   {
     const on = document.getElementById('en-proxmox').checked;
@@ -1430,6 +1723,10 @@ function collect() {
       url,
       slug: slug || undefined,
       apiKey: maskedVal(document.getElementById('uk-apikey')) || undefined,
+      insecureTLS: document.getElementById('uk-insecure').value === 'true' || undefined,
+      username: document.getElementById('uk-username').value.trim() || undefined,
+      password: maskedVal(document.getElementById('uk-password')) || undefined,
+      historyHours: ukHistoryPeriod,
       icon: document.getElementById('icon-uptimekuma').value.trim() || undefined,
     };
   }
@@ -1510,7 +1807,17 @@ function collect() {
 
   {
     const alertsOn = document.getElementById('en-alerts').checked;
-    const a = { enabled: alertsOn };
+    const cpuWarning = clampedPercentInput('al-th-cpu-warning', 80);
+    const ramWarning = clampedPercentInput('al-th-ram-warning', 80);
+    const diskWarning = clampedPercentInput('al-th-disk-warning', 80);
+    const a = {
+      enabled: alertsOn,
+      thresholds: {
+        cpu: { warning: cpuWarning, critical: Math.max(cpuWarning, clampedPercentInput('al-th-cpu-critical', 90)) },
+        ram: { warning: ramWarning, critical: Math.max(ramWarning, clampedPercentInput('al-th-ram-critical', 90)) },
+        disk: { warning: diskWarning, critical: Math.max(diskWarning, clampedPercentInput('al-th-disk-critical', 90)) },
+      }
+    };
     if (document.getElementById('al-ntfy-en').checked) {
       a.ntfy = {
         enabled: true,
@@ -1691,6 +1998,7 @@ async function saveConfig(opts = {}) {
   btns.forEach(b => b.disabled = true);
   try {
     const cfgPayload = collect();
+    applySettingsPreview(cfgPayload);
     const r = await fetch('/api/config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
@@ -1706,6 +2014,7 @@ async function saveConfig(opts = {}) {
     try {
       const p = window.parent;
       if(p && p !== window && typeof p.render === 'function') {
+        if (typeof p.clearOverviewCache === 'function') p.clearOverviewCache();
         p.render(body.data);
       }
     } catch(e){}
@@ -1744,25 +2053,58 @@ function toast(msg, type) {
   toastTimer = setTimeout(() => { el.className = ''; }, 3500);
 }
 
-function dotColor(st){ return st==='ok'?'var(--green)':st==='bad'?'var(--red)':'var(--muted)'; }
+function dotColor(st){ return st==='ok'?'var(--green)':st==='bad'?'var(--red)':st==='warn'?'var(--yellow)':'var(--muted)'; }
 function setDot(id, st){ const el=document.getElementById(id); if(el) el.style.background=dotColor(st); }
+function platformDot(configured, total, online, connecting, issue = false) {
+  if (!configured) return 'gray';
+  total = Number(total || 0);
+  online = Number(online || 0);
+  if (connecting) return online > 0 ? 'warn' : 'gray';
+  if (total > 0 && online === 0) return 'bad';
+  if (issue || (total > 0 && online < total)) return 'warn';
+  return online > 0 ? 'ok' : 'gray';
+}
 async function refreshDots(cfg, newData){
   try { if(!cfg){ const rc=await fetch('/api/config',{headers:authHeaders()}); cfg=await rc.json(); } } catch { cfg={}; }
   let d = newData;
   if(!d){
     try { const rs=await fetch('/api/status',{headers:authHeaders()}); d=await rs.json(); } catch {}
   }
-  const ev=(configured, ok)=> !configured ? 'gray' : (ok ? 'ok' : 'bad');
+  d = d || {};
   const en=c=>!!(c && c.enabled!==false);
-  setDot('dot-proxmox', ev(en(cfg.proxmox), (d.proxmox?.nodes||[]).length>0 && (d.proxmox?.nodes||[]).every(n=>n.node?.online)));
-  setDot('dot-linux', ev(en(cfg.linux), (d.linux||[]).length>0 && (d.linux||[]).every(l=>l.online)));
-  setDot('dot-kubernetes', ev(en(cfg.kubernetes), !!(d.kubernetes && d.kubernetes.online) && !((d.kubernetes?.pods)||[]).some(p=>p.failed)));
-  setDot('dot-synology', ev(en(cfg.snmp), (d.snmp||[]).length>0 && (d.snmp||[]).every(x=>x.online)));
-  setDot('dot-healthchecks', ev(en(cfg.healthchecks), !!(d.healthchecks && d.healthchecks.online) && ((d.healthchecks?.summary?.down)||0)===0));
-  setDot('dot-uptimekuma', ev(en(cfg.uptimekuma), !!(d.uptimekuma && d.uptimekuma.online)));
-  setDot('dot-prometheus', ev(en(cfg.prometheus), !!(d.prometheus && d.prometheus.online) && ((d.prometheus?.summary?.down)||0)===0 && ((d.prometheus?.summary?.unknown)||0)===0 && ((d.prometheus?.summary?.instanceDown)||0)===0));
-  setDot('dot-docker', ev(en(cfg.docker), (d.docker||[]).length>0 && (d.docker||[]).every(h=>h.online)));
-  setDot('dot-database', ev(en(cfg.database), (d.database||[]).length>0 && (d.database||[]).every(x=>x.online)));
+  const pxNodes = d.proxmox?.nodes || [];
+  setDot('dot-proxmox', platformDot(en(cfg.proxmox), pxNodes.length, pxNodes.filter(n=>n.node?.online).length, !!d.proxmox?._connecting || pxNodes.some(n=>n._connecting), pxNodes.some(n => n.node?.online && (n.services||[]).some(s=>!s.active&&!s.excluded))));
+  const linuxRows = d.linux || [];
+  setDot('dot-linux', platformDot(en(cfg.linux), linuxRows.length, linuxRows.filter(l=>l.online).length, linuxRows.some(l=>l._connecting), linuxRows.some(l=>l.online&&(l.services||[]).some(s=>!s.active&&!s.excluded))));
+  const kOnline = !!(d.kubernetes && d.kubernetes.online);
+  setDot('dot-kubernetes', platformDot(en(cfg.kubernetes), d.kubernetes ? 1 : 0, kOnline ? 1 : 0, !!d.kubernetes?._connecting, !!((d.kubernetes?.pods)||[]).some(p=>p.failed)));
+  const snmpRows = d.snmp || [];
+  const snmpTotal = Math.max(snmpRows.length, cfg.snmp?.devices?.length || 0);
+  const snmpConfigured = cfg.snmp?.devices?.length || 0;
+  const snmpOnline = snmpRows.filter(x=>x.online).length;
+  const snmpConnecting = snmpRows.some(x=>x._connecting)
+    || (en(cfg.snmp) && snmpConfigured > 0 && snmpRows.length < snmpConfigured)
+    || (en(cfg.snmp) && snmpConfigured > 0 && snmpOnline === 0 && (d.loading || d.refreshing));
+  setDot('dot-synology', platformDot(en(cfg.snmp), snmpTotal, snmpOnline, snmpConnecting));
+  const hcOnline = !!(d.healthchecks && d.healthchecks.online);
+  setDot('dot-healthchecks', platformDot(en(cfg.healthchecks), d.healthchecks ? 1 : 0, hcOnline ? 1 : 0, !!d.healthchecks?._connecting, ((d.healthchecks?.summary?.down)||0)>0 || ((d.healthchecks?.summary?.grace)||0)>0));
+  const ukOnline = !!(d.uptimekuma && d.uptimekuma.online);
+  setDot('dot-uptimekuma', platformDot(en(cfg.uptimekuma), d.uptimekuma ? 1 : 0, ukOnline ? 1 : 0, !!d.uptimekuma?._connecting));
+  const promInstances = d.prometheus?.instances || [];
+  const promTotal = Math.max(promInstances.length, cfg.prometheus?.instances?.length || (cfg.prometheus?.url ? 1 : 0));
+  setDot('dot-prometheus', platformDot(en(cfg.prometheus), promTotal, promInstances.filter(i=>i.online).length || (d.prometheus?.online ? 1 : 0), !!d.prometheus?._connecting || promInstances.some(i=>i._connecting), ((d.prometheus?.summary?.instanceDown)||0)>0));
+  const dockerRows = d.docker || [];
+  const dockerTotal = Math.max(dockerRows.length, cfg.docker?.hosts?.length || 0);
+  const dockerConfigured = cfg.docker?.hosts?.length || 0;
+  const dockerOnline = dockerRows.filter(h=>h.online).length;
+  const dockerConnecting = dockerRows.some(h=>h._connecting)
+    || (en(cfg.docker) && dockerConfigured > 0 && dockerRows.length < dockerConfigured)
+    || (en(cfg.docker) && dockerConfigured > 0 && dockerOnline === 0 && (d.loading || d.refreshing))
+    || dockerRows.some(h => String(h.error || '').toLowerCase().includes('refresh in progress'));
+  setDot('dot-docker', platformDot(en(cfg.docker), dockerTotal, dockerOnline, dockerConnecting, dockerRows.some(h=>h.online&&(h.summary?.stopped||0)>0)));
+  const dbRows = d.database || [];
+  const dbTotal = Math.max(dbRows.length, cfg.database?.instances?.length || 0);
+  setDot('dot-database', platformDot(en(cfg.database), dbTotal, dbRows.filter(x=>x.online).length, dbRows.some(x=>x._connecting)));
   document.querySelectorAll('#db-list .arr-item').forEach(item => {
     const nm = item.querySelector('.db-name')?.value.trim();
     const dot = item.querySelector('.db-dot');
@@ -1788,7 +2130,8 @@ async function refreshDots(cfg, newData){
     const bar = document.createElement('div');
     bar.className = 'save-row';
     bar.style.cssText = 'display:flex;justify-content:flex-end;margin-top:16px';
-    if(cb.closest('.settings-pair')) bar.style.marginTop = 'auto';
+    if(cb.querySelector('#cfg-language')) bar.style.marginTop = '22px';
+    else if(cb.closest('.settings-pair')) bar.style.marginTop = 'auto';
     bar.innerHTML = '<button class="btn-save" type="button" onclick="saveConfig()">' + svg + ' Save & Apply</button>';
     cb.appendChild(bar);
   });
@@ -1802,9 +2145,11 @@ async function refreshDots(cfg, newData){
     handleUnauth(r);
     const cfg = await r.json();
     populate(cfg);
+    loadHostClock();
     document.querySelectorAll('.card-body').forEach(el => el.classList.add('hidden'));
     document.querySelectorAll('#cb-alerts .arr-body').forEach(el => el.classList.add('hidden'));
     document.querySelectorAll('.card-hdr .toggle input[type=checkbox]').forEach(en => en.closest('.card').classList.toggle('card-off', !en.checked));
+    applyLanguage(document.getElementById('cfg-language')?.value || currentLang());
     refreshDots(cfg);
     setInterval(() => refreshDots(), 7000);
   } catch (e) {

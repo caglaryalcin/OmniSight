@@ -228,8 +228,11 @@ async function getSystemInfo(session, deviceKey) {
   return {
     cpu: cpuUser != null ? cpuUser + (cpuSystem || 0) : null,
     systemTemp: systemTemp != null ? systemTemp : null,
+    systemTempLabel: systemTemp != null ? 'CPU temperature' : null,
     ram: memTotal ? {
       percent: Math.round((memUsed / memTotal) * 100),
+      usedBytes: memUsed,
+      totalBytes: memTotal,
       usedGB: (memUsed / 1024 ** 3).toFixed(1),
       totalGB: (memTotal / 1024 ** 3).toFixed(1),
     } : null,
@@ -358,8 +361,13 @@ async function getDeviceData(device) {
       getNetwork(session, device.host).catch(e => { console.error(`[SNMP ${device.name}] network:`, e.message); return []; }),
     ]);
     const hist = synHistory.get(device.host) || [];
-    if (sysInfo.cpu != null || sysInfo.ram) {
-      hist.push({ time: Date.now(), cpu: sysInfo.cpu ?? 0, ram: sysInfo.ram?.percent ?? 0 });
+    if (sysInfo.cpu != null || sysInfo.ram || sysInfo.systemTemp != null) {
+      hist.push({
+        time: Date.now(),
+        cpu: sysInfo.cpu ?? null,
+        ram: sysInfo.ram?.percent ?? null,
+        temp: sysInfo.systemTemp ?? null,
+      });
       if (hist.length > 240) hist.shift();
       synHistory.set(device.host, hist);
     }
@@ -370,6 +378,7 @@ async function getDeviceData(device) {
       online: true,
       cpu:     sysInfo.cpu     ?? null,
       systemTemp: sysInfo.systemTemp ?? null,
+      systemTempLabel: sysInfo.systemTempLabel ?? null,
       ram:     sysInfo.ram     ?? null,
       disks,
       volumes,
