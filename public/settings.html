@@ -293,6 +293,14 @@ html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#dd
       <div class="form-group"><label>Token Secret</label><input type="password" id="px-tokensecret" placeholder=""></div>
       <div class="form-group"><label>API TLS</label><select id="px-insecure"><option value="false">Verify certificate</option><option value="true">Allow self-signed</option></select></div>
     </div>
+    <div class="form-group">
+      <div class="sys-hdr">
+        <label style="margin:0">SSH metrics fallback</label>
+        <button class="btn-add" type="button" onclick="addPveSshMetricHost()">+ Add SSH</button>
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Add one SSH entry for each Proxmox node. Node name must match the Proxmox node name. SSH host is the node IP or DNS. Save & Apply; Disk I/O appears after the second refresh.</div>
+      <div id="px-ssh-list"></div>
+    </div>
     <div class="form-group" style="margin-bottom:0">
       <div class="sys-hdr">
         <label style="margin:0">Nodes</label>
@@ -713,7 +721,7 @@ html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#dd
 
 <script src="/i18n.js"></script>
 <script>
-let lCount = 0, sCount = 0, dCount = 0, dbCount = 0, dkApiCount = 0, dkSshCount = 0, promCount = 0;
+let lCount = 0, sCount = 0, dCount = 0, dbCount = 0, dkApiCount = 0, dkSshCount = 0, pveSshCount = 0, promCount = 0;
 
 function toggleAlertBody(enId, bodyId) {
   document.getElementById(bodyId).classList.toggle('hidden', !document.getElementById(enId).checked);
@@ -1015,6 +1023,33 @@ function addDockerSshHost(data = {}) {
     </div>`;
   document.getElementById('docker-ssh-list').appendChild(item);
   if (data.sshPassword) secVal(data.sshPassword, item.querySelector('.dkssh-password'));
+}
+
+function addPveSshMetricHost(data = {}) {
+  const idx = pveSshCount++;
+  const id = `pvessh-${idx}`;
+  const item = document.createElement('div');
+  item.className = 'arr-item';
+  const title = escHtml(trText(data.node || data.name || 'Proxmox SSH metrics'));
+  const fallbackTitle = String(trText('Proxmox SSH metrics')).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\r/g,'').replace(/\n/g,' ');
+  item.innerHTML = `
+    <div class="arr-hdr" onclick="toggleArr('${id}')">
+      <span class="arr-hdr-name">${title}</span>
+      <button class="btn-rm" type="button" onclick="event.stopPropagation();this.closest('.arr-item').remove()">✕</button>
+    </div>
+    <div class="arr-body" id="ab-${id}">
+      <div class="form-grid">
+        <div class="form-group"><label>${escHtml(trText('Node name'))}</label><input type="text" class="pvessh-node" value="${escHtml(data.node||data.name||'')}" placeholder="${escHtml(trText('Proxmox node name'))}" oninput="this.closest('.arr-item').querySelector('.arr-hdr-name').textContent=this.value||'${fallbackTitle}'"></div>
+        <div class="form-group"><label>${escHtml(trText('SSH host'))}</label><input type="text" class="pvessh-host" value="${escHtml(data.sshHost||'')}" placeholder="${escHtml(trText('Node IP or DNS'))}"></div>
+        <div class="form-group"><label>${escHtml(trText('SSH user'))}</label><input type="text" class="pvessh-user" value="${escHtml(data.sshUser||'root')}" placeholder="root"></div>
+        <div class="form-group"><label>${escHtml(trText('SSH port'))}</label><input type="number" class="pvessh-port" value="${escHtml(data.sshPort||'22')}" placeholder="22"></div>
+        <div class="form-group"><label>${escHtml(trText('Command'))}</label><select class="pvessh-sudo"><option value="" ${data.sudo===undefined?'selected':''}>${escHtml(trText('No sudo'))}</option><option value="true" ${data.sudo===true?'selected':''}>${escHtml(trText('Use sudo'))}</option></select></div>
+        <div class="form-group"><label>${escHtml(trText('SSH key path (optional)'))}</label><input type="text" class="pvessh-key" value="${escHtml(data.sshKey||'')}" placeholder="/data/id_rsa"></div>
+        <div class="form-group"><label>${escHtml(trText('SSH password (optional)'))}</label><input type="password" class="pvessh-password" placeholder="${escHtml(trText('Leave blank to keep current password'))}"></div>
+      </div>
+    </div>`;
+  document.getElementById('px-ssh-list').appendChild(item);
+  if (data.sshPassword) secVal(data.sshPassword, item.querySelector('.pvessh-password'));
 }
 
 function addPrometheusInstance(data = {}) {
@@ -1472,6 +1507,7 @@ function populate(cfg) {
     document.getElementById('px-tokenid').value = cfg.proxmox.tokenId || '';
     secVal(cfg.proxmox.tokenSecret, document.getElementById('px-tokensecret'));
     document.getElementById('px-insecure').value = cfg.proxmox.insecureTLS ? 'true' : 'false';
+    (cfg.proxmox.sshMetrics || []).forEach(addPveSshMetricHost);
   }
   if (cfg.linux) {
     document.getElementById('en-linux').checked = cfg.linux.enabled !== false;
@@ -1610,6 +1646,21 @@ function collect() {
     const url = document.getElementById('px-url').value.trim();
     const tokenId = document.getElementById('px-tokenid').value.trim();
     const tokenSecret = maskedVal(document.getElementById('px-tokensecret'));
+    const sshMetrics = [];
+    document.querySelectorAll('#px-ssh-list .arr-item').forEach(item => {
+      const sshHost = item.querySelector('.pvessh-host').value.trim();
+      const sudoVal = item.querySelector('.pvessh-sudo')?.value || '';
+      const h = {
+        node: item.querySelector('.pvessh-node').value.trim(),
+        sshHost: sshHost || undefined,
+        sshUser: item.querySelector('.pvessh-user').value.trim() || undefined,
+        sshPort: Number(item.querySelector('.pvessh-port').value) || undefined,
+        sudo: sudoVal ? sudoVal === 'true' : undefined,
+        sshKey: item.querySelector('.pvessh-key').value.trim() || undefined,
+        sshPassword: maskedVal(item.querySelector('.pvessh-password')) || undefined,
+      };
+      if (h.node && h.sshHost) sshMetrics.push(h);
+    });
     if (on) cfg.proxmox = {
       enabled: on,
       icon: document.getElementById('icon-proxmox').value.trim() || undefined,
@@ -1617,6 +1668,7 @@ function collect() {
       tokenId: tokenId || undefined,
       tokenSecret: tokenSecret || undefined,
       insecureTLS: document.getElementById('px-insecure').value === 'true' || undefined,
+      sshMetrics: sshMetrics.length ? sshMetrics : undefined,
     };
   }
 

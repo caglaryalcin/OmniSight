@@ -24,6 +24,7 @@ const SVC_NAME = /^[a-zA-Z0-9@._:-]+$/;
 const K8S_NAME = /^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$/i;
 const ONE_MB = 1024 * 1024;
 const MAX_ICON_BYTES = 512 * 1024;
+const MAX_AVATAR_BYTES = 512 * 1024;
 const MAX_CERT_BYTES = 5 * ONE_MB;
 const MAX_KUBECONFIG_BYTES = ONE_MB;
 const DEBUG_ENABLED = ['1', 'true', 'yes', 'on'].includes(String(process.env.OMNISIGHT_DEBUG || '').toLowerCase());
@@ -307,6 +308,24 @@ function isSafeSvg(buf) {
   return !/<\s*(script|foreignobject|iframe|object|embed|link|base)\b/.test(s)
     && !/\son[a-z]+\s*=/.test(s)
     && !/(javascript:|data:text\/html|<!doctype|<!entity)/.test(s);
+}
+
+function normalizeAvatarDataUrl(dataUrl) {
+  if (!dataUrl) return '';
+  const raw = String(dataUrl);
+  const mime = (raw.match(/^data:([^;]+);base64,/i)?.[1] || '').toLowerCase();
+  const allowed = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml']);
+  if (!allowed.has(mime)) throw new Error('Use PNG, JPG, WebP or SVG');
+  const buf = readBase64Payload(raw, MAX_AVATAR_BYTES);
+  if (mime === 'image/svg+xml' && !isSafeSvg(buf)) throw new Error('SVG contains unsafe active content');
+  return `data:${mime};base64,${buf.toString('base64')}`;
+}
+
+function publicProfile(auth) {
+  return {
+    username: auth?.username || null,
+    avatar: typeof auth?.avatar === 'string' ? auth.avatar : '',
+  };
 }
 
 function authMiddleware(req, res, next) {
@@ -1132,6 +1151,27 @@ app.get('/api/auth-status', (req, res) => {
   res.json({ required: !!auth, username: auth?.username || null, twoFactorEnabled: totpEnabled(auth) });
 });
 
+app.get('/api/profile', (req, res) => {
+  const auth = loadAuth();
+  if (!auth) return res.status(404).json({ error: 'Profile is not configured' });
+  res.json(publicProfile(auth));
+});
+
+app.post('/api/profile/avatar', (req, res) => {
+  try {
+    const auth = loadAuth();
+    if (!auth) return res.status(404).json({ error: 'Profile is not configured' });
+    const avatar = normalizeAvatarDataUrl(req.body?.dataUrl || '');
+    const nextAuth = { ...auth };
+    if (avatar) nextAuth.avatar = avatar;
+    else delete nextAuth.avatar;
+    writePrivateYaml(AUTH_PATH, nextAuth);
+    res.json(publicProfile(nextAuth));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 app.post('/api/set-password', (req, res) => {
   const { username, password, currentPassword } = req.body || {};
   if (!username) return res.status(400).json({ error: 'Missing fields' });
@@ -1154,6 +1194,7 @@ app.post('/api/set-password', (req, res) => {
   const hash = password ? hashPassword(password, salt) : auth.hash;
   const nextAuth = { username: finalUsername, hash, salt };
   if (auth?.totp) nextAuth.totp = auth.totp;
+  if (auth?.avatar) nextAuth.avatar = auth.avatar;
   writePrivateYaml(AUTH_PATH, nextAuth);
   res.json({ ok: true });
 });
@@ -1347,10 +1388,11 @@ app.post('/api/config', async (req, res) => {
   }
 });
 
-app.post('/api/preferences', (req, res) => {
+app.post('/api/preferences', async (req, res) => {
   try {
     const incoming = req.body || {};
     const existing = fs.existsSync(CONFIG_PATH) ? yaml.load(fs.readFileSync(CONFIG_PATH, 'utf8')) || {} : {};
+    const previousUptimeKuma = config.uptimekuma ? { ...config.uptimekuma } : null;
 
     if (incoming.preferredLanguage !== undefined) {
       const lang = String(incoming.preferredLanguage || 'en').toLowerCase();
@@ -1359,6 +1401,11 @@ app.post('/api/preferences', (req, res) => {
 
     if (incoming.defaultTimePeriodHours !== undefined) {
       existing.defaultTimePeriodHours = uptimeKumaHistoryHours(incoming.defaultTimePeriodHours);
+    }
+
+    if (incoming.uptimekuma && typeof incoming.uptimekuma === 'object' && incoming.uptimekuma.historyHours !== undefined) {
+      existing.uptimekuma = existing.uptimekuma || {};
+      existing.uptimekuma.historyHours = uptimeKumaHistoryHours(incoming.uptimekuma.historyHours);
     }
 
     if (incoming.appearance && typeof incoming.appearance === 'object') {
@@ -1370,11 +1417,20 @@ app.post('/api/preferences', (req, res) => {
 
     writePrivateYaml(CONFIG_PATH, existing);
     config = loadConfig();
+    const shouldRefreshUptimeKuma = uptimeKumaConfigChanged(previousUptimeKuma, config.uptimekuma);
 
     if (cache.data) {
       if (cache.data.uptimekuma) cache.data.uptimekuma.historyHours = uptimeKumaConfig().historyHours;
       assignStatic(cache.data);
       cache.data.timestamp = new Date().toISOString();
+    }
+
+    if (shouldRefreshUptimeKuma && config.uptimekuma && config.uptimekuma.enabled !== false) {
+      try {
+        await refreshUptimeKumaNow();
+      } catch (err) {
+        console.warn(`Uptime Kuma preference refresh failed: ${err.message}`);
+      }
     }
 
     res.json({ ok: true, data: cache.data });

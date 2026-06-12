@@ -79,6 +79,18 @@ header{
 .menu-item{display:block;padding:10px 14px;font-size:13px;font-weight:500;color:var(--text);text-decoration:none;cursor:pointer;border:none;background:none;width:100%;text-align:left;border-radius:8px}
 .menu-item:hover{background:rgba(255,255,255,.06)}
 .menu-item.danger{color:var(--red)}
+.profile-chip{height:36px;max-width:176px;border:1px solid var(--border);background:var(--panel);color:var(--text);border-radius:8px;padding:0 10px 0 7px;display:flex;align-items:center;gap:8px;cursor:pointer;transition:border-color .15s,background .15s;min-width:0}
+.profile-chip:hover{border-color:var(--border2);background:var(--panel2)}
+.profile-avatar{width:24px;height:24px;border-radius:999px;border:1px solid var(--border);background:var(--row);display:grid;place-items:center;overflow:hidden;color:var(--green);font-size:9px;font-weight:850;letter-spacing:.03em;flex:0 0 auto}
+.profile-avatar img{width:100%;height:100%;object-fit:cover;display:block}
+.profile-chip-copy{min-width:0;display:flex;flex-direction:column;align-items:flex-start;line-height:1.05}
+.profile-chip-name{font-size:12px;font-weight:750;max-width:106px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.profile-chip-sub{font-size:10px;color:var(--muted);max-width:106px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.menu-profile{display:flex;align-items:center;gap:10px;padding:10px 10px 12px;border-bottom:1px solid var(--border);margin-bottom:5px}
+.menu-profile .profile-avatar{width:34px;height:34px;font-size:11px}
+.menu-profile-main{min-width:0;display:flex;flex-direction:column;gap:2px}
+.menu-profile-main strong{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:124px}
+.menu-profile-main span{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:124px}
 
 /* Layout */
 .layout{display:flex;height:calc(100vh - 88px)}
@@ -402,22 +414,25 @@ html[data-theme="light"] .topbar{background:rgba(255,255,255,.78)}
 .pve-node-hdr{align-items:center;gap:12px}
 .pve-head-main{flex:1;min-width:0;display:flex;flex-wrap:wrap;align-items:stretch}
 .pve-head-title,.pve-head-stat{min-width:0;min-height:48px;margin:-1px 0 0 -1px;border:1px solid var(--border);background:transparent;padding:7px 10px;display:flex;flex-direction:column;justify-content:center}
-.pve-head-title{flex:.95 1 112px}
+.pve-head-title{flex:0 0 auto;width:max-content;max-width:min(260px,34vw)}
 .pve-head-stat{flex:1 1 86px}
+.pve-head-stat.is-host{flex:1.05 1 150px}
+.pve-head-stat.is-vms{flex:.65 1 64px}
 .pve-head-stat.has-spark{flex:1.55 1 150px;display:grid;grid-template-columns:minmax(52px,auto) minmax(70px,1fr);align-items:center;column-gap:10px}
+.pve-head-stat.is-temp.has-spark{flex:1.28 1 136px}
 .pve-head-text{min-width:0}
-.pve-head-title .node-name{width:auto;max-width:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pve-head-title .node-name{width:auto;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pve-head-sub,.pve-head-lbl{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.055em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pve-head-val{font-size:14px;font-weight:800;color:var(--text);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .mini-hist{width:100%;height:24px;display:block;opacity:.9}
 .mini-hist-bg{fill:rgba(255,255,255,.025)}
 html[data-theme="light"] .mini-hist-bg{fill:rgba(15,23,42,.035)}
-.snmp-head-main{display:grid;grid-template-columns:minmax(135px,.62fr) minmax(150px,.78fr) minmax(190px,1fr) minmax(190px,1fr) minmax(190px,1fr)}
-.docker-head-main{display:grid;grid-template-columns:minmax(120px,.55fr) minmax(260px,1.25fr) minmax(110px,.5fr) minmax(180px,.9fr) minmax(180px,.9fr) minmax(110px,.55fr)}
+.snmp-head-main{display:grid;grid-template-columns:fit-content(260px) minmax(150px,.78fr) minmax(190px,1fr) minmax(190px,1fr) minmax(190px,1fr)}
+.docker-head-main{display:grid;grid-template-columns:fit-content(260px) minmax(260px,1.25fr) minmax(110px,.5fr) minmax(180px,.9fr) minmax(180px,.9fr) minmax(110px,.55fr)}
 @media (max-width:1200px){
   .docker-row{grid-template-columns:9px minmax(130px,1.2fr) minmax(140px,1fr) 62px 70px minmax(110px,1fr) minmax(90px,1fr) minmax(110px,1fr) auto}
-  .snmp-head-main{grid-template-columns:minmax(120px,.62fr) minmax(130px,.78fr) minmax(150px,1fr) minmax(150px,1fr) minmax(150px,1fr)}
-  .docker-head-main{grid-template-columns:minmax(110px,.55fr) minmax(220px,1.2fr) minmax(96px,.5fr) minmax(150px,.9fr) minmax(150px,.9fr) minmax(96px,.55fr)}
+  .snmp-head-main{grid-template-columns:fit-content(220px) minmax(130px,.78fr) minmax(150px,1fr) minmax(150px,1fr) minmax(150px,1fr)}
+  .docker-head-main{grid-template-columns:fit-content(220px) minmax(220px,1.2fr) minmax(96px,.5fr) minmax(150px,.9fr) minmax(150px,.9fr) minmax(96px,.55fr)}
 }
 .lg-ts{color:var(--muted)}
 .lg-err{color:var(--red);font-weight:600}
@@ -639,6 +654,8 @@ html[data-theme="light"] .overview-card .sb-csum-item{background:transparent!imp
   .topbar{padding:0 14px;gap:8px}
   .search,#lupd,#pbtn-lbl,.pubstatus span{display:none}
   .pubstatus{padding:0;width:36px;height:36px;justify-content:center}
+  .profile-chip{width:36px;padding:0;justify-content:center}
+  .profile-chip-copy{display:none}
   .overview{padding:14px}
   .overview-kpis,.overview-kpis.no-side,.overview-layout{grid-template-columns:1fr}
   .overview-grid{grid-template-columns:1fr}
@@ -740,10 +757,21 @@ html[data-theme="light"] .overview-card .sb-csum-item{background:transparent!imp
         Refresh
       </button>
       <div class="menu-wrap">
-        <button class="menu-btn" onclick="toggleMenu()" title="Account">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+        <button class="profile-chip" onclick="toggleMenu()" title="Account">
+          <span class="profile-avatar" id="top-profile-avatar">OS</span>
+          <span class="profile-chip-copy">
+            <span class="profile-chip-name" id="top-profile-name">OmniSight</span>
+            <span class="profile-chip-sub" id="top-profile-sub">Account</span>
+          </span>
         </button>
         <div class="menu-drop" id="menu-drop">
+          <div class="menu-profile">
+            <span class="profile-avatar" id="menu-profile-avatar">OS</span>
+            <div class="menu-profile-main">
+              <strong id="menu-profile-name">OmniSight</strong>
+              <span id="menu-profile-sub">Account</span>
+            </div>
+          </div>
           <button class="menu-item" onclick="openEmbed('/profile')">Profile</button>
           <button class="menu-item" onclick="openEmbed('/settings')">Settings</button>
           <button class="menu-item" onclick="openEmbed('/logs')">Logs</button>
@@ -846,6 +874,33 @@ function drawTimeSelect(id, currentLimit) {
   </div>`;
 }
 
+const HISTORY_PERIOD_OPTIONS = [
+  { h: 0.333333, l: 'Last 20 minutes' },
+  { h: 1, l: 'Last 1 hour' },
+  { h: 3, l: 'Last 3 hours' },
+  { h: 6, l: 'Last 6 hours' },
+  { h: 12, l: 'Last 12 hours' },
+  { h: 24, l: 'Last 24 hours' },
+];
+function periodLabel(hours) {
+  const h = periodHoursValue(hours);
+  const label = HISTORY_PERIOD_OPTIONS.find(o => Math.abs(o.h - h) < 0.01)?.l || `${h} Hours`;
+  return trText(label);
+}
+function drawUptimeHistorySelect(currentHours) {
+  const current = periodHoursValue(currentHours);
+  const optsHtml = HISTORY_PERIOD_OPTIONS.map(o =>
+    `<div class="os-sel-opt ${Math.abs(o.h - current) < 0.01 ? 'active' : ''}" onclick="setUptimeKumaHistoryHours(${o.h})">${trText(o.l)}</div>`
+  ).join('');
+  return `<div class="os-sel" onclick="event.stopPropagation()">
+    <div class="os-sel-btn" onclick="openOsSel(this)" title="${escAttr(periodLabel(current))}">
+      <span>${escHtml(periodLabel(current))}</span>
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <div class="os-sel-menu">${optsHtml}</div>
+  </div>`;
+}
+
 let timeLimits = {};
 try { timeLimits = JSON.parse(localStorage.getItem('os_time_limits') || '{}'); } catch {}
 function syncDefaultPeriodOverride(data) {
@@ -862,6 +917,28 @@ window.setTimeLimit = function(id, val) {
   timeLimits[id] = Number(val);
   try { localStorage.setItem('os_time_limits', JSON.stringify(timeLimits)); } catch {}
   if (window._lastData) render(window._lastData);
+};
+
+window.setUptimeKumaHistoryHours = async function(hours) {
+  const next = periodHoursValue(hours);
+  if (window._lastData?.uptimekuma) {
+    window._lastData.uptimekuma.historyHours = next;
+    render(window._lastData);
+  }
+  try {
+    const r = await fetch('/api/preferences', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ uptimekuma: { historyHours: next } }),
+    });
+    handleUnauth(r);
+    const b = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(b.error || r.statusText);
+    if (b.data) render(b.data);
+    else doRefresh();
+  } catch (err) {
+    console.error('Uptime Kuma history range update failed:', err);
+  }
 };
 
 let dockerContainerSort = 'state';
@@ -1022,10 +1099,17 @@ function bc(v){ return v>=90?'var(--red)':v>=70?'var(--yellow)':'var(--green)' }
 function bchex(v){ return v>=90?'#F87171':v>=70?'#FBBF24':'#34D399' }
 function tempColor(v){ return v>=60?'var(--red)':v>=50?'var(--yellow)':'var(--green)' }
 function tempHex(v){ return v>=60?'#F87171':v>=50?'#FBBF24':'#34D399' }
+function pveTempColor(v){ return v>=60?'var(--red)':'var(--yellow)' }
+function pveTempHex(v){ return v>=60?'#F87171':'#FBBF24' }
 function dc(ok){ return ok?'md-green':'md-red' }
 function bdg(cls,txt){ return `<span class="badge bg-${cls}">${txt}</span>` }
 function hasNum(v){ return v !== null && v !== undefined && v !== '' && Number.isFinite(Number(v)); }
 function fmtRate(v){ return hasNum(v) ? `${fmtBytes(Number(v))}/s` : ''; }
+function metricRateSum(o, readKey, writeKey) {
+  if (!o) return null;
+  const vals = [o[readKey], o[writeKey]].filter(hasNum).map(Number);
+  return vals.length ? vals.reduce((a,b)=>a+b,0) : null;
+}
 function fmtBytePair(usedBytes, totalBytes, usedGB, totalGB){
   if(hasNum(usedBytes) && hasNum(totalBytes)) return `${fmtBytes(Number(usedBytes))} / ${fmtBytes(Number(totalBytes))}`;
   return usedGB ? `${usedGB}/${totalGB} GB` : '';
@@ -1434,12 +1518,21 @@ function miniSparkline(data, key, current, colorFn = bchex, maxScale = 100) {
     <path d="${line}" fill="none" stroke="${clr}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
   </svg>`;
 }
-function pveHeadStat(label, value, color = 'var(--text)', spark = '') {
+function pveHeadStat(label, value, color = 'var(--text)', spark = '', extraClass = '') {
   if (value === null || value === undefined || value === '') return '';
-  return `<div class="pve-head-stat ${spark ? 'has-spark' : ''}">
+  const cls = [extraClass, spark ? 'has-spark' : ''].filter(Boolean).join(' ');
+  return `<div class="pve-head-stat ${cls}">
     <div class="pve-head-text"><div class="pve-head-val" style="color:${color}">${escHtml(value)}</div><div class="pve-head-lbl">${escHtml(label)}</div></div>
     ${spark}
   </div>`;
+}
+function displayPveHost(host) {
+  return String(host || '').replace(/^https?:\/\//i, '');
+}
+function rateColor(){ return '#22D3EE'; }
+function rateSparkMax(data, key, current) {
+  const vals = (Array.isArray(data) ? data.map(d => d?.[key]) : []).concat([current]).filter(hasNum).map(Number);
+  return Math.max(1, ...vals) * 1.15;
 }
 function buildProxmox(px){
   if(!px?.nodes?.length) return null;
@@ -1503,7 +1596,7 @@ function buildProxmox(px){
     </div>`;
   }
 
-  const nodesHtml = px.nodes.map(({node,services=[],vms,history,host,backup,storage=[],_connecting})=>{
+  const nodesHtml = px.nodes.map(({node,services=[],vms,history,host,backup,storage=[],metrics,_connecting})=>{
     if(_connecting) return `
     <div class="node-hdr" style="cursor:default">
       <div class="mon-dot md-gray"></div>
@@ -1513,6 +1606,10 @@ function buildProxmox(px){
     </div>`;
     const cpuPct = node.cpu ?? 0;
     const ramPct = node.ram?.percent ?? 0;
+    const diskRate = metricRateSum(metrics?.diskIO, 'readBps', 'writeBps');
+    const bandwidthRate = metricRateSum(metrics?.bandwidth, 'rxBps', 'txBps');
+    const diskIOTxt = diskRate != null ? fmtRate(diskRate) : '';
+    const bandwidthTxt = bandwidthRate != null ? fmtRate(bandwidthRate) : '';
     const svcFailed = services.filter(s=>!s.active && !s.excluded).length;
     const hasIssue = !node.online || svcFailed>0;
     const isOpen = userOverride['node:'+node.name] !== undefined
@@ -1520,11 +1617,13 @@ function buildProxmox(px){
       : false;
     const nodeVms = vms || [];
     const pveStats = node.online ? [
-      pveHeadStat('Host', host || '-'),
+      pveHeadStat('Host', displayPveHost(host) || '-', 'var(--text)', '', 'is-host'),
       pveHeadStat('CPU', `${cpuPct}%`, bc(cpuPct), miniSparkline(history, 'cpu', cpuPct)),
       pveHeadStat('RAM', `${ramPct}%`, bc(ramPct), miniSparkline(history, 'mem', ramPct)),
-      node.temp != null ? pveHeadStat('Temp', `${node.temp}°C`, tempColor(node.temp)) : '',
-      pveHeadStat('VMs', `${nodeVms.filter(v=>v.running).length}/${nodeVms.length}`),
+      pveHeadStat('Disk I/O', diskIOTxt || '--', diskIOTxt ? 'var(--cyan)' : 'var(--muted)', diskIOTxt ? miniSparkline(history, 'diskIO', diskRate, rateColor, rateSparkMax(history, 'diskIO', diskRate)) : ''),
+      pveHeadStat('Bandwidth', bandwidthTxt || '--', bandwidthTxt ? 'var(--green)' : 'var(--muted)', bandwidthTxt ? miniSparkline(history, 'bandwidth', bandwidthRate, () => '#34D399', rateSparkMax(history, 'bandwidth', bandwidthRate)) : ''),
+      node.temp != null ? pveHeadStat(node.tempLabel || 'Temperature', `${node.temp}°C`, pveTempColor(node.temp), miniSparkline(history, 'temp', node.temp, pveTempHex, 100), 'is-temp') : '',
+      pveHeadStat('VMs', `${nodeVms.filter(v=>v.running).length}/${nodeVms.length}`, 'var(--text)', '', 'is-vms'),
       node.uptime ? pveHeadStat('Uptime', fmtUptime(node.uptime)) : '',
     ].filter(Boolean).join('') : pveHeadStat('Status', 'Unreachable', 'var(--muted)');
 
@@ -1566,8 +1665,8 @@ function buildProxmox(px){
         </div>` })()}
         ${(()=>{ const lim=historyLimitFor('px:'+node.name); return node.temp!=null ? `
         <div class="chart-row">
-          <div class="chart-hdr"><span class="nb-label">Temperature</span><span class="nb-pct" style="color:${tempColor(node.temp)}">${node.temp}°C</span></div>
-          ${histChart(history,'temp',node.temp,lim,tempHex,100,'°C','Temperature')}
+          <div class="chart-hdr"><span class="nb-label">${escHtml(node.tempLabel || 'Temperature')}</span><span class="nb-pct" style="color:${pveTempColor(node.temp)}">${node.temp}°C</span></div>
+          ${histChart(history,'temp',node.temp,lim,pveTempHex,100,'°C',node.tempLabel || 'Temperature')}
         </div>` : '' })()}
         ${backup?`<div class="row" style="padding:8px 0;margin-top:6px;border-top:1px solid var(--border)">
           <span class="nb-label" style="flex:1">Last backup</span>
@@ -2027,7 +2126,7 @@ function buildSynology(syn){
       pveHeadStat('Host', dev.host || '-'),
       dev.cpu != null ? pveHeadStat('CPU', `${dev.cpu}%`, bc(dev.cpu), miniSparkline(dev.history, 'cpu', dev.cpu)) : pveHeadStat('CPU', '--', 'var(--muted)'),
       dev.ram ? pveHeadStat('RAM', `${dev.ram.percent}%`, bc(dev.ram.percent), miniSparkline(dev.history, 'ram', dev.ram.percent)) : pveHeadStat('RAM', '--', 'var(--muted)'),
-      dev.systemTemp != null ? pveHeadStat('CPU temp', `${dev.systemTemp}°C`, tempColor(dev.systemTemp), miniSparkline(dev.history, 'temp', dev.systemTemp, tempHex, 100)) : pveHeadStat('CPU temp', '--', 'var(--muted)'),
+      dev.systemTemp != null ? pveHeadStat('CPU temp', `${dev.systemTemp}°C`, pveTempColor(dev.systemTemp), miniSparkline(dev.history, 'temp', dev.systemTemp, pveTempHex, 100)) : pveHeadStat('CPU temp', '--', 'var(--muted)'),
     ].join('');
     return `
       <div class="node-hdr pve-node-hdr" onclick="toggleSnmp('${skey}')">
@@ -2060,8 +2159,8 @@ function buildSynology(syn){
         </div>` : '' })()}
         ${(()=>{ const lim=historyLimitFor('snmp:'+skey); return dev.systemTemp!=null ? `
           <div class="chart-row">
-            <div class="chart-hdr"><span class="nb-label">${dev.systemTempLabel || 'CPU temperature'}</span><span class="nb-pct" style="color:${tempColor(dev.systemTemp)}">${dev.systemTemp}°C</span></div>
-            ${histChart(dev.history,'temp',dev.systemTemp,lim,tempHex,100,'°C','Temperature')}
+            <div class="chart-hdr"><span class="nb-label">${dev.systemTempLabel || 'CPU temperature'}</span><span class="nb-pct" style="color:${pveTempColor(dev.systemTemp)}">${dev.systemTemp}°C</span></div>
+            ${histChart(dev.history,'temp',dev.systemTemp,lim,pveTempHex,100,'°C','Temperature')}
           </div>` : '' })()}
         ${dev.volumes?.length ? `
           <div class="syn-section" style="margin-top:6px">Volumes</div>
@@ -2269,6 +2368,7 @@ function buildUptimeKuma(uk){
   const warn = (s.pending??0) + (s.unknown??0);
   const maint = s.maintenance??0;
   const health = uptimeKumaHealth(uk);
+  const historyHours = periodHoursValue(uk.historyHours || defaultPeriodHours());
 
   const sbSummaryHtml = online ? `<div class="sb-csum">
     <div class="sb-csum-item"><div class="sb-csum-val">${s.total??0}</div><div class="sb-csum-lbl">Total</div></div>
@@ -2296,12 +2396,17 @@ function buildUptimeKuma(uk){
   </div>`;
   const statusColor = st => st==='up'?'green':st==='down'?'red':(st==='pending'||st==='unknown')?'yellow':'gray';
   const dotColor = st => st==='up'?'md-green':st==='down'?'md-red':(st==='pending'||st==='unknown')?'md-yellow':'md-gray';
+  const rangeToolbar = online ? `<div style="display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:10px 16px;border-bottom:1px solid var(--border)">
+    <span style="font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)">${trText('History range')}</span>
+    ${drawUptimeHistorySelect(historyHours)}
+  </div>` : '';
   const body = !online
     ? `<div class="offline-row">
         <div class="mon-dot md-red"></div>
         <div>Uptime Kuma unreachable<div class="offline-err">${uk.error||''}</div></div>
        </div>`
     : `<div id="uk-monitors">
+        ${rangeToolbar}
         ${monitors.length?colHdr:''}
         ${monitors.map(m=>`<div class="mon-row uk-mon-row">
           <div class="uk-mon-top">
@@ -2312,7 +2417,7 @@ function buildUptimeKuma(uk){
             <span style="width:96px;flex-shrink:0;display:flex;justify-content:center"><span class="badge bg-${statusColor(m.status)}" style="font-size:13px">${m.status}</span></span>
             ${notifyBell('uk:'+m.name)}
           </div>
-          <div class="uk-mon-bars">${uptimeBars(m.history, m.status, { hours: uk.historyHours || 1 })}</div>
+          <div class="uk-mon-bars">${uptimeBars(m.history, m.status, { hours: historyHours })}</div>
         </div>`).join('')}
         ${!monitors.length?'<div class="empty">No monitors found</div>':''}
       </div>`;
@@ -3096,8 +3201,8 @@ function overviewKpiOptions(metric, ids, panels){
   const supported = {
     cpu: ['proxmox','linux','snmp','docker'],
     mem: ['proxmox','linux','snmp','docker'],
-    disk: ['linux'],
-    bandwidth: ['linux','snmp'],
+    disk: ['proxmox','linux'],
+    bandwidth: ['proxmox','linux','snmp'],
   }[metric] || [];
   return ['all', ...ids.filter(id => supported.includes(id))].map(id => ({ id, label: platformKpiLabel(id, panels) }));
 }
@@ -3136,7 +3241,8 @@ function kpiRate(label, vals){
 function overviewKpiMetric(data, metric, platform){
   const linuxOnline = (data.linux||[]).filter(s=>s.online);
   const snmpOnline = (data.snmp||[]).filter(s=>s.online);
-  const pveOnline = (data.proxmox?.nodes||[]).map(n=>n.node||n).filter(n=>n.online);
+  const pveRows = (data.proxmox?.nodes||[]).filter(n=>n.node?.online);
+  const pveOnline = pveRows.map(n=>n.node||n).filter(n=>n.online);
   const dockerOnline = (data.docker||[]).filter(h=>h.online);
   const cpu = {
     proxmox: pveOnline.map(n=>n.cpu),
@@ -3151,9 +3257,11 @@ function overviewKpiMetric(data, metric, platform){
     docker: dockerOnline.map(h=>h.summary?.memPercent),
   };
   const disk = {
+    proxmox: pveRows.map(n=>metricRateSum(n.metrics?.diskIO, 'readBps', 'writeBps')),
     linux: linuxOnline.map(s=>(Number(s.metrics?.diskIO?.readBps)||0)+(Number(s.metrics?.diskIO?.writeBps)||0)),
   };
   const bandwidth = {
+    proxmox: pveRows.map(n=>metricRateSum(n.metrics?.bandwidth, 'rxBps', 'txBps')),
     linux: linuxOnline.map(s=>(Number(s.metrics?.bandwidth?.rxBps)||0)+(Number(s.metrics?.bandwidth?.txBps)||0)),
     snmp: snmpOnline.map(dev => (dev.network||[]).reduce((a,n)=>a+(Number(n.rxMBps)||0)*1024*1024+(Number(n.txMBps)||0)*1024*1024,0)),
   };
@@ -3252,7 +3360,7 @@ function overviewRows(id, data){
     return (data.proxmox?.nodes||[]).slice(0,6).map(({node, services=[]}) => {
       const failed = services.filter(s=>!s.active&&!s.excluded).length;
       const ramPct = node.ram?.percent ?? node.memPct;
-      const sub = node.online ? [node.ip, node.cpu!=null?`CPU ${node.cpu}%`:'', ramPct!=null?`RAM ${ramPct}%`:'', node.temp!=null?`Temp ${node.temp}°C`:'' ].filter(Boolean).join(' · ') : 'Node offline';
+      const sub = node.online ? [node.ip, node.cpu!=null?`CPU ${node.cpu}%`:'', ramPct!=null?`RAM ${ramPct}%`:'', node.temp!=null?`${node.tempLabel || 'Temp'} ${node.temp}°C`:'' ].filter(Boolean).join(' · ') : 'Node offline';
       return overviewRow('proxmox', node.name, sub, node.online?(failed?'yellow':'green'):'red', node.online?(failed?`${failed} failed`:'healthy'):'offline', node.online?(failed?'md-yellow':'md-green'):'md-red');
     }).join('');
   }
@@ -4000,6 +4108,35 @@ function toggleMenu(){ document.getElementById('menu-drop').classList.toggle('op
 document.addEventListener('click', e => { if(!e.target.closest('.menu-wrap')) document.getElementById('menu-drop')?.classList.remove('open'); });
 
 function escHtml(s){ return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function profileInitials(name){
+  const parts = String(name || 'OmniSight').trim().split(/\s+/).filter(Boolean);
+  const chars = parts.length > 1 ? parts[0][0] + parts[parts.length - 1][0] : (parts[0] || 'OS').slice(0, 2);
+  return chars.toUpperCase();
+}
+function setProfileAvatar(el, profile){
+  if(!el) return;
+  if(profile?.avatar) el.innerHTML = `<img src="${profile.avatar}" alt="">`;
+  else el.textContent = profileInitials(profile?.username);
+}
+function applyTopProfile(profile = {}){
+  const username = profile.username || 'OmniSight';
+  document.getElementById('top-profile-name')?.replaceChildren(document.createTextNode(username));
+  document.getElementById('menu-profile-name')?.replaceChildren(document.createTextNode(username));
+  setProfileAvatar(document.getElementById('top-profile-avatar'), { ...profile, username });
+  setProfileAvatar(document.getElementById('menu-profile-avatar'), { ...profile, username });
+}
+async function loadTopProfile(){
+  try{
+    const r = await fetch('/api/profile', { headers: authHeaders(), cache:'no-store' });
+    handleUnauth(r);
+    if(!r.ok) return;
+    applyTopProfile(await r.json());
+  }catch(e){ if(e.message !== 'Unauthorized') applyTopProfile(); }
+}
+window.addEventListener('message', e => {
+  if(e.origin !== window.location.origin) return;
+  if(e.data?.type === 'omnisight-profile') applyTopProfile(e.data.profile || {});
+});
 function highlightLog(text){
   const re=/(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?)|\b(ERROR|ERR|FATAL|CRITICAL|WARNING|WARN|INFO|NOTICE|DEBUG|TRACE)\b|(\b\d{1,3}(?:\.\d{1,3}){3}(?::\d+)?\b)|("[^"]*"|'+"'"+'[^'+"'"+']*'+"'"+')|(\b\d+(?:\.\d+)?\b)/g;
   let out='',last=0,m;
@@ -4171,6 +4308,9 @@ async function initialLoad(){
       return m ? m[1] : null;
     })();
     if(!token){ window.location.href='/login'; return; }
+    loadTopProfile();
+  } else {
+    applyTopProfile();
   }
   await initialLoad();
 })();

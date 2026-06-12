@@ -189,6 +189,10 @@ function handleReport(r) {
       ram: memTotal ? Math.round((memUsed / memTotal) * 100) : 0,
       disk: diskTotal ? Math.round((diskUsed / diskTotal) * 100) : 0,
       temp: a.temp ?? null,
+      diskReadBps: diskIO?.readBps ?? null,
+      diskWriteBps: diskIO?.writeBps ?? null,
+      bandwidthRxBps: bandwidth?.rxBps ?? null,
+      bandwidthTxBps: bandwidth?.txBps ?? null,
     });
     if (hist.length > HISTORY_MAX) hist.shift();
     history.set(id, hist);
@@ -361,7 +365,20 @@ function getProxmoxData(config) {
     const nodeName = a.pve?.node || a.pveNode || a.hostname;
     const online = isOnline(a, now) && !!a.pve;
     if (!online) {
-      return { node: { name: nodeName, online: false, cpuCores: 0, cpuRaw: 0, ram: { used: 0, total: 0 }, temp: a.temp ?? null }, host: a.ip, services: [], vms: [], history: [...(history.get(a.id) || [])].map(h => ({ time: h.time, cpu: h.cpu, mem: h.ram, temp: h.temp })), backup: null, storage: [] };
+      return {
+        node: { name: nodeName, online: false, cpuCores: 0, cpuRaw: 0, ram: { used: 0, total: 0 }, temp: a.temp ?? null },
+        host: a.ip,
+        services: [],
+        vms: [],
+        history: [...(history.get(a.id) || [])].map(h => ({
+          time: h.time, cpu: h.cpu, mem: h.ram, temp: h.temp,
+          diskIO: (Number(h.diskReadBps) || 0) + (Number(h.diskWriteBps) || 0),
+          bandwidth: (Number(h.bandwidthRxBps) || 0) + (Number(h.bandwidthTxBps) || 0),
+        })),
+        metrics: { diskIO: a.metrics?.diskIO || null, bandwidth: a.metrics?.bandwidth || null },
+        backup: null,
+        storage: [],
+      };
     }
     const res = a.pve.resources || [];
     const ne = res.find(r => r.type === 'node' && r.node === nodeName) || {};
@@ -421,7 +438,12 @@ function getProxmoxData(config) {
       host: a.ip,
       services,
       vms,
-      history: [...(history.get(a.id) || [])].map(h => ({ time: h.time, cpu: h.cpu, mem: h.ram, temp: h.temp })),
+      history: [...(history.get(a.id) || [])].map(h => ({
+        time: h.time, cpu: h.cpu, mem: h.ram, temp: h.temp,
+        diskIO: (Number(h.diskReadBps) || 0) + (Number(h.diskWriteBps) || 0),
+        bandwidth: (Number(h.bandwidthRxBps) || 0) + (Number(h.bandwidthTxBps) || 0),
+      })),
+      metrics: { diskIO: a.metrics?.diskIO || null, bandwidth: a.metrics?.bandwidth || null },
       backup,
       storage,
     };

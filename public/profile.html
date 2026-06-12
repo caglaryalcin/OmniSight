@@ -60,6 +60,12 @@ input:last-of-type{margin-bottom:0}
 .user-edit button{background:var(--green);color:#000;border:none;border-radius:7px;padding:0 14px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
 .user-edit button:hover{filter:brightness(1.1)}
 .divider{border:none;border-top:1px solid var(--border);margin:16px 0}
+.avatar-row{display:flex;align-items:center;gap:16px;margin:14px 0 4px}
+.avatar-preview{width:72px;height:72px;border-radius:999px;border:1px solid var(--border);background:var(--row);display:grid;place-items:center;overflow:hidden;color:var(--green);font-weight:800;font-size:20px;flex-shrink:0}
+.avatar-preview img{width:100%;height:100%;object-fit:cover;display:block}
+.avatar-copy{min-width:0;flex:1}
+.avatar-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.avatar-actions .btn{margin-top:0}
 html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#dde3ec;--text:#1c2433;--muted:#64748b;--green:#0e9f6e;--red:#dc2f2f;--yellow:#b7791f;--blue:#3b82f6;}
 </style>
 <style>html.embed header{display:none}</style>
@@ -110,6 +116,19 @@ html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#dd
       <button onclick="saveUsername()">Save</button>
     </div>
     <div class="msg" id="msg-user"></div>
+    <div class="avatar-row">
+      <div class="avatar-preview" id="avatar-preview">OS</div>
+      <div class="avatar-copy">
+        <div class="card-title" style="margin-bottom:4px">Profile picture</div>
+        <p class="muted">Shown in the top bar account menu.</p>
+        <div class="avatar-actions">
+          <button class="btn secondary" type="button" onclick="document.getElementById('avatar-file').click()">Choose image</button>
+          <button class="btn secondary" type="button" onclick="removeAvatar()">Remove</button>
+        </div>
+        <input id="avatar-file" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" style="display:none" onchange="uploadAvatarFile(this)">
+        <div class="msg" id="msg-avatar"></div>
+      </div>
+    </div>
     <hr class="divider">
     <div class="card-title" style="margin-bottom:12px">Change password</div>
     <label>Current password</label>
@@ -159,6 +178,75 @@ document.addEventListener('click', e => { if(!e.target.closest('.menu-wrap')) do
 function authHeaders(){ const t=sessionStorage.getItem('os_token')||localStorage.getItem('os_token'); return t?{'x-session-token':t}:{}; }
 function handleUnauth(r){ if(r.status===401){ sessionStorage.removeItem('os_token'); localStorage.removeItem('os_token'); document.cookie='session=; path=/; max-age=0'; window.location.href='/login'; throw new Error('Unauthorized'); } }
 function escHtml(s){ return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+let currentAvatar = '';
+function initials(name){
+  const parts = String(name || 'OmniSight').trim().split(/\s+/).filter(Boolean);
+  const chars = (parts.length > 1 ? parts[0][0] + parts[parts.length - 1][0] : (parts[0] || 'OS').slice(0,2));
+  return chars.toUpperCase();
+}
+function renderAvatar(username, avatar = currentAvatar){
+  currentAvatar = avatar || '';
+  const el = document.getElementById('avatar-preview');
+  if(!el) return;
+  el.innerHTML = currentAvatar
+    ? `<img src="${currentAvatar}" alt="">`
+    : escHtml(initials(username));
+}
+function notifyProfileChanged(profile){
+  try { window.parent?.postMessage({ type:'omnisight-profile', profile }, window.location.origin); } catch(e){}
+}
+async function loadProfile(){
+  const r = await fetch('/api/profile', { headers: authHeaders(), cache:'no-store' });
+  handleUnauth(r);
+  const d = await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(d.error || r.statusText);
+  if(d.username) document.getElementById('user-display').textContent = d.username;
+  renderAvatar(d.username, d.avatar);
+  return d;
+}
+function fileDataUrl(file){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error('Could not read image'));
+    reader.readAsDataURL(file);
+  });
+}
+async function saveAvatar(dataUrl){
+  const msgEl = document.getElementById('msg-avatar');
+  msgEl.textContent = ''; msgEl.className = 'msg';
+  const r = await fetch('/api/profile/avatar', {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json', ...authHeaders() },
+    body:JSON.stringify({ dataUrl })
+  });
+  handleUnauth(r);
+  const d = await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(d.error || r.statusText);
+  renderAvatar(d.username, d.avatar);
+  notifyProfileChanged(d);
+  msgEl.textContent = dataUrl ? 'Profile picture updated.' : 'Profile picture removed.';
+  msgEl.className = 'msg ok';
+  return d;
+}
+async function uploadAvatarFile(input){
+  const file = input.files && input.files[0];
+  if(!file) return;
+  const msgEl = document.getElementById('msg-avatar');
+  try {
+    msgEl.textContent = 'Uploading...'; msgEl.className = 'msg';
+    await saveAvatar(await fileDataUrl(file));
+  } catch(e) {
+    msgEl.textContent = e.message; msgEl.className = 'msg err';
+  } finally {
+    input.value = '';
+  }
+}
+async function removeAvatar(){
+  const msgEl = document.getElementById('msg-avatar');
+  try { await saveAvatar(''); }
+  catch(e){ msgEl.textContent = e.message; msgEl.className = 'msg err'; }
+}
 async function doLogout(){
   await fetch('/api/logout',{method:'POST',headers:authHeaders()}).catch(()=>{});
   sessionStorage.removeItem('os_token'); localStorage.removeItem('os_token');
@@ -251,6 +339,8 @@ async function saveUsername(){
     const d = await r.json();
     if(!r.ok) throw new Error(d.error||r.statusText);
     document.getElementById('user-display').textContent = username;
+    renderAvatar(username);
+    notifyProfileChanged({ username, avatar: currentAvatar });
     document.getElementById('user-edit').classList.remove('open');
     document.getElementById('chg-user').value = '';
     msgEl.textContent='Username updated!'; msgEl.className='msg ok';
@@ -283,6 +373,8 @@ async function savePassword(){
     if(!r.ok) throw new Error(d.error||r.statusText);
     if(username !== '__current__'){
       document.getElementById('user-display').textContent = username;
+      renderAvatar(username);
+      notifyProfileChanged({ username, avatar: currentAvatar });
       document.getElementById('user-edit').classList.remove('open');
       document.getElementById('chg-user').value = '';
     }
@@ -313,6 +405,8 @@ async function setPassword(hasExisting){
     document.getElementById('card-2fa').style.display='';
     set2FAState(false);
     document.getElementById('user-display').textContent = username;
+    renderAvatar(username, '');
+    notifyProfileChanged({ username, avatar: '' });
   } catch(e){ msgEl.textContent=e.message; msgEl.className='msg err'; }
 }
 
@@ -324,7 +418,12 @@ async function setPassword(hasExisting){
   if(d.required){
     document.getElementById('card-change').style.display='';
     document.getElementById('card-2fa').style.display='';
-    if(d.username) document.getElementById('user-display').textContent = d.username;
+    try {
+      await loadProfile();
+    } catch(e) {
+      if(d.username) document.getElementById('user-display').textContent = d.username;
+      renderAvatar(d.username, '');
+    }
     set2FAState(!!d.twoFactorEnabled);
   } else {
     document.getElementById('card-setup').style.display='';

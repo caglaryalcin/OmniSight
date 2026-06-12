@@ -8,7 +8,7 @@ A simple, single-glance monitoring dashboard for Proxmox, Linux servers, Kuberne
 
 - **Modern UI** — fully redesigned interface: glass header, soft-glow status indicators, card-grid summaries, draggable/collapsible dashboard cards, compact platform summaries in detail headers, Inter typography, refined dark & light themes and subtle micro-animations
 - **One agent, one command** — Linux servers, Proxmox nodes and Docker hosts can be monitored by a single tiny push agent (one bash script + systemd, nothing beyond `curl`). In Settings just click **+ Add System / Node / Host**, pick **Binary**, **Docker** or **Stack**, copy the pre-filled command, run it on the server — the system self-registers and pops up online within seconds. No inbound firewall rules, NAT-friendly (see [The agent](#the-agent))
-- **Proxmox** — node CPU/RAM/temperature/uptime, VM/LXC, per-node service status with **start/stop/restart/exclude** actions, **last backup** (vzdump) status, **Ceph cluster storage health** with active alert summaries, node storage utilization and CPU/RAM history charts — collected via API token or locally by the agent via `pvesh`
+- **Proxmox** — node CPU/RAM/temperature/uptime, Disk I/O and bandwidth when exposed by the API, agent or optional SSH metrics fallback, VM/LXC, per-node service status with **start/stop/restart/exclude** actions, **last backup** (vzdump) status, **Ceph cluster storage health** with active alert summaries, node storage utilization and CPU/RAM/temperature history charts — collected via API token, locally by the agent via `pvesh`, or SSH fallback for host-only metrics
 - **Linux servers** — CPU/RAM/disk/swap/load/temperature/uptime/OS plus disk I/O and bandwidth history, with **auto-discovered** running/failed services and near-instant **status/start/stop/restart/exclude** actions over the agent's command long-poll. Works on any systemd Linux incl. NAS devices (e.g. Synology)
 - **Kubernetes** — pod / deployment / service status, expandable groups, live pod log viewer and optional pod CPU/RAM sorting when the Kubernetes metrics API is available
 - **SNMP** — status of any SNMP v2c/v3 device (Synology, UniFi, switches, routers, …) with CPU/RAM/system or CPU temperature, dynamic MB/GB memory display and history charts where exposed
@@ -29,6 +29,7 @@ A simple, single-glance monitoring dashboard for Proxmox, Linux servers, Kuberne
 - **Custom CA** — trust private/self-signed CAs (see [Custom CA certificates](#custom-ca-certificates))
 - **Public status** — Read-only public summary page (`/status`)
 - **Agents** — connected agent inventory, installed versions and update actions
+- **Profile** — profile image, password changes and optional TOTP two-factor authentication
 - **Appearance** — dashboard side panel toggle, default history period, 12/24 hour time format and English/Turkish UI language preference
 
 ![](https://raw.githubusercontent.com/caglaryalcin/OmniSight/refs/heads/main/screenshots/public-page.png)
@@ -246,7 +247,7 @@ In Kubernetes you can also mount the CA from a ConfigMap — `deploy/kubernetes.
 The live config is `data/config.yaml` (created automatically on first save). Easiest is to configure everything from the Settings UI; to hand-edit, copy the template — `cp config.example.yaml data/config.yaml` — and edit it. All sections are optional; include only what you use. See `config.example.yaml`.
 
 - `linux` — `enabled` + `agentToken` (auto-generated from the Settings UI). Systems self-register via the [agent](#the-agent); no per-server entries needed. Services are auto-discovered and Exclude/Include is managed from the UI
-- `proxmox` — `enabled`, optional `url` / `tokenId` / `tokenSecret` / `insecureTLS` for API mode, plus optional `icon`. Without API settings, data can come from agents running on the nodes (`pvesh`)
+- `proxmox` — `enabled`, optional `url` / `tokenId` / `tokenSecret` / `insecureTLS` for API mode, optional `sshMetrics[]` (`node`, `sshHost`, `sshUser`, `sshPassword`/`sshKey`, `sshPort`, `sudo`) to fill host CPU temperature and host Disk I/O when the API does not expose them, plus optional `icon`. Without API settings, data can come from agents running on the nodes (`pvesh`)
 - `docker` — `enabled`, optional `hosts[]` for Docker API or SSH hosts (`sshHost`, `sshUser`, `sshPassword`/`sshKey`, `sshMode`, `sudo`, `insecureTLS`), plus optional `icon`. Agent-reported Docker hosts also appear automatically
 - `kubernetes` — kubeconfig, namespaces[] (the Settings UI has a **Browse…** button that uploads a kubeconfig from your machine into `data/` and fills in the container path automatically). Pod CPU/RAM sorting uses the Kubernetes metrics API when it is available to the configured account
 - `snmp.devices[]` — SNMP v2c (community) or v3 (username, authPassword, privPassword, …)
