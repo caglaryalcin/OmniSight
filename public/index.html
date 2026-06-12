@@ -411,15 +411,16 @@ html[data-theme="light"] .topbar{background:rgba(255,255,255,.78)}
 .docker-sort-btn:hover,.docker-sort-btn.active{color:var(--green)}
 .docker-sort-arrow{font-size:11px;line-height:1;color:currentColor;opacity:.7}
 .docker-host-history{margin-bottom:12px}
-.pve-node-hdr{align-items:center;gap:12px}
+.pve-node-hdr{align-items:center;gap:8px}
 .pve-head-main{flex:1;min-width:0;display:flex;flex-wrap:wrap;align-items:stretch}
 .pve-head-title,.pve-head-stat{min-width:0;min-height:48px;margin:-1px 0 0 -1px;border:1px solid var(--border);background:transparent;padding:7px 10px;display:flex;flex-direction:column;justify-content:center}
 .pve-head-title{flex:0 0 auto;width:max-content;max-width:min(260px,34vw)}
 .pve-head-stat{flex:1 1 86px}
-.pve-head-stat.is-host{flex:1.05 1 150px}
-.pve-head-stat.is-vms{flex:.65 1 64px}
+.pve-head-stat.is-host{flex:0 1 auto;width:max-content;max-width:min(230px,22vw)}
+.pve-head-stat.is-vms,.pve-head-stat.is-uptime{flex:0 0 auto;width:max-content}
 .pve-head-stat.has-spark{flex:1.55 1 150px;display:grid;grid-template-columns:minmax(52px,auto) minmax(70px,1fr);align-items:center;column-gap:10px}
 .pve-head-stat.is-temp.has-spark{flex:1.28 1 136px}
+.pve-node-hdr .badge + .nbell{margin-left:-3px}
 .pve-head-text{min-width:0}
 .pve-head-title .node-name{width:auto;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pve-head-sub,.pve-head-lbl{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.055em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -775,6 +776,7 @@ html[data-theme="light"] .overview-card .sb-csum-item{background:transparent!imp
           <button class="menu-item" onclick="openEmbed('/profile')">Profile</button>
           <button class="menu-item" onclick="openEmbed('/settings')">Settings</button>
           <button class="menu-item" onclick="openEmbed('/logs')">Logs</button>
+          <button class="menu-item" onclick="openEmbed('/alerts')">Alerts</button>
           <button class="menu-item" onclick="openEmbed('/about')">About</button>
           <button class="menu-item danger" onclick="doLogout()">Sign out</button>
         </div>
@@ -1101,6 +1103,10 @@ function tempColor(v){ return v>=60?'var(--red)':v>=50?'var(--yellow)':'var(--gr
 function tempHex(v){ return v>=60?'#F87171':v>=50?'#FBBF24':'#34D399' }
 function pveTempColor(v){ return v>=60?'var(--red)':'var(--yellow)' }
 function pveTempHex(v){ return v>=60?'#F87171':'#FBBF24' }
+function tempHistoryKey(label){
+  const clean = String(label || 'temperature').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  return `temp_${clean || 'temperature'}`;
+}
 function dc(ok){ return ok?'md-green':'md-red' }
 function bdg(cls,txt){ return `<span class="badge bg-${cls}">${txt}</span>` }
 function hasNum(v){ return v !== null && v !== undefined && v !== '' && Number.isFinite(Number(v)); }
@@ -1526,6 +1532,12 @@ function pveHeadStat(label, value, color = 'var(--text)', spark = '', extraClass
     ${spark}
   </div>`;
 }
+function pveTempHistorySource(history, temp, index = 0) {
+  const key = temp?.historyKey || tempHistoryKey(temp?.label || 'Temperature');
+  const hasKeyHistory = Array.isArray(history) && history.some(d => hasNum(d?.[key]));
+  if (hasKeyHistory || index > 0) return { key, data: hasKeyHistory ? history : [] };
+  return { key: 'temp', data: history };
+}
 function displayPveHost(host) {
   return String(host || '').replace(/^https?:\/\//i, '');
 }
@@ -1616,15 +1628,26 @@ function buildProxmox(px){
       ? userOverride['node:'+node.name]
       : false;
     const nodeVms = vms || [];
+    const tempList = Array.isArray(node.temps) && node.temps.length
+      ? node.temps
+      : (node.temp != null ? [{ label: node.tempLabel || 'Temperature', value: node.temp }] : []);
+    const tempStats = tempList.map((t, idx) => {
+      const label = t.label || 'Temperature';
+      const value = t.value ?? t.temp;
+      const source = pveTempHistorySource(history, t, idx);
+      return value != null
+        ? pveHeadStat(label, `${value}°C`, pveTempColor(value), miniSparkline(source.data, source.key, value, pveTempHex, 100), 'is-temp')
+        : '';
+    });
     const pveStats = node.online ? [
       pveHeadStat('Host', displayPveHost(host) || '-', 'var(--text)', '', 'is-host'),
       pveHeadStat('CPU', `${cpuPct}%`, bc(cpuPct), miniSparkline(history, 'cpu', cpuPct)),
       pveHeadStat('RAM', `${ramPct}%`, bc(ramPct), miniSparkline(history, 'mem', ramPct)),
       pveHeadStat('Disk I/O', diskIOTxt || '--', diskIOTxt ? 'var(--cyan)' : 'var(--muted)', diskIOTxt ? miniSparkline(history, 'diskIO', diskRate, rateColor, rateSparkMax(history, 'diskIO', diskRate)) : ''),
       pveHeadStat('Bandwidth', bandwidthTxt || '--', bandwidthTxt ? 'var(--green)' : 'var(--muted)', bandwidthTxt ? miniSparkline(history, 'bandwidth', bandwidthRate, () => '#34D399', rateSparkMax(history, 'bandwidth', bandwidthRate)) : ''),
-      node.temp != null ? pveHeadStat(node.tempLabel || 'Temperature', `${node.temp}°C`, pveTempColor(node.temp), miniSparkline(history, 'temp', node.temp, pveTempHex, 100), 'is-temp') : '',
+      ...tempStats,
       pveHeadStat('VMs', `${nodeVms.filter(v=>v.running).length}/${nodeVms.length}`, 'var(--text)', '', 'is-vms'),
-      node.uptime ? pveHeadStat('Uptime', fmtUptime(node.uptime)) : '',
+      node.uptime ? pveHeadStat('Uptime', fmtUptime(node.uptime), 'var(--text)', '', 'is-uptime') : '',
     ].filter(Boolean).join('') : pveHeadStat('Status', 'Unreachable', 'var(--muted)');
 
     const sortedVms = [...(vms||[])].sort((a,b) => {
@@ -1664,11 +1687,16 @@ function buildProxmox(px){
           ${histChart(history,'mem',ramPct,lim)}
           ${node.ram?.usedGB?`<div class="chart-foot">${node.ram.usedGB}/${node.ram.totalGB} GB</div>`:''}
         </div>` })()}
-        ${(()=>{ const lim=historyLimitFor('px:'+node.name); return node.temp!=null ? `
-        <div class="chart-row">
-          <div class="chart-hdr"><span class="nb-label">${escHtml(node.tempLabel || 'Temperature')}</span><span class="nb-pct" style="color:${pveTempColor(node.temp)}">${node.temp}°C</span></div>
-          ${histChart(history,'temp',node.temp,lim,pveTempHex,100,'°C',node.tempLabel || 'Temperature')}
-        </div>` : '' })()}
+        ${(()=>{ const lim=historyLimitFor('px:'+node.name); return tempList.map((t, idx) => {
+          const label = t.label || 'Temperature';
+          const value = t.value ?? t.temp;
+          if (value == null) return '';
+          const source = pveTempHistorySource(history, t, idx);
+          return `<div class="chart-row">
+            <div class="chart-hdr"><span class="nb-label">${escHtml(label)}</span><span class="nb-pct" style="color:${pveTempColor(value)}">${value}°C</span></div>
+            ${histChart(source.data, source.key, value, lim, pveTempHex, 100, '°C', label)}
+          </div>`;
+        }).join('') })()}
         ${backup?`<div class="row" style="padding:8px 0;margin-top:6px;border-top:1px solid var(--border)">
           <span class="nb-label" style="flex:1">Last backup</span>
           ${backup.endtime?`<span style="font-size:12px;color:var(--muted);margin-right:8px">${relTime(new Date(backup.endtime*1000).toISOString())}</span>`:''}
@@ -1805,11 +1833,27 @@ function buildLinux(linux){
     const diskIOTxt = diskIO ? `${fmtRate(diskIO.readBps)} / ${fmtRate(diskIO.writeBps)}` : '';
     const bwTxt = bw ? `${fmtRate(bw.rxBps)} / ${fmtRate(bw.txBps)}` : '';
     const ptag = srv.platform && srv.platform!=='linux' ? ` <span class="badge bg-blue" style="font-size:10px;padding:1px 7px">${srv.platform}</span>` : '';
+    const srvSvcTotal = (srv.services || []).filter(s => !s.excluded).length;
+    const srvSvcUp = (srv.services || []).filter(s => s.active && !s.excluded).length;
+    const linuxStats = [
+      pveHeadStat('Host', srv.ip || srv.host || '-', 'var(--text)', '', 'is-host'),
+      cpuPct != null ? pveHeadStat('CPU', `${cpuPct}%`, bc(cpuPct), miniSparkline(srv.history, 'cpu', cpuPct)) : '',
+      ramPct != null ? pveHeadStat('Memory', `${ramPct}%`, bc(ramPct), miniSparkline(srv.history, 'ram', ramPct)) : '',
+      srv.disk ? pveHeadStat('Disk', `${srv.disk.percent}%`, bc(srv.disk.percent), miniSparkline(srv.history, 'disk', srv.disk.percent)) : '',
+      srv.temp != null ? pveHeadStat('Temp', `${srv.temp}°C`, tempColor(srv.temp), miniSparkline(srv.history, 'temp', srv.temp, tempHex, 100)) : '',
+      srvSvcTotal ? pveHeadStat('Services', `${srvSvcUp}/${srvSvcTotal}`) : '',
+      srv.uptime ? pveHeadStat('Uptime', fmtUptime(srv.uptime)) : '',
+    ].filter(Boolean).join('');
     return `
-      <div class="node-hdr" onclick="toggleLinux('${lkey}')">
+      <div class="node-hdr pve-node-hdr" onclick="toggleLinux('${lkey}')">
         <div class="mon-dot ${svcFailed?'md-yellow':'md-green'}"></div>
-        <div class="node-name" style="width:auto;min-width:110px">${srv.name}${ptag}</div>
-        <div class="node-info">${srv.ip||srv.host||''}${cpuPct!=null?' · CPU '+cpuPct+'%':''}${ramPct!=null?' · Memory '+ramPct+'%':''}${srv.temp!=null?' · Temp '+srv.temp+'°C':''}${srv.uptime?' · Uptime - '+fmtUptime(srv.uptime):''}</div>
+        <div class="pve-head-main">
+          <div class="pve-head-title">
+            <div class="node-name">${escHtml(srv.name)}${ptag}</div>
+            <div class="pve-head-sub">${svcFailed ? `${svcFailed} failed` : 'online'}</div>
+          </div>
+          ${linuxStats}
+        </div>
         ${bdg(svcFailed?'red':'green', svcFailed?`${svcFailed} failed`:'all ok')}
         ${notifyBell('lx:'+srv.name)}
         <span class="chevron ${linuxOpen[lkey]?'open':''}" style="margin-left:4px">▼</span>
@@ -1836,10 +1880,10 @@ function buildLinux(linux){
           <div class="chart-row">
             <div class="chart-hdr">
               <span class="nb-label">Disk</span>
-              <span style="font-size:12px;color:var(--muted)">${srv.disk.usedGB}/${srv.disk.totalGB} GB</span>
               <span class="nb-pct" style="color:${bc(diskPct)}">${diskPct}%</span>
             </div>
             ${histChart(srv.history,'disk',diskPct,lim)}
+            <div class="chart-foot">${srv.disk.usedGB}/${srv.disk.totalGB} GB</div>
           </div>` : '' })()}
         ${(()=>{ const lim=historyLimitFor('lx:'+lkey); return srv.temp!=null?`
           <div class="chart-row">

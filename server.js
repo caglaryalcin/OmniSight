@@ -80,6 +80,7 @@ function writePrivateYaml(file, obj) {
 }
 
 const NOTIFY_PATH = path.join(__dirname, 'data', 'notifications.yaml');
+const ALERT_HISTORY_PATH = path.join(__dirname, 'data', 'alerts.yaml');
 function loadNotify() {
   try { const a = yaml.load(fs.readFileSync(NOTIFY_PATH, 'utf8')); return new Set(Array.isArray(a) ? a : (a?.disabled || [])); }
   catch { return new Set(); }
@@ -89,6 +90,36 @@ function saveNotify() {
   catch (e) { console.warn('notifications save failed:', e.message); }
 }
 let notifyDisabled = loadNotify();
+
+const ALERT_HISTORY_MAX = 2000;
+function loadAlertHistory() {
+  try {
+    const a = yaml.load(fs.readFileSync(ALERT_HISTORY_PATH, 'utf8'));
+    return Array.isArray(a) ? a.slice(-ALERT_HISTORY_MAX) : [];
+  } catch { return []; }
+}
+function saveAlertHistory() {
+  try { writePrivateYaml(ALERT_HISTORY_PATH, alertHistory.slice(-ALERT_HISTORY_MAX)); }
+  catch (e) { console.warn('alerts history save failed:', e.message); }
+}
+let alertHistory = loadAlertHistory();
+function pushAlertHistory(entry = {}) {
+  const item = {
+    id: crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(12).toString('hex'),
+    t: Date.now(),
+    type: 'problem',
+    severity: 'normal',
+    title: '',
+    message: '',
+    label: '',
+    detail: '',
+    ...entry,
+  };
+  alertHistory.push(item);
+  if (alertHistory.length > ALERT_HISTORY_MAX) alertHistory = alertHistory.slice(-ALERT_HISTORY_MAX);
+  saveAlertHistory();
+  return item;
+}
 
 const SESSIONS_PATH = path.join(__dirname, 'data', 'sessions.yaml');
 const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
@@ -830,8 +861,31 @@ function alertThresholds() {
 function logAlertResult(rs) {
   (rs || []).forEach(r => { if (!r.ok) console.warn(`Alert ${r.channel} failed: ${r.error}`); });
 }
+function dispatchTrackedAlert(alertConfig, alert, meta = {}, only) {
+  const entry = pushAlertHistory({
+    ...meta,
+    title: alert.title || '',
+    message: alert.message || '',
+    priority: alert.priority || '',
+    tags: alert.tags || '',
+    status: 'sending',
+    channels: [],
+  });
+  dispatchAlert(alertConfig, alert, only)
+    .then(results => {
+      entry.channels = results;
+      entry.status = results.length && results.every(r => !r.ok) ? 'failed' : 'sent';
+      saveAlertHistory();
+      logAlertResult(results);
+    })
+    .catch(err => {
+      entry.status = 'failed';
+      entry.error = err.message || String(err);
+      saveAlertHistory();
+    });
+}
 function runAlertChecks(data) {
-  if (!config.alerts) return;
+  if (!config.alerts || config.alerts.enabled === false) return;
   const cur = extractChecks(data);
   const now = Date.now();
   for (const key of Array.from(alertFirstSeen.keys())) {
@@ -844,7 +898,7 @@ function runAlertChecks(data) {
   const sendProblem = c => {
     const threshold = c.kind === 'threshold';
     const critical = !threshold || c.severity === 'critical';
-    dispatchAlert(config.alerts, {
+    dispatchTrackedAlert(config.alerts, {
       title: threshold
         ? `${critical ? '\u{1F534} CRITICAL' : '\u26A0\uFE0F WARNING'} \u2014 ${c.label}`
         : `\u{1F534} DOWN \u2014 ${c.label}`,
@@ -852,19 +906,38 @@ function runAlertChecks(data) {
         ? `${c.label} is ${c.severity}: ${c.detail}\n${new Date().toLocaleString()}`
         : `${c.label} is ${c.detail || 'down'}\n${new Date().toLocaleString()}`,
       priority: critical ? 'high' : 'default', tags: critical ? 'rotating_light' : 'warning',
-    }).then(logAlertResult).catch(() => {});
+    }, {
+      type: 'problem',
+      severity: threshold ? c.severity : 'critical',
+      key: c.key,
+      label: c.label,
+      detail: c.detail,
+      metric: c.metric || '',
+      value: c.value ?? null,
+      threshold: c.threshold ?? null,
+    });
   };
   const sendRecovery = c => {
     const threshold = c.kind === 'threshold';
-    dispatchAlert(config.alerts, {
+    dispatchTrackedAlert(config.alerts, {
       title: threshold ? `\u{1F7E2} NORMAL \u2014 ${c.label}` : `\u{1F7E2} UP \u2014 ${c.label}`,
       message: threshold
         ? `${c.label} is back below threshold\n${new Date().toLocaleString()}`
         : `${c.label} recovered\n${new Date().toLocaleString()}`,
       priority: 'default', tags: 'white_check_mark',
-    }).then(logAlertResult).catch(() => {});
+    }, {
+      type: 'recovery',
+      severity: 'normal',
+      key: c.key,
+      label: c.label,
+      detail: c.detail,
+      metric: c.metric || '',
+      value: c.value ?? null,
+      threshold: c.threshold ?? null,
+    });
   };
   for (const [key, c] of cur) {
+    c.key = key;
     if (notifyDisabled.has(key)) continue;
     if (now - (alertFirstSeen.get(key) || now) < ALERT_STARTUP_GRACE_MS) continue;
     const p = prevChecks.get(key);
@@ -1919,6 +1992,18 @@ app.get('/api/logs', (req, res) => {
   res.json(LOG_BUFFER.filter(l => l.t > since));
 });
 
+app.get('/api/alerts/history', (req, res) => {
+  const since = Number(req.query.since) || 0;
+  res.setHeader('Cache-Control', 'no-store');
+  res.json(alertHistory.filter(a => Number(a.t || 0) > since));
+});
+
+app.post('/api/alerts/history/clear', (req, res) => {
+  alertHistory = [];
+  saveAlertHistory();
+  res.json({ ok: true });
+});
+
 function buildPublicSummary(data) {
   const out = [];
   const nodes = data.proxmox?.nodes || [];
@@ -2044,11 +2129,27 @@ app.post('/api/alerts/test', async (req, res) => {
   try {
     if (!config.alerts) return res.status(400).json({ error: 'alerts not configured' });
     const only = req.query.channel;
-    const results = await dispatchAlert(config.alerts, {
+    const alert = {
       title: '\u{1F514} OmniSight test alert',
       message: 'This is a test notification from OmniSight.\n' + new Date().toLocaleString(),
       priority: 'default', tags: 'bell',
-    }, only);
+    };
+    const entry = pushAlertHistory({
+      type: 'test',
+      severity: 'normal',
+      label: 'OmniSight test alert',
+      detail: only ? `channel: ${only}` : 'all channels',
+      title: alert.title,
+      message: alert.message,
+      priority: alert.priority,
+      tags: alert.tags,
+      status: 'sending',
+      channels: [],
+    });
+    const results = await dispatchAlert(config.alerts, alert, only);
+    entry.channels = results;
+    entry.status = results.length && results.every(r => !r.ok) ? 'failed' : 'sent';
+    saveAlertHistory();
     results.forEach(r => { if (!r.ok) console.warn(`Alert test ${r.channel} failed: ${r.error}`); });
     res.json({ ok: true, results });
   } catch (err) { res.status(500).json({ error: err.message }); }

@@ -181,6 +181,14 @@ function tempLabel(label) {
   return 'Temperature';
 }
 
+function tempHistoryKey(label) {
+  const clean = String(label || 'temperature')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  return `temp_${clean || 'temperature'}`;
+}
+
 function tempScore(label) {
   const s = String(label || '').toLowerCase();
   if (/fan|rpm|volt|power|watt|freq|clock|load|usage|critical|crit|max|high|limit|alarm|cpuinfo|cpus/.test(s)) return -100;
@@ -192,11 +200,38 @@ function tempScore(label) {
   return -100;
 }
 
-function extractTemperature(input) {
+function tempVariantScore(label) {
+  const s = String(label || '').toLowerCase();
+  let score = 0;
+  if (/nvme|ssd|disk|drive/.test(s)) {
+    if (/composite/.test(s)) score += 25;
+    if (/(^|[\s._:-])sensor\s*\d+/.test(s)) score -= 25;
+  }
+  if (/(^|[\s._:-])cpu($|[\s._:-])|coretemp|package|(^|[\s._:-])core($|[\s._:-]|\d)/.test(s)) {
+    if (/package|tctl|tdie/.test(s)) score += 25;
+    if (/(^|[\s._:-])core\s*\d+/.test(s)) score -= 5;
+  }
+  return score;
+}
+
+function uniqueTemps(values = []) {
+  const byLabel = new Map();
+  values
+    .filter(v => v && v.label && Number.isFinite(Number(v.value)))
+    .forEach(v => {
+      const prev = byLabel.get(v.label);
+      if (!prev || v.score > prev.score || (v.score === prev.score && v.value > prev.value)) {
+        byLabel.set(v.label, { value: Math.round(Number(v.value)), label: v.label, score: v.score });
+      }
+    });
+  return [...byLabel.values()].sort((a, b) => (b.score - a.score) || a.label.localeCompare(b.label));
+}
+
+function extractTemperatures(input) {
   const values = [];
   const seen = new Set();
   function add(value, label) {
-    const score = tempScore(label);
+    const score = tempScore(label) + tempVariantScore(label);
     const n = tempNum(value);
     if (score < 0 || n === null || n < 15 || n > 115) return;
     values.push({ value: Math.round(n), label: tempLabel(label), score });
@@ -220,9 +255,11 @@ function extractTemperature(input) {
     }
   }
   walk(input);
-  if (!values.length) return null;
-  values.sort((a, b) => (b.score - a.score) || (b.value - a.value));
-  return values[0];
+  return uniqueTemps(values);
+}
+
+function extractTemperature(input) {
+  return extractTemperatures(input)[0] || null;
 }
 
 function pveSshMetricHosts(cfg) {
@@ -283,7 +320,7 @@ function parseSshMetrics(text, key) {
       const label = parts[2] || '';
       const raw = Number(parts[3]);
       const value = Number.isFinite(raw) ? raw / 1000 : NaN;
-      const score = tempScore(`${source} ${label}`);
+      const score = tempScore(`${source} ${label}`) + tempVariantScore(`${source} ${label}`);
       if (score >= 0 && Number.isFinite(value) && value >= 15 && value <= 115) {
         tempCandidates.push({ value: Math.round(value), label: tempLabel(`${source} ${label}`), score });
       }
@@ -292,7 +329,7 @@ function parseSshMetrics(text, key) {
       writeSectors += Number(parts[3]) || 0;
     }
   }
-  tempCandidates.sort((a, b) => (b.score - a.score) || (b.value - a.value));
+  const tempInfos = uniqueTemps(tempCandidates);
   const now = Date.now();
   const readBytes = readSectors * 512;
   const writeBytes = writeSectors * 512;
@@ -306,7 +343,7 @@ function parseSshMetrics(text, key) {
       writeBps: Math.max(0, (writeBytes - prev.writeBytes) / sec),
     };
   }
-  return { tempInfo: tempCandidates[0] || null, diskIO };
+  return { tempInfo: tempInfos[0] || null, tempInfos, diskIO };
 }
 
 async function readSshMetrics(cfg, nodeName) {
@@ -362,11 +399,25 @@ async function nodeData(cfg, node, excluded, resource = null) {
     const sshMetrics = await readSshMetricsSafe(cfg, name);
     const finalDiskIO = diskIO || sshMetrics?.diskIO || null;
     const finalDiskIOTotal = finalDiskIO ? (Number(finalDiskIO.readBps) || 0) + (Number(finalDiskIO.writeBps) || 0) : null;
-    const apiTempInfo = extractTemperature(sensors) ?? extractTemperature(status) ?? extractTemperature(resource) ?? extractTemperature(node);
-    const tempInfo = sshMetrics?.tempInfo ?? (sshMetrics?.error ? null : apiTempInfo);
+    const apiTempInfos = uniqueTemps([
+      ...extractTemperatures(sensors),
+      ...extractTemperatures(status),
+      ...extractTemperatures(resource),
+      ...extractTemperatures(node),
+    ]);
+    const tempInfos = uniqueTemps([
+      ...(sshMetrics?.tempInfos || []),
+      ...(sshMetrics?.error ? [] : apiTempInfos),
+    ]);
+    const apiTempInfo = apiTempInfos[0] || null;
+    const tempInfo = tempInfos[0] ?? (sshMetrics?.error ? null : apiTempInfo);
     const temp = tempInfo?.value ?? null;
     const hist = pveHistory.get(name) || [];
-    hist.push({ time: Date.now(), cpu, mem: mem.percent || 0, temp, diskIO: finalDiskIOTotal, bandwidth: bandwidthTotal });
+    const tempHistory = {};
+    for (const t of tempInfos) {
+      tempHistory[tempHistoryKey(t.label)] = t.value;
+    }
+    hist.push({ time: Date.now(), cpu, mem: mem.percent || 0, temp, ...tempHistory, diskIO: finalDiskIOTotal, bandwidth: bandwidthTotal });
     if (hist.length > 240) hist.shift();
     pveHistory.set(name, hist);
     const exList = excluded[name] || [];
@@ -380,6 +431,7 @@ async function nodeData(cfg, node, excluded, resource = null) {
         ram: mem,
         temp,
         tempLabel: tempInfo?.label || null,
+        temps: tempInfos.map(t => ({ label: t.label, value: t.value, historyKey: tempHistoryKey(t.label) })),
         uptime: Number(status.uptime) || null,
       },
       host: cfg.url,

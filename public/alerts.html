@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>try{document.documentElement.setAttribute("data-theme",localStorage.getItem("os_theme")||"dark")}catch(e){}</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>OmniSight - Alerts</title>
+<link rel="icon" type="image/svg+xml" href="/assets/omnisight-logo.svg">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#141617;--panel:#181A1B;--row:#141617;--border:#242C3B;--text:#E2E8F2;--muted:#7D8AA3;--green:#34D399;--red:#F87171;--yellow:#FBBF24;--blue:#60A5FA}
+body{background:var(--bg);color:var(--text);font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;display:flex;flex-direction:column;height:100vh}
+*{scrollbar-width:thin;scrollbar-color:var(--border) var(--bg)}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border);border:2px solid var(--bg);border-radius:999px}
+::-webkit-scrollbar-thumb:hover{background:var(--muted)}
+::-webkit-scrollbar-corner{background:var(--bg)}
+header{background:var(--panel);border-bottom:1px solid var(--border);height:64px;padding:0 24px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.logo{font-size:19px;font-weight:700;display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit}
+.ldot{width:12px;height:12px;border-radius:50%;background:var(--yellow)}
+.hdr-r{display:flex;align-items:center;gap:8px}
+.btn{background:var(--row);border:1px solid var(--border);color:var(--text);padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;display:flex;align-items:center;gap:6px}
+.btn:hover{border-color:#4a5568}
+.btn.active{border-color:var(--yellow);color:var(--yellow)}
+.filter-bar{background:var(--panel);border-bottom:1px solid var(--border);padding:8px 20px;display:flex;align-items:center;gap:8px;flex-shrink:0}
+.filter-btn{padding:3px 10px;border-radius:20px;border:1px solid var(--border);background:none;color:var(--muted);font-size:11px;font-weight:700;cursor:pointer;text-transform:uppercase}
+.filter-btn.on{background:var(--row);color:var(--text);border-color:#4a5568}
+.filter-btn.problem.on{color:var(--red);border-color:var(--red)}
+.filter-btn.recovery.on{color:var(--green);border-color:var(--green)}
+.filter-btn.test.on{color:var(--blue);border-color:var(--blue)}
+#search{background:var(--row);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:4px 10px;outline:none;margin-left:auto;width:220px}
+#search:focus{border-color:#4a5568}
+#alert-wrap{flex:1;overflow-y:auto;padding:12px 20px;font-size:12px;line-height:1.45}
+.alert-row{display:grid;grid-template-columns:178px 82px 92px minmax(220px,1fr) 220px;gap:12px;align-items:start;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.055)}
+.alert-row:hover{background:rgba(255,255,255,.03)}
+.alert-time{color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+.pill{display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--border);border-radius:999px;padding:2px 9px;font-size:10px;font-weight:800;text-transform:uppercase;line-height:1.4;width:max-content}
+.pill.problem{color:var(--red);border-color:rgba(248,113,113,.45);background:rgba(248,113,113,.10)}
+.pill.recovery{color:var(--green);border-color:rgba(52,211,153,.45);background:rgba(52,211,153,.10)}
+.pill.test{color:var(--blue);border-color:rgba(96,165,250,.45);background:rgba(96,165,250,.10)}
+.sev{font-weight:800;text-transform:uppercase;font-size:10px}
+.sev.critical{color:var(--red)}
+.sev.warning{color:var(--yellow)}
+.sev.normal{color:var(--green)}
+.alert-main{min-width:0}
+.alert-title{font-weight:750;color:var(--text);font-size:13px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.alert-msg{color:var(--muted);white-space:pre-wrap;word-break:break-word}
+.channels{display:flex;flex-wrap:wrap;gap:5px;justify-content:flex-end}
+.channel{border:1px solid var(--border);border-radius:999px;padding:2px 7px;color:var(--muted);font-size:10px;font-weight:700}
+.channel.ok{color:var(--green);border-color:rgba(52,211,153,.45)}
+.channel.fail{color:var(--red);border-color:rgba(248,113,113,.45)}
+.empty-msg{color:var(--muted);text-align:center;padding:40px}
+.count{font-size:11px;color:var(--muted)}
+.menu-wrap{position:relative}
+.menu-btn{background:var(--row);border:1px solid var(--border);color:var(--text);padding:8px 13px;border-radius:7px;cursor:pointer;font-size:14px;display:flex;align-items:center;gap:6px}
+.menu-btn:hover{border-color:#4a5568}
+.menu-drop{display:none;position:absolute;right:0;top:calc(100% + 6px);background:var(--panel);border:1px solid var(--border);border-radius:8px;min-width:140px;overflow:hidden;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.menu-drop.open{display:block}
+.menu-item{display:block;padding:10px 16px;font-size:13px;color:var(--text);text-decoration:none;cursor:pointer;border:none;background:none;width:100%;text-align:left}
+.menu-item:hover{background:rgba(255,255,255,.05)}
+.menu-item.danger{color:var(--red)}
+html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#dde3ec;--text:#1c2433;--muted:#64748b;--green:#0e9f6e;--red:#dc2f2f;--yellow:#b7791f;--blue:#3b82f6}
+html.embed header{display:none}
+@media(max-width:900px){.alert-row{grid-template-columns:1fr}.channels{justify-content:flex-start}}
+</style>
+<script>if(window.self!==window.top)document.documentElement.classList.add("embed");</script>
+</head>
+<body>
+<header>
+  <a href="/" class="logo"><div class="ldot"></div>OmniSight</a>
+  <div class="hdr-r">
+    <span class="count" id="count"></span>
+    <button class="btn" id="follow-btn" onclick="toggleFollow()">Follow</button>
+    <button class="btn" onclick="clearHistory()">Clear</button>
+    <div class="menu-wrap">
+      <button class="menu-btn" onclick="toggleMenu()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+      </button>
+      <div class="menu-drop" id="menu-drop">
+        <a class="menu-item" href="/profile">Profile</a>
+        <a class="menu-item" href="/settings">Settings</a>
+        <a class="menu-item" href="/logs">Logs</a>
+        <button class="menu-item danger" onclick="doLogout()">Sign out</button>
+      </div>
+    </div>
+  </div>
+</header>
+<div class="filter-bar">
+  <button class="filter-btn problem on" onclick="toggleFilter('problem',this)">Problem</button>
+  <button class="filter-btn recovery on" onclick="toggleFilter('recovery',this)">Recovery</button>
+  <button class="filter-btn test on" onclick="toggleFilter('test',this)">Test</button>
+  <button class="btn" id="copy-btn" onclick="copyAlerts()">Copy all</button>
+  <input id="search" type="text" placeholder="Filter..." oninput="renderAlerts()">
+</div>
+<div id="alert-wrap"><div class="empty-msg">Loading alerts...</div></div>
+
+<script src="/i18n.js"></script>
+<script>
+function currentLang(){ return OmniI18n.currentLang('en'); }
+function t(text){ return OmniI18n.t(text, currentLang()); }
+function applyLanguage(){
+  const lang = currentLang();
+  OmniI18n.apply(document, lang);
+  document.title = lang === 'tr' ? 'OmniSight - Bildirimler' : 'OmniSight - Alerts';
+}
+function authHeaders(){ const t=sessionStorage.getItem('os_token'); return t?{'x-session-token':t}:{}; }
+function handleUnauth(r){ if(r.status===401){ sessionStorage.removeItem('os_token'); document.cookie='session=; path=/; max-age=0'; window.location.href='/login'; throw new Error('Unauthorized'); } }
+async function doLogout(){ await fetch('/api/logout',{method:'POST',headers:authHeaders()}).catch(()=>{}); sessionStorage.removeItem('os_token'); document.cookie='session=; path=/; max-age=0'; window.location.href='/login'; }
+function toggleMenu(){ document.getElementById('menu-drop').classList.toggle('open'); }
+document.addEventListener('click', e => { if(!e.target.closest('.menu-wrap')) document.getElementById('menu-drop')?.classList.remove('open'); });
+
+let allAlerts = [];
+let lastTs = 0;
+let follow = true;
+let filters = { problem: true, recovery: true, test: true };
+
+function toggleFollow(){
+  follow = !follow;
+  document.getElementById('follow-btn').classList.toggle('active', follow);
+  if(follow) scrollTop();
+}
+function toggleFilter(type, btn){
+  filters[type] = !filters[type];
+  btn.classList.toggle('on', filters[type]);
+  renderAlerts();
+}
+function fmt(ts){
+  const lang = currentLang() === 'tr' ? 'tr-TR' : 'en-GB';
+  return new Date(ts).toLocaleString(lang, { year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false });
+}
+function escHtml(s){ return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function visibleAlerts(){
+  const q = document.getElementById('search').value.toLowerCase();
+  return allAlerts
+    .filter(a => filters[a.type || 'problem'])
+    .filter(a => !q || [a.title,a.message,a.label,a.detail,a.severity,a.status].some(v => String(v || '').toLowerCase().includes(q)))
+    .sort((a,b) => Number(b.t || 0) - Number(a.t || 0));
+}
+function channelHtml(a){
+  const channels = Array.isArray(a.channels) ? a.channels : [];
+  if(!channels.length) return `<span class="channel">${escHtml(t(a.status || 'sending'))}</span>`;
+  return channels.map(c => `<span class="channel ${c.ok?'ok':'fail'}" title="${escHtml(c.error || '')}">${escHtml(c.channel)} ${c.ok?'OK':'FAIL'}</span>`).join('');
+}
+function renderAlerts(){
+  const wrap = document.getElementById('alert-wrap');
+  const rows = visibleAlerts();
+  document.getElementById('count').textContent = `${rows.length} ${t('entries')}`;
+  if(!rows.length){ wrap.innerHTML = `<div class="empty-msg">${t('No alerts yet')}</div>`; applyLanguage(); return; }
+  wrap.innerHTML = rows.map(a => {
+    const type = a.type || 'problem';
+    const sev = a.severity || 'normal';
+    const title = a.title || a.label || type;
+    const msg = a.message || [a.label, a.detail].filter(Boolean).join(' - ');
+    return `<div class="alert-row">
+      <span class="alert-time">${fmt(a.t)}</span>
+      <span class="pill ${escHtml(type)}">${escHtml(t(type))}</span>
+      <span class="sev ${escHtml(sev)}">${escHtml(t(sev))}</span>
+      <div class="alert-main">
+        <div class="alert-title">${escHtml(title)}</div>
+        <div class="alert-msg">${escHtml(msg)}</div>
+      </div>
+      <div class="channels">${channelHtml(a)}</div>
+    </div>`;
+  }).join('');
+  applyLanguage();
+  if(follow) scrollTop();
+}
+async function copyAlerts(){
+  const rows = visibleAlerts();
+  const text = rows.map(a => `${fmt(a.t)} ${String(a.type || '').toUpperCase()} ${String(a.severity || '').toUpperCase()} ${a.title || a.label || ''} ${a.message || a.detail || ''}`).join('\n');
+  const btn = document.getElementById('copy-btn');
+  try {
+    await navigator.clipboard.writeText(text);
+    const old = btn.textContent;
+    btn.textContent = t('Copied');
+    setTimeout(() => { btn.textContent = old; }, 1200);
+  } catch {
+    const old = btn.textContent;
+    btn.textContent = t('Copy failed');
+    setTimeout(() => { btn.textContent = old; }, 1200);
+  }
+}
+async function clearHistory(){
+  if(!confirm(t('Clear alert history?'))) return;
+  const r = await fetch('/api/alerts/history/clear', { method:'POST', headers:authHeaders() });
+  handleUnauth(r);
+  allAlerts = [];
+  lastTs = 0;
+  renderAlerts();
+}
+function scrollTop(){ document.getElementById('alert-wrap').scrollTop = 0; }
+async function poll(){
+  try {
+    const r = await fetch(`/api/alerts/history?since=${lastTs}`, { headers: authHeaders(), cache:'no-store' });
+    handleUnauth(r);
+    const rows = await r.json();
+    if(rows.length){
+      const seen = new Set(allAlerts.map(a => a.id));
+      rows.forEach(a => { if(!seen.has(a.id)){ allAlerts.push(a); seen.add(a.id); } });
+      if(allAlerts.length > 2000) allAlerts = allAlerts.slice(-2000);
+      lastTs = Math.max(...allAlerts.map(a => Number(a.t || 0)));
+      renderAlerts();
+    } else if(!allAlerts.length) {
+      renderAlerts();
+    }
+  } catch(e){ if(e.message !== 'Unauthorized') console.error(e); }
+  setTimeout(poll, 3000);
+}
+(async()=>{
+  const r = await fetch('/api/auth-status').catch(()=>null);
+  if(r?.status===401){ window.location.href='/login'; return; }
+  document.getElementById('follow-btn').classList.add('active');
+  applyLanguage();
+  poll();
+})();
+</script>
+</body>
+</html>
