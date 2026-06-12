@@ -151,7 +151,7 @@ header{
 .hb{display:flex;gap:2px;align-items:center;flex:1}
 .hb-bar{width:7px;height:22px;border-radius:2px;flex-shrink:0}
 .uk-bars{display:flex;align-items:center;gap:4px;min-width:0;overflow:hidden}
-.uk-bar{width:5px;height:18px;border-radius:4px;flex:0 0 5px;background:var(--muted);opacity:.95;cursor:help}
+.uk-bar{width:5px;height:18px;border-radius:4px;flex:0 0 5px;background:var(--muted);opacity:.95;cursor:default}
 .uk-bar.up{background:var(--green)}
 .uk-bar.down{background:var(--red)}
 .uk-bar.warn{background:var(--yellow)}
@@ -2181,53 +2181,58 @@ function uptimeStatusWeight(status){
   if(st === 'up') return 1;
   return 0;
 }
-function compactUptimeHistory(history, currentStatus, maxPoints = 180, limit = 6000, alreadyBucketed = false, minuteLimit = 0){
-  const raw = Array.isArray(history) && history.length
-    ? history.slice(-limit)
-    : Array.from({ length: 60 }, () => ({ status: currentStatus || 'unknown' }));
-  if(!alreadyBucketed && raw.length && raw.some(h => h?.time)){
-    const byMinute = new Map();
-    raw.forEach(h => {
-      const ms = new Date(h?.time || 0).getTime();
-      if(!Number.isFinite(ms)) return;
-      const minute = Math.floor(ms / 60000) * 60000;
-      if(!byMinute.has(minute)) byMinute.set(minute, []);
-      byMinute.get(minute).push(h);
-    });
-    if(byMinute.size){
-      let bucketed = [...byMinute.entries()].sort((a,b)=>a[0]-b[0]).map(([minute, chunk]) => {
-        const picked = [...chunk].sort((a,b) => uptimeStatusWeight(b?.status || currentStatus) - uptimeStatusWeight(a?.status || currentStatus))[0] || chunk[chunk.length - 1] || {};
-        const pingVals = chunk.map(h => Number(h?.ping)).filter(Number.isFinite);
-        const avgPing = pingVals.length ? Math.round(pingVals.reduce((a,b)=>a+b,0) / pingVals.length) : picked.ping;
-        const message = [...chunk].reverse().map(h => h?.message).find(Boolean) || picked.message || '';
-        return {
-          ...picked,
-          time: new Date(minute).toISOString(),
-          endTime: new Date(minute + 59999).toISOString(),
-          ping: avgPing,
-          message,
-          count: chunk.length,
-        };
-      });
-      if(minuteLimit > 0) bucketed = bucketed.slice(-minuteLimit);
-      return compactUptimeHistory(bucketed, currentStatus, maxPoints, bucketed.length, true, 0);
+function compactUptimeHistory(history, currentStatus, maxPoints = 180, limit = 6000, _alreadyBucketed = false, minuteLimit = 0){
+  const windowMinutes = Math.max(1, Math.ceil(Number(minuteLimit || maxPoints) || 60));
+  const pointCount = Math.max(1, Math.min(Math.ceil(Number(maxPoints) || 180), windowMinutes));
+  const endMs = Math.ceil(Date.now() / 60000) * 60000;
+  const startMs = endMs - windowMinutes * 60000;
+  const bucketMs = (endMs - startMs) / pointCount;
+  const emptyStatus = currentStatus || 'unknown';
+  const raw = Array.isArray(history)
+    ? history.slice(-limit).map(h => ({ ...h, _ms: new Date(h?.time || 0).getTime() })).filter(h => Number.isFinite(h._ms)).sort((a,b) => a._ms - b._ms)
+    : [];
+  const buckets = Array.from({ length: pointCount }, () => []);
+  raw.forEach(h => {
+    if (h._ms < startMs || h._ms > endMs) return;
+    const idx = Math.max(0, Math.min(pointCount - 1, Math.floor((h._ms - startMs) / bucketMs)));
+    buckets[idx].push(h);
+  });
+  let rawIndex = raw.findIndex(h => h._ms >= startMs);
+  if (rawIndex < 0) rawIndex = raw.length;
+  let carry = [...raw].reverse().find(h => h._ms <= startMs) || null;
+  return buckets.map((chunk, idx) => {
+    const segStart = Math.round(startMs + idx * bucketMs);
+    const segEnd = Math.round(startMs + (idx + 1) * bucketMs - 1);
+    while (rawIndex < raw.length && raw[rawIndex]._ms <= segEnd) {
+      if (raw[rawIndex]._ms >= startMs) carry = raw[rawIndex];
+      rawIndex += 1;
     }
-  }
-  if(raw.length <= maxPoints) return raw.map(h => ({ ...h, count: 1 }));
-  const step = Math.ceil(raw.length / maxPoints);
-  const out = [];
-  for(let i = 0; i < raw.length; i += step){
-    const chunk = raw.slice(i, i + step);
+    if (!chunk.length) {
+      const base = carry || (!raw.length ? { status: emptyStatus } : null);
+      return {
+        ...(base || {}),
+        status: base?.status || 'unknown',
+        time: new Date(segStart).toISOString(),
+        endTime: new Date(segEnd).toISOString(),
+        ping: null,
+        message: '',
+        count: 0,
+        missing: true,
+      };
+    }
     const picked = [...chunk].sort((a,b) => uptimeStatusWeight(b?.status || currentStatus) - uptimeStatusWeight(a?.status || currentStatus))[0] || chunk[chunk.length - 1] || {};
-    const start = chunk.find(h => h?.time)?.time || '';
-    const end = [...chunk].reverse().find(h => h?.time)?.time || start;
     const pingVals = chunk.map(h => Number(h?.ping)).filter(Number.isFinite);
     const avgPing = pingVals.length ? Math.round(pingVals.reduce((a,b)=>a+b,0) / pingVals.length) : picked.ping;
     const message = [...chunk].reverse().map(h => h?.message).find(Boolean) || picked.message || '';
-    const count = chunk.reduce((sum,h)=>sum + Number(h?.count || 1), 0);
-    out.push({ ...picked, time: start || picked.time, endTime: end || start || picked.time, ping: avgPing, message, count });
-  }
-  return out;
+    return {
+      ...picked,
+      time: new Date(segStart).toISOString(),
+      endTime: new Date(segEnd).toISOString(),
+      ping: avgPing,
+      message,
+      count: chunk.reduce((sum,h)=>sum + Number(h?.count || 1), 0),
+    };
+  });
 }
 function uptimeBars(history, currentStatus, options = {}){
   const hours = Number(options.hours || 0);
@@ -2239,7 +2244,7 @@ function uptimeBars(history, currentStatus, options = {}){
     const titleTime = h?.time ? new Date(h.time).toLocaleString() : '';
     const titleEnd = h?.endTime && h.endTime !== h.time ? new Date(h.endTime).toLocaleTimeString([], { hour12:false }) : '';
     const title = [st, titleEnd ? `${titleTime} - ${titleEnd}` : titleTime, h?.ping != null ? `${h.ping} ms` : '', h?.count > 1 ? `${h.count} checks` : '', h?.message || ''].filter(Boolean).join(' · ');
-    return `<span class="uk-bar ${cls}" aria-label="${escAttr(title)}" data-title="${escAttr(title)}" data-status="${escAttr(st)}" data-time="${escAttr(h?.time || '')}" data-end-time="${escAttr(h?.endTime || '')}" data-count="${escAttr(h?.count || '')}" data-ping="${escAttr(h?.ping ?? '')}" data-message="${escAttr(h?.message || '')}" onmousemove="showUptimeTooltip(event,this)" onmouseleave="hideChartTooltip()"></span>`;
+    return `<span class="uk-bar ${cls}" data-title="${escAttr(title)}" data-status="${escAttr(st)}" data-time="${escAttr(h?.time || '')}" data-end-time="${escAttr(h?.endTime || '')}" data-count="${escAttr(h?.count || '')}" data-ping="${escAttr(h?.ping ?? '')}" data-message="${escAttr(h?.message || '')}" onmousemove="showUptimeTooltip(event,this)" onmouseleave="hideChartTooltip()"></span>`;
   }).join('')}</div>`;
 }
 function uptimeKumaHealth(uk){
