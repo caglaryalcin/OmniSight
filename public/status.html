@@ -53,6 +53,7 @@ h1{font-size:22px;font-weight:800;letter-spacing:-.02em}
   <div id="list"></div>
   <div class="foot">Auto-refreshes every 15s · Powered by <a href="https://github.com/caglaryalcin/OmniSight" target="_blank" rel="noopener" style="color:var(--green);text-decoration:none;font-weight:700">OmniSight</a></div>
 </div>
+<script src="/i18n.js"></script>
 <script>
 function genChart(data, status) {
   const W = 300, H = 26;
@@ -83,33 +84,9 @@ function genChart(data, status) {
 const dotCls = s => s === 'ok' ? 'd-ok' : s === 'warn' ? 'd-warn' : s === 'down' ? 'd-down' : 'd-gray';
 const txtCls = s => s === 'ok' ? 't-ok' : s === 'warn' ? 't-warn' : s === 'down' ? 't-down' : '';
 let pageLang = 'en';
-try { pageLang = localStorage.getItem('os_lang') || 'en'; } catch {}
-const I18N_TR = {
-  'Status':'Durum',
-  'Status page':'Durum Sayfası',
-  'Status Page':'Durum Sayfası',
-  'SYSTEMS':'Sunucular',
-  'Systems':'Sunucular',
-  'NAME':'İsim',
-  'Name':'İsim',
-  'Operational':'Çalışıyor',
-  'Degraded':'Sorunlu',
-  'Down':'Kapalı',
-  'Connecting…':'Bağlanıyor…',
-  'Unknown':'Bilinmiyor',
-  'Loading…':'Yükleniyor…',
-  'Last updated':'Son güncelleme',
-  'All systems operational':'Tüm sunucular çalışıyor',
-  'Partial degradation':'Kısmi sorun var',
-  'Major outage':'Büyük kesinti',
-  'No data':'Veri yok',
-  'No services configured':'Yapılandırılmış servis yok',
-  'Status page is not enabled':'Durum sayfası etkin değil',
-  'Auto-refreshes every 15s':'Her 15 saniyede otomatik yenilenir',
-  'Powered by OmniSight':'OmniSight ile çalışır'
-};
+try { pageLang = OmniI18n.currentLang('en'); } catch {}
 function t(text) {
-  return pageLang === 'tr' ? (I18N_TR[text] || text) : text;
+  return OmniI18n.t(text, pageLang);
 }
 const label  = s => s === 'ok' ? t('Operational') : s === 'warn' ? t('Degraded') : s === 'down' ? t('Down') : s === 'connecting' ? t('Connecting…') : t('Unknown');
 function escHtml(s) {
@@ -141,7 +118,7 @@ async function load() {
     const r = await fetch('/api/public/status');
     if (!r.ok) throw new Error(t('Status page is not enabled'));
     const d = await r.json();
-    try { pageLang = localStorage.getItem('os_lang') || d.preferredLanguage || 'en'; } catch { pageLang = d.preferredLanguage || 'en'; }
+    try { pageLang = OmniI18n.currentLang(d.preferredLanguage || 'en'); } catch { pageLang = d.preferredLanguage || 'en'; }
     document.documentElement.lang = pageLang;
     document.querySelector('.foot').innerHTML = pageLang === 'tr'
       ? 'Her 15 saniyede otomatik yenilenir · <a href="https://github.com/caglaryalcin/OmniSight" target="_blank" rel="noopener" style="color:var(--green);text-decoration:none;font-weight:700">OmniSight</a> ile çalışır'

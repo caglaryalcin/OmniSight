@@ -66,60 +66,13 @@ html.embed header{display:none}
   </div>
   <div class="msg" id="msg"></div>
 </main>
+<script src="/i18n.js"></script>
 <script>
-const I18N_TR = {
-  'Agents':'Ajanlar',
-  'Connected push agents and their installed versions.':'Bağlı push ajanları ve kurulu sürümleri.',
-  'Latest':'Güncel',
-  'Refresh':'Yenile',
-  'Agent':'Ajan',
-  'Role':'Rol',
-  'System':'Sistem',
-  'Status':'Durum',
-  'Version':'Sürüm',
-  'Action':'İşlem',
-  'Loading agents...':'Ajanlar yükleniyor...',
-  'No agents have reported yet.':'Henüz raporlayan ajan yok.',
-  'unknown':'bilinmiyor',
-  'online':'çevrimiçi',
-  'offline':'çevrimdışı',
-  'Update':'Güncelle',
-  'Offline':'Çevrimdışı',
-  'Current':'Güncel',
-  'Updating...':'Güncelleniyor...',
-  'Copied':'Kopyalandı',
-  'Copy':'Kopyala',
-  'Manual update required.':'Manuel güncelleme gerekli.',
-  'Update command sent. Waiting for next report...':'Güncelleme komutu gönderildi. Sonraki rapor bekleniyor...',
-  'never':'hiç',
-  'ago':'önce'
-};
-const I18N_ATTRS = ['placeholder','title','aria-label'];
-function currentLang(){ try { return localStorage.getItem('os_lang') || 'en'; } catch { return 'en'; } }
-function t(text){ return currentLang() === 'tr' ? (I18N_TR[text] || text) : text; }
+function currentLang(){ return OmniI18n.currentLang('en'); }
+function t(text){ return OmniI18n.t(text, currentLang()); }
 function applyLanguage(){
   const lang = currentLang();
-  document.documentElement.lang = lang;
-  document.querySelectorAll('*').forEach(el => I18N_ATTRS.forEach(attr => {
-    if(!el.hasAttribute(attr)) return;
-    const key = `_osOrig_${attr}`;
-    if(el[key] === undefined) el[key] = el.getAttribute(attr);
-    el.setAttribute(attr, t(el[key]));
-  }));
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
-    acceptNode(node){
-      const p = node.parentElement;
-      if(!p || ['SCRIPT','STYLE','PRE','CODE','TEXTAREA'].includes(p.tagName)) return NodeFilter.FILTER_REJECT;
-      return node.nodeValue.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
-    }
-  });
-  let node;
-  while((node = walker.nextNode())){
-    if(node._osOrigText === undefined) node._osOrigText = node.nodeValue;
-    const original = node._osOrigText;
-    const trimmed = original.trim();
-    node.nodeValue = original.replace(trimmed, t(trimmed));
-  }
+  OmniI18n.apply(document, lang);
   document.title = currentLang() === 'tr' ? 'OmniSight - Ajanlar' : 'OmniSight - Agents';
 }
 function authHeaders(){ const t=sessionStorage.getItem('os_token')||localStorage.getItem('os_token'); return t?{'x-session-token':t}:{}; }

@@ -756,6 +756,7 @@ html[data-theme="light"] .overview-card .sb-csum-item{background:transparent!imp
   </main>
 </div>
 
+<script src="/i18n.js"></script>
 <script>
 const INTERVAL = 15000;
 let timer = null;
@@ -778,115 +779,14 @@ let recentLogsSig = '';
 let recentLogsRequest = null;
 let recentLogsLoaded = false;
 let notifyOff = new Set();
-const I18N_TR = {
-  'Dashboard':'Panel',
-  'Settings':'Ayarlar',
-  'Logs':'Kayıtlar',
-  'Agents':'Ajanlar',
-  'Profile':'Profil',
-  'About':'Hakkında',
-  'Help':'Yardım',
-  'Sign out':'Çıkış yap',
-  'Public status':'Durum Sayfası',
-  'Status Page':'Durum Sayfası',
-  'Public status page is enabled':'Durum Sayfası açık',
-  'Open public status page':'Durum Sayfasını aç',
-  'Live platforms':'Canlı platformlar',
-  'Search host, service, container':'Host, servis, container ara',
-  'Theme':'Tema',
-  'Account':'Hesap',
-  'Pause':'Duraklat',
-  'Resume':'Sürdür',
-  'Refresh':'Yenile',
-  'All healthy':'Tümü sağlıklı',
-  'degraded':'sorunlu',
-  'healthy':'sağlıklı',
-  'connecting...':'bağlanıyor...',
-  'connecting…':'bağlanıyor…',
-  'Unconfigured':'Yapılandırılmamış',
-  'No data configured':'Veri yapılandırılmadı',
-  'Loading…':'Yükleniyor…',
-  'Loading logs...':'Kayıtlar yükleniyor...',
-  'No rows to show yet':'Henüz satır yok',
-  'No monitors found':'Monitör bulunamadı',
-  'Uptime Kuma unreachable':'Uptime Kuma erişilemiyor',
-  'Recent logs':'Son kayıtlar',
-  'Active alerts':'Aktif bildirimler',
-  'No active alerts':'Aktif bildirim yok',
-  'CPU usage':'CPU kullanımı',
-  'Memory usage':'Bellek kullanımı',
-  'Disk I/O':'Disk I/O',
-  'Bandwidth':'Bant genişliği',
-  'Temperature':'Sıcaklık',
-  'CPU temperature':'CPU sıcaklığı',
-  'CPU temp':'CPU sıcaklığı',
-  'System temperature':'Sistem sıcaklığı',
-  'System temp':'Sistem sıcaklığı',
-  'Disk temp':'Disk sıcaklığı',
-  'Sort by':'Sıralama',
-  'Name':'İsim',
-  'Memory':'Bellek',
-  'RAM':'RAM',
-  'Network':'Ağ',
-  'Disk':'Disk',
-  'Image':'İmaj',
-  'Ports':'Portlar',
-  'State':'Durum',
-  'Network I/O':'Ağ I/O',
-  'All platforms':'Tüm platformlar',
-  'Network devices':'Ağ cihazları',
-  'Linux Servers':'Linux Sunucuları',
-  'Not reported':'Raporlanmadı',
-  'Read and write combined':'Okuma ve yazma toplamı',
-  'Inbound plus outbound':'Gelen ve giden toplamı',
-  'Monitor':'Monitör',
-  'Last Heartbeat':'Son heartbeat',
-  'Ping':'Ping',
-  'Status':'Durum',
-  'Total':'Toplam',
-  'Up':'Up',
-  'Down':'Down',
-  'Pending':'Bekleyen',
-  'Maint':'Bakım',
-  'Unreachable':'Erişilemiyor',
-  'Expand sidebar':'Sidebar genişlet',
-  'Collapse sidebar':'Sidebar daralt',
-  'Resize sidebar':'Sidebar boyutlandır',
-  'Collapse':'Kapat',
-  'Expand':'Aç'
-};
-const I18N_ATTRS = ['placeholder','title','aria-label'];
 function currentLang(data = window._lastData) {
-  try { return localStorage.getItem('os_lang') || data?.preferredLanguage || 'en'; }
-  catch { return data?.preferredLanguage || 'en'; }
+  return OmniI18n.currentLang(data?.preferredLanguage || 'en');
 }
 function trText(text, lang = currentLang()) {
-  return lang === 'tr' ? (I18N_TR[text] || text) : text;
+  return OmniI18n.t(text, lang);
 }
 window.applyLanguage = function(lang = currentLang()) {
-  try { localStorage.setItem('os_lang', lang); } catch {}
-  document.documentElement.lang = lang;
-  if (!document.body) return;
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
-    acceptNode(node) {
-      const p = node.parentElement;
-      if (!p || ['SCRIPT','STYLE','PRE','CODE','TEXTAREA'].includes(p.tagName)) return NodeFilter.FILTER_REJECT;
-      return node.nodeValue.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
-    }
-  });
-  let node;
-  while ((node = walker.nextNode())) {
-    if (node._osOrigText === undefined) node._osOrigText = node.nodeValue;
-    const original = node._osOrigText;
-    const trimmed = original.trim();
-    node.nodeValue = original.replace(trimmed, trText(trimmed, lang));
-  }
-  document.querySelectorAll('*').forEach(el => I18N_ATTRS.forEach(attr => {
-    if (!el.hasAttribute(attr)) return;
-    const key = `_osOrig_${attr}`;
-    if (el[key] === undefined) el[key] = el.getAttribute(attr);
-    el.setAttribute(attr, trText(el[key], lang));
-  }));
+  OmniI18n.apply(document, lang);
 };
 const BELL_ON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>';
 const BELL_OFF = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13.73 21a2 2 0 0 1-3.46 0"/><path d="M18.63 13A17.89 17.89 0 0 1 18 8"/><path d="M6.26 6.26A5.86 5.86 0 0 0 6 8c0 7-3 9-3 9h14"/><path d="M18 8a6 6 0 0 0-9.33-5"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';

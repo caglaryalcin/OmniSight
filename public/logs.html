@@ -96,48 +96,13 @@ html.embed header{display:none}
 </div>
 <div id="log-wrap"><div class="empty-msg">No logs yet…</div></div>
 
+<script src="/i18n.js"></script>
 <script>
-const I18N_TR = {
-  'Logs':'Kayıtlar',
-  'Follow':'Takip et',
-  'Clear':'Temizle',
-  'Copy all':'Tümünü kopyala',
-  'Copied':'Kopyalandı',
-  'Copy failed':'Kopyalanamadı',
-  'Filter…':'Filtrele…',
-  'No logs yet…':'Henüz kayıt yok…',
-  'No matching logs':'Eşleşen kayıt yok',
-  'entries':'kayıt',
-  'Profile':'Profil',
-  'Settings':'Ayarlar',
-  'Sign out':'Çıkış yap'
-};
-const I18N_ATTRS = ['placeholder','title','aria-label'];
-function currentLang(){ try { return localStorage.getItem('os_lang') || 'en'; } catch { return 'en'; } }
-function t(text){ return currentLang() === 'tr' ? (I18N_TR[text] || text) : text; }
+function currentLang(){ return OmniI18n.currentLang('en'); }
+function t(text){ return OmniI18n.t(text, currentLang()); }
 function applyLanguage(){
   const lang = currentLang();
-  document.documentElement.lang = lang;
-  document.querySelectorAll('*').forEach(el => I18N_ATTRS.forEach(attr => {
-    if(!el.hasAttribute(attr)) return;
-    const key = `_osOrig_${attr}`;
-    if(el[key] === undefined) el[key] = el.getAttribute(attr);
-    el.setAttribute(attr, t(el[key]));
-  }));
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
-    acceptNode(node){
-      const p = node.parentElement;
-      if(!p || ['SCRIPT','STYLE','PRE','CODE','TEXTAREA'].includes(p.tagName)) return NodeFilter.FILTER_REJECT;
-      return node.nodeValue.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
-    }
-  });
-  let node;
-  while((node = walker.nextNode())){
-    if(node._osOrigText === undefined) node._osOrigText = node.nodeValue;
-    const original = node._osOrigText;
-    const trimmed = original.trim();
-    node.nodeValue = original.replace(trimmed, t(trimmed));
-  }
+  OmniI18n.apply(document, lang);
   document.title = currentLang() === 'tr' ? 'OmniSight — Kayıtlar' : 'OmniSight — Logs';
 }
 function toggleMenu(){ document.getElementById('menu-drop').classList.toggle('open'); }

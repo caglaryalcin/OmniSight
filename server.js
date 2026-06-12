@@ -726,7 +726,9 @@ function extractChecks(data) {
   return m;
 }
 
+const ALERT_STARTUP_GRACE_MS = 60000;
 let prevChecks = null;
+const alertFirstSeen = new Map();
 function pctNumber(v) {
   const n = Number(v);
   if (!Number.isFinite(n)) return null;
@@ -766,6 +768,13 @@ function logAlertResult(rs) {
 function runAlertChecks(data) {
   if (!config.alerts) return;
   const cur = extractChecks(data);
+  const now = Date.now();
+  for (const key of Array.from(alertFirstSeen.keys())) {
+    if (!cur.has(key)) alertFirstSeen.delete(key);
+  }
+  for (const key of cur.keys()) {
+    if (!alertFirstSeen.has(key)) alertFirstSeen.set(key, now);
+  }
   if (prevChecks === null) { prevChecks = cur; return; }
   const sendProblem = c => {
     const threshold = c.kind === 'threshold';
@@ -792,6 +801,7 @@ function runAlertChecks(data) {
   };
   for (const [key, c] of cur) {
     if (notifyDisabled.has(key)) continue;
+    if (now - (alertFirstSeen.get(key) || now) < ALERT_STARTUP_GRACE_MS) continue;
     const p = prevChecks.get(key);
     if (!p) {
       if (!c.ok) sendProblem(c);

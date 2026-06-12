@@ -64,6 +64,8 @@ main{padding:20px;max-width:1100px;margin:0 auto;display:flex;flex-direction:col
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .form-grid.g3{grid-template-columns:1fr 1fr 1fr}
 .appearance-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.host-clock{min-height:16px;font-size:12px;color:var(--muted);text-align:right;margin:-2px 0 2px}
+.host-clock-spacer{visibility:hidden}
 .inline-toggle{min-height:37px;background:var(--row);border:1px solid var(--border);border-radius:6px;padding:7px 10px;display:flex;align-items:center;justify-content:space-between;gap:12px}
 .inline-toggle span{font-size:13px;color:var(--text);line-height:1.25}
 @media (max-width:980px){.appearance-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
@@ -186,11 +188,12 @@ html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#dd
   <div class="card-body" style="display:flex !important;flex-direction:column">
     <div class="appearance-grid">
       <div class="form-group" style="margin-bottom:0;">
+        <div class="host-clock host-clock-spacer">Host time</div>
         <label>Timezone</label>
         <select id="cfg-timezone"></select>
-        <div id="host-clock" style="font-size:12px;color:var(--muted);margin-top:7px">Host time: loading...</div>
       </div>
       <div class="form-group" style="margin-bottom:0;">
+        <div class="host-clock host-clock-spacer">Host time</div>
         <label>Time Format</label>
         <select id="cfg-timeformat">
           <option value="24h">24 Hour (20:52)</option>
@@ -198,6 +201,7 @@ html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#dd
         </select>
       </div>
       <div class="form-group" style="margin-bottom:0;">
+        <div id="host-clock" class="host-clock">Host time: loading...</div>
         <label>Default time period</label>
         <select id="cfg-default-period" onchange="applySettingsPreview()">
           <option value="0.333333">Last 20 minutes</option>
@@ -230,7 +234,7 @@ html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#dd
 <div class="card">
   <div class="card-hdr" style="cursor:default">
     <div class="card-left">
-      <div class="card-icon" id="dot-certificates" style="background:var(--blue)"></div>
+      <div class="card-icon" id="dot-certificates" style="background:var(--muted)"></div>
       <span class="card-title">Certificates</span>
     </div>
   </div>
@@ -707,6 +711,7 @@ html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#dd
 
 <div id="toast"></div>
 
+<script src="/i18n.js"></script>
 <script>
 let lCount = 0, sCount = 0, dCount = 0, dbCount = 0, dkApiCount = 0, dkSshCount = 0, promCount = 0;
 
@@ -759,34 +764,11 @@ function escHtml(s) {
   return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-const I18N_TR = {
-  'Profile':'Profil','Settings':'Ayarlar','Logs':'Kayıtlar','Sign out':'Çıkış yap',
-  'System Settings':'Sistem Ayarları','Appearance':'Görünüm','Timezone':'Saat dilimi','Time Format':'Saat formatı',
-  'Default time period':'Varsayılan zaman aralığı','Preferred language':'Tercih edilen dil',
-  'Dashboard side panel':'Dashboard sağ paneli','Show Active alerts and Recent logs':'Aktif bildirimler ve son kayıtları göster',
-  'English':'İngilizce','Turkish':'Türkçe','🇬🇧 English':'🇬🇧 İngilizce','🇹🇷 Turkish':'🇹🇷 Türkçe','Certificates':'Sertifikalar','CA certificates':'CA sertifikaları',
-  'Upload certificate':'Sertifika yükle','Status Page':'Durum Sayfası','Public status page':'Herkese açık durum sayfası',
-  'Read-only summary at':'Salt okunur özet','no login required':'Oturum açmaya gerek yok',
-  'Read-only summary at /status, no login required':'/status adresinde salt okunur özet, oturum açmaya gerek yok',
-  'Public page title':'Herkese açık sayfa başlığı',
-  'Resource thresholds':'Kaynak eşikleri','Alerts':'Bildirimler','CPU Warning %':'CPU Uyarı %',
-  'RAM Warning %':'RAM Uyarı %','Disk Warning %':'Disk Uyarı %','CPU Critical %':'CPU Kritik %',
-  'RAM Critical %':'RAM Kritik %','Disk Critical %':'Disk Kritik %','History range (default)':'Geçmiş aralığı (varsayılan)',
-  'Username (optional)':'Kullanıcı adı (opsiyonel)','Password (optional)':'Parola (opsiyonel)',
-  'API Key (optional)':'API anahtarı (opsiyonel)','Status page slug':'Durum sayfası slug',
-  'URL':'URL','TLS':'TLS','Verify certificate':'Sertifikayı doğrula','Allow self-signed':'Self-signed kabul et',
-  'Last 20 minutes':'Son 20 dakika','Last 1 hour':'Son 1 saat','Last 3 hours':'Son 3 saat',
-  'Last 6 hours':'Son 6 saat','Last 12 hours':'Son 12 saat','Last 24 hours':'Son 24 saat',
-  'Save & Apply':'Kaydet ve uygula','Browse…':'Göz at…','Icon (optional)':'İkon (opsiyonel)',
-  'Host time: loading...':'Host saati: yükleniyor...','No certificates uploaded.':'Yüklenmiş sertifika yok.',
-  'Could not load certificates.':'Sertifikalar yüklenemedi.'
-};
-const I18N_ATTRS = ['placeholder','title','aria-label'];
 function currentLang() {
-  return localStorage.getItem('os_lang') || document.getElementById('cfg-language')?.value || 'en';
+  return OmniI18n.currentLang(document.getElementById('cfg-language')?.value || 'en');
 }
 function trText(text, lang = currentLang()) {
-  return lang === 'tr' ? (I18N_TR[text] || text) : text;
+  return OmniI18n.t(text, lang);
 }
 function renderLocalizedBlocks(lang = currentLang()) {
   const statusDesc = document.getElementById('public-status-desc');
@@ -797,30 +779,7 @@ function renderLocalizedBlocks(lang = currentLang()) {
   }
 }
 function applyLanguage(lang = currentLang()) {
-  localStorage.setItem('os_lang', lang);
-  document.documentElement.lang = lang;
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
-    acceptNode(node) {
-      const p = node.parentElement;
-      if (!p || ['SCRIPT','STYLE','PRE','CODE','TEXTAREA'].includes(p.tagName)) return NodeFilter.FILTER_REJECT;
-      return node.nodeValue.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
-    }
-  });
-  let node;
-  while ((node = walker.nextNode())) {
-    if (node._osOrigText === undefined) node._osOrigText = node.nodeValue;
-    const original = node._osOrigText;
-    const trimmed = original.trim();
-    const translated = trText(trimmed, lang);
-    node.nodeValue = original.replace(trimmed, translated);
-  }
-  document.querySelectorAll('*').forEach(el => I18N_ATTRS.forEach(attr => {
-    if (!el.hasAttribute(attr)) return;
-    const key = `_osOrig_${attr}`;
-    if (el[key] === undefined) el[key] = el.getAttribute(attr);
-    const original = el[key];
-    el.setAttribute(attr, trText(original, lang));
-  }));
+  OmniI18n.apply(document, lang);
   renderLocalizedBlocks(lang);
 }
 async function persistPreferencePatch(patch, throwOnError = false) {
@@ -1937,7 +1896,7 @@ async function loadCertificates() {
     handleUnauth(r);
     const b = await r.json();
     const files = b.files || [];
-    if (dot) dot.style.background = files.length ? 'var(--green)' : 'var(--blue)';
+    if (dot) dot.style.background = files.length ? 'var(--green)' : 'var(--muted)';
     el.innerHTML = files.length ? files.map(f => `
       <div class="agent-row">
         <span style="font-weight:600">${escHtml(f.name)}</span>

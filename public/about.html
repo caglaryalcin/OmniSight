@@ -31,9 +31,9 @@ html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#dd
   <h1>OmniSight</h1>
   <div class="ver" id="ver">version —</div>
   <div class="card">
-    <p>OmniSight is a simple, single-glance monitoring dashboard for <b>Proxmox</b>, <b>Linux servers</b>, <b>Kubernetes</b>, <b>Synology (SNMP)</b>, <b>Docker</b> and <b>Healthchecks</b>.</p>
-    <p class="muted">Stack: Node.js + Express backend, single-file vanilla HTML/CSS/JS frontend. Alerts via ntfy, Telegram and SMTP.</p>
-    <p style="display:flex;align-items:center;gap:8px">Author:
+    <p id="about-desc">OmniSight is a simple, single-glance monitoring dashboard for <b>Proxmox</b>, <b>Linux servers</b>, <b>Kubernetes</b>, <b>SNMP devices</b>, <b>Docker</b>, <b>databases</b>, <b>Healthchecks</b>, <b>Uptime Kuma</b> and <b>Prometheus</b>.</p>
+    <p class="muted" id="about-stack">Stack: Node.js + Express backend, single-file vanilla HTML/CSS/JS frontend. Alerts via ntfy, Telegram and SMTP.</p>
+    <p style="display:flex;align-items:center;gap:8px"><span id="author-label">Author:</span>
       <a href="https://github.com/caglaryalcin" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:6px;color:var(--green);text-decoration:none;font-weight:600">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.3.8-.6v-2c-3.2.7-3.9-1.5-3.9-1.5-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.7 1.3 3.4 1 .1-.7.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.8 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17 4.7 18 5 18 5c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.5-2.7 5.5-5.3 5.8.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6 4.6-1.5 7.9-5.8 7.9-10.9C23.5 5.7 18.3.5 12 .5z"/></svg>
         caglaryalcin
@@ -41,25 +41,49 @@ html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#dd
     </p>
   </div>
 </main>
+<script src="/i18n.js"></script>
 <script>
+const ABOUT_DESC_EN = 'OmniSight is a simple, single-glance monitoring dashboard for <b>Proxmox</b>, <b>Linux servers</b>, <b>Kubernetes</b>, <b>SNMP devices</b>, <b>Docker</b>, <b>databases</b>, <b>Healthchecks</b>, <b>Uptime Kuma</b> and <b>Prometheus</b>.';
+const ABOUT_DESC_TR = 'OmniSight; <b>Proxmox</b>, <b>Linux sunucuları</b>, <b>Kubernetes</b>, <b>SNMP cihazları</b>, <b>Docker</b>, <b>veritabanları</b>, <b>Healthchecks</b>, <b>Uptime Kuma</b> ve <b>Prometheus</b> için basit, tek bakışta izleme sağlayan bir paneldir.';
+const ABOUT_STACK_EN = 'Stack: Node.js + Express backend, single-file vanilla HTML/CSS/JS frontend. Alerts via ntfy, Telegram and SMTP.';
+const ABOUT_STACK_TR = 'Altyapı: Node.js + Express backend, tek dosyalı vanilla HTML/CSS/JS frontend. Bildirimler ntfy, Telegram ve SMTP üzerinden gönderilir.';
+let aboutVersion = null;
+let aboutAuthor = 'caglaryalcin';
+function currentLang(){ return OmniI18n.currentLang('en'); }
+function t(text){ return OmniI18n.t(text, currentLang()); }
+function renderAboutVersion(){
+  const el = document.getElementById('ver');
+  if(el) el.textContent = t('version') + ' ' + (aboutVersion || '—') + ' \u00b7 ' + t('by') + ' ' + aboutAuthor;
+}
+window.applyLanguage = function(){
+  const lang = currentLang();
+  document.title = lang === 'tr' ? 'OmniSight - Hakkında' : 'OmniSight - About';
+  OmniI18n.apply(document, lang);
+  const desc = document.getElementById('about-desc');
+  const stack = document.getElementById('about-stack');
+  const author = document.getElementById('author-label');
+  if(desc) desc.innerHTML = lang === 'tr' ? ABOUT_DESC_TR : ABOUT_DESC_EN;
+  if(stack) stack.textContent = lang === 'tr' ? ABOUT_STACK_TR : ABOUT_STACK_EN;
+  if(author) author.textContent = t('Author:');
+  renderAboutVersion();
+};
 function authHeaders(){ const t=sessionStorage.getItem('os_token')||localStorage.getItem('os_token'); return t?{'x-session-token':t}:{}; }
 (async()=>{
   try{
-    let version = null;
-    let author = 'caglaryalcin';
     try {
       const r = await fetch('/api/about', { headers: authHeaders() });
       if (r.ok) {
         const d = await r.json();
-        version = d.version ? 'v' + d.version : null;
-        if (d.author) author = d.author;
+        aboutVersion = d.version ? 'v' + d.version : null;
+        if (d.author) aboutAuthor = d.author;
       }
     } catch(e) {
       console.error(e);
     }
-    document.getElementById('ver').textContent = 'version ' + (version || '—') + ' \u00b7 by ' + author;
+    window.applyLanguage();
   }catch{}
 })();
+window.applyLanguage();
 </script>
 </body>
 </html>
