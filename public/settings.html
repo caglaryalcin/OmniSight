@@ -290,7 +290,7 @@ html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#dd
     <div class="form-grid">
       <div class="form-group"><label>API URL</label><input type="text" id="px-url" placeholder="https://pve.example.local:8006"></div>
       <div class="form-group"><label>Token ID</label><input type="text" id="px-tokenid" placeholder="root@pam!omnisight"></div>
-      <div class="form-group"><label>Token Secret</label><input type="password" id="px-tokensecret" placeholder=""></div>
+      <div class="form-group"><label>Token Secret</label><input type="password" id="px-tokensecret" placeholder=""><div style="font-size:12px;color:var(--muted);line-height:1.35;overflow-wrap:anywhere">API token covers Proxmox inventory, CPU, RAM, VM/LXC, services, storage and API-exposed network metrics. CPU/System/NVMe temperatures and some host Disk I/O counters are not always exposed by the Proxmox API; add SSH metrics fallback for those values.</div></div>
       <div class="form-group"><label>API TLS</label><select id="px-insecure"><option value="false">Verify certificate</option><option value="true">Allow self-signed</option></select></div>
     </div>
     <div class="form-group">

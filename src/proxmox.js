@@ -283,7 +283,7 @@ function findSshMetricHost(cfg, nodeName) {
   const want = String(nodeName || '').toLowerCase();
   return hosts.find(h => String(h.node || h.name || '').toLowerCase() === want)
     || hosts.find(h => String(h.sshHost || '').toLowerCase() === want)
-    || (hosts.length === 1 ? hosts[0] : null);
+    || null;
 }
 
 const SSH_METRICS_SCRIPT = [

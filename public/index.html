@@ -1831,7 +1831,18 @@ function buildLinux(linux){
     const diskIO = srv.metrics?.diskIO || null;
     const bw = srv.metrics?.bandwidth || null;
     const diskIOTxt = diskIO ? `${fmtRate(diskIO.readBps)} / ${fmtRate(diskIO.writeBps)}` : '';
-    const bwTxt = bw ? `${fmtRate(bw.rxBps)} / ${fmtRate(bw.txBps)}` : '';
+    const bwRx = hasNum(bw?.rxBps) ? Number(bw.rxBps) : null;
+    const bwTx = hasNum(bw?.txBps) ? Number(bw.txBps) : null;
+    const bwTotalBps = bw && (bwRx != null || bwTx != null) ? (bwRx || 0) + (bwTx || 0) : null;
+    const bwMbps = bwTotalBps != null ? Math.round((bwTotalBps / 1024 / 1024) * 100) / 100 : null;
+    const bwHistory = Array.isArray(srv.history) ? srv.history.map(h => {
+      const rx = hasNum(h?.bandwidthRxBps) ? Number(h.bandwidthRxBps) : null;
+      const tx = hasNum(h?.bandwidthTxBps) ? Number(h.bandwidthTxBps) : null;
+      return {
+        time: h?.time,
+        bandwidthMbps: (rx != null || tx != null) ? Math.round((((rx || 0) + (tx || 0)) / 1024 / 1024) * 100) / 100 : null,
+      };
+    }) : [];
     const ptag = srv.platform && srv.platform!=='linux' ? ` <span class="badge bg-blue" style="font-size:10px;padding:1px 7px">${srv.platform}</span>` : '';
     const srvSvcTotal = (srv.services || []).filter(s => !s.excluded).length;
     const srvSvcUp = (srv.services || []).filter(s => s.active && !s.excluded).length;
@@ -1859,7 +1870,7 @@ function buildLinux(linux){
         <span class="chevron ${linuxOpen[lkey]?'open':''}" style="margin-left:4px">▼</span>
       </div>
       <div class="node-body ${linuxOpen[lkey]?'open':''}" id="lx-${lkey}">
-        ${(()=>{ const lim=historyLimitFor('lx:'+lkey); return (cpuPct!=null||srv.ram!=null||srv.disk!=null||srv.temp!=null)?`<div style="display:flex; justify-content:flex-end; margin-bottom:4px;">
+        ${(()=>{ const lim=historyLimitFor('lx:'+lkey); return (cpuPct!=null||srv.ram!=null||srv.disk!=null||srv.temp!=null||bwMbps!=null)?`<div style="display:flex; justify-content:flex-end; margin-bottom:4px;">
           ${drawTimeSelect('lx:'+lkey, lim)}
         </div>`:'' })()}
         ${(()=>{ const lim=historyLimitFor('lx:'+lkey); return cpuPct!=null?`
@@ -1890,6 +1901,11 @@ function buildLinux(linux){
             <div class="chart-hdr"><span class="nb-label">Temperature</span><span class="nb-pct" style="color:${tempColor(srv.temp)}">${srv.temp}°C</span></div>
             ${histChart(srv.history,'temp',srv.temp,lim,tempHex,100,'°C','Temperature')}
           </div>` : '' })()}
+        ${(()=>{ const lim=historyLimitFor('lx:'+lkey); return bwMbps!=null?`
+          <div class="chart-row">
+            <div class="chart-hdr"><span class="nb-label">Bandwidth</span><span class="nb-pct" style="color:var(--green)">↓ ${bwRx != null ? fmtRate(bwRx) : '--'} / ↑ ${bwTx != null ? fmtRate(bwTx) : '--'}</span></div>
+            ${histChart(bwHistory,'bandwidthMbps',bwMbps,lim,()=>'#34D399',rateSparkMax(bwHistory,'bandwidthMbps',bwMbps),' MB/s','Bandwidth')}
+          </div>` : '' })()}
         ${srv.os||srv.kernel||srv.disk||srv.load||diskIO||bw?`
           <div class="row" style="padding:8px 0;margin-top:6px;border-top:1px solid var(--border);flex-wrap:wrap;gap:14px">
             ${srv.os?`<span style="font-size:12px;color:var(--muted)">OS <span style="color:var(--text);font-weight:600">${srv.os}</span></span>`:''}
@@ -1898,7 +1914,6 @@ function buildLinux(linux){
             ${diskIOTxt?metricSpan('Disk I/O', diskIOTxt):''}
             ${hasNum(diskIO?.iops)?metricSpan('IOPS', diskIO.iops):''}
             ${hasNum(diskIO?.util)?metricSpan('Disk busy', diskIO.util+'%'):''}
-            ${bwTxt?metricSpan('Bandwidth', `↓ ${fmtRate(bw.rxBps)} / ↑ ${fmtRate(bw.txBps)}`):''}
             ${srv.agentVersion?`<span style="font-size:12px;color:var(--muted)">Agent <span style="color:var(--text);font-weight:600">v${srv.agentVersion}</span></span>`:''}
           </div>`:''}
         ${srv.swap && srv.swap.totalKB>0?`

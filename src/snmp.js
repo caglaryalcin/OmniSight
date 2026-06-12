@@ -50,13 +50,13 @@ function createSession(device) {
     return snmp.createV3Session(device.host, user, {
       context: '',
       transport: 'udp4',
-      timeout: 3000,
+      timeout: 5000,
       retries: 0,
     });
   }
   return snmp.createSession(device.host, device.community || 'public', {
     version: snmp.Version2c,
-    timeout: 3000,
+    timeout: 5000,
     retries: 0,
   });
 }
@@ -146,6 +146,7 @@ async function getHrMemory(session) {
 }
 
 const cpuPrev = new Map();
+const memPrev = new Map();
 // Vendor-neutral CPU via UCD ssCpuRaw counters (delta over poll interval).
 // Works on any net-snmp based device (Linux, UniFi, pfSense, …).
 async function ucdRawCpu(session, key) {
@@ -179,6 +180,7 @@ async function getSystemInfo(session, deviceKey) {
   let cpuSystem = synVals['1.3.6.1.4.1.6574.1.4.2.0'];
   let memTotalKB = synVals['1.3.6.1.4.1.6574.1.1.1.0'];
   let memFreeKB  = synVals['1.3.6.1.4.1.6574.1.1.2.0'];
+  let memSource = memTotalKB != null ? 'synology' : null;
   const systemTemp = toNum(synVals['1.3.6.1.4.1.6574.1.2.0']);
 
 
@@ -206,6 +208,7 @@ async function getSystemInfo(session, deviceKey) {
   }
 
   let ucdMem = null;
+  let ucdMemError = null;
   try {
     const ucd = await snmpGet(session, [
       '1.3.6.1.4.1.2021.4.5.0',
@@ -220,7 +223,7 @@ async function getSystemInfo(session, deviceKey) {
     if (uTotal && uFree != null) {
       ucdMem = { totalKB: uTotal, freeKB: clampMemoryFree(uTotal, uFree + uBuf + uCached) };
     }
-  } catch (e) { console.error('[SNMP ucd-mem]', e.message); }
+  } catch (e) { ucdMemError = e; console.error(`[SNMP ${deviceKey} ucd-mem]`, e.message); }
 
   if (ucdMem) {
     const synTotal = toNum(memTotalKB);
@@ -228,31 +231,50 @@ async function getSystemInfo(session, deviceKey) {
     if (closeEnough) {
       memTotalKB = ucdMem.totalKB;
       memFreeKB = ucdMem.freeKB;
+      memSource = 'ucd';
     }
   }
 
   if (memTotalKB == null) {
     try {
       const hr = await getHrMemory(session);
-      if (hr) { memTotalKB = hr.totalKB; memFreeKB = hr.freeKB; }
+      if (hr) { memTotalKB = hr.totalKB; memFreeKB = hr.freeKB; memSource = 'hrStorage'; }
     } catch (e) { console.error('[SNMP hrStorage mem]', e.message); }
   }
 
   const memTotal = memTotalKB != null ? memTotalKB * 1024 : null;
   const memFree  = memFreeKB  != null ? memFreeKB  * 1024 : null;
   const memUsed  = memTotal != null && memFree != null ? Math.max(0, Math.min(memTotal, memTotal - memFree)) : null;
+  let ram = memTotal ? {
+    percent: clampPercent((memUsed / memTotal) * 100),
+    usedBytes: memUsed,
+    totalBytes: memTotal,
+    usedGB: (memUsed / 1024 ** 3).toFixed(1),
+    totalGB: (memTotal / 1024 ** 3).toFixed(1),
+    source: memSource,
+  } : null;
+
+  const prevMem = memPrev.get(deviceKey);
+  if (ram && memSource !== 'ucd' && ucdMemError && prevMem?.ram) {
+    const jump = Math.abs((ram.percent ?? 0) - (prevMem.ram.percent ?? 0));
+    const suspiciousFull = ram.percent >= 95 && prevMem.ram.percent <= 90;
+    if (suspiciousFull || jump >= 35) {
+      ram = { ...prevMem.ram, stale: true };
+    }
+  } else if (ram && memSource !== 'ucd' && ucdMemError && !prevMem && ram.percent >= 95) {
+    ram = null;
+  } else if (!ram && ucdMemError && prevMem?.ram && Date.now() - prevMem.time < 10 * 60 * 1000) {
+    ram = { ...prevMem.ram, stale: true };
+  }
+  if (ram && !ram.stale && (memSource === 'ucd' || ram.percent < 95 || !ucdMemError)) {
+    memPrev.set(deviceKey, { ram, time: Date.now() });
+  }
 
   return {
     cpu: cpuUser != null ? cpuUser + (cpuSystem || 0) : null,
     systemTemp: systemTemp != null ? systemTemp : null,
     systemTempLabel: systemTemp != null ? 'CPU temperature' : null,
-    ram: memTotal ? {
-      percent: clampPercent((memUsed / memTotal) * 100),
-      usedBytes: memUsed,
-      totalBytes: memTotal,
-      usedGB: (memUsed / 1024 ** 3).toFixed(1),
-      totalGB: (memTotal / 1024 ** 3).toFixed(1),
-    } : null,
+    ram,
   };
 }
 
@@ -371,8 +393,11 @@ async function getNetwork(session, deviceKey) {
 async function getDeviceData(device) {
   const session = createSession(device);
   try {
-    const [sysInfo, disks, volumes, network] = await Promise.all([
-      getSystemInfo(session, device.host).catch(e => { console.error(`[SNMP ${device.name}] sysInfo:`, e.message); return {}; }),
+    const sysInfo = await getSystemInfo(session, device.host).catch(e => {
+      console.error(`[SNMP ${device.name}] sysInfo:`, e.message);
+      return {};
+    });
+    const [disks, volumes, network] = await Promise.all([
       getDisks(session).catch(e => { console.error(`[SNMP ${device.name}] disks:`, e.message); return []; }),
       getVolumes(session).catch(e => { console.error(`[SNMP ${device.name}] volumes:`, e.message); return []; }),
       getNetwork(session, device.host).catch(e => { console.error(`[SNMP ${device.name}] network:`, e.message); return []; }),

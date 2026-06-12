@@ -180,6 +180,7 @@
       'SSH metrics fallback':'SSH metrik yedeği',
       '+ Add SSH':'+ SSH ekle',
       'Add one SSH entry for each Proxmox node. Node name must match the Proxmox node name. SSH host is the node IP or DNS. Save & Apply; Disk I/O appears after the second refresh.':'Her Proxmox node için bir SSH satırı ekle. Node adı Proxmox node adıyla aynı olmalı. SSH host node IP veya DNS adresidir. Kaydet ve uygula; Disk I/O ikinci yenilemeden sonra görünür.',
+      'API token covers Proxmox inventory, CPU, RAM, VM/LXC, services, storage and API-exposed network metrics. CPU/System/NVMe temperatures and some host Disk I/O counters are not always exposed by the Proxmox API; add SSH metrics fallback for those values.':'API token Proxmox envanteri, CPU, RAM, VM/LXC, servisler, storage ve API ile sunulan network metriklerini kapsar. CPU/System/NVMe sıcaklıkları ve bazı host Disk I/O sayaçları Proxmox API tarafından her zaman sunulmaz; bu değerler için SSH metrik yedeği ekleyin.',
       'Node name':'Node adı',
       'Proxmox node name':'Proxmox node adı',
       'Node IP or DNS':'Node IP veya DNS',
