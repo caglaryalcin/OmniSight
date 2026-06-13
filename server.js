@@ -15,6 +15,7 @@ const { getProxmoxApiData } = require('./src/proxmox');
 const { getDockerApiData, dockerLogs: dockerApiLogs, dockerPrune: dockerApiPrune } = require('./src/docker');
 const { dispatchAlert } = require('./src/alerts');
 const { decryptConfig, encryptConfigValue, isEncrypted, SENSITIVE_KEYS, encryptionEnabled } = require('./src/crypto');
+const { loadHistoryMap, scheduleSaveHistoryMap } = require('./src/historyStore');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -429,7 +430,11 @@ let cache = { data: null };
 let refreshPromise = null;
 let refreshGeneration = 0;
 
-const PLATFORM_HISTORY = {};
+const PLATFORM_HISTORY_MAX = 1440;
+const PLATFORM_HISTORY = Object.fromEntries(loadHistoryMap('platform-history', PLATFORM_HISTORY_MAX));
+function savePlatformHistory() {
+  scheduleSaveHistoryMap('platform-history', new Map(Object.entries(PLATFORM_HISTORY)), PLATFORM_HISTORY_MAX);
+}
 
 function hasProxmoxApi() {
   return !!(config.proxmox && config.proxmox.url && config.proxmox.tokenId && config.proxmox.tokenSecret);
@@ -536,17 +541,22 @@ function preserveDockerOnTransient(nextRows) {
 }
 
 const DOCKER_HISTORY_MAX = 5760;
+const dockerHistory = loadHistoryMap('docker-history', DOCKER_HISTORY_MAX);
+function dockerHistoryKey(row = {}) {
+  return dockerRowKeys(row)[0] || String(row.name || row.host || 'docker');
+}
 function mergeDockerHistory(nextRows) {
   const rows = normalizeDockerRows(nextRows);
   if (!Array.isArray(rows)) return rows;
   const prevRows = Array.isArray(cache.data?.docker) ? cache.data.docker : [];
   const now = Date.now();
-  return rows.map(row => {
+  let changed = false;
+  const merged = rows.map(row => {
     if (!row || !row.online) return row;
     const prev = findPreviousOnlineDockerRow(prevRows, row);
     let history = Array.isArray(row.history)
       ? row.history.slice()
-      : (Array.isArray(prev?.history) ? prev.history.slice() : []);
+      : (Array.isArray(prev?.history) ? prev.history.slice() : dockerHistory.get(dockerHistoryKey(row)) || []);
     if (!row._stale && !row._connecting) {
       const point = { time: now };
       if (Number.isFinite(Number(row.summary?.cpu))) point.cpu = Number(row.summary.cpu);
@@ -556,12 +566,16 @@ function mergeDockerHistory(nextRows) {
         if (!last || now - Number(last.time || 0) > REFRESH_INTERVAL / 2) {
           if (!history.length) history.push({ ...point, time: now - REFRESH_INTERVAL });
           history.push(point);
+          changed = true;
         }
       }
     }
     if (history.length > DOCKER_HISTORY_MAX) history = history.slice(-DOCKER_HISTORY_MAX);
+    dockerHistory.set(dockerHistoryKey(row), history);
     return { ...row, history };
   });
+  if (changed) scheduleSaveHistoryMap('docker-history', dockerHistory, DOCKER_HISTORY_MAX);
+  return merged;
 }
 
 async function getProxmoxData() {
@@ -971,6 +985,7 @@ function preserveProxmoxOnTransient(next, err) {
 }
 
 const UPTIME_KUMA_HISTORY_MAX = 6000;
+const uptimeKumaHistory = loadHistoryMap('uptimekuma-history', UPTIME_KUMA_HISTORY_MAX);
 function heartbeatKey(h) {
   return [h?.time || '', h?.status || '', h?.ping ?? '', h?.message || ''].join('|');
 }
@@ -998,20 +1013,46 @@ function mergeHeartbeatHistory(prevHistory = [], nextHistory = [], hours = 1) {
 function uptimeKumaMonitorKeys(m = {}) {
   return [m.id, m.name, m.url].filter(v => v !== undefined && v !== null && String(v).trim() !== '').map(v => String(v));
 }
+function uptimeKumaHistoryKey(m = {}) {
+  return uptimeKumaMonitorKeys(m)[0] || 'monitor';
+}
+function observedUptimeKumaHeartbeat(m = {}, now = Date.now()) {
+  if (!m.status) return null;
+  return {
+    status: m.status,
+    time: new Date(now).toISOString(),
+    ping: m.ping ?? null,
+    message: m.message || '',
+    source: 'omnisight',
+  };
+}
 function mergeUptimeKumaHistory(next) {
   const prev = cache.data?.uptimekuma;
   if (!next?.monitors?.length) return next;
   const hours = uptimeKumaHistoryHours(next.historyHours || uptimeKumaConfig()?.historyHours || defaultTimePeriodHours());
+  const keepHours = 24;
   const prevByKey = new Map();
   (prev?.monitors || []).forEach(m => {
     uptimeKumaMonitorKeys(m).forEach(k => prevByKey.set(k, m));
   });
+  let changed = false;
+  const now = Date.now();
   const monitors = next.monitors.map(m => {
     const keys = uptimeKumaMonitorKeys(m);
     const old = keys.map(k => prevByKey.get(k)).find(Boolean);
-    const history = mergeHeartbeatHistory(old?.history || [], m.history || [], hours);
-    return { ...m, history };
+    const storeKey = uptimeKumaHistoryKey(m);
+    const stored = uptimeKumaHistory.get(storeKey) || [];
+    const observed = observedUptimeKumaHeartbeat(m, now);
+    const lastStored = stored[stored.length - 1];
+    const lastTime = new Date(lastStored?.time || 0).getTime();
+    const addObserved = observed && (!lastStored || !Number.isFinite(lastTime) || now - lastTime > REFRESH_INTERVAL / 2);
+    const history = mergeHeartbeatHistory(stored, old?.history || [], keepHours);
+    const withLive = mergeHeartbeatHistory(history, [...(m.history || []), ...(addObserved ? [observed] : [])], keepHours);
+    uptimeKumaHistory.set(storeKey, withLive);
+    if (addObserved || (m.history || []).length) changed = true;
+    return { ...m, history: withLive };
   });
+  if (changed) scheduleSaveHistoryMap('uptimekuma-history', uptimeKumaHistory, UPTIME_KUMA_HISTORY_MAX);
   return {
     ...next,
     historyHours: hours,
@@ -1102,8 +1143,9 @@ function backgroundRefresh(opts = {}) {
         if (s.status === 'down') score = 0;
         else if (s.status === 'warn') score = 65;
         PLATFORM_HISTORY[s.id].push({ health: score });
-        if (PLATFORM_HISTORY[s.id].length > 1440) PLATFORM_HISTORY[s.id].shift();
+        if (PLATFORM_HISTORY[s.id].length > PLATFORM_HISTORY_MAX) PLATFORM_HISTORY[s.id].splice(0, PLATFORM_HISTORY[s.id].length - PLATFORM_HISTORY_MAX);
       });
+      savePlatformHistory();
     })
     .catch(err => { console.error(err.message); })
     .finally(() => { if (generation === refreshGeneration) refreshPromise = null; });

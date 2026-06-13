@@ -3,8 +3,10 @@ const http = require('http');
 const fs = require('fs');
 const os = require('os');
 const { Client } = require('ssh2');
+const { loadHistoryMap, scheduleSaveHistoryMap } = require('./historyStore');
 
-const pveHistory = new Map();
+const PVE_HISTORY_MAX = 5760;
+const pveHistory = loadHistoryMap('proxmox-history', PVE_HISTORY_MAX);
 const pveSshDiskStats = new Map();
 
 function normBase(url) {
@@ -418,8 +420,9 @@ async function nodeData(cfg, node, excluded, resource = null) {
       tempHistory[tempHistoryKey(t.label)] = t.value;
     }
     hist.push({ time: Date.now(), cpu, mem: mem.percent || 0, temp, ...tempHistory, diskIO: finalDiskIOTotal, bandwidth: bandwidthTotal });
-    if (hist.length > 240) hist.shift();
+    if (hist.length > PVE_HISTORY_MAX) hist.splice(0, hist.length - PVE_HISTORY_MAX);
     pveHistory.set(name, hist);
+    scheduleSaveHistoryMap('proxmox-history', pveHistory, PVE_HISTORY_MAX);
     const exList = excluded[name] || [];
     return {
       node: {

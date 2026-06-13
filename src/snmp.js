@@ -1,4 +1,5 @@
 const snmp = require('net-snmp');
+const { loadHistoryMap, scheduleSaveHistoryMap } = require('./historyStore');
 
 const DISK_STATUS = { 1: 'normal', 2: 'initialized', 3: 'not initialized', 4: 'sys partition failed', 5: 'crashed' };
 const VOLUME_STATUS = { 1: 'normal', 2: 'repairing', 3: 'migrating', 4: 'expanding', 5: 'deleting', 6: 'creating', 11: 'degraded', 12: 'crashed' };
@@ -349,7 +350,8 @@ async function getVolumes(session) {
 }
 
 const netPrev = new Map();
-const synHistory = new Map();
+const SNMP_HISTORY_MAX = 5760;
+const synHistory = loadHistoryMap('snmp-history', SNMP_HISTORY_MAX);
 
 async function getNetwork(session, deviceKey) {
   const [descrs, rxOctets, txOctets] = await Promise.all([
@@ -410,8 +412,9 @@ async function getDeviceData(device) {
         ram: sysInfo.ram?.percent ?? null,
         temp: sysInfo.systemTemp ?? null,
       });
-      if (hist.length > 240) hist.shift();
+      if (hist.length > SNMP_HISTORY_MAX) hist.splice(0, hist.length - SNMP_HISTORY_MAX);
       synHistory.set(device.host, hist);
+      scheduleSaveHistoryMap('snmp-history', synHistory, SNMP_HISTORY_MAX);
     }
 
     return {

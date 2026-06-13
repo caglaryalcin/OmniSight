@@ -1080,6 +1080,9 @@ function setOverride(key, val) {
   userOverride[key] = val;
   try { localStorage.setItem(UO_KEY, JSON.stringify(userOverride)); } catch {}
 }
+function panelOpenState(key, fallback = false) {
+  return userOverride[key] !== undefined ? !!userOverride[key] : !!fallback;
+}
 
 let activePanel = null;
 
@@ -1354,9 +1357,7 @@ function histChart(data, key, pct, limit = 80, colorFn = bchex, maxScale = 100, 
   const vals = rawVals.filter(v => v !== null);
   if (!vals.length) return empty;
 
-  const firstKnown = vals[0];
-  rawVals = rawVals.map(v => v === null ? firstKnown : v);
-  const actualVals = rawVals.length < limit ? [...Array(limit - rawVals.length).fill(firstKnown), ...rawVals] : rawVals;
+  const actualVals = rawVals.length < limit ? [...Array(limit - rawVals.length).fill(null), ...rawVals] : rawVals;
   const actualPtsRaw = ptsRaw.length < limit ? [...Array(limit - ptsRaw.length).fill(null), ...ptsRaw] : ptsRaw;
 
   let minV = Math.min(...vals);
@@ -1486,7 +1487,7 @@ function toggleLinux(key){
   setOverride('linux:'+key, linuxOpen[key]);
   const el = document.getElementById(`lx-${key}`);
   const chev = document.querySelector(`[onclick="toggleLinux('${key}')"] .chevron`);
-  if(el) el.style.display = linuxOpen[key] ? 'block' : 'none';
+  if(el){ el.classList.toggle('open', !!linuxOpen[key]); el.style.display = ''; }
   if(chev) chev.classList.toggle('open', !!linuxOpen[key]);
 }
 
@@ -1846,6 +1847,8 @@ function buildLinux(linux){
     const ptag = srv.platform && srv.platform!=='linux' ? ` <span class="badge bg-blue" style="font-size:10px;padding:1px 7px">${srv.platform}</span>` : '';
     const srvSvcTotal = (srv.services || []).filter(s => !s.excluded).length;
     const srvSvcUp = (srv.services || []).filter(s => s.active && !s.excluded).length;
+    const isOpen = panelOpenState('linux:'+lkey, linuxOpen[lkey]);
+    linuxOpen[lkey] = isOpen;
     const linuxStats = [
       pveHeadStat('Host', srv.ip || srv.host || '-', 'var(--text)', '', 'is-host'),
       cpuPct != null ? pveHeadStat('CPU', `${cpuPct}%`, bc(cpuPct), miniSparkline(srv.history, 'cpu', cpuPct)) : '',
@@ -1867,9 +1870,9 @@ function buildLinux(linux){
         </div>
         ${bdg(svcFailed?'red':'green', svcFailed?`${svcFailed} failed`:'all ok')}
         ${notifyBell('lx:'+srv.name)}
-        <span class="chevron ${linuxOpen[lkey]?'open':''}" style="margin-left:4px">▼</span>
+        <span class="chevron ${isOpen?'open':''}" style="margin-left:4px">▼</span>
       </div>
-      <div class="node-body ${linuxOpen[lkey]?'open':''}" id="lx-${lkey}">
+      <div class="node-body ${isOpen?'open':''}" id="lx-${lkey}">
         ${(()=>{ const lim=historyLimitFor('lx:'+lkey); return (cpuPct!=null||srv.ram!=null||srv.disk!=null||srv.temp!=null||bwMbps!=null)?`<div style="display:flex; justify-content:flex-end; margin-bottom:4px;">
           ${drawTimeSelect('lx:'+lkey, lim)}
         </div>`:'' })()}
@@ -2690,6 +2693,8 @@ function buildDocker(docker){
     const hostContainers = host.containers || [];
     const stopped = hostContainers.filter(c=>c.state==='exited'||c.state==='dead').length;
     const containers = sortDockerContainers(hostContainers);
+    const isOpen = panelOpenState('docker:'+dkey, dockerOpen[dkey]);
+    dockerOpen[dkey] = isOpen;
     const dockerStats = [
       pveHeadStat('Host', host.host || '-'),
       pveHeadStat('Containers', `${host.summary.running}/${host.summary.total}`),
@@ -2710,7 +2715,7 @@ function buildDocker(docker){
         ${bdg(stopped?'yellow':'green', stopped?`${stopped} stopped`:'all running')}
         ${notifyBell('dk:'+host.name)}
       </div>
-      <div class="node-body ${dockerOpen[dkey]?'open':''}" id="dk-${dkey}" style="${dockerOpen[dkey]!==undefined?'':''}">
+      <div class="node-body ${isOpen?'open':''}" id="dk-${dkey}">
         ${dockerHostCharts(host, dkey)}
         ${host.summary?.unused>0?`<div class="mon-row" style="justify-content:space-between"><span style="color:var(--muted)">${host.summary.unused} unused image${host.summary.unused>1?'s':''}</span><button class="btn-act" onclick="event.stopPropagation();dockerPrune(${jsStr(host.name)},this)">Prune</button></div>`:''}
         ${hostContainers.length ? dockerContainerHeader() : ''}

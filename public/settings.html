@@ -722,6 +722,9 @@ html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#dd
 <script src="/i18n.js"></script>
 <script>
 let lCount = 0, sCount = 0, dCount = 0, dbCount = 0, dkApiCount = 0, dkSshCount = 0, pveSshCount = 0, promCount = 0;
+const SETTINGS_CARD_OPEN_KEY = 'os_settings_card_open';
+let settingsCardOpen = {};
+try { settingsCardOpen = JSON.parse(localStorage.getItem(SETTINGS_CARD_OPEN_KEY) || '{}') || {}; } catch {}
 
 function toggleAlertBody(enId, bodyId) {
   document.getElementById(bodyId).classList.toggle('hidden', !document.getElementById(enId).checked);
@@ -732,12 +735,40 @@ function flushPendingTags() {
     if (inp && b && inp.value.trim()) b.click();
   });
 }
+function settingsCardKey(card) {
+  const body = card?.querySelector('.card-body');
+  if (body?.id) return body.id.replace(/^cb-/, '');
+  const title = card?.querySelector('.card-title')?.textContent || 'card';
+  return 'card:' + title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
+function saveSettingsCardOpen() {
+  try { localStorage.setItem(SETTINGS_CARD_OPEN_KEY, JSON.stringify(settingsCardOpen)); } catch {}
+}
+function setSettingsCardOpen(card, open, persist = true) {
+  const body = card?.querySelector('.card-body');
+  if (!body) return;
+  body.classList.toggle('hidden', !open);
+  if (persist) {
+    settingsCardOpen[settingsCardKey(card)] = !!open;
+    saveSettingsCardOpen();
+  }
+}
+function applySettingsCardOpen() {
+  document.querySelectorAll('.card').forEach(card => {
+    const body = card.querySelector('.card-body');
+    if (!body) return;
+    const en = card.querySelector('.card-hdr .toggle input[type=checkbox]');
+    const enabled = !en || en.checked;
+    const key = settingsCardKey(card);
+    setSettingsCardOpen(card, enabled && settingsCardOpen[key] === true, false);
+  });
+}
 function toggleCard(id) {
   const en = document.getElementById(`en-${id}`);
   const card = en.closest('.card');
   const on = en.checked;
   card.classList.toggle('card-off', !on);
-  card.querySelector('.card-body').classList.toggle('hidden', !on);
+  setSettingsCardOpen(card, on);
   if (!on) saveConfig();
 }
 
@@ -745,7 +776,7 @@ document.addEventListener('click', e => {
   const hdr = e.target.closest('.card-hdr');
   if (!hdr || e.target.closest('.toggle')) return;
   const body = hdr.parentElement.querySelector('.card-body');
-  if (body) body.classList.toggle('hidden');
+  if (body) setSettingsCardOpen(hdr.parentElement, body.classList.contains('hidden'));
 });
 
 function addTag(listId, inputId) {
@@ -2175,7 +2206,7 @@ async function refreshDots(cfg, newData){
     const cfg = await r.json();
     populate(cfg);
     loadHostClock();
-    document.querySelectorAll('.card-body').forEach(el => el.classList.add('hidden'));
+    applySettingsCardOpen();
     document.querySelectorAll('#cb-alerts .arr-body').forEach(el => el.classList.add('hidden'));
     document.querySelectorAll('.card-hdr .toggle input[type=checkbox]').forEach(en => en.closest('.card').classList.toggle('card-off', !en.checked));
     applyLanguage(document.getElementById('cfg-language')?.value || currentLang());

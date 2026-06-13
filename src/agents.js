@@ -2,15 +2,16 @@ const fs = require('fs');
 const path = require('path');
 const yaml = require('js-yaml');
 const crypto = require('crypto');
+const { loadHistoryMap, scheduleSaveHistoryMap } = require('./historyStore');
 
 const AGENTS_PATH = path.join(__dirname, '..', 'data', 'agents.yaml');
-const HISTORY_MAX = 1440;
+const HISTORY_MAX = 5760;
 const CMD_TIMEOUT = 60000;
 const INSTALL_PENDING_TTL = 5 * 60 * 1000;
 const SVC_NAME = /^[a-zA-Z0-9@._:-]+$/;
 
 const agents = new Map();
-const history = new Map();
+const history = loadHistoryMap('agent-history', HISTORY_MAX);
 const pending = new Map();
 const pendingInstalls = new Map();
 const waiters = new Map();
@@ -194,8 +195,9 @@ function handleReport(r) {
       bandwidthRxBps: bandwidth?.rxBps ?? null,
       bandwidthTxBps: bandwidth?.txBps ?? null,
     });
-    if (hist.length > HISTORY_MAX) hist.shift();
+    if (hist.length > HISTORY_MAX) hist.splice(0, hist.length - HISTORY_MAX);
     history.set(id, hist);
+    scheduleSaveHistoryMap('agent-history', history, HISTORY_MAX);
   }
   saveAgents();
   return a;
