@@ -193,7 +193,8 @@ html[data-theme="light"] .hist-bg{fill:rgba(0,0,0,.04)}
 .chart-row{margin-bottom:18px}
 .chart-row:last-child{margin-bottom:0}
 .chart-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;padding:0 1px}
-.chart-foot{font-size:16px;color:var(--muted);margin-top:5px;text-align:center;font-variant-numeric:tabular-nums}
+.chart-foot{font-size:15px;color:var(--muted);margin-top:5px;text-align:center;font-variant-numeric:tabular-nums}
+.chart-hdr .nb-label{font-size:15px}
 
 #os-tooltip {
   position: fixed; background: var(--panel); border: 1px solid var(--border2);
@@ -1547,6 +1548,16 @@ function rateSparkMax(data, key, current) {
   const vals = (Array.isArray(data) ? data.map(d => d?.[key]) : []).concat([current]).filter(hasNum).map(Number);
   return Math.max(1, ...vals) * 1.15;
 }
+function rateToMBps(value) {
+  if (!hasNum(value)) return null;
+  return Math.round((Number(value) / 1024 / 1024) * 100) / 100;
+}
+function rateHistoryMBps(history, sourceKey, targetKey) {
+  return Array.isArray(history) ? history.map(h => ({
+    time: h?.time,
+    [targetKey]: hasNum(h?.[sourceKey]) ? rateToMBps(h[sourceKey]) : null,
+  })) : [];
+}
 function buildProxmox(px){
   if(!px?.nodes?.length) return null;
   const cs = px.clusterSummary || {};
@@ -1623,6 +1634,10 @@ function buildProxmox(px){
     const bandwidthRate = metricRateSum(metrics?.bandwidth, 'rxBps', 'txBps');
     const diskIOTxt = diskRate != null ? fmtRate(diskRate) : '';
     const bandwidthTxt = bandwidthRate != null ? fmtRate(bandwidthRate) : '';
+    const diskIOMbps = rateToMBps(diskRate);
+    const bandwidthMbps = rateToMBps(bandwidthRate);
+    const diskIOHistory = rateHistoryMBps(history, 'diskIO', 'diskIOMbps');
+    const bandwidthHistory = rateHistoryMBps(history, 'bandwidth', 'bandwidthMbps');
     const svcFailed = services.filter(s=>!s.active && !s.excluded).length;
     const hasIssue = !node.online || svcFailed>0;
     const isOpen = userOverride['node:'+node.name] !== undefined
@@ -1688,6 +1703,16 @@ function buildProxmox(px){
           ${histChart(history,'mem',ramPct,lim)}
           ${node.ram?.usedGB?`<div class="chart-foot">${node.ram.usedGB}/${node.ram.totalGB} GB</div>`:''}
         </div>` })()}
+        ${(()=>{ const lim=historyLimitFor('px:'+node.name); return diskIOMbps!=null?`
+        <div class="chart-row">
+          <div class="chart-hdr"><span class="nb-label">Disk I/O</span><span class="nb-pct" style="color:var(--cyan)">${diskIOTxt}</span></div>
+          ${histChart(diskIOHistory,'diskIOMbps',diskIOMbps,lim,rateColor,rateSparkMax(diskIOHistory,'diskIOMbps',diskIOMbps),' MB/s','Disk I/O')}
+        </div>` : '' })()}
+        ${(()=>{ const lim=historyLimitFor('px:'+node.name); return bandwidthMbps!=null?`
+        <div class="chart-row">
+          <div class="chart-hdr"><span class="nb-label">Bandwidth</span><span class="nb-pct" style="color:var(--green)">${bandwidthTxt}</span></div>
+          ${histChart(bandwidthHistory,'bandwidthMbps',bandwidthMbps,lim,()=>'#34D399',rateSparkMax(bandwidthHistory,'bandwidthMbps',bandwidthMbps),' MB/s','Bandwidth')}
+        </div>` : '' })()}
         ${(()=>{ const lim=historyLimitFor('px:'+node.name); return tempList.map((t, idx) => {
           const label = t.label || 'Temperature';
           const value = t.value ?? t.temp;
@@ -1832,16 +1857,24 @@ function buildLinux(linux){
     const diskIO = srv.metrics?.diskIO || null;
     const bw = srv.metrics?.bandwidth || null;
     const diskIOTxt = diskIO ? `${fmtRate(diskIO.readBps)} / ${fmtRate(diskIO.writeBps)}` : '';
+    const diskRead = hasNum(diskIO?.readBps) ? Number(diskIO.readBps) : null;
+    const diskWrite = hasNum(diskIO?.writeBps) ? Number(diskIO.writeBps) : null;
+    const diskIOTotalBps = diskIO && (diskRead != null || diskWrite != null) ? (diskRead || 0) + (diskWrite || 0) : null;
+    const diskIOMbps = rateToMBps(diskIOTotalBps);
     const bwRx = hasNum(bw?.rxBps) ? Number(bw.rxBps) : null;
     const bwTx = hasNum(bw?.txBps) ? Number(bw.txBps) : null;
     const bwTotalBps = bw && (bwRx != null || bwTx != null) ? (bwRx || 0) + (bwTx || 0) : null;
-    const bwMbps = bwTotalBps != null ? Math.round((bwTotalBps / 1024 / 1024) * 100) / 100 : null;
+    const bwMbps = rateToMBps(bwTotalBps);
+    const diskIOHistory = Array.isArray(srv.history) ? srv.history.map(h => ({
+      time: h?.time,
+      diskIOMbps: hasNum(h?.diskIO) ? rateToMBps(h.diskIO) : null,
+    })) : [];
     const bwHistory = Array.isArray(srv.history) ? srv.history.map(h => {
       const rx = hasNum(h?.bandwidthRxBps) ? Number(h.bandwidthRxBps) : null;
       const tx = hasNum(h?.bandwidthTxBps) ? Number(h.bandwidthTxBps) : null;
       return {
         time: h?.time,
-        bandwidthMbps: (rx != null || tx != null) ? Math.round((((rx || 0) + (tx || 0)) / 1024 / 1024) * 100) / 100 : null,
+        bandwidthMbps: (rx != null || tx != null) ? rateToMBps((rx || 0) + (tx || 0)) : null,
       };
     }) : [];
     const ptag = srv.platform && srv.platform!=='linux' ? ` <span class="badge bg-blue" style="font-size:10px;padding:1px 7px">${srv.platform}</span>` : '';
@@ -1898,6 +1931,11 @@ function buildLinux(linux){
             </div>
             ${histChart(srv.history,'disk',diskPct,lim)}
             <div class="chart-foot">${srv.disk.usedGB}/${srv.disk.totalGB} GB</div>
+          </div>` : '' })()}
+        ${(()=>{ const lim=historyLimitFor('lx:'+lkey); return diskIOMbps!=null?`
+          <div class="chart-row">
+            <div class="chart-hdr"><span class="nb-label">Disk I/O</span><span class="nb-pct" style="color:var(--cyan)">↓ ${diskRead != null ? fmtRate(diskRead) : '--'} / ↑ ${diskWrite != null ? fmtRate(diskWrite) : '--'}</span></div>
+            ${histChart(diskIOHistory,'diskIOMbps',diskIOMbps,lim,rateColor,rateSparkMax(diskIOHistory,'diskIOMbps',diskIOMbps),' MB/s','Disk I/O')}
           </div>` : '' })()}
         ${(()=>{ const lim=historyLimitFor('lx:'+lkey); return srv.temp!=null?`
           <div class="chart-row">
@@ -2185,6 +2223,16 @@ function buildSynology(syn){
     };
 
     const skey = 'd'+i;
+    const diskRate = metricRateSum(dev.metrics?.diskIO, 'readBps', 'writeBps');
+    const bandwidthRate = metricRateSum(dev.metrics?.bandwidth, 'rxBps', 'txBps');
+    const diskIOMbps = rateToMBps(diskRate);
+    const bandwidthMbps = rateToMBps(bandwidthRate);
+    const diskRead = hasNum(dev.metrics?.diskIO?.readBps) ? Number(dev.metrics.diskIO.readBps) : null;
+    const diskWrite = hasNum(dev.metrics?.diskIO?.writeBps) ? Number(dev.metrics.diskIO.writeBps) : null;
+    const bwRx = hasNum(dev.metrics?.bandwidth?.rxBps) ? Number(dev.metrics.bandwidth.rxBps) : null;
+    const bwTx = hasNum(dev.metrics?.bandwidth?.txBps) ? Number(dev.metrics.bandwidth.txBps) : null;
+    const diskIOHistory = rateHistoryMBps(dev.history, 'diskIO', 'diskIOMbps');
+    const bandwidthHistory = rateHistoryMBps(dev.history, 'bandwidth', 'bandwidthMbps');
     const snmpStats = [
       pveHeadStat('Host', dev.host || '-'),
       dev.cpu != null ? pveHeadStat('CPU', `${dev.cpu}%`, bc(dev.cpu), miniSparkline(dev.history, 'cpu', dev.cpu)) : pveHeadStat('CPU', '--', 'var(--muted)'),
@@ -2205,7 +2253,7 @@ function buildSynology(syn){
         ${notifyBell('snmp:'+dev.name)}
       </div>
       <div class="node-body ${snmpOpen[skey]?'open':''}" id="snmp-${skey}">
-        ${(()=>{ const lim=historyLimitFor('snmp:'+skey); return (dev.cpu!=null||dev.ram!=null||dev.systemTemp!=null)?`<div style="display:flex; justify-content:flex-end; margin-bottom:4px;">
+        ${(()=>{ const lim=historyLimitFor('snmp:'+skey); return (dev.cpu!=null||dev.ram!=null||dev.systemTemp!=null||diskIOMbps!=null||bandwidthMbps!=null)?`<div style="display:flex; justify-content:flex-end; margin-bottom:4px;">
           ${drawTimeSelect('snmp:'+skey, lim)}
         </div>`:'' })()}
         ${(()=>{ const lim=historyLimitFor('snmp:'+skey); return dev.cpu!=null ? `<div class="chart-row">
@@ -2220,6 +2268,16 @@ function buildSynology(syn){
           ${histChart(dev.history,'ram',dev.ram.percent,lim)}
           ${dev.ram.usedGB ? `<div class="chart-foot">${fmtBytePair(dev.ram.usedBytes, dev.ram.totalBytes, dev.ram.usedGB, dev.ram.totalGB)}</div>` : ''}
         </div>` : '' })()}
+        ${(()=>{ const lim=historyLimitFor('snmp:'+skey); return diskIOMbps!=null ? `
+          <div class="chart-row">
+            <div class="chart-hdr"><span class="nb-label">Disk I/O</span><span class="nb-pct" style="color:var(--cyan)">↓ ${diskRead != null ? fmtRate(diskRead) : '--'} / ↑ ${diskWrite != null ? fmtRate(diskWrite) : '--'}</span></div>
+            ${histChart(diskIOHistory,'diskIOMbps',diskIOMbps,lim,rateColor,rateSparkMax(diskIOHistory,'diskIOMbps',diskIOMbps),' MB/s','Disk I/O')}
+          </div>` : '' })()}
+        ${(()=>{ const lim=historyLimitFor('snmp:'+skey); return bandwidthMbps!=null ? `
+          <div class="chart-row">
+            <div class="chart-hdr"><span class="nb-label">Bandwidth</span><span class="nb-pct" style="color:var(--green)">↓ ${bwRx != null ? fmtRate(bwRx) : '--'} / ↑ ${bwTx != null ? fmtRate(bwTx) : '--'}</span></div>
+            ${histChart(bandwidthHistory,'bandwidthMbps',bandwidthMbps,lim,()=>'#34D399',rateSparkMax(bandwidthHistory,'bandwidthMbps',bandwidthMbps),' MB/s','Bandwidth')}
+          </div>` : '' })()}
         ${(()=>{ const lim=historyLimitFor('snmp:'+skey); return dev.systemTemp!=null ? `
           <div class="chart-row">
             <div class="chart-hdr"><span class="nb-label">${dev.systemTempLabel || 'CPU temperature'}</span><span class="nb-pct" style="color:${pveTempColor(dev.systemTemp)}">${dev.systemTemp}°C</span></div>
@@ -3266,7 +3324,7 @@ function overviewKpiOptions(metric, ids, panels){
   const supported = {
     cpu: ['proxmox','linux','snmp','docker'],
     mem: ['proxmox','linux','snmp','docker'],
-    disk: ['proxmox','linux'],
+    disk: ['proxmox','linux','snmp'],
     bandwidth: ['proxmox','linux','snmp'],
   }[metric] || [];
   return ['all', ...ids.filter(id => supported.includes(id))].map(id => ({ id, label: platformKpiLabel(id, panels) }));
@@ -3324,11 +3382,12 @@ function overviewKpiMetric(data, metric, platform){
   const disk = {
     proxmox: pveRows.map(n=>metricRateSum(n.metrics?.diskIO, 'readBps', 'writeBps')),
     linux: linuxOnline.map(s=>(Number(s.metrics?.diskIO?.readBps)||0)+(Number(s.metrics?.diskIO?.writeBps)||0)),
+    snmp: snmpOnline.map(s=>metricRateSum(s.metrics?.diskIO, 'readBps', 'writeBps')),
   };
   const bandwidth = {
     proxmox: pveRows.map(n=>metricRateSum(n.metrics?.bandwidth, 'rxBps', 'txBps')),
     linux: linuxOnline.map(s=>(Number(s.metrics?.bandwidth?.rxBps)||0)+(Number(s.metrics?.bandwidth?.txBps)||0)),
-    snmp: snmpOnline.map(dev => (dev.network||[]).reduce((a,n)=>a+(Number(n.rxMBps)||0)*1024*1024+(Number(n.txMBps)||0)*1024*1024,0)),
+    snmp: snmpOnline.map(s=>metricRateSum(s.metrics?.bandwidth, 'rxBps', 'txBps')),
   };
   const allVals = obj => Object.values(obj).flat();
   if(metric === 'cpu') return kpiPct('reporting source', platform === 'all' ? allVals(cpu) : (cpu[platform] || []));

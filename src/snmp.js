@@ -103,6 +103,10 @@ function buildMap(items) {
   return map;
 }
 
+function cleanSnmpText(value) {
+  return Buffer.isBuffer(value) ? value.toString('utf8').replace(/\0/g, '') : String(value || '');
+}
+
 function clampPercent(n) {
   if (!Number.isFinite(n)) return null;
   return Math.max(0, Math.min(100, Math.round(n)));
@@ -350,44 +354,161 @@ async function getVolumes(session) {
 }
 
 const netPrev = new Map();
+const diskIoPrev = new Map();
 const SNMP_HISTORY_MAX = 5760;
 const synHistory = loadHistoryMap('snmp-history', SNMP_HISTORY_MAX);
 
+function rateFromCounters(cache, key, read, write) {
+  const now = Date.now();
+  const r = read != null ? Number(read) : null;
+  const w = write != null ? Number(write) : null;
+  if (!Number.isFinite(r) || !Number.isFinite(w)) return null;
+  const prev = cache.get(key);
+  cache.set(key, { time: now, read: r, write: w });
+  if (!prev || !Number.isFinite(prev.read) || !Number.isFinite(prev.write)) return null;
+  const elapsed = (now - prev.time) / 1000;
+  if (elapsed <= 0) return null;
+  const dRead = r - prev.read;
+  const dWrite = w - prev.write;
+  if (dRead < 0 || dWrite < 0) return null;
+  return {
+    readBps: dRead / elapsed,
+    writeBps: dWrite / elapsed,
+  };
+}
+
+function parseTableRows(rows, base) {
+  const prefix = base + '.';
+  const prefixLen = base.split('.').length;
+  const cols = {};
+  rows.forEach(({ oid, value }) => {
+    if (!oid.startsWith(prefix)) return;
+    const parts = oid.split('.');
+    if (parts.length < prefixLen + 2) return;
+    const col = parts[prefixLen];
+    const idx = parts[prefixLen + 1];
+    if (!cols[col]) cols[col] = {};
+    cols[col][idx] = value;
+  });
+  return cols;
+}
+
+function firstCounter(cols, idx, keys) {
+  for (const key of keys) {
+    const n = toNum(cols[key]?.[idx]);
+    if (n != null && Number.isFinite(n)) return n;
+  }
+  return null;
+}
+
+async function getDiskIoFromTable(session, deviceKey, base, source, readKeys, writeKeys) {
+  const rows = await snmpWalk(session, base);
+  const cols = parseTableRows(rows, base);
+  const names = cols['2'] || {};
+  const devices = [];
+  let readBps = 0;
+  let writeBps = 0;
+  let any = false;
+  for (const idx of Object.keys(names)) {
+    const rawName = names[idx];
+    const name = Buffer.isBuffer(rawName) ? rawName.toString('utf8').replace(/\0/g, '') : String(rawName || `disk${idx}`);
+    if (!name || /^(loop|ram|zram|dm-|md)$/i.test(name)) continue;
+    const read = firstCounter(cols, idx, readKeys);
+    const write = firstCounter(cols, idx, writeKeys);
+    const rate = rateFromCounters(diskIoPrev, `${source}:${deviceKey}:${idx}`, read, write);
+    if (!rate) continue;
+    any = true;
+    readBps += rate.readBps;
+    writeBps += rate.writeBps;
+    devices.push({ name, readBps: rate.readBps, writeBps: rate.writeBps });
+  }
+  return any ? { readBps, writeBps, devices, source } : null;
+}
+
+async function getDiskIO(session, deviceKey, preferSynology = false) {
+  const sources = preferSynology
+    ? [
+        ['1.3.6.1.4.1.6574.101.1.1', 'synology-storageio', ['8', '12', '3'], ['9', '13', '4']],
+        ['1.3.6.1.4.1.2021.13.15.1.1', 'ucd-diskio', ['12', '3'], ['13', '4']],
+      ]
+    : [
+        ['1.3.6.1.4.1.2021.13.15.1.1', 'ucd-diskio', ['12', '3'], ['13', '4']],
+        ['1.3.6.1.4.1.6574.101.1.1', 'synology-storageio', ['8', '12', '3'], ['9', '13', '4']],
+      ];
+  for (const [base, source, readKeys, writeKeys] of sources) {
+    try {
+      const data = await getDiskIoFromTable(session, deviceKey, base, source, readKeys, writeKeys);
+      if (data) return data;
+    } catch {
+      // Some devices simply do not expose this table.
+    }
+  }
+  return null;
+}
+
+function sumNetworkBandwidth(network) {
+  if (!Array.isArray(network)) return null;
+  let rxBps = 0;
+  let txBps = 0;
+  let any = false;
+  for (const item of network) {
+    const rx = Number(item.rxMBps);
+    const tx = Number(item.txMBps);
+    if (Number.isFinite(rx) && rx >= 0) { rxBps += rx * 1024 * 1024; any = true; }
+    if (Number.isFinite(tx) && tx >= 0) { txBps += tx * 1024 * 1024; any = true; }
+  }
+  return any ? { rxBps, txBps } : null;
+}
+
 async function getNetwork(session, deviceKey) {
-  const [descrs, rxOctets, txOctets] = await Promise.all([
-    snmpWalk(session, '1.3.6.1.2.1.2.2.1.2'),
-    snmpWalk(session, '1.3.6.1.2.1.31.1.1.1.6'),
-    snmpWalk(session, '1.3.6.1.2.1.31.1.1.1.10'),
+  const [
+    names,
+    descrs,
+    rxHcOctets,
+    txHcOctets,
+    rxOctets,
+    txOctets,
+    operStatus,
+  ] = await Promise.all([
+    snmpWalk(session, '1.3.6.1.2.1.31.1.1.1.1').catch(() => []),
+    snmpWalk(session, '1.3.6.1.2.1.2.2.1.2').catch(() => []),
+    snmpWalk(session, '1.3.6.1.2.1.31.1.1.1.6').catch(() => []),
+    snmpWalk(session, '1.3.6.1.2.1.31.1.1.1.10').catch(() => []),
+    snmpWalk(session, '1.3.6.1.2.1.2.2.1.10').catch(() => []),
+    snmpWalk(session, '1.3.6.1.2.1.2.2.1.16').catch(() => []),
+    snmpWalk(session, '1.3.6.1.2.1.2.2.1.8').catch(() => []),
   ]);
 
+  const nameMap  = buildMap(names);
   const descrMap = buildMap(descrs);
-  const rxMap    = buildMap(rxOctets);
-  const txMap    = buildMap(txOctets);
-  const now = Date.now();
+  const rxMap    = { ...buildMap(rxOctets), ...buildMap(rxHcOctets) };
+  const txMap    = { ...buildMap(txOctets), ...buildMap(txHcOctets) };
+  const upMap    = buildMap(operStatus);
+  const indexes = [...new Set([...Object.keys(nameMap), ...Object.keys(descrMap), ...Object.keys(rxMap), ...Object.keys(txMap)])];
 
-  const interfaces = Object.keys(descrMap)
-    .filter(idx => {
-      const name = descrMap[idx]?.toString() || '';
-      return name && !name.startsWith('lo') && !name.includes('dummy');
-    })
+  const interfaces = indexes
     .map(idx => {
-      const name = descrMap[idx]?.toString() || `eth${idx}`;
-      const rx = rxMap[idx] != null ? Number(rxMap[idx]) : null;
-      const tx = txMap[idx] != null ? Number(txMap[idx]) : null;
-      const key = `${deviceKey}-${idx}`;
-      const prev = netPrev.get(key);
-      netPrev.set(key, { time: now, rx, tx });
-
-      let rxMBps = null, txMBps = null;
-      if (prev && rx != null && tx != null) {
-        const elapsed = (now - prev.time) / 1000;
-        if (elapsed > 0) {
-          rxMBps = ((rx - prev.rx) / elapsed / 1024 / 1024).toFixed(2);
-          txMBps = ((tx - prev.tx) / elapsed / 1024 / 1024).toFixed(2);
-        }
-      }
-      return { name, rxMBps, txMBps };
-    });
+      const ifName = cleanSnmpText(nameMap[idx]);
+      const descr = cleanSnmpText(descrMap[idx]);
+      const name = ifName || descr || `if${idx}`;
+      const rx = toNum(rxMap[idx]);
+      const tx = toNum(txMap[idx]);
+      const oper = toNum(upMap[idx]);
+      const rate = rateFromCounters(netPrev, `${deviceKey}:${idx}`, rx, tx);
+      const rxMBps = rate ? (rate.readBps / 1024 / 1024).toFixed(2) : null;
+      const txMBps = rate ? (rate.writeBps / 1024 / 1024).toFixed(2) : null;
+      return { name, ifName, descr, operStatus: oper, rxMBps, txMBps };
+    })
+    .filter(iface => {
+      const name = iface.ifName || iface.name || '';
+      if (!name || /^(lo|dummy|sit|tunl|ip6tnl|veth)/i.test(name)) return false;
+      if (/docker|br-|virbr|vnet|tailscale|wg|zt/i.test(name)) return false;
+      if (iface.operStatus != null && iface.operStatus !== 1) return false;
+      const wanted = /^(eth|ovs_|bond)/i.test(name);
+      if (wanted) return true;
+      return iface.rxMBps != null || iface.txMBps != null;
+    })
+    .map(({ name, rxMBps, txMBps }) => ({ name, rxMBps, txMBps }));
 
   return interfaces;
 }
@@ -404,13 +525,18 @@ async function getDeviceData(device) {
       getVolumes(session).catch(e => { console.error(`[SNMP ${device.name}] volumes:`, e.message); return []; }),
       getNetwork(session, device.host).catch(e => { console.error(`[SNMP ${device.name}] network:`, e.message); return []; }),
     ]);
+    const diskIO = await getDiskIO(session, device.host, !!(disks.length || volumes.length))
+      .catch(e => { console.error(`[SNMP ${device.name}] disk I/O:`, e.message); return null; });
+    const bandwidth = sumNetworkBandwidth(network);
     const hist = synHistory.get(device.host) || [];
-    if (sysInfo.cpu != null || sysInfo.ram || sysInfo.systemTemp != null) {
+    if (sysInfo.cpu != null || sysInfo.ram || sysInfo.systemTemp != null || diskIO || bandwidth) {
       hist.push({
         time: Date.now(),
         cpu: sysInfo.cpu ?? null,
         ram: sysInfo.ram?.percent ?? null,
         temp: sysInfo.systemTemp ?? null,
+        diskIO: diskIO ? (Number(diskIO.readBps) || 0) + (Number(diskIO.writeBps) || 0) : null,
+        bandwidth: bandwidth ? (Number(bandwidth.rxBps) || 0) + (Number(bandwidth.txBps) || 0) : null,
       });
       if (hist.length > SNMP_HISTORY_MAX) hist.splice(0, hist.length - SNMP_HISTORY_MAX);
       synHistory.set(device.host, hist);
@@ -428,6 +554,7 @@ async function getDeviceData(device) {
       disks,
       volumes,
       network,
+      metrics: { diskIO, bandwidth },
       history: [...hist],
     };
   } catch (err) {
