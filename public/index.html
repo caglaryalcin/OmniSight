@@ -4423,15 +4423,11 @@ async function initialLoad(){
 
 (async()=>{
   applyThemeIcon();
-  const r = await fetch('/api/auth-status').catch(()=>null);
+  const r = await fetch('/api/auth-status', { headers: authHeaders() }).catch(()=>null);
   if(!r){ await initialLoad(); return; }
   const d = await r.json().catch(()=>({}));
   if(d.required){
-    const token = sessionStorage.getItem('os_token') || (() => {
-      const m = document.cookie.match(/(?:^|;\s*)session=([^;]+)/);
-      return m ? m[1] : null;
-    })();
-    if(!token){ window.location.href='/login'; return; }
+    if(!d.authenticated){ window.location.href='/login'; return; }
     loadTopProfile();
   } else {
     applyTopProfile();

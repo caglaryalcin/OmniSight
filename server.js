@@ -209,6 +209,30 @@ function currentSessionToken(req) {
   return req.headers['x-session-token'] || req.cookies?.session || null;
 }
 
+function reloadSessionsFromDisk() {
+  const fresh = loadSessions();
+  sessions.clear();
+  for (const [k, v] of fresh) sessions.set(k, v);
+}
+
+function validSession(req, auth = loadAuth()) {
+  const token = currentSessionToken(req);
+  if (!token) return null;
+  let session = sessions.get(token);
+  if (!session) {
+    reloadSessionsFromDisk();
+    session = sessions.get(token);
+  }
+  const expired = !session || Date.now() >= Number(session.expires || 0);
+  const stalePassword = !!(auth?.passwordChangedAt && Number(session?.created || 0) < Number(auth.passwordChangedAt || 0));
+  if (expired || stalePassword) {
+    sessions.delete(token);
+    saveSessions(sessions);
+    return null;
+  }
+  return { token, session };
+}
+
 function keepOnlyCurrentSession(req) {
   const token = currentSessionToken(req);
   const current = token ? sessions.get(token) : null;
@@ -373,15 +397,7 @@ function authMiddleware(req, res, next) {
   if (req.path.startsWith('/assets/')) return next();
   if (req.path.startsWith('/api/icons/')) return next();
   if (req.path.startsWith('/agent/') || ['/api/agent/report', '/api/agent/result', '/api/agent/commands'].includes(req.path)) return next();
-  const token = req.headers['x-session-token'] || req.cookies?.session;
-  if (token && sessions.has(token)) {
-    const session = sessions.get(token);
-    const validSession = Date.now() < session.expires
-      && (!auth?.passwordChangedAt || Number(session.created || 0) >= Number(auth.passwordChangedAt || 0));
-    if (validSession) return next();
-    sessions.delete(token);
-    saveSessions(sessions);
-  }
+  if (validSession(req, auth)) return next();
   if (config.publicStatus && (req.path === '/status' || req.path === '/api/public/status')) return next();
   if (!auth) {
     if (['/login', '/api/login', '/api/auth-status', '/api/set-password'].includes(req.path)) return next();
@@ -1351,7 +1367,12 @@ app.post('/api/logout', (req, res) => {
 
 app.get('/api/auth-status', (req, res) => {
   const auth = loadAuth();
-  res.json({ required: !!auth, username: auth?.username || null, twoFactorEnabled: totpEnabled(auth) });
+  res.json({
+    required: !!auth,
+    authenticated: !!(auth && validSession(req, auth)),
+    username: auth?.username || null,
+    twoFactorEnabled: totpEnabled(auth),
+  });
 });
 
 app.get('/api/profile', (req, res) => {
