@@ -196,6 +196,26 @@ No ConfigMap/Secret to create: the app starts empty and you configure it from th
 
 > **Docker path note:** Windows paths don't work inside the container. Put `kube.bin` in `./data/` and reference it with a container path, e.g. `kubeconfig: /app/data/kube.bin`.
 
+### Password recovery
+
+If you lock yourself out, reset the local account from inside the running container/pod. The command updates `data/auth.yaml`; no restart is required and old sessions are invalidated automatically.
+
+Docker:
+
+```bash
+docker exec -e OMNISIGHT_RESET_PASSWORD='NewStrongPass1' omnisight \
+  npm run reset-password -- --username admin
+```
+
+Kubernetes:
+
+```bash
+kubectl exec -n omnisight deploy/omnisight -- sh -lc \
+  "OMNISIGHT_RESET_PASSWORD='NewStrongPass1' npm run reset-password -- --username admin"
+```
+
+If you also lost access to your authenticator app, add `--disable-2fa`.
+
 ## Environment variables
 
 | Variable | Required | Default | Description |

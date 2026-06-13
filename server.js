@@ -171,6 +171,14 @@ function loginRateFail(key) {
   loginAttempts.set(key, rec);
 }
 
+function auditLogin(req, username, outcome, reason = '') {
+  const ip = String(req.ip || req.socket?.remoteAddress || 'unknown');
+  const user = String(username || '').slice(0, 128).replace(/[\r\n\t]/g, ' ');
+  const msg = `[auth] login ${outcome}: user="${user || '-'}" ip=${ip}${reason ? ` reason=${reason}` : ''}`;
+  if (outcome === 'success') console.log(msg);
+  else console.warn(msg);
+}
+
 function loadAuth() {
   if (!fs.existsSync(AUTH_PATH)) return null;
   return yaml.load(fs.readFileSync(AUTH_PATH, 'utf8')) || null;
@@ -366,7 +374,14 @@ function authMiddleware(req, res, next) {
   if (req.path.startsWith('/api/icons/')) return next();
   if (req.path.startsWith('/agent/') || ['/api/agent/report', '/api/agent/result', '/api/agent/commands'].includes(req.path)) return next();
   const token = req.headers['x-session-token'] || req.cookies?.session;
-  if (token && sessions.has(token) && Date.now() < sessions.get(token).expires) return next();
+  if (token && sessions.has(token)) {
+    const session = sessions.get(token);
+    const validSession = Date.now() < session.expires
+      && (!auth?.passwordChangedAt || Number(session.created || 0) >= Number(auth.passwordChangedAt || 0));
+    if (validSession) return next();
+    sessions.delete(token);
+    saveSessions(sessions);
+  }
   if (config.publicStatus && (req.path === '/status' || req.path === '/api/public/status')) return next();
   if (!auth) {
     if (['/login', '/api/login', '/api/auth-status', '/api/set-password'].includes(req.path)) return next();
@@ -1278,18 +1293,43 @@ app.post('/api/login', (req, res) => {
   const auth = loadAuth();
   if (!auth) return res.json({ ok: true });
   const { username, password, code } = req.body || {};
-  if (!username || !password) return res.status(400).json({ error: 'Missing credentials' });
+  if (!username || !password) {
+    auditLogin(req, username, 'failed', 'missing_credentials');
+    return res.status(400).json({ error: 'Missing credentials' });
+  }
   const rate = loginRateCheck(req, username);
-  if (!rate.ok) return res.status(429).json({ error: 'Too many login attempts. Try again later.', retryAfter: rate.retryAfter });
-  if (username !== auth.username) { loginRateFail(rate.key); return res.status(401).json({ error: 'Invalid credentials' }); }
+  if (!rate.ok) {
+    auditLogin(req, username, 'failed', 'rate_limited');
+    return res.status(429).json({ error: 'Too many login attempts. Try again later.', retryAfter: rate.retryAfter });
+  }
+  if (username !== auth.username) {
+    loginRateFail(rate.key);
+    auditLogin(req, username, 'failed', 'unknown_user');
+    return res.status(401).json({ error: 'Invalid credentials' });
+  }
   try {
-    if (!verifyPassword(password, auth.hash, auth.salt)) { loginRateFail(rate.key); return res.status(401).json({ error: 'Invalid credentials' }); }
-  } catch { loginRateFail(rate.key); return res.status(401).json({ error: 'Invalid credentials' }); }
+    if (!verifyPassword(password, auth.hash, auth.salt)) {
+      loginRateFail(rate.key);
+      auditLogin(req, username, 'failed', 'invalid_password');
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+  } catch {
+    loginRateFail(rate.key);
+    auditLogin(req, username, 'failed', 'password_check_error');
+    return res.status(401).json({ error: 'Invalid credentials' });
+  }
   if (totpEnabled(auth)) {
-    if (!code) return res.status(401).json({ error: 'Two-factor code required', twoFactorRequired: true });
+    if (!code) {
+      auditLogin(req, username, 'failed', 'two_factor_required');
+      return res.status(401).json({ error: 'Two-factor code required', twoFactorRequired: true });
+    }
     let totpOk = false;
     try { totpOk = verifyTotp(auth.totp.secret, code); } catch {}
-    if (!totpOk) { loginRateFail(rate.key); return res.status(401).json({ error: 'Invalid two-factor code', twoFactorRequired: true }); }
+    if (!totpOk) {
+      loginRateFail(rate.key);
+      auditLogin(req, username, 'failed', 'invalid_two_factor');
+      return res.status(401).json({ error: 'Invalid two-factor code', twoFactorRequired: true });
+    }
   }
   const token = genToken();
   const remember = req.body.remember === true;
@@ -1298,6 +1338,7 @@ app.post('/api/login', (req, res) => {
   saveSessions(sessions);
   loginAttempts.delete(rate.key);
   res.cookie('session', token, sessionCookieOptions(req, remember));
+  auditLogin(req, username, 'success');
   res.json({ ok: true, token });
 });
 
@@ -1355,6 +1396,8 @@ app.post('/api/set-password', (req, res) => {
   const salt = password ? crypto.randomBytes(16).toString('hex') : auth.salt;
   const hash = password ? hashPassword(password, salt) : auth.hash;
   const nextAuth = { username: finalUsername, hash, salt };
+  if (password) nextAuth.passwordChangedAt = Date.now();
+  else if (auth?.passwordChangedAt) nextAuth.passwordChangedAt = auth.passwordChangedAt;
   if (auth?.totp) nextAuth.totp = auth.totp;
   if (auth?.avatar) nextAuth.avatar = auth.avatar;
   writePrivateYaml(AUTH_PATH, nextAuth);

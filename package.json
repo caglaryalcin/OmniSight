@@ -1,12 +1,13 @@
 {
   "name": "omnisight",
-  "version": "1.6.5",
+  "version": "1.7.0",
   "description": "Agent-based monitoring dashboard for Proxmox, Linux servers, Docker, Kubernetes, SNMP devices, databases, Healthchecks and Uptime Kuma",
   "main": "server.js",
   "scripts": {
     "start": "node --openssl-legacy-provider server.js",
     "dev": "node --openssl-legacy-provider --watch server.js",
-    "encrypt-config": "node scripts/encrypt-config.js"
+    "encrypt-config": "node scripts/encrypt-config.js",
+    "reset-password": "node src/reset-password.js"
   },
   "dependencies": {
     "@kubernetes/client-node": "^1.4.0",
