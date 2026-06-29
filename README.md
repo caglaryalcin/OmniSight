@@ -65,6 +65,9 @@ A simple, single-glance monitoring dashboard for Proxmox, Linux servers, Kuberne
 - **Profile** — profile image, password changes, password reset support, passkeys and optional TOTP two-factor authentication
 - **Appearance** — dashboard side panel toggle, default history period, 12/24 hour time format, English/Turkish UI language preference and installable PWA manifest
 - **Backup & restore** — config backup export/restore plus password-gated full backup export for users, secret key, certs and history
+
+![](https://raw.githubusercontent.com/caglaryalcin/OmniSight/refs/heads/main/screenshots/backup-export.png)
+
 - **Topology** — relationship map for platforms, hosts and workloads
 
 ![](https://raw.githubusercontent.com/caglaryalcin/OmniSight/refs/heads/main/screenshots/topology.png)
