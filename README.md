@@ -1,8 +1,10 @@
 <img src="./public/assets/omnisight-wordmark.svg" width="512" alt="Omnisight Logo" />
 
-![Status](https://img.shields.io/badge/status-stable-brightgreen) [![Version](https://img.shields.io/badge/version-1.10.0-blue)](https://github.com/caglaryalcin/OmniSight/releases) [![Latest Release](https://img.shields.io/github/v/release/caglaryalcin/OmniSight?include_prereleases&color=blue)](https://github.com/caglaryalcin/OmniSight/releases)
+![Status](https://img.shields.io/badge/status-stable-brightgreen) [![Latest Release](https://img.shields.io/github/v/release/caglaryalcin/OmniSight?include_prereleases&color=blue)](https://github.com/caglaryalcin/OmniSight/releases)
 
 A simple, single-glance monitoring dashboard for Proxmox, Linux servers, Kubernetes, SNMP devices, Docker, Dockhand, databases, built-in service checks, Healthchecks, Uptime Kuma and Prometheus.
+
+For deeper architecture, operations and troubleshooting notes, see [DOCUMENTATION.md](DOCUMENTATION.md).
 
 ## Features
 
@@ -82,7 +84,7 @@ A simple, single-glance monitoring dashboard for Proxmox, Linux servers, Kuberne
 
 ## Stack
 
-Node.js + Express backend · single-file vanilla HTML/CSS/JS frontend (no framework).
+Node.js + Express backend · vanilla HTML/CSS/JS frontend (no framework).
 
 ## Dashboard
 
@@ -103,6 +105,14 @@ npm start
 ```
 
 Dashboard: `http://localhost:3000` — the app starts with no config; set up your account and configure platforms from the Settings UI.
+
+### Demo mode
+
+```bash
+npm run demo
+```
+
+Demo: `http://localhost:4000` — default credentials are `demo` / `demo` unless `OMNISIGHT_DEMO_USER` and `OMNISIGHT_DEMO_PASSWORD` are set.
 
 ## The agent
 
@@ -196,10 +206,13 @@ Nothing to pre-create. The single `data/` directory holds all state (`config.yam
 
 ```bash
 docker run -d --name omnisight -p 3000:3000 \
+  --cap-add NET_RAW \
   -e TZ=UTC \
   -v $(pwd)/data:/app/data \
   ghcr.io/caglaryalcin/omnisight
 ```
+
+`NET_RAW` is only needed for built-in Ping checks. HTTP, TCP and DNS checks work without it.
 
 To build the image yourself instead, uncomment `build: .` in `docker-compose.yml`, or run `docker build -t omnisight .` and replace the last line with `omnisight`.
 
@@ -212,10 +225,12 @@ docker compose restart omnisight
 
 ### Pre-built image (CI/CD)
 
-A GitHub Actions workflow (`.github/workflows/deploy.yml`) builds and pushes the image to GitHub Container Registry on every push to `main`/`master` and on `v*` tags:
+A GitHub Actions workflow (`.github/workflows/deploy.yml`) builds and pushes the image to GitHub Container Registry on `main`/`master` and `v*` tags. It also pushes to Docker Hub when `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` are configured for the repository:
 
 ```bash
-docker pull ghcr.io/caglaryalcin/omnisight
+docker pull ghcr.io/caglaryalcin/omnisight:latest
+# Optional Docker Hub mirror, when configured:
+# docker pull docker.io/<namespace>/omnisight:latest
 ```
 
 ### Docker Stack (Swarm)
@@ -231,7 +246,9 @@ docker stack deploy -c docker-stack.yml omnisight
 
 ### Kubernetes / Helm
 
-For Helm deployments, expose the main app on container port `3000`. The optional demo listener runs on `4000` when `OMNISIGHT_START_DEMO=1` and `DEMO_PORT=4000`; expose that as a second service port only when you want the demo page reachable.
+For Helm deployments, expose the main app on container port `3000`. The image also exposes `4000` for the bundled demo server. Use `OMNISIGHT_MODE=prod` for the normal app, or run a separate demo deployment with `OMNISIGHT_MODE=demo` and `OMNISIGHT_DEMO_PORT=4000` when you want the demo page reachable.
+
+When running from source with `npm start`, `OMNISIGHT_START_DEMO=1` can start the demo listener alongside the main app.
 
 > **Docker path note:** Windows paths don't work inside the container. Put `kube.bin` in `./data/` and reference it with a container path, e.g. `kubeconfig: /app/data/kube.bin`.
 
@@ -271,8 +288,10 @@ For disaster recovery, the safest flow is still: stop OmniSight, restore the fil
 | Variable | Required | Default | Description |
 |---|---|---|---|
 | `PORT` | No | `3000` | HTTP port |
-| `DEMO_PORT` / `OMNISIGHT_DEMO_PORT` | No | `4000` | Demo dashboard port when the bundled demo listener is explicitly enabled |
-| `OMNISIGHT_START_DEMO` | No | `0` | Set to `1` to start the bundled demo listener alongside the main app |
+| `OMNISIGHT_MODE` | No | `prod` | Container entrypoint mode. `prod` runs the main app; `demo` runs the bundled demo server. |
+| `DEMO_PORT` / `OMNISIGHT_DEMO_PORT` | No | `4000` | Demo dashboard port |
+| `OMNISIGHT_DEMO_USER` / `OMNISIGHT_DEMO_PASSWORD` | No | `demo` / `demo` | Demo login credentials |
+| `OMNISIGHT_START_DEMO` | No | `0` | Source/local mode only: set to `1` to start the demo listener alongside the main app |
 | `OMNISIGHT_ALERT_COOLDOWN_MS` | No | `3600000` | Minimum time before the same alert notification can be sent again |
 | `TZ` | No | `UTC` | Server timezone for Node timestamps and notifications, e.g. `Europe/Istanbul`. `TIMEZONE` is also accepted as an alias. |
 | `OMNISIGHT_ENCRYPT` | No | `true` | Config encryption is **enabled by default**. Plaintext secrets require this to be disabled and `OMNISIGHT_ALLOW_PLAINTEXT_SECRETS=1`. |
@@ -427,7 +446,7 @@ curl -fsS http://<omnisight-host>:3000/api/webhook/event \
 | `/settings` | Configuration |
 | `/agents` | Connected agents, versions and update actions |
 | `/topology` | Platform relationship map |
-| `/profile` | Username / password and two-factor authentication |
+| `/profile` | Profile image, username, e-mail, password, passkeys and two-factor authentication |
 | `/event-center` | Event Center: live log / warning / error stream plus audit and alert history, timeline, acknowledge and mute actions |
 | `/about` | Version info and GitHub |
 
@@ -439,7 +458,8 @@ The sidebar footer also links to GitHub and opens a new issue form for help/bug 
 - All state lives in `./data/` (`config.yaml`, `secret.key`, `kube.bin`, `auth.yaml`, `sessions.yaml`, SSH keys) — it never leaves your machine.
 - Login password is set on first run through the onboarding wizard. Passwords must be at least 8 characters and contain both an uppercase and a lowercase letter.
 - Multi-user access is stored in `data/users.yaml` with `admin`, `operator` and `read-only` roles. Existing single-user `auth.yaml` installs are migrated automatically. New users created with a temporary password are forced to change it before accessing the dashboard.
-- Optional TOTP two-factor authentication can be enabled from the Profile page.
+- Passkeys and optional TOTP two-factor authentication can be enabled from the Profile page.
+- Password reset by e-mail can be enabled or disabled by admins.
 - Sessions use `HttpOnly`, `SameSite=Strict` cookies; login attempts are rate-limited.
 - Mutating API requests are protected by same-origin checks, and browser security headers are enabled.
 - Uploaded icons, kubeconfigs and certificates are size-limited; uploaded SVG icons are checked for active content.
