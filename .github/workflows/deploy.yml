@@ -25,61 +25,54 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
 
       - name: Set up Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
+
+      - name: Resolve image names
+        id: img
+        shell: bash
+        env:
+          DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME || secrets.DOCKERHUB_USERNAME }}
+        run: |
+          set -euo pipefail
+          dockerhub_user="$(printf '%s' "$DOCKERHUB_USERNAME" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
+          if [ -z "$dockerhub_user" ]; then
+            echo "::error::Set DOCKERHUB_USERNAME as a repository variable or secret."
+            exit 1
+          fi
+          if ! [[ "$dockerhub_user" =~ ^[a-z0-9][a-z0-9_-]*$ ]]; then
+            echo "::error::Docker Hub username/namespace '$dockerhub_user' is not a valid Docker image namespace."
+            exit 1
+          fi
+          echo "ghcr=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+          echo "dockerhub=docker.io/${dockerhub_user}/omnisight" >> "$GITHUB_OUTPUT"
+          echo "dockerhub_user=${dockerhub_user}" >> "$GITHUB_OUTPUT"
 
       - name: Log in to GitHub Container Registry
-        shell: bash
-        env:
-          GHCR_USER: ${{ github.actor }}
-          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          for attempt in 1 2 3 4 5; do
-            if printf '%s' "$GHCR_TOKEN" | timeout 45s docker login ghcr.io -u "$GHCR_USER" --password-stdin; then
-              exit 0
-            fi
-            if [ "$attempt" -eq 5 ]; then
-              echo "GHCR login failed after ${attempt} attempts" >&2
-              exit 1
-            fi
-            sleep $((attempt * 10))
-          done
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Log in to DockerHub
-        shell: bash
-        env:
-          DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USERNAME }}
-          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          for attempt in 1 2 3 4 5; do
-            if printf '%s' "$DOCKERHUB_TOKEN" | timeout 45s docker login docker.io -u "$DOCKERHUB_USER" --password-stdin; then
-              exit 0
-            fi
-            if [ "$attempt" -eq 5 ]; then
-              echo "DockerHub login failed after ${attempt} attempts" >&2
-              exit 1
-            fi
-            sleep $((attempt * 10))
-          done
-
-      - name: Lowercase image name
-        id: img
-        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+        uses: docker/login-action@v4
+        with:
+          username: ${{ steps.img.outputs.dockerhub_user }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Docker metadata
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: |
-            ${{ steps.img.outputs.name }}
-            docker.io/${{ secrets.DOCKERHUB_USERNAME }}/omnisight
+            ${{ steps.img.outputs.ghcr }}
+            ${{ steps.img.outputs.dockerhub }}
           tags: |
             type=ref,event=branch
             type=ref,event=tag
@@ -87,7 +80,7 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: true
