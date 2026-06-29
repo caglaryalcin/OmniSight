@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>try{document.documentElement.setAttribute("data-theme",localStorage.getItem("os_theme")||"dark")}catch(e){}</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>OmniSight - Documentation</title>
+<link rel="icon" href="/assets/omnisight-logo.svg" type="image/svg+xml">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#141617;--panel:#181A1B;--row:#141617;--row2:#1D2021;--border:#242C3B;--border2:#2E3850;--text:#E2E8F2;--muted:#7D8AA3;--green:#34D399;--red:#F87171;--yellow:#FBBF24;--blue:#60A5FA;--accent:#6366F1}
+html{color-scheme:dark;scroll-behavior:smooth;scroll-padding-top:82px}
+body{background:var(--bg);color:var(--text);font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;line-height:1.62;-webkit-font-smoothing:antialiased}
+body::before{content:'';position:fixed;inset:0;z-index:-1;background:radial-gradient(900px 500px at 85% -10%, rgba(99,102,241,.10), transparent 60%),radial-gradient(800px 500px at -10% 110%, rgba(34,211,238,.06), transparent 60%)}
+header{height:64px;padding:0 24px;background:rgba(24,26,27,.86);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:30;backdrop-filter:blur(14px)}
+.logo{font-size:19px;font-weight:800;display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit}
+.ldot{width:12px;height:12px;border-radius:50%;background:var(--green);box-shadow:0 0 12px rgba(52,211,153,.55)}
+.hdr-actions{display:flex;align-items:center;gap:8px}
+.btn{height:32px;border:1px solid var(--border);background:var(--row);color:var(--text);border-radius:8px;padding:0 12px;font-size:12px;font-weight:750;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+.btn:hover{border-color:var(--blue)}
+.page{max-width:1440px;margin:0 auto;padding:24px;display:grid;grid-template-columns:minmax(0,1fr) 272px;gap:24px;align-items:start}
+.doc{min-width:0;border:1px solid var(--border);background:rgba(24,26,27,.94);border-radius:12px;padding:26px 30px}
+.doc h1{font-size:30px;line-height:1.16;letter-spacing:0;font-weight:850;margin:0 0 12px}
+.doc h2{font-size:22px;line-height:1.25;margin:30px 0 10px;padding-top:4px;font-weight:850;letter-spacing:0;border-top:1px solid var(--border)}
+.doc h2:first-child{border-top:0;margin-top:0}
+.doc h3{font-size:16px;margin:20px 0 8px;font-weight:820;letter-spacing:0;color:var(--text)}
+.doc p{color:var(--muted);margin:9px 0}
+.doc strong{color:var(--text)}
+.doc a{color:var(--blue);text-decoration:none}
+.doc a:hover{text-decoration:underline}
+.doc ul,.doc ol{margin:9px 0 10px 22px;color:var(--muted)}
+.doc li{margin:5px 0}
+.doc code{font-family:ui-monospace,Menlo,Consolas,monospace;background:var(--row);border:1px solid var(--border);border-radius:5px;padding:1px 5px;color:var(--text);font-size:12px}
+.doc pre{background:var(--row);border:1px solid var(--border);border-radius:8px;padding:13px 14px;overflow:auto;margin:12px 0;color:var(--text);font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;line-height:1.5;white-space:pre}
+.doc pre code{border:0;background:transparent;padding:0;font-size:inherit}
+.doc table{width:100%;border-collapse:separate;border-spacing:0;margin:12px 0;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.doc th,.doc td{padding:10px 11px;border-top:1px solid var(--border);text-align:left;vertical-align:top}
+.doc tr:first-child th{border-top:0}
+.doc th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);background:rgba(0,0,0,.18)}
+.doc td{font-size:13px;color:var(--muted)}
+.doc td:first-child{color:var(--text);font-weight:750;white-space:nowrap}
+.tabs{position:sticky;top:84px;border:1px solid var(--border);background:rgba(24,26,27,.94);border-radius:12px;padding:10px;max-height:calc(100vh - 104px);overflow:auto}
+.tabs-title{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:850;padding:4px 8px 8px}
+.doc-search{width:100%;height:32px;border:1px solid var(--border);background:var(--row);color:var(--text);border-radius:8px;padding:0 10px;font-size:12px;outline:0;margin:0 0 8px}
+.doc-search:focus{border-color:var(--blue)}
+.doc-search::placeholder{color:var(--muted)}
+.tabs-list{display:flex;flex-direction:column;gap:1px}
+.tab{display:block;width:100%;text-align:left;border:0;background:transparent;color:var(--muted);font-size:12px;font-weight:750;padding:8px 9px;border-radius:7px;text-decoration:none;cursor:pointer}
+.tab:hover{background:rgba(255,255,255,.05);color:var(--text)}
+.tab.active{background:rgba(99,102,241,.16);color:var(--text)}
+.tab.hidden{display:none}
+.search-empty{display:none;color:var(--muted);font-size:12px;padding:8px 9px}
+.search-empty.show{display:block}
+.loading{color:var(--muted);padding:24px}
+.err{color:var(--red);padding:24px}
+html.embed header{display:none}
+html.embed .page{padding-top:20px}
+html[data-theme="light"]{color-scheme:light;--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--row2:#f8fafc;--border:#dde3ec;--border2:#c9d3e2;--text:#1c2433;--muted:#64748b;--green:#0e9f6e;--red:#dc2f2f;--yellow:#b7791f;--blue:#3b82f6;--accent:#4f46e5}
+html[data-theme="light"] body::before{background:radial-gradient(900px 500px at 85% -10%, rgba(79,70,229,.08), transparent 60%),radial-gradient(800px 500px at -10% 110%, rgba(14,165,233,.06), transparent 60%)}
+html[data-theme="light"] header{background:rgba(255,255,255,.86)}
+html[data-theme="light"] .doc,
+html[data-theme="light"] .tabs{background:rgba(255,255,255,.96);box-shadow:0 1px 2px rgba(16,24,40,.05)}
+html[data-theme="light"] .doc th{background:rgba(16,24,40,.045)}
+html[data-theme="light"] .tab:hover{background:rgba(16,24,40,.045)}
+html[data-theme="light"] .tab.active{background:#edf4ff;color:var(--text)}
+@media(max-width:1020px){.page{grid-template-columns:1fr}.tabs{position:sticky;top:64px;z-index:20;max-height:none;display:block;overflow:hidden;border-radius:10px}.tabs-title{display:none}.tabs-list{flex-direction:row;gap:4px;overflow:auto}.tab{white-space:nowrap;width:auto}.doc-search{margin-bottom:8px}}
+@media(max-width:680px){header{height:58px;padding:0 16px}.page{padding:14px}.doc{padding:20px 18px}.doc h1{font-size:24px}.doc h2{font-size:19px}.doc table{display:block;overflow:auto}}
+</style>
+<script>if(window.self!==window.top)document.documentElement.classList.add('embed');</script>
+</head>
+<body>
+<header>
+  <a class="logo" href="/"><span class="ldot"></span><span>OmniSight</span></a>
+  <div class="hdr-actions">
+    <a class="btn" href="/">Dashboard</a>
+    <a class="btn" href="/settings">Settings</a>
+  </div>
+</header>
+<main class="page">
+  <article class="doc" id="doc"><div class="loading">Loading documentation...</div></article>
+  <aside class="tabs" id="tabs">
+    <div class="tabs-title">Sections</div>
+    <input class="doc-search" id="doc-search" type="search" placeholder="Search documentation">
+    <div class="tabs-list" id="tabs-list"></div>
+    <div class="search-empty" id="search-empty">No matching sections.</div>
+  </aside>
+</main>
+<script>
+function applyTheme(theme){
+  const t = theme === 'light' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', t);
+}
+window.addEventListener('message', event => {
+  if(event.origin !== location.origin) return;
+  if(event.data?.type === 'omnisight-theme') applyTheme(event.data.theme);
+});
+window.addEventListener('storage', event => {
+  if(event.key === 'os_theme') applyTheme(event.newValue);
+});
+function authHeaders(){ const t=sessionStorage.getItem('os_token')||localStorage.getItem('os_token'); return t?{'x-session-token':t}:{}; }
+function handleUnauth(r){ if(r.status===401 || (r.redirected && r.url.includes('/login'))){ sessionStorage.removeItem('os_token'); localStorage.removeItem('os_token'); document.cookie='session=; path=/; max-age=0'; (window.top || window).location.href='/login'; throw new Error('Unauthorized'); } }
+function esc(s){ return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function slug(s){ return String(s || '').toLowerCase().replace(/`/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'') || 'section'; }
+function inline(s){
+  return esc(s)
+    .replace(/`([^`]+)`/g,'<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>')
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g,'<a href="$2">$1</a>');
+}
+function renderMarkdown(md){
+  const lines = md.replace(/\r\n/g,'\n').split('\n');
+  const out = [];
+  const heads = [];
+  const used = new Map();
+  let i = 0;
+  function unique(base){ const n = used.get(base) || 0; used.set(base, n + 1); return n ? `${base}-${n + 1}` : base; }
+  while(i < lines.length){
+    const line = lines[i];
+    if(!line.trim()){ i++; continue; }
+    if(line.startsWith('```')){
+      const code = [];
+      i++;
+      while(i < lines.length && !lines[i].startsWith('```')) code.push(lines[i++]);
+      i++;
+      out.push(`<pre><code>${esc(code.join('\n'))}</code></pre>`);
+      continue;
+    }
+    const h = line.match(/^(#{1,3})\s+(.+)$/);
+    if(h){
+      const level = h[1].length;
+      const text = h[2].trim();
+      const id = unique(slug(text));
+      heads.push({ level, text, id });
+      out.push(`<h${level} id="${id}">${inline(text)}</h${level}>`);
+      i++;
+      continue;
+    }
+    if(line.trim().startsWith('|') && lines[i + 1] && /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/.test(lines[i + 1])){
+      const rows = [];
+      while(i < lines.length && lines[i].trim().startsWith('|')){
+        rows.push(lines[i].trim());
+        i++;
+      }
+      const cells = r => r.replace(/^\||\|$/g,'').split('|').map(c => c.trim());
+      const header = cells(rows[0]);
+      const body = rows.slice(2).map(cells);
+      out.push('<table><tr>' + header.map(c => `<th>${inline(c)}</th>`).join('') + '</tr>' + body.map(r => '<tr>' + r.map(c => `<td>${inline(c)}</td>`).join('') + '</tr>').join('') + '</table>');
+      continue;
+    }
+    if(/^\s*-\s+/.test(line)){
+      const items = [];
+      while(i < lines.length && /^\s*-\s+/.test(lines[i])) items.push(lines[i++].replace(/^\s*-\s+/,''));
+      out.push('<ul>' + items.map(item => `<li>${inline(item)}</li>`).join('') + '</ul>');
+      continue;
+    }
+    if(/^\s*\d+\.\s+/.test(line)){
+      const items = [];
+      while(i < lines.length && /^\s*\d+\.\s+/.test(lines[i])) items.push(lines[i++].replace(/^\s*\d+\.\s+/,''));
+      out.push('<ol>' + items.map(item => `<li>${inline(item)}</li>`).join('') + '</ol>');
+      continue;
+    }
+    const para = [];
+    while(i < lines.length && lines[i].trim() && !/^(#{1,3})\s+/.test(lines[i]) && !lines[i].startsWith('```') && !/^\s*[-\d]/.test(lines[i]) && !lines[i].trim().startsWith('|')){
+      para.push(lines[i++].trim());
+    }
+    out.push(`<p>${inline(para.join(' '))}</p>`);
+  }
+  return { html: out.join('\n'), heads };
+}
+function renderTabs(heads){
+  const list = document.getElementById('tabs-list');
+  const sections = heads.filter(h => h.level === 2).map(h => {
+    const sectionEl = document.getElementById(h.id);
+    let text = h.text;
+    let cursor = sectionEl?.nextElementSibling;
+    while(cursor && cursor.tagName !== 'H2'){
+      text += ' ' + cursor.textContent;
+      cursor = cursor.nextElementSibling;
+    }
+    return { ...h, search: text.toLowerCase() };
+  });
+  list.innerHTML = sections.map(h => `<a class="tab" data-search="${esc(h.search)}" href="#${h.id}">${esc(h.text.replace(/^\d+\.\s*/,''))}</a>`).join('');
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', event => {
+      const target = document.querySelector(tab.getAttribute('href'));
+      if(!target) return;
+      event.preventDefault();
+      target.scrollIntoView({ behavior:'smooth', block:'start' });
+      history.replaceState(null, '', tab.getAttribute('href'));
+    });
+  });
+  const input = document.getElementById('doc-search');
+  const empty = document.getElementById('search-empty');
+  input.addEventListener('input', () => {
+    const q = input.value.trim().toLowerCase();
+    let visible = 0;
+    document.querySelectorAll('.tab').forEach(tab => {
+      const hit = !q || tab.dataset.search.includes(q);
+      tab.classList.toggle('hidden', !hit);
+      if(hit) visible++;
+    });
+    empty.classList.toggle('show', visible === 0);
+  });
+  input.addEventListener('keydown', event => {
+    if(event.key !== 'Enter') return;
+    const first = document.querySelector('.tab:not(.hidden)');
+    if(first) first.click();
+  });
+}
+function activateTabs(){
+  const tabs = new Map([...document.querySelectorAll('.tab')].map(tab => [tab.getAttribute('href').slice(1), tab]));
+  function setActive(id){ document.querySelectorAll('.tab.active').forEach(t => t.classList.remove('active')); tabs.get(id)?.classList.add('active'); }
+  const observer = new IntersectionObserver(entries => {
+    const visible = entries.filter(e => e.isIntersecting).sort((a,b) => b.intersectionRatio - a.intersectionRatio)[0];
+    if(visible) setActive(visible.target.id);
+  }, { rootMargin:'-12% 0px -70% 0px', threshold:[0, .2, .5, 1] });
+  document.querySelectorAll('.doc h2').forEach(h => {
+    if(h && h.nodeType === 1) observer.observe(h);
+  });
+  setActive((location.hash || '#1-overview').slice(1));
+}
+(async()=>{
+  try{
+    const r = await fetch('/docs.md', { headers: authHeaders(), cache:'no-store' });
+    handleUnauth(r);
+    if(!r.ok) throw new Error(r.statusText || 'Could not load documentation');
+    const md = await r.text();
+    const rendered = renderMarkdown(md);
+    document.getElementById('doc').innerHTML = rendered.html;
+    renderTabs(rendered.heads);
+    activateTabs();
+    if(location.hash && document.querySelector(location.hash)) setTimeout(() => document.querySelector(location.hash).scrollIntoView(), 0);
+  }catch(e){
+    document.getElementById('doc').innerHTML = `<div class="err">${esc(e.message || e)}</div>`;
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,474 @@
+<html lang="en">
+<head>
+<script>try{document.documentElement.setAttribute("data-theme",localStorage.getItem("os_theme")||"dark")}catch(e){}</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>OmniSight - Agents</title>
+<link rel="icon" href="/assets/omnisight-logo.svg" type="image/svg+xml">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#141617;--panel:#181A1B;--row:#141617;--border:#242C3B;--text:#E2E8F2;--muted:#7D8AA3;--green:#34D399;--red:#F87171;--yellow:#FBBF24;--blue:#60A5FA}
+html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#dde3ec;--text:#1c2433;--muted:#64748b;--green:#0e9f6e;--red:#dc2f2f;--yellow:#b7791f;--blue:#3b82f6}
+body{background:var(--bg);color:var(--text);font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;-webkit-user-select:none;user-select:none}
+body::before{content:'';position:fixed;inset:0;z-index:-1;background:radial-gradient(900px 500px at 85% -10%, rgba(99,102,241,.10), transparent 60%),radial-gradient(800px 500px at -10% 110%, rgba(34,211,238,.06), transparent 60%)}
+header{background:var(--panel);border-bottom:1px solid var(--border);height:64px;padding:0 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.logo{font-size:19px;font-weight:700;display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit}
+.ldot{width:12px;height:12px;border-radius:50%;background:var(--green)}
+main{max-width:1200px;margin:28px auto;padding:0 24px}
+.top{display:flex;align-items:flex-end;gap:16px;margin-bottom:18px}
+h1{font-size:18px;font-weight:750;flex:1}
+.sub{color:var(--muted);font-size:13px;margin-top:5px}
+.pill{border:1px solid var(--border);background:var(--panel);border-radius:999px;padding:6px 10px;color:var(--muted);font-size:12px;font-weight:650}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.row{display:grid;grid-template-columns:10px minmax(170px,1.1fr) minmax(100px,.6fr) minmax(160px,1fr) 110px 125px 130px;gap:14px;align-items:center;padding:12px 14px;border-top:1px solid var(--border)}
+.row:first-child{border-top:0}
+.hdr{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em;font-weight:750;background:rgba(0,0,0,.08)}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--muted)}
+.dot.ok{background:var(--green)}.dot.bad{background:var(--red)}.dot.connecting{background:var(--yellow)}
+.name{font-weight:750;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.meta{color:var(--muted);font-size:12px;margin-top:2px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cell{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.badge{display:inline-flex;align-items:center;justify-content:center;border-radius:999px;border:1px solid var(--border);padding:3px 9px;font-size:12px;font-weight:750}
+.bg-green{color:var(--green);background:rgba(52,211,153,.10);border-color:rgba(52,211,153,.30)}
+.bg-red{color:var(--red);background:rgba(248,113,113,.10);border-color:rgba(248,113,113,.30)}
+.bg-yellow{color:var(--yellow);background:rgba(251,191,36,.10);border-color:rgba(251,191,36,.30)}
+.bg-gray{color:var(--muted);background:rgba(148,163,184,.08)}
+.btn{height:30px;border-radius:7px;border:1px solid var(--border);background:var(--row);color:var(--text);font-size:12px;font-weight:700;cursor:pointer;padding:0 11px}
+.btn:hover{border-color:var(--blue)}
+.btn.primary{background:var(--blue);border-color:var(--blue);color:#fff}
+.btn:disabled{opacity:.55;cursor:not-allowed}
+.action-cell{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.empty{padding:34px;color:var(--muted);text-align:center}
+.msg{margin-top:12px;color:var(--muted);font-size:13px;min-height:18px}
+.msg.ok{color:var(--green)}.msg.err{color:var(--red)}
+.cmd{margin-top:10px;background:var(--row);border:1px solid var(--border);border-radius:8px;padding:12px 90px 12px 12px;position:relative;color:var(--text);font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;line-height:1.45;white-space:pre-wrap;word-break:break-word}
+.cmd .btn{position:absolute;right:8px;top:8px}
+.cmd.has-title{padding:33px 90px 12px 12px;white-space:normal}
+.cmd-title{position:absolute;left:12px;top:7px;right:92px;color:var(--muted);font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cmd-body{display:block;margin:0 0 10px;font:inherit;line-height:1.42;white-space:pre-wrap;word-break:break-word}
+.cmd-note{margin-top:0;color:var(--muted);font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:12px;line-height:1.35;white-space:normal}
+.cmd-panel-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.cmd-panel-title{font-weight:800;color:var(--text);font-size:14px}
+.cmd-host-chip{display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(96,165,250,.35);background:rgba(96,165,250,.10);color:var(--text);border-radius:9px;padding:7px 10px;font-weight:800;font-size:13px;box-shadow:inset 0 0 0 1px rgba(96,165,250,.08)}
+.cmd-host-chip span{color:var(--blue);font-size:10px;text-transform:uppercase;letter-spacing:.08em}
+.notice{display:none;align-items:flex-start;gap:10px;margin:0 0 14px;border:1px solid rgba(251,191,36,.30);background:rgba(251,191,36,.08);border-radius:8px;padding:10px 12px;color:var(--text);font-size:13px;line-height:1.35}
+.notice.show{display:flex}
+.notice-dot{width:9px;height:9px;border-radius:50%;background:var(--yellow);margin-top:4px;flex:0 0 auto}
+.notice-body{flex:1;min-width:0}
+.notice-title{font-weight:800;margin-bottom:2px}
+.notice-text{color:var(--muted)}
+.notice .btn{height:28px;flex:0 0 auto}
+.action-hint{width:100%;color:var(--muted);font-size:11px;line-height:1.25}
+html.embed header{display:none}
+@media(max-width:900px){.row{grid-template-columns:10px minmax(150px,1fr) 90px 100px}.row .hide-sm,.hdr .hide-sm{display:none}}
+</style>
+<script>if(window.self!==window.top)document.documentElement.classList.add('embed');</script>
+</head>
+<body>
+<header><a href="/" class="logo"><div class="ldot"></div>OmniSight</a></header>
+<main>
+  <div class="top">
+    <div>
+      <h1>Agents</h1>
+      <div class="sub">Connected push agents and their installed versions.</div>
+    </div>
+    <div class="pill" id="latest">Latest -</div>
+    <button class="btn" onclick="loadAgents()">Refresh</button>
+  </div>
+  <div class="notice" id="agent-notice"></div>
+  <div class="card" id="agents-card">
+    <div class="row hdr">
+      <div></div><div>Agent</div><div>Role</div><div class="hide-sm">System</div><div>Status</div><div class="hide-sm">Version</div><div>Action</div>
+    </div>
+    <div class="empty">Loading agents...</div>
+  </div>
+  <div class="msg" id="msg"></div>
+</main>
+<script src="/i18n.js"></script>
+<script>
+function currentLang(){ return OmniI18n.currentLang('en'); }
+function t(text){ return OmniI18n.t(text, currentLang()); }
+let appliedLang = '';
+function applyLanguage(){
+  const lang = currentLang();
+  if(appliedLang !== lang){
+    OmniI18n.apply(document, lang);
+    appliedLang = lang;
+  }
+  document.title = currentLang() === 'tr' ? 'OmniSight - Ajanlar' : 'OmniSight - Agents';
+}
+function authHeaders(){ const t=sessionStorage.getItem('os_token')||localStorage.getItem('os_token'); return t?{'x-session-token':t}:{}; }
+const AGENTS_DEMO_MODE = location.port === '4000' || /^demo(?:-|\.|$)/i.test(location.hostname) || /^demo-omni/i.test(location.hostname);
+function handleUnauth(r){ if(r.status===401 || (r.redirected && r.url.includes('/login'))){ sessionStorage.removeItem('os_token'); localStorage.removeItem('os_token'); document.cookie='session=; path=/; max-age=0'; (window.top || window).location.href='/login'; throw new Error('Unauthorized'); } }
+async function readJson(r){
+  const text = await r.text();
+  try { return text ? JSON.parse(text) : {}; }
+  catch {
+    const htmlTitle = text.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1] || text.match(/<h1[^>]*>([^<]+)<\/h1>/i)?.[1] || '';
+    const detail = htmlTitle ? htmlTitle.replace(/\s+/g, ' ').trim() : (text.slice(0,120) || r.statusText);
+    throw new Error(r.status >= 500 ? `OmniSight backend unavailable (${r.status}${detail ? `: ${detail}` : ''})` : `Unexpected response from server (${r.status}): ${detail}`);
+  }
+}
+const activeAgentFetchControllers = new Set();
+function abortAgentFetches(){
+  activeAgentFetchControllers.forEach(ctrl => {
+    try { ctrl.abort(); } catch {}
+  });
+  activeAgentFetchControllers.clear();
+}
+async function fetchJson(url, options = {}, timeoutMs = 6000){
+  const ctrl = new AbortController();
+  activeAgentFetchControllers.add(ctrl);
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try{
+    const r = await fetch(url, { cache:'no-cache', ...options, signal: ctrl.signal });
+    handleUnauth(r);
+    const d = await readJson(r);
+    if(!r.ok) throw new Error(d.error || r.statusText);
+    return d;
+  }catch(e){
+    if(e.name === 'AbortError') throw new Error(embedPaused ? 'Agents request cancelled' : 'Agents request timed out');
+    throw e;
+  }finally{
+    clearTimeout(timer);
+    activeAgentFetchControllers.delete(ctrl);
+  }
+}
+function esc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function rel(ts){
+  if(!ts) return t('never');
+  const tr = currentLang() === 'tr';
+  const s=Math.max(0,Math.round((Date.now()-Number(ts))/1000));
+  if(s<60)return tr ? `${s}sn önce` : s+'s ago';
+  const m=Math.round(s/60); if(m<60)return tr ? `${m}dk önce` : m+'m ago';
+  const h=Math.round(m/60); if(h<48)return tr ? `${h}sa önce` : h+'h ago';
+  const d=Math.round(h/24); return tr ? `${d}g önce` : d+'d ago';
+}
+function cmpVer(a,b){
+  const pa=String(a||'0').split('.').map(n=>parseInt(n,10)||0), pb=String(b||'0').split('.').map(n=>parseInt(n,10)||0);
+  for(let i=0;i<3;i++){ if((pa[i]||0)!==(pb[i]||0)) return (pa[i]||0)-(pb[i]||0); }
+  return 0;
+}
+function roleText(a){
+  if(a.pveNode || a.platform === 'proxmox' || a.role === 'proxmox') return 'Proxmox';
+  if(a.role === 'docker' || a.hasDocker) return 'Docker';
+  return a.platform === 'synology' ? 'Synology' : 'Linux';
+}
+function badge(cls, text){ return `<span class="badge bg-${cls}">${esc(text)}</span>`; }
+function copyText(text, btn){
+  navigator.clipboard?.writeText(text).then(()=>{ const o=btn.textContent; btn.textContent=t('Copied'); setTimeout(()=>btn.textContent=o,1200); });
+}
+function demoAgentsData(){
+  const now = Date.now();
+  return {
+    latestVersion: '1.2.0',
+    demo: true,
+    agents: [
+      {
+        id: 'demo-agent',
+        name: 'demo-linux-01',
+        ip: '192.0.2.50',
+        os: 'Ubuntu 24.04 LTS',
+        kernel: '6.8.0-demo',
+        platform: 'linux',
+        role: 'linux',
+        online: true,
+        agentVersion: '1.2.0',
+        lastSeen: now - 15000,
+      },
+      {
+        id: 'demo-offline',
+        name: 'demo-offline-01',
+        ip: '192.0.2.51',
+        os: 'Debian 12',
+        kernel: '6.1.0-demo',
+        platform: 'linux',
+        role: 'linux',
+        online: false,
+        agentVersion: '1.1.0',
+        lastSeen: now - 3600_000,
+      },
+    ],
+  };
+}
+function demoAgentRepairCommands(id){
+  const safeId = id || 'demo-offline';
+  return [
+    {
+      title: 'Query agent',
+      description: 'Checks service state, recent logs and dashboard reachability on the offline host.',
+      command: `sudo bash -lc 'systemctl status omnisight-agent --no-pager -l || true\njournalctl -u omnisight-agent -n 120 --no-pager || true\ncurl -sS -m 20 http://demo.local/api/agent/ping -H "X-Agent-Token: demo-token" -H "Content-Type: application/json" --data "{\"id\":\"${safeId}\"}"'`,
+    },
+    {
+      title: 'Repair systemd agent',
+      description: 'Reinstalls the agent with the current dashboard token, keeps the same agent identity and restarts the service.',
+      command: `curl -fsSL http://demo.local/agent/install.sh | sudo OMNISIGHT_URL=http://demo.local OMNISIGHT_TOKEN=demo-token OMNISIGHT_AGENT_ID=${safeId} bash`,
+    },
+  ];
+}
+const AGENTS_CACHE_KEY = 'os_agents_cache_v2';
+function agentsCacheKey(){
+  const token = sessionStorage.getItem('os_token') || localStorage.getItem('os_token') || 'anon';
+  return `${AGENTS_CACHE_KEY}:${String(token).slice(-18)}`;
+}
+function readAgentsCache(maxAgeMs = 10 * 60 * 1000){
+  try{
+    const key = agentsCacheKey();
+    const raw = sessionStorage.getItem(key) || localStorage.getItem(key);
+    if(!raw) return null;
+    const box = JSON.parse(raw);
+    if(!box || Date.now() - Number(box.t || 0) > maxAgeMs) return null;
+    return box.data || null;
+  }catch{ return null; }
+}
+function writeAgentsCache(data){
+  try{
+    if(!data) return;
+    const key = agentsCacheKey();
+    const raw = JSON.stringify({ t: Date.now(), data });
+    sessionStorage.setItem(key, raw);
+    localStorage.setItem(key, raw);
+  }catch{}
+}
+let msgHoldUntil = 0;
+function clearMsg(force = false){
+  if(!force && Date.now() < msgHoldUntil) return;
+  const msg = document.getElementById('msg');
+  msg.textContent = '';
+  msg.className = 'msg';
+  msgHoldUntil = 0;
+}
+function showManualCommand(message, command){
+  const msg = document.getElementById('msg');
+  msg.className = 'msg err';
+  msgHoldUntil = Date.now() + 60000;
+  msg.innerHTML = `${esc(message)}<div class="cmd">${esc(command)}<button class="btn" onclick="copyText(this.parentElement.childNodes[0].textContent,this)">${t('Copy')}</button></div>`;
+  setTimeout(() => clearMsg(), 60050);
+}
+function showCommandPanel(title, commands, opts = {}){
+  const msg = document.getElementById('msg');
+  msg.className = 'msg';
+  msgHoldUntil = Date.now() + 120000;
+  const subject = opts.subjectValue ? `<div class="cmd-host-chip"><span>${esc(t(opts.subjectLabel || 'Hostname'))}</span>${esc(opts.subjectValue)}</div>` : '';
+  const head = `<div class="cmd-panel-head"><div class="cmd-panel-title">${esc(title)}</div>${subject}</div>`;
+  const blocks = (commands || []).map(c => `<div class="cmd has-title"><div class="cmd-title">${esc(t(c.title || 'Command'))}</div><pre class="cmd-body">${esc(c.command || '')}</pre><button class="btn" onclick="copyText(this.parentElement.querySelector('.cmd-body').textContent,this)">${t('Copy')}</button>${c.description ? `<div class="cmd-note">${esc(t(c.description))}</div>` : ''}</div>`).join('');
+  msg.innerHTML = `${head}${blocks}`;
+  setTimeout(() => clearMsg(), 120050);
+}
+function agentHeaderHtml(){
+  return `<div class="row hdr">
+    <div></div><div>${t('Agent')}</div><div>${t('Role')}</div><div class="hide-sm">${t('System')}</div><div>${t('Status')}</div><div class="hide-sm">${t('Version')}</div><div>${t('Action')}</div>
+  </div>`;
+}
+function cssEscapeValue(v){
+  return window.CSS?.escape ? CSS.escape(String(v ?? '')) : String(v ?? '').replace(/["\\]/g, '\\$&');
+}
+function jsArg(v){
+  return esc(JSON.stringify(String(v ?? '')));
+}
+function repairCommandTitle(a){
+  if(a.role === 'docker' || a.hasDocker) return 'Repair systemd agent or Docker container agent';
+  return 'Repair systemd agent';
+}
+function renderAgentNotice(rows){
+  const el = document.getElementById('agent-notice');
+  if(!el) return;
+  const offline = (rows || []).filter(a => !a.online && !a.connecting);
+  if(!offline.length){
+    el.className = 'notice';
+    el.innerHTML = '';
+    return;
+  }
+  const first = offline[0];
+  const countText = offline.length === 1 ? t('1 offline agent') : `${offline.length} ${t('offline agents')}`;
+  el.className = 'notice show';
+  el.innerHTML = `<div class="notice-dot"></div>
+    <div class="notice-body">
+      <div class="notice-title">${esc(countText)}</div>
+      <div class="notice-text">${esc(t('If the host logs show 401 invalid agent token after a backup restore, open the repair panel and run'))} <strong>${esc(t(repairCommandTitle(first)))}</strong> ${esc(t('on the affected host.'))}</div>
+    </div>
+    <button class="btn" onclick="showAgentRepair(${jsArg(first.id)},this)">${esc(t('Show command'))}</button>`;
+}
+function agentRowHtml(a, latest){
+  const ver = a.agentVersion || 'unknown';
+  const outdated = ver === 'unknown' || cmpVer(ver, latest) < 0;
+  const newer = ver !== 'unknown' && cmpVer(ver, latest) > 0;
+  const versionBadge = ver === 'unknown' ? badge('gray',t('unknown')) : outdated ? badge('yellow','v'+ver) : newer ? badge('yellow','v'+ver) : badge('green','v'+ver);
+  const safeId = esc(a.id);
+  const action = a.connecting
+    ? `<button class="btn" disabled>${t('Waiting')}</button><div class="action-hint">${esc(t('Waiting for report'))}</div>`
+    : !a.online
+    ? `<button class="btn" onclick="showAgentRepair(${jsArg(a.id)},this)">${t('Repair command')}</button><div class="action-hint">${esc(t('Run on host'))}</div>`
+    : outdated
+    ? `<button class="btn primary" onclick="updateAgent(${jsArg(a.id)},this)">${t('Update')}</button>`
+    : `<button class="btn" disabled>${t('Current')}</button>`;
+  return `<div class="row" data-agent-id="${safeId}">
+    <div class="dot ${a.online?'ok':a.connecting?'connecting':'bad'}"></div>
+    <div class="cell"><div class="name">${esc(a.name||a.id)}</div><div class="meta">${esc(a.id)}${a.ip?' · '+esc(a.ip):''}</div></div>
+    <div>${esc(roleText(a))}</div>
+    <div class="cell hide-sm"><div>${esc(a.os||a.platform||'')}</div><div class="meta">${esc(a.kernel||'')}</div></div>
+    <div>${a.online?badge('green',t('online')):a.connecting?badge('yellow',t('connecting')):badge('red',t('offline'))}<div class="meta agent-last-seen" data-agent-id="${safeId}">${rel(a.lastSeen)}</div></div>
+    <div class="hide-sm">${versionBadge}</div>
+    <div class="action-cell">${action}</div>
+  </div>`;
+}
+function agentRenderSignature(data){
+  const rows = data.agents || [];
+  return JSON.stringify({
+    latestVersion: data.latestVersion || '',
+    lang: currentLang(),
+    agents: rows.map(a => [
+      a.id, a.name, a.ip, a.os, a.kernel, a.platform, a.role,
+      a.agentVersion, a.online, a.connecting, a.hasDocker, a.pveNode
+    ])
+  });
+}
+function updateAgentRelativeTimes(rows){
+  const card = document.getElementById('agents-card');
+  (rows || []).forEach(a => {
+    const el = card.querySelector(`.agent-last-seen[data-agent-id="${cssEscapeValue(a.id)}"]`);
+    if(el) el.textContent = rel(a.lastSeen);
+  });
+}
+function renderAgents(data){
+  const latest = data.latestVersion || '1.0.0';
+  document.getElementById('latest').textContent = t('Latest') + ' v' + latest;
+  const rows = data.agents || [];
+  renderAgentNotice(rows);
+  const card = document.getElementById('agents-card');
+  const header = agentHeaderHtml();
+  const signature = agentRenderSignature(data);
+  if(!rows.length){
+    if(agentsSignature !== signature) card.innerHTML = header + `<div class="empty">${t('No agents have reported yet.')}</div>`;
+    agentsSignature = signature;
+    applyLanguage();
+    return;
+  }
+  if(signature === agentsSignature){
+    updateAgentRelativeTimes(rows);
+    applyLanguage();
+    return;
+  }
+  agentsSignature = signature;
+  card.innerHTML = header + rows.map(a => agentRowHtml(a, latest)).join('');
+  applyLanguage();
+}
+let agentsLoading = false;
+let agentsSignature = '';
+let embedPaused = false;
+let agentsPollTimer = null;
+let agentsLastLoadedAt = 0;
+window.addEventListener('message', event => {
+  if(event.origin !== window.location.origin) return;
+  if(event.data?.type !== 'omnisight-embed-visibility') return;
+  embedPaused = event.data.visible === false;
+  if(embedPaused) {
+    clearTimeout(agentsPollTimer);
+    abortAgentFetches();
+    return;
+  }
+  if(!embedPaused) scheduleAgentsPoll(50);
+});
+function scheduleAgentsPoll(delay = 15000){
+  clearTimeout(agentsPollTimer);
+  agentsPollTimer = setTimeout(async () => {
+    if(!embedPaused) await loadAgents();
+    scheduleAgentsPoll(embedPaused ? 5000 : 15000);
+  }, delay);
+}
+async function loadAgents(){
+  if(agentsLoading || embedPaused) return;
+  if(agentsLastLoadedAt && Date.now() - agentsLastLoadedAt < 5000) return;
+  if(AGENTS_DEMO_MODE){
+    renderAgents(demoAgentsData());
+    agentsLastLoadedAt = Date.now();
+    clearMsg(true);
+    return;
+  }
+  agentsLoading = true;
+  clearMsg();
+  try{
+    const d = await fetchJson('/api/agents', { headers:authHeaders() }, 3500);
+    writeAgentsCache(d);
+    renderAgents(d);
+    agentsLastLoadedAt = Date.now();
+  }catch(e){
+    if(e.message === 'Agents request cancelled') return;
+    const cached = readAgentsCache(30 * 60 * 1000);
+    if(cached){
+      renderAgents(cached);
+      const msg = document.getElementById('msg');
+      msg.textContent = e.message === 'Agents request timed out' ? t('Agents request timed out; showing last cached data.') : e.message;
+      msg.className = 'msg err';
+      return;
+    }
+    const msg = document.getElementById('msg');
+    msg.textContent = e.message;
+    msg.className = 'msg err';
+  }finally{
+    agentsLoading = false;
+  }
+}
+async function updateAgent(id, btn){
+  const msg = document.getElementById('msg');
+  clearMsg(true);
+  if(AGENTS_DEMO_MODE){
+    msg.textContent = t('Update command sent. Waiting for next report...');
+    msg.className = 'msg ok';
+    renderAgents(demoAgentsData());
+    return;
+  }
+  const old = btn.textContent; btn.disabled = true; btn.textContent = t('Updating...');
+  try{
+    const r = await fetch('/api/agent/update',{method:'POST',headers:{'Content-Type':'application/json',...authHeaders()},body:JSON.stringify({id})});
+    handleUnauth(r);
+    const d = await readJson(r).catch(e=>({ error:e.message }));
+    if(r.status === 409 && d.manualCommand){
+      showManualCommand(d.error || t('Manual update required.'), d.manualCommand);
+      btn.disabled = false; btn.textContent = old;
+      return;
+    }
+    if(!r.ok) throw new Error(d.error||r.statusText);
+    msg.textContent = d.output || t('Update command sent. Waiting for next report...');
+    msg.className = 'msg ok';
+    setTimeout(loadAgents, 2500);
+  }catch(e){ msg.textContent = e.message; msg.className = 'msg err'; btn.disabled = false; btn.textContent = old; }
+}
+async function showAgentRepair(id, btn){
+  const msg = document.getElementById('msg');
+  clearMsg(true);
+  if(AGENTS_DEMO_MODE){
+    showCommandPanel(t('Agent repair commands'), demoAgentRepairCommands(id), { subjectLabel: 'Hostname', subjectValue: id || 'demo-offline' });
+    return;
+  }
+  const old = btn.textContent; btn.disabled = true; btn.textContent = t('Loading...');
+  try{
+    const d = await fetchJson(`/api/agent/repair-commands?id=${encodeURIComponent(id)}`, { headers:authHeaders() }, 6000);
+    showCommandPanel(t('Agent repair commands'), d.commands || [], { subjectLabel: 'Hostname', subjectValue: d.name || id });
+  }catch(e){
+    msg.textContent = e.message;
+    msg.className = 'msg err';
+  }finally{
+    btn.disabled = false;
+    btn.textContent = old;
+  }
+}
+applyLanguage();
+if(AGENTS_DEMO_MODE) {
+  renderAgents(demoAgentsData());
+} else {
+  const cachedAgents = readAgentsCache();
+  if(cachedAgents) {
+    agentsSignature = '';
+    renderAgents(cachedAgents);
+    setTimeout(() => {
+      if(!embedPaused) loadAgents();
+    }, 900);
+  } else {
+    loadAgents();
+  }
+  scheduleAgentsPoll(15000);
+}
+</script>
+</body>
+</html>

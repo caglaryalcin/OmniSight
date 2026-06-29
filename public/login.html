@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>OmniSight — Login</title>
+<link rel="icon" type="image/svg+xml" href="/assets/omnisight-logo.svg">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#141617;--panel:#181A1B;--border:#242C3B;
+  --text:#E2E8F2;--muted:#7D8AA3;--green:#34D399;--red:#F87171;
+}
+body{background:var(--bg);color:var(--text);font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;min-height:100vh;padding:20px;-webkit-user-select:none;user-select:none}
+body::before{content:'';position:fixed;inset:0;z-index:-1;background:
+  radial-gradient(800px 500px at 70% -10%, rgba(99,102,241,.16), transparent 60%),
+  radial-gradient(700px 500px at 10% 110%, rgba(34,211,238,.09), transparent 60%)}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:18px;padding:38px 34px;width:100%;max-width:380px;
+  box-shadow:0 1px 2px rgba(0,0,0,.25),0 24px 60px -24px rgba(0,0,0,.6);animation:in .3s ease}
+@keyframes in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.logo{display:flex;align-items:center;gap:10px;margin-bottom:28px;justify-content:center;transform:translateX(-12px)}
+.logo-mark{width:28px;height:28px;display:block;object-fit:contain}
+.logo-text{font-size:19px;font-weight:800;letter-spacing:-.02em}
+label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;font-weight:500;text-transform:uppercase;letter-spacing:.4px}
+input{
+  width:100%;background:#1A202C;border:1px solid var(--border);border-radius:7px;
+  color:var(--text);font-size:14px;padding:10px 12px;outline:none;margin-bottom:16px;
+  transition:border-color .15s;
+  -webkit-user-select:text;user-select:text;
+}
+input:focus{border-color:#4a5568}
+.btn{
+  width:100%;background:var(--green);border:none;border-radius:7px;
+  color:#fff;font-size:14px;font-weight:600;padding:11px;cursor:pointer;
+  transition:opacity .15s;
+}
+.btn:hover{opacity:.88}
+.btn:disabled{opacity:.5;cursor:default}
+.passkey-btn{width:100%;background:transparent;border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:13px;font-weight:650;padding:10px;cursor:pointer;margin-top:10px}
+.passkey-btn:hover{border-color:#4a5568}
+.err{color:var(--red);font-size:13px;text-align:center;margin-top:12px;min-height:18px}
+.remember{display:flex;align-items:center;gap:8px;margin-bottom:16px;cursor:pointer;user-select:none}
+.remember input{width:auto;margin:0;cursor:pointer}
+.remember span{font-size:13px;color:var(--muted)}
+.otp-note{font-size:12px;color:var(--muted);margin:-8px 0 14px;line-height:1.45;text-align:center}
+.back-btn{width:100%;background:transparent;border:1px solid var(--border);border-radius:7px;color:var(--muted);font-size:13px;font-weight:600;padding:10px;cursor:pointer;margin-top:10px;margin-bottom:8px}
+.back-btn:hover{color:var(--text);border-color:#4a5568}
+.link-row{text-align:center;margin:12px 0 0}
+.forgot-row{margin-top:14px}
+.terminal-row{margin:18px 0 0}
+.text-link{background:none;border:none;color:var(--muted);font-size:14px;font-weight:650;cursor:pointer;text-decoration:none}
+.text-link:hover{color:var(--text)}
+.forgot-link{font-size:12.5px;color:#a8b3c7}
+.terminal-link{font-size:12.5px;color:#a8b3c7}
+.terminal-link::before{content:">_";font-family:ui-monospace,SFMono-Regular,Consolas,monospace;margin-right:7px;color:var(--green);font-weight:800}
+.terminal-link:hover{color:var(--text)}
+.hint{font-size:12px;color:var(--muted);line-height:1.5;text-align:center;margin:-4px 0 14px}
+.err.ok{color:var(--green)}
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.62);display:none;align-items:center;justify-content:center;padding:20px;z-index:50}
+.modal-backdrop.open{display:flex}
+.modal{width:min(656px,100%);background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:22px 24px;box-shadow:0 28px 80px rgba(0,0,0,.45);position:relative}
+.modal h2{font-size:18px;margin-bottom:14px}
+.modal p{font-size:14px;color:var(--text);line-height:1.55;margin:12px 0}
+.modal-close{position:absolute;right:18px;top:14px;background:none;border:none;color:var(--muted);font-size:24px;line-height:1;cursor:pointer}
+.modal-close:hover{color:var(--text)}
+.cmd{display:block;width:100%;background:#202326;border:1px solid rgba(255,255,255,.04);border-radius:8px;color:#fff;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:12px;line-height:1.45;padding:10px 12px;margin-top:10px;white-space:pre-wrap;word-break:break-word;-webkit-user-select:text;user-select:text}
+.version-foot{color:var(--muted);font-size:12px;text-align:center;min-height:16px}
+</style>
+</head>
+<body>
+<form class="card" id="login-form" onsubmit="event.preventDefault(); submitForm()">
+  <div class="logo"><img class="logo-mark" src="/assets/omnisight-logo.svg" alt=""><span class="logo-text" id="title">OmniSight</span></div>
+  <div id="login-step">
+    <label for="u">Username</label>
+    <input id="u" type="text" autocomplete="username" autofocus>
+    <label for="p">Password</label>
+    <input id="p" type="password" autocomplete="current-password">
+  </div>
+  <div id="totp-wrap" style="display:none">
+    <label for="code">Two-factor code</label>
+    <input id="code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456">
+    <div class="otp-note">Enter the 6-digit code from your authenticator app.</div>
+    <button class="btn inline-submit" type="button" onclick="submitForm()">Verify code</button>
+    <button class="back-btn" type="button" onclick="resetTwoFactorStep()">Back to sign in</button>
+  </div>
+  <div id="confirm-wrap" style="display:none">
+    <label for="p2">Confirm password</label>
+    <input id="p2" type="password" autocomplete="new-password">
+  </div>
+  <div id="reset-request-step" style="display:none">
+    <label for="reset-email">Recovery e-mail</label>
+    <input id="reset-email" type="email" autocomplete="email" placeholder="you@example.com">
+    <div class="hint">We will send a reset code if this e-mail is configured on your account.</div>
+    <button class="btn reset-btn" type="button" onclick="submitForm()">Send reset code</button>
+    <button class="back-btn" type="button" onclick="showSignIn()">Back to sign in</button>
+    <div class="link-row terminal-row"><button class="text-link terminal-link" type="button" onclick="openInstructions()">Terminal instructions</button></div>
+  </div>
+  <div id="reset-confirm-step" style="display:none">
+    <label for="reset-code">Reset code</label>
+    <input id="reset-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456">
+    <label for="reset-pw">New password</label>
+    <input id="reset-pw" type="password" autocomplete="new-password">
+    <label for="reset-pw2">Confirm new password</label>
+    <input id="reset-pw2" type="password" autocomplete="new-password">
+    <button class="back-btn" type="button" onclick="showForgotPassword()">Request another code</button>
+  </div>
+  <label class="remember" id="rem-wrap"><input type="checkbox" id="rem"><span>Remember me for 30 days</span></label>
+  <button class="btn" id="btn" type="submit">Sign in</button>
+  <button class="passkey-btn" id="passkey-btn" type="button" onclick="loginPasskey()">Sign in with passkey</button>
+  <div class="link-row forgot-row" id="forgot-row"><button class="text-link forgot-link" type="button" onclick="showForgotPassword()">Forgot password?</button></div>
+  <div class="err" id="err"></div>
+</div>
+<div class="modal-backdrop" id="instructions-modal" onclick="if(event.target===this)closeInstructions()">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="instructions-title">
+    <button class="modal-close" type="button" onclick="closeInstructions()" aria-label="Close">&times;</button>
+    <h2 id="instructions-title">Command line instructions</h2>
+    <p>If you've lost access to your admin account, you can reset the password from the OmniSight container.</p>
+    <p>Run one of these commands, then sign in with the new password.</p>
+    <code class="cmd">docker exec -e OMNISIGHT_RESET_PASSWORD='NewStrongPass1' omnisight npm run reset-password -- --username admin</code>
+    <code class="cmd">docker compose exec -e OMNISIGHT_RESET_PASSWORD='NewStrongPass1' omnisight npm run reset-password -- --username admin</code>
+    <p>Add <code class="cmd" style="display:inline-block;width:auto;margin:0;padding:2px 6px">--disable-2fa</code> if you also lost access to your authenticator app.</p>
+  </div>
+</form>
+<div class="version-foot" id="version-foot"></div>
+<script>
+let mode = 'login';
+let twoFactorVisible = false;
+let pendingLogin = null;
+let loginSubmitting = false;
+let resetEmail = '';
+let passwordResetEnabled = true;
+function $(id){ return document.getElementById(id); }
+function b64urlToBuffer(s){
+  const str = String(s || '');
+  const bin = atob(str.replace(/-/g,'+').replace(/_/g,'/') + '='.repeat((4 - str.length % 4) % 4));
+  const bytes = new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) bytes[i] = bin.charCodeAt(i);
+  return bytes.buffer;
+}
+function bufferToB64url(buf){
+  const bytes = new Uint8Array(buf);
+  let s = '';
+  bytes.forEach(b => s += String.fromCharCode(b));
+  return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+function prepareRequestOptions(publicKey){
+  publicKey.challenge = b64urlToBuffer(publicKey.challenge);
+  publicKey.allowCredentials = (publicKey.allowCredentials || []).map(c => ({ ...c, id: b64urlToBuffer(c.id) }));
+  return publicKey;
+}
+function setMsg(text, ok=false){
+  const err = $('err');
+  err.textContent = text || '';
+  err.className = 'err' + (ok ? ' ok' : '');
+}
+function hideSteps(){
+  ['login-step','totp-wrap','confirm-wrap','reset-request-step','reset-confirm-step'].forEach(id => $(id).style.display = 'none');
+}
+function showSignIn(){
+  mode = 'login'; pendingLogin = null; twoFactorVisible = false;
+  hideSteps();
+  $('login-step').style.display = '';
+  $('rem-wrap').style.display = 'flex';
+  $('forgot-row').style.display = passwordResetEnabled ? '' : 'none';
+  $('btn').style.display = '';
+  $('passkey-btn').style.display = '';
+  $('title').textContent = 'OmniSight';
+  $('btn').textContent = 'Sign in';
+  setMsg('');
+  $('u').focus();
+}
+function showTwoFactorStep(creds){
+  mode = 'login'; pendingLogin = creds; twoFactorVisible = true;
+  hideSteps();
+  $('totp-wrap').style.display = '';
+  $('rem-wrap').style.display = 'none';
+  $('forgot-row').style.display = 'none';
+  $('btn').style.display = 'none';
+  $('passkey-btn').style.display = 'none';
+  $('title').textContent = 'Two-factor authentication';
+  $('btn').textContent = 'Verify code';
+  $('code').value = '';
+  $('code').focus();
+}
+function resetTwoFactorStep(){ showSignIn(); $('p').focus(); }
+function setMode(m){
+  mode = m; pendingLogin = null; twoFactorVisible = false;
+  hideSteps();
+  const reg = m === 'register';
+  $('login-step').style.display = '';
+  $('confirm-wrap').style.display = reg ? '' : 'none';
+  $('rem-wrap').style.display = reg ? 'none' : 'flex';
+  $('forgot-row').style.display = reg || !passwordResetEnabled ? 'none' : '';
+  $('btn').style.display = '';
+  $('passkey-btn').style.display = reg ? 'none' : '';
+  $('btn').textContent = reg ? 'Register' : 'Sign in';
+  $('title').textContent = reg ? 'Create account' : 'OmniSight';
+  setMsg('');
+}
+function showForgotPassword(){
+  if(!passwordResetEnabled) return;
+  mode = 'forgot-request'; pendingLogin = null; twoFactorVisible = false;
+  hideSteps();
+  $('reset-request-step').style.display = '';
+  $('rem-wrap').style.display = 'none';
+  $('forgot-row').style.display = 'none';
+  $('btn').style.display = 'none';
+  $('passkey-btn').style.display = 'none';
+  $('title').textContent = 'Reset password';
+  $('btn').textContent = 'Send reset code';
+  setMsg('');
+  $('reset-email').focus();
+}
+function showResetConfirm(email){
+  mode = 'forgot-confirm'; resetEmail = email;
+  hideSteps();
+  $('reset-confirm-step').style.display = '';
+  $('rem-wrap').style.display = 'none';
+  $('forgot-row').style.display = 'none';
+  $('btn').style.display = '';
+  $('passkey-btn').style.display = 'none';
+  $('title').textContent = 'Reset password';
+  $('btn').textContent = 'Reset password';
+  $('reset-code').value = '';
+  $('reset-pw').value = '';
+  $('reset-pw2').value = '';
+  $('reset-code').focus();
+}
+function openInstructions(){ $('instructions-modal').classList.add('open'); }
+function closeInstructions(){ $('instructions-modal').classList.remove('open'); }
+function pwError(pw){
+  if(pw.length < 8) return 'Password must be at least 8 characters';
+  if(!/[a-z]/.test(pw)) return 'Password must contain a lowercase letter';
+  if(!/[A-Z]/.test(pw)) return 'Password must contain an uppercase letter';
+  return null;
+}
+async function requestPasswordReset(){
+  const email = $('reset-email').value.trim();
+  if(!email){ setMsg('Enter recovery e-mail'); return; }
+  const r = await fetch('/api/password-reset/request',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email})});
+  const d = await r.json().catch(()=>({}));
+  if(!r.ok){ setMsg(d.error || 'Could not request reset code'); return; }
+  showResetConfirm(email);
+  setMsg(d.message || 'If this e-mail is configured, a reset code has been sent.', true);
+}
+async function confirmPasswordReset(){
+  const code = $('reset-code').value.trim();
+  const password = $('reset-pw').value;
+  const password2 = $('reset-pw2').value;
+  if(!code || !password){ setMsg('Enter reset code and new password'); return; }
+  if(password !== password2){ setMsg('Passwords do not match'); return; }
+  const pe = pwError(password); if(pe){ setMsg(pe); return; }
+  const r = await fetch('/api/password-reset/confirm',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:resetEmail,code,password})});
+  const d = await r.json().catch(()=>({}));
+  if(!r.ok || !d.ok){ setMsg(d.error || 'Password reset failed'); return; }
+  showSignIn();
+  $('p').value = '';
+  setMsg('Password reset. Sign in with your new password.', true);
+}
+async function loginPasskey(){
+  const btn = $('passkey-btn');
+  if(!window.PublicKeyCredential || !navigator.credentials?.get){
+    setMsg('Passkeys are not supported by this browser');
+    return;
+  }
+  btn.disabled = true;
+  setMsg('');
+  try{
+    const username = $('u').value.trim();
+    const optRes = await fetch('/api/passkeys/auth/options', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ username })
+    });
+    const opt = await optRes.json().catch(()=>({}));
+    if(!optRes.ok) throw new Error(opt.error || 'No passkey available');
+    const cred = await navigator.credentials.get({ publicKey: prepareRequestOptions(opt.publicKey) });
+    if(!cred) throw new Error('Passkey sign-in was cancelled');
+    const payload = {
+      id: cred.id,
+      rawId: bufferToB64url(cred.rawId),
+      type: cred.type,
+      remember: $('rem').checked,
+      response: {
+        authenticatorData: bufferToB64url(cred.response.authenticatorData),
+        clientDataJSON: bufferToB64url(cred.response.clientDataJSON),
+        signature: bufferToB64url(cred.response.signature),
+        userHandle: cred.response.userHandle ? bufferToB64url(cred.response.userHandle) : '',
+      }
+    };
+    const r = await fetch('/api/passkeys/auth/verify', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(payload)
+    });
+    const d = await r.json().catch(()=>({}));
+    if(!r.ok || !d.ok) throw new Error(d.error || 'Passkey sign-in failed');
+    if(d.token){
+      if(payload.remember){ localStorage.setItem('os_token', d.token); sessionStorage.removeItem('os_token'); }
+      else { sessionStorage.setItem('os_token', d.token); localStorage.removeItem('os_token'); }
+    } else {
+      sessionStorage.removeItem('os_token');
+      localStorage.removeItem('os_token');
+    }
+    window.location.href = d.mustChangePassword ? '/profile?mustChangePassword=1' : '/';
+  }catch(e){
+    setMsg(e.message || 'Passkey sign-in failed');
+  }finally{
+    btn.disabled = false;
+  }
+}
+async function submitForm(){
+  const btn = $('btn');
+  const inlineSubmit = document.querySelector('#totp-wrap .inline-submit');
+  if(mode === 'forgot-request' || mode === 'forgot-confirm'){
+    btn.disabled = true; setMsg('');
+    try { mode === 'forgot-request' ? await requestPasswordReset() : await confirmPasswordReset(); }
+    catch { setMsg('Network error'); }
+    finally { btn.disabled = false; }
+    return;
+  }
+  if(loginSubmitting) return;
+  if(twoFactorVisible && (!pendingLogin?.username || !pendingLogin?.password)){
+    resetTwoFactorStep();
+    setMsg('Sign in again to verify two-factor authentication');
+    return;
+  }
+  const username = twoFactorVisible ? String(pendingLogin.username || '') : $('u').value.trim();
+  const password = twoFactorVisible ? String(pendingLogin.password || '') : $('p').value;
+  const remember = twoFactorVisible ? !!pendingLogin?.remember : $('rem').checked;
+  if(!twoFactorVisible && (!username || !password)){ setMsg('Enter username and password'); return; }
+  loginSubmitting = true;
+  btn.disabled = true;
+  if(inlineSubmit) inlineSubmit.disabled = true;
+  setMsg('');
+  try {
+    if(mode === 'register'){
+      if(password !== $('p2').value){ setMsg('Passwords do not match'); btn.disabled = false; return; }
+      const rr = await fetch('/api/set-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,password})});
+      const dd = await rr.json();
+      if(!rr.ok || !dd.ok){ setMsg(dd.error || 'Registration failed'); btn.disabled = false; return; }
+    }
+    const code = twoFactorVisible ? $('code').value.trim() : '';
+    if(twoFactorVisible && !code){ setMsg('Enter two-factor code'); return; }
+    const r = await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,password,remember,code})});
+    const d = await r.json();
+    if(d.twoFactorRequired){
+      showTwoFactorStep({ username, password, remember });
+      setMsg(d.error || 'Two-factor code required');
+      return;
+    }
+    if(!r.ok || !d.ok){ setMsg(d.error || 'Login failed'); return; }
+    if(d.token){
+      if(remember){ localStorage.setItem('os_token', d.token); sessionStorage.removeItem('os_token'); }
+      else { sessionStorage.setItem('os_token', d.token); localStorage.removeItem('os_token'); }
+    } else {
+      sessionStorage.removeItem('os_token');
+      localStorage.removeItem('os_token');
+    }
+    pendingLogin = null;
+    window.location.href = d.mustChangePassword ? '/profile?mustChangePassword=1' : '/';
+  } catch { setMsg('Network error'); } finally {
+    loginSubmitting = false;
+    btn.disabled = false;
+    if(inlineSubmit) inlineSubmit.disabled = false;
+  }
+}
+
+$('u').addEventListener('keydown', e => { if(e.key==='Enter') $('p').focus(); });
+$('p').addEventListener('keydown', e => {
+  if(e.key==='Enter'){
+    if(twoFactorVisible) $('code').focus();
+    else submitForm();
+  }
+});
+$('code').addEventListener('keydown', e => { if(e.key==='Enter') submitForm(); });
+['reset-email','reset-code','reset-pw','reset-pw2'].forEach(id => $(id).addEventListener('keydown', e => { if(e.key==='Enter') submitForm(); }));
+document.addEventListener('keydown', e => { if(e.key === 'Escape') closeInstructions(); });
+
+(async () => {
+  try {
+    const r = await fetch('/api/auth-status');
+    const d = await r.json();
+    const versionFoot = $('version-foot');
+    if(versionFoot) versionFoot.textContent = d.version ? `OmniSight v${d.version}` : '';
+    passwordResetEnabled = d.passwordResetEnabled !== false;
+    $('forgot-row').style.display = passwordResetEnabled && mode === 'login' ? '' : 'none';
+    if(d.demo && d.demoDefaultCredentials && mode === 'login'){
+      $('u').placeholder = 'demo';
+      $('p').placeholder = 'demo';
+    }
+    if(r.ok && !d.required) setMode('register');
+  } catch {}
+})();
+</script>
+</body>
+</html>

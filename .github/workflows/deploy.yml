@@ -1,0 +1,97 @@
+name: Build and publish Docker image
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+    paths-ignore:
+      - '**.md'
+      - 'README*'
+      - 'docs/**'
+      - 'screenshots/**'
+      - 'deploy/**'
+      - 'LICENSE'
+      - '.gitignore'
+      - '.dockerignore'
+      - 'config.example.yaml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        shell: bash
+        env:
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3 4 5; do
+            if printf '%s' "$GHCR_TOKEN" | timeout 45s docker login ghcr.io -u "$GHCR_USER" --password-stdin; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 5 ]; then
+              echo "GHCR login failed after ${attempt} attempts" >&2
+              exit 1
+            fi
+            sleep $((attempt * 10))
+          done
+
+      - name: Log in to DockerHub
+        shell: bash
+        env:
+          DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3 4 5; do
+            if printf '%s' "$DOCKERHUB_TOKEN" | timeout 45s docker login docker.io -u "$DOCKERHUB_USER" --password-stdin; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 5 ]; then
+              echo "DockerHub login failed after ${attempt} attempts" >&2
+              exit 1
+            fi
+            sleep $((attempt * 10))
+          done
+
+      - name: Lowercase image name
+        id: img
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ steps.img.outputs.name }}
+            docker.io/${{ secrets.DOCKERHUB_USERNAME }}/omnisight
+          tags: |
+            type=ref,event=branch
+            type=ref,event=tag
+            type=sha,format=short
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

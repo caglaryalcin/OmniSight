@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>try{document.documentElement.setAttribute("data-theme",localStorage.getItem("os_theme")||"dark")}catch(e){}</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>OmniSight — Profile</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%230B0E14' stroke='%2334D399' stroke-width='2'/><circle cx='16' cy='16' r='6' fill='%2334D399'/><circle cx='16' cy='16' r='10' fill='none' stroke='%2334D399' stroke-width='1.5' stroke-opacity='.4'/></svg>">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#141617;--panel:#181A1B;--row:#141617;--border:#242C3B;
+  --text:#E2E8F2;--muted:#7D8AA3;--green:#34D399;--red:#F87171;
+}
+body{background:var(--bg);color:var(--text);font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;-webkit-user-select:none;user-select:none}
+input,textarea,select{-webkit-user-select:text;user-select:text}
+body::before{content:'';position:fixed;inset:0;z-index:-1;background:
+  radial-gradient(900px 500px at 85% -10%, rgba(99,102,241,.10), transparent 60%),
+  radial-gradient(800px 500px at -10% 110%, rgba(34,211,238,.06), transparent 60%)}
+header{background:var(--panel);border-bottom:1px solid var(--border);height:64px;padding:0 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.logo{font-size:19px;font-weight:700;display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit}
+.ldot{width:12px;height:12px;border-radius:50%;background:var(--green)}
+.menu-wrap{position:relative}
+.menu-btn{background:var(--row);border:1px solid var(--border);color:var(--text);padding:8px 13px;border-radius:7px;cursor:pointer;font-size:14px;display:flex;align-items:center;gap:6px}
+.menu-btn:hover{border-color:#4a5568}
+.menu-drop{display:none;position:absolute;right:0;top:calc(100% + 6px);background:var(--panel);border:1px solid var(--border);border-radius:8px;min-width:140px;overflow:hidden;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.menu-drop.open{display:block}
+.menu-item{display:block;padding:10px 16px;font-size:13px;color:var(--text);text-decoration:none;cursor:pointer;border:none;background:none;width:100%;text-align:left}
+.menu-item:hover{background:rgba(255,255,255,.05)}
+.menu-item.danger{color:var(--red)}
+main{max-width:760px;margin:40px auto;padding:0 24px}
+h1{font-size:18px;font-weight:700;margin-bottom:24px}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:24px;margin-bottom:16px}
+.card-title{font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:16px}
+label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;font-weight:500}
+input{width:100%;background:var(--row);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:14px;padding:9px 12px;outline:none;margin-bottom:14px;transition:border-color .15s}
+input:focus{border-color:#4a5568}
+input:last-of-type{margin-bottom:0}
+.btn{background:var(--green);color:#000;border:none;border-radius:7px;padding:9px 20px;font-size:13px;font-weight:600;cursor:pointer;margin-top:16px}
+.btn.secondary{background:var(--row);color:var(--text);border:1px solid var(--border)}
+.btn:hover{filter:brightness(1.1)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.msg{font-size:13px;margin-top:12px;min-height:18px}
+.msg:empty{display:none;margin:0;min-height:0}
+.msg.ok{color:var(--green)}
+.msg.err{color:var(--red)}
+.no-auth{color:var(--muted);font-size:13px;line-height:1.6}
+.muted{color:var(--muted);font-size:13px;line-height:1.6}
+.status-pill{display:inline-flex;align-items:center;border:1px solid var(--border);border-radius:999px;padding:2px 8px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-left:8px}
+.status-pill.on{color:var(--green);border-color:rgba(52,211,153,.35);background:rgba(52,211,153,.11)}
+.status-pill.off{color:var(--muted);background:var(--row)}
+.secret-box{background:var(--row);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin:10px 0 14px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;word-break:break-all;user-select:text;-webkit-user-select:text}
+.twofa-qr-wrap{display:flex;align-items:center;gap:16px;margin:14px 0 16px}
+.twofa-qr{width:132px;height:132px;border-radius:10px;border:1px solid var(--border);background:#fff;padding:8px;display:grid;place-items:center;flex:0 0 auto}
+.twofa-qr img{width:100%;height:100%;display:block}
+.twofa-qr-copy{min-width:0;max-width:420px}
+.user-row,.email-row{display:flex;align-items:center;gap:10px;width:100%;min-height:38px;background:var(--row);border:1px solid var(--border);border-radius:7px;padding:7px 10px;margin-bottom:0}
+.user-name,.email-display{font-size:14px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.email-display.empty{color:var(--muted);font-weight:500}
+.user-input,.email-input{display:none;flex:1;min-width:0;background:transparent;border:none;border-radius:0;color:var(--text);font-size:14px;font-weight:600;padding:0;margin:0}
+.user-input:focus,.email-input:focus{border-color:transparent}
+.user-row.editing .user-name,.email-row.editing .email-display{display:none}
+.user-row.editing .user-input,.email-row.editing .email-input{display:block}
+.edit-btn{background:none;border:none;color:var(--muted);cursor:pointer;padding:4px;border-radius:5px;display:flex;align-items:center;transition:color .15s}
+.edit-btn:hover{color:var(--text)}
+.divider{border:none;border-top:1px solid var(--border);margin:16px 0}
+.avatar-row{display:flex;flex-direction:column;align-items:center;gap:18px;margin:0}
+.avatar-preview{width:104px;height:104px;border-radius:999px;border:1px solid var(--border);background:var(--row);display:grid;place-items:center;overflow:hidden;color:var(--green);font-weight:800;font-size:30px;flex-shrink:0}
+.avatar-preview img{width:100%;height:100%;object-fit:cover;display:block}
+.avatar-copy{min-width:0;flex:1}
+.avatar-actions{display:flex;flex-wrap:nowrap;justify-content:flex-start;align-items:center;gap:8px;margin-top:0}
+.avatar-actions .btn{margin-top:0}
+.account-head{display:grid;grid-template-columns:260px minmax(0,1fr);align-items:start;gap:28px}
+.account-main{min-width:0;flex:1}
+.account-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px 20px}
+.account-field{min-width:0}
+.account-field.wide{grid-column:1 / -1}
+.account-field .btn{margin-top:2px}
+.username-save-row,.email-save-row{display:flex;margin-top:18px}
+.username-save-row .btn,.email-save-row .btn{margin-top:0}
+.account-field .field-submit,.account-field .password-submit{margin-top:18px}
+.field-submit{display:flex;justify-content:center}
+.email-save-row .field-submit{margin-top:0}
+.account-section-title{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;font-weight:600;margin:2px 0 12px}
+.twofa-section{border-top:1px solid var(--border);margin-top:24px;padding-top:20px}
+.twofa-title{display:flex;align-items:center;gap:8px}
+.account-field .twofa-start,.account-field .twofa-submit{margin-top:18px}
+.passkey-list{display:grid;gap:8px;margin-top:14px}
+.passkey-row{display:flex;align-items:center;gap:10px;background:var(--row);border:1px solid var(--border);border-radius:8px;padding:10px 12px}
+.passkey-main{min-width:0;flex:1}
+.passkey-name{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.passkey-meta{font-size:11px;color:var(--muted);margin-top:3px}
+.passkey-delete{background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:7px;padding:6px 9px;cursor:pointer}
+.passkey-delete:hover{color:var(--red);border-color:rgba(248,113,113,.42)}
+.profile-modal{display:none;position:fixed;inset:0;background:rgba(4,6,10,.66);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);z-index:1000;align-items:center;justify-content:center;padding:18px}
+.profile-modal.open{display:flex}
+.profile-modal-box{width:min(430px,94vw);background:var(--panel);border:1px solid var(--border);border-radius:16px;box-shadow:0 24px 64px rgba(0,0,0,.5);overflow:hidden}
+.profile-modal-hdr{display:flex;align-items:center;gap:10px;padding:16px 20px;border-bottom:1px solid var(--border)}
+.profile-modal-title{font-size:16px;font-weight:700;flex:1}
+.profile-modal-x{background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer;padding:4px 8px;border-radius:6px}
+.profile-modal-x:hover{color:var(--text);background:rgba(255,255,255,.06)}
+.profile-modal-body{padding:18px 20px}
+.profile-modal-copy{font-size:13px;color:var(--muted);line-height:1.45;margin-bottom:14px}
+.profile-modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:4px}
+.profile-modal-actions .btn{margin-top:0}
+.password-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.password-grid input{margin-bottom:0}
+.account-head .avatar-row{margin:0;align-items:center;justify-self:start;align-self:start}
+.account-head .avatar-row{flex:0 0 auto}
+.account-head .avatar-copy{display:none}
+@media (max-width:720px){.account-head{display:flex;flex-direction:column}.account-head .avatar-copy{max-width:none}.account-head .avatar-row{align-items:center}.account-fields,.password-grid{grid-template-columns:1fr}}
+html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#dde3ec;--text:#1c2433;--muted:#64748b;--green:#0e9f6e;--red:#dc2f2f;--yellow:#b7791f;--blue:#3b82f6;}
+</style>
+<style>html.embed header{display:none}</style>
+<script>if(window.self!==window.top)document.documentElement.classList.add('embed');</script>
+</head>
+<body>
+<header>
+  <a href="/" class="logo"><div class="ldot"></div>OmniSight</a>
+  <div class="menu-wrap">
+    <button class="menu-btn" onclick="toggleMenu()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+    </button>
+    <div class="menu-drop" id="menu-drop">
+      <a class="menu-item" href="/profile">Profile</a>
+      <a class="menu-item" href="/settings">Settings</a>
+        <a class="menu-item" href="/event-center">Event Center</a>
+      <button class="menu-item danger" onclick="doLogout()">Sign out</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <h1>Profile</h1>
+
+  <div class="card" id="card-setup" style="display:none">
+    <div class="card-title">Set up login password</div>
+    <p class="no-auth" style="margin-bottom:16px">No password is set. Configure one to protect OmniSight.</p>
+    <label>Username</label>
+    <input id="new-user" type="text" autocomplete="username">
+    <label>Password</label>
+    <input id="new-pw" type="password" autocomplete="new-password">
+    <label>Confirm password</label>
+    <input id="new-pw2" type="password" autocomplete="new-password">
+    <button class="btn" onclick="setPassword(false)">Set password</button>
+    <div class="msg" id="msg-setup"></div>
+  </div>
+
+  <div class="card" id="card-change">
+    <div class="avatar-row">
+      <div class="avatar-preview" id="avatar-preview">OS</div>
+      <div class="avatar-actions">
+        <button class="btn secondary" type="button" onclick="document.getElementById('avatar-file').click()">Upload picture</button>
+      </div>
+      <input id="avatar-file" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" style="display:none" onchange="uploadAvatarFile(this)">
+      <div class="msg" id="msg-avatar"></div>
+    </div>
+    <div class="account-main">
+      <div class="card-title">Account</div>
+      <div class="account-fields">
+        <div class="account-field">
+          <label>Username</label>
+          <div class="user-row" id="user-row">
+            <div class="user-name" id="user-display"></div>
+            <input class="user-input" id="chg-user" type="text" autocomplete="username" placeholder="New username">
+            <button class="edit-btn" onclick="toggleUserEdit()" title="Change username">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            </button>
+          </div>
+          <div class="username-save-row" id="username-save-row">
+            <button class="btn" type="button" onclick="saveUsername()">Save username</button>
+          </div>
+          <div class="msg" id="msg-user"></div>
+        </div>
+        <div class="account-field">
+          <label>E-mail</label>
+          <div class="email-row" id="email-row">
+            <div class="email-display empty" id="email-display">No e-mail address</div>
+            <input class="email-input" id="recovery-email" type="email" autocomplete="email" placeholder="you@example.com">
+            <button class="edit-btn" onclick="toggleEmailEdit()" title="Change e-mail">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            </button>
+          </div>
+          <div class="email-save-row">
+            <button class="btn field-submit" type="button" onclick="saveRecoveryEmail()">Save E-Mail address</button>
+          </div>
+          <div class="msg" id="msg-email"></div>
+        </div>
+        <div class="account-field wide">
+          <div class="account-section-title">Change password</div>
+          <div class="password-grid">
+            <div>
+              <label>Current password</label>
+              <input id="cur-pw" type="password" autocomplete="current-password">
+            </div>
+            <div>
+              <label>New password</label>
+              <input id="chg-pw" type="password" autocomplete="new-password">
+            </div>
+            <div>
+              <label>Confirm new password</label>
+              <input id="chg-pw2" type="password" autocomplete="new-password">
+            </div>
+          </div>
+          <button class="btn password-submit" onclick="savePassword()">Update password</button>
+          <div class="msg" id="msg-change"></div>
+
+          <div class="twofa-section" id="card-2fa">
+            <div class="account-section-title twofa-title">Two-factor authentication <span class="status-pill off" id="twofa-status">Off</span></div>
+            <p class="muted" id="twofa-desc">Protect sign-in with a 6-digit code from an authenticator app.</p>
+
+            <button class="btn twofa-start" id="twofa-start" onclick="setup2FA()">Setup 2FA</button>
+
+            <div id="twofa-setup" style="display:none">
+              <div class="twofa-qr-wrap" id="twofa-qr-wrap" style="display:none">
+                <div class="twofa-qr"><img id="twofa-qr-img" alt="Two-factor authentication QR code"></div>
+                <div class="twofa-qr-copy">
+                  <p class="muted">Scan this QR code with an authenticator app, then enter the generated code below.</p>
+                  <p class="muted" style="margin-top:6px">If scanning is not available, add the secret manually.</p>
+                </div>
+              </div>
+              <div class="secret-box" id="twofa-secret"></div>
+              <label>Authenticator URI</label>
+              <div class="secret-box" id="twofa-uri"></div>
+              <label>Current password</label>
+              <input id="twofa-current" type="password" autocomplete="current-password">
+              <label>Two-factor code</label>
+              <input id="twofa-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456">
+              <button class="btn twofa-submit" onclick="enable2FA()">Enable 2FA</button>
+            </div>
+
+            <div id="twofa-enabled" style="display:none">
+              <label>Current password</label>
+              <input id="twofa-disable-current" type="password" autocomplete="current-password">
+              <label>Two-factor code</label>
+              <input id="twofa-disable-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456">
+              <button class="btn secondary" onclick="disable2FA()">Disable 2FA</button>
+            </div>
+
+            <div class="msg" id="msg-2fa"></div>
+          </div>
+
+          <div class="twofa-section" id="card-passkeys">
+            <div class="account-section-title">Passkeys</div>
+            <p class="muted">Use a device passkey or security key to sign in without typing your password.</p>
+            <button class="btn twofa-start" type="button" onclick="addPasskey()">Add passkey</button>
+            <div class="passkey-list" id="passkey-list"><div class="muted">Loading passkeys...</div></div>
+            <div class="msg" id="msg-passkey"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div class="profile-modal" id="passkey-delete-modal" onclick="if(event.target===this)closePasskeyDeleteModal(false)">
+  <div class="profile-modal-box">
+    <div class="profile-modal-hdr">
+      <span class="profile-modal-title">Remove passkey</span>
+      <button class="profile-modal-x" type="button" onclick="closePasskeyDeleteModal(false)">✕</button>
+    </div>
+    <div class="profile-modal-body">
+      <div class="profile-modal-copy">Enter your current password to remove this passkey.</div>
+      <label>Current password</label>
+      <input id="passkey-delete-password" type="password" autocomplete="current-password">
+      <div class="profile-modal-actions">
+        <button type="button" class="btn secondary" onclick="closePasskeyDeleteModal(false)">Cancel</button>
+        <button type="button" class="btn" onclick="closePasskeyDeleteModal(true)">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/i18n.js"></script>
+<script>
+function currentLang(){ return window.OmniI18n?.currentLang('en') || 'en'; }
+function t(text){ return window.OmniI18n?.t(text, currentLang()) || text; }
+function applyLanguage(){
+  const lang = currentLang();
+  window.OmniI18n?.apply(document, lang);
+  return lang;
+}
+window.applyLanguage = applyLanguage;
+function toggleMenu(){ document.getElementById('menu-drop').classList.toggle('open'); }
+document.addEventListener('click', e => { if(!e.target.closest('.menu-wrap')) document.getElementById('menu-drop')?.classList.remove('open'); });
+
+function authHeaders(){ const t=sessionStorage.getItem('os_token')||localStorage.getItem('os_token'); return t?{'x-session-token':t}:{}; }
+function handleUnauth(r){ if(r.status===401){ sessionStorage.removeItem('os_token'); localStorage.removeItem('os_token'); document.cookie='session=; path=/; max-age=0'; (window.top || window).location.href='/login'; throw new Error('Unauthorized'); } }
+function escHtml(s){ return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function b64urlToBuffer(s){
+  const bin = atob(String(s || '').replace(/-/g,'+').replace(/_/g,'/') + '='.repeat((4 - String(s || '').length % 4) % 4));
+  const bytes = new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) bytes[i] = bin.charCodeAt(i);
+  return bytes.buffer;
+}
+function bufferToB64url(buf){
+  const bytes = new Uint8Array(buf);
+  let s = '';
+  bytes.forEach(b => s += String.fromCharCode(b));
+  return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+function prepareCreationOptions(publicKey){
+  publicKey.challenge = b64urlToBuffer(publicKey.challenge);
+  publicKey.user.id = b64urlToBuffer(publicKey.user.id);
+  publicKey.excludeCredentials = (publicKey.excludeCredentials || []).map(c => ({ ...c, id: b64urlToBuffer(c.id) }));
+  return publicKey;
+}
+let currentAvatar = '';
+const profileUrlParams = new URLSearchParams(location.search);
+let profileMustChange = profileUrlParams.has('mustChangePassword');
+function initials(name){
+  const parts = String(name || 'OS').trim().split(/\s+/).filter(Boolean);
+  const chars = (parts.length > 1 ? parts[0][0] + parts[parts.length - 1][0] : (parts[0] || 'OS').slice(0,2));
+  return chars.toUpperCase();
+}
+function renderAvatar(username, avatar = currentAvatar){
+  currentAvatar = avatar || '';
+  const el = document.getElementById('avatar-preview');
+  if(!el) return;
+  el.innerHTML = currentAvatar
+    ? `<img src="${currentAvatar}" alt="">`
+    : escHtml(initials(username));
+}
+function notifyProfileChanged(profile){
+  try { window.parent?.postMessage({ type:'omnisight-profile', profile }, window.location.origin); } catch(e){}
+}
+function renderEmail(email){
+  const clean = String(email || '').trim();
+  const display = document.getElementById('email-display');
+  const input = document.getElementById('recovery-email');
+  if(input) input.value = clean;
+  if(display){
+    display.textContent = clean || t('No e-mail address');
+    display.classList.toggle('empty', !clean);
+  }
+}
+function renderPasskeys(passkeys = []){
+  const card = document.getElementById('card-passkeys');
+  const list = document.getElementById('passkey-list');
+  if(card) card.style.display = '';
+  if(!list) return;
+  if(!passkeys.length){
+    list.innerHTML = `<div class="muted">${escHtml(t('No passkeys registered yet.'))}</div>`;
+    return;
+  }
+  list.innerHTML = passkeys.map(k => {
+    const last = k.lastUsedAt ? new Date(k.lastUsedAt).toLocaleString() : t('Never used');
+    const created = k.createdAt ? new Date(k.createdAt).toLocaleDateString() : '';
+    return `<div class="passkey-row">
+      <div class="passkey-main">
+        <div class="passkey-name">${escHtml(k.name || 'Passkey')}</div>
+        <div class="passkey-meta">${escHtml([created && `${t('Created')} ${created}`, `${t('Last used')}: ${last}`].filter(Boolean).join(' · '))}</div>
+      </div>
+      <button class="passkey-delete" type="button" onclick="deletePasskey('${escHtml(k.id)}')">${escHtml(t('Remove'))}</button>
+    </div>`;
+  }).join('');
+}
+let passkeyDeleteResolve = null;
+function askPasskeyDeletePassword(){
+  return new Promise(resolve => {
+    passkeyDeleteResolve = resolve;
+    const modal = document.getElementById('passkey-delete-modal');
+    const input = document.getElementById('passkey-delete-password');
+    if(input) input.value = '';
+    modal?.classList.add('open');
+    setTimeout(() => input?.focus(), 50);
+  });
+}
+function closePasskeyDeleteModal(ok){
+  const modal = document.getElementById('passkey-delete-modal');
+  const input = document.getElementById('passkey-delete-password');
+  const password = ok ? String(input?.value || '') : '';
+  modal?.classList.remove('open');
+  const resolve = passkeyDeleteResolve;
+  passkeyDeleteResolve = null;
+  if(resolve) resolve(password);
+}
+document.getElementById('passkey-delete-password')?.addEventListener('keydown', e => {
+  if(e.key === 'Enter') closePasskeyDeleteModal(true);
+  if(e.key === 'Escape') closePasskeyDeleteModal(false);
+});
+async function loadProfile(){
+  const r = await fetch('/api/profile', { headers: authHeaders(), cache:'no-store' });
+  handleUnauth(r);
+  const d = await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(d.error || r.statusText);
+  if(d.username) {
+    document.getElementById('user-display').textContent = d.username;
+    document.getElementById('chg-user').value = d.username;
+  }
+  renderEmail(d.recoveryEmail || '');
+  renderAvatar(d.username, d.avatar);
+  renderPasskeys(d.passkeys || []);
+  profileMustChange = d.mustChangePassword === true || profileMustChange;
+  if (profileMustChange) {
+    const msgEl = document.getElementById('msg-change');
+    msgEl.textContent = t('Change your temporary password to continue.');
+    msgEl.className = 'msg err';
+    setTimeout(() => document.getElementById('cur-pw')?.focus(), 60);
+  }
+  return d;
+}
+function fileDataUrl(file){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error('Could not read image'));
+    reader.readAsDataURL(file);
+  });
+}
+async function saveAvatar(dataUrl){
+  const msgEl = document.getElementById('msg-avatar');
+  msgEl.textContent = ''; msgEl.className = 'msg';
+  const r = await fetch('/api/profile/avatar', {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json', ...authHeaders() },
+    body:JSON.stringify({ dataUrl })
+  });
+  handleUnauth(r);
+  const d = await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(d.error || r.statusText);
+  renderAvatar(d.username, d.avatar);
+  notifyProfileChanged(d);
+    msgEl.textContent = t(dataUrl ? 'Profile picture updated.' : 'Profile picture removed.');
+  msgEl.className = 'msg ok';
+  return d;
+}
+async function uploadAvatarFile(input){
+  const file = input.files && input.files[0];
+  if(!file) return;
+  const msgEl = document.getElementById('msg-avatar');
+  try {
+    msgEl.textContent = t('Uploading...'); msgEl.className = 'msg';
+    await saveAvatar(await fileDataUrl(file));
+  } catch(e) {
+    msgEl.textContent = e.message; msgEl.className = 'msg err';
+  } finally {
+    input.value = '';
+  }
+}
+async function removeAvatar(){
+  const msgEl = document.getElementById('msg-avatar');
+  try { await saveAvatar(''); }
+  catch(e){ msgEl.textContent = e.message; msgEl.className = 'msg err'; }
+}
+async function saveRecoveryEmail(){
+  const msgEl = document.getElementById('msg-email');
+  msgEl.textContent = ''; msgEl.className = 'msg';
+  const email = document.getElementById('recovery-email').value.trim();
+  try {
+    const r = await fetch('/api/profile/recovery-email', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', ...authHeaders() },
+      body:JSON.stringify({ email })
+    });
+    handleUnauth(r);
+    const d = await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(d.error || r.statusText);
+    renderEmail(d.recoveryEmail || '');
+    document.getElementById('email-row')?.classList.remove('editing');
+    msgEl.textContent = t(d.recoveryEmail ? 'Email address saved.' : 'Email address removed.');
+    msgEl.className = 'msg ok';
+  } catch(e) {
+    msgEl.textContent = e.message; msgEl.className = 'msg err';
+  }
+}
+async function doLogout(){
+  await fetch('/api/logout',{method:'POST',headers:authHeaders()}).catch(()=>{});
+  sessionStorage.removeItem('os_token'); localStorage.removeItem('os_token');
+  window.location.href='/login';
+}
+
+function passkeyMsg(text, cls=''){
+  const el = document.getElementById('msg-passkey');
+  if(!el) return;
+  el.textContent = text || '';
+  el.className = 'msg ' + cls;
+}
+function profileIsEmbedded(){
+  try { return window.self !== window.top; } catch(e) { return true; }
+}
+window.addEventListener('message', e => {
+  if(e.origin !== window.location.origin) return;
+  const d = e.data || {};
+  if(d.type !== 'omnisight-passkey-result') return;
+  if(d.ok){
+    renderPasskeys(d.passkeys || []);
+    passkeyMsg(t('Passkey added.'), 'ok');
+  } else {
+    const msg = d.error || t('Passkey setup failed');
+    passkeyMsg(/sameOriginWithAncestors/i.test(msg) ? t('Browser blocked passkey setup in this view. Check passkey permissions and try again.') : msg, 'err');
+  }
+});
+async function addPasskey(){
+  passkeyMsg('');
+  if(profileIsEmbedded()){
+    passkeyMsg(t('Starting passkey setup...'));
+    window.parent?.postMessage({ type:'omnisight-passkey-add' }, window.location.origin);
+    return;
+  }
+  if(!window.PublicKeyCredential || !navigator.credentials?.create){
+    passkeyMsg(t('Passkeys are not supported by this browser.'), 'err');
+    return;
+  }
+  try{
+    const optRes = await fetch('/api/passkeys/register/options', { method:'POST', headers:authHeaders() });
+    handleUnauth(optRes);
+    const opt = await optRes.json().catch(()=>({}));
+    if(!optRes.ok) throw new Error(opt.error || optRes.statusText);
+    const cred = await navigator.credentials.create({ publicKey: prepareCreationOptions(opt.publicKey) });
+    if(!cred) throw new Error('Passkey setup was cancelled');
+    const payload = {
+      id: cred.id,
+      rawId: bufferToB64url(cred.rawId),
+      type: cred.type,
+      name: navigator.platform ? `${navigator.platform} passkey` : 'Passkey',
+      response: {
+        clientDataJSON: bufferToB64url(cred.response.clientDataJSON),
+        attestationObject: bufferToB64url(cred.response.attestationObject),
+        transports: typeof cred.response.getTransports === 'function' ? cred.response.getTransports() : [],
+      },
+    };
+    const r = await fetch('/api/passkeys/register/verify', { method:'POST', headers:{'Content-Type':'application/json', ...authHeaders()}, body:JSON.stringify(payload) });
+    handleUnauth(r);
+    const d = await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(d.error || r.statusText);
+    renderPasskeys(d.passkeys || []);
+    passkeyMsg(t('Passkey added.'), 'ok');
+  }catch(e){
+    const msg = e.message || t('Passkey setup failed');
+    passkeyMsg(/sameOriginWithAncestors/i.test(msg) ? t('Browser blocked passkey setup in this view. Check passkey permissions and try again.') : msg, 'err');
+  }
+}
+async function deletePasskey(id){
+  passkeyMsg('');
+  const currentPassword = await askPasskeyDeletePassword();
+  if(!currentPassword){ passkeyMsg(t('Enter current password'), 'err'); return; }
+  try{
+    const r = await fetch('/api/passkeys/' + encodeURIComponent(id), {
+      method:'DELETE',
+      headers:{'Content-Type':'application/json', ...authHeaders()},
+      body:JSON.stringify({ currentPassword }),
+    });
+    handleUnauth(r);
+    const d = await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(d.error || r.statusText);
+    renderPasskeys(d.passkeys || []);
+    passkeyMsg(t('Passkey removed.'), 'ok');
+  }catch(e){
+    passkeyMsg(t(e.message || 'Could not remove passkey'), 'err');
+  }
+}
+
+let pending2FASecret = '';
+function set2FAState(enabled){
+  const status = document.getElementById('twofa-status');
+  const start = document.getElementById('twofa-start');
+  const setup = document.getElementById('twofa-setup');
+  const enabledBox = document.getElementById('twofa-enabled');
+  const qrWrap = document.getElementById('twofa-qr-wrap');
+  const qrImg = document.getElementById('twofa-qr-img');
+  pending2FASecret = '';
+  status.textContent = t(enabled ? 'On' : 'Off');
+  status.className = 'status-pill ' + (enabled ? 'on' : 'off');
+  start.style.display = enabled ? 'none' : '';
+  setup.style.display = 'none';
+  enabledBox.style.display = enabled ? '' : 'none';
+  if(qrWrap) qrWrap.style.display = 'none';
+  if(qrImg) qrImg.removeAttribute('src');
+  document.getElementById('msg-2fa').textContent = '';
+}
+function twoFAMsg(text, cls){
+  const el = document.getElementById('msg-2fa');
+  el.textContent = text || '';
+  el.className = 'msg ' + (cls || '');
+}
+async function setup2FA(){
+  twoFAMsg('');
+  try{
+    const r = await fetch('/api/2fa/setup', { method:'POST', headers:authHeaders() });
+    handleUnauth(r);
+    const d = await r.json();
+    if(!r.ok) throw new Error(d.error || r.statusText);
+    pending2FASecret = d.secret;
+    document.getElementById('twofa-secret').textContent = d.secret;
+    document.getElementById('twofa-uri').textContent = d.otpauth;
+    const qrWrap = document.getElementById('twofa-qr-wrap');
+    const qrImg = document.getElementById('twofa-qr-img');
+    if(d.qrDataUrl && qrWrap && qrImg){
+      qrImg.src = d.qrDataUrl;
+      qrWrap.style.display = 'flex';
+    } else if(qrWrap) {
+      qrWrap.style.display = 'none';
+    }
+    document.getElementById('twofa-setup').style.display = '';
+    document.getElementById('twofa-start').style.display = 'none';
+    document.getElementById('twofa-current').focus();
+  }catch(e){ twoFAMsg(e.message, 'err'); }
+}
+async function enable2FA(){
+  twoFAMsg('');
+  const currentPassword = document.getElementById('twofa-current').value;
+  const code = document.getElementById('twofa-code').value.trim();
+  if(!pending2FASecret){ twoFAMsg(t('Start setup first'), 'err'); return; }
+  if(!currentPassword || !code){ twoFAMsg(t('Current password and code are required'), 'err'); return; }
+  try{
+    const r = await fetch('/api/2fa/enable', { method:'POST', headers:{'Content-Type':'application/json', ...authHeaders()}, body:JSON.stringify({ currentPassword, code, secret: pending2FASecret }) });
+    handleUnauth(r);
+    const d = await r.json();
+    if(!r.ok) throw new Error(d.error || r.statusText);
+    document.getElementById('twofa-current').value = '';
+    document.getElementById('twofa-code').value = '';
+    set2FAState(true);
+    twoFAMsg(t('Two-factor authentication enabled.'), 'ok');
+  }catch(e){ twoFAMsg(e.message, 'err'); }
+}
+async function disable2FA(){
+  twoFAMsg('');
+  const currentPassword = document.getElementById('twofa-disable-current').value;
+  const code = document.getElementById('twofa-disable-code').value.trim();
+  if(!currentPassword || !code){ twoFAMsg(t('Current password and code are required'), 'err'); return; }
+  try{
+    const r = await fetch('/api/2fa/disable', { method:'POST', headers:{'Content-Type':'application/json', ...authHeaders()}, body:JSON.stringify({ currentPassword, code }) });
+    handleUnauth(r);
+    const d = await r.json();
+    if(!r.ok) throw new Error(d.error || r.statusText);
+    document.getElementById('twofa-disable-current').value = '';
+    document.getElementById('twofa-disable-code').value = '';
+    set2FAState(false);
+    twoFAMsg(t('Two-factor authentication disabled.'), 'ok');
+  }catch(e){ twoFAMsg(e.message, 'err'); }
+}
+
+function toggleUserEdit(){
+  const row = document.getElementById('user-row');
+  const input = document.getElementById('chg-user');
+  const open = row.classList.toggle('editing');
+  if(open){
+    input.value = document.getElementById('user-display').textContent.trim();
+    input.focus();
+    input.select();
+  }
+  document.getElementById('msg-user').textContent='';
+}
+
+function toggleEmailEdit(){
+  const row = document.getElementById('email-row');
+  const input = document.getElementById('recovery-email');
+  const open = row.classList.toggle('editing');
+  if(open){
+    input.focus();
+    input.select();
+  }
+  document.getElementById('msg-email').textContent='';
+}
+
+async function saveUsername(){
+  const msgEl = document.getElementById('msg-user');
+  msgEl.textContent=''; msgEl.className='msg';
+  const username = document.getElementById('chg-user').value.trim();
+  if(!username){ msgEl.textContent=t('Enter a username'); msgEl.className='msg err'; return; }
+  try {
+    const r = await fetch('/api/set-password',{method:'POST',headers:{'Content-Type':'application/json',...authHeaders()},body:JSON.stringify({username})});
+    handleUnauth(r);
+    const d = await r.json();
+    if(!r.ok) throw new Error(d.error||r.statusText);
+    document.getElementById('user-display').textContent = username;
+    document.getElementById('chg-user').value = username;
+    renderAvatar(username);
+    notifyProfileChanged({ username, avatar: currentAvatar });
+    document.getElementById('user-row').classList.remove('editing');
+    msgEl.textContent=t('Username updated!'); msgEl.className='msg ok';
+  } catch(e){ msgEl.textContent=e.message; msgEl.className='msg err'; }
+}
+
+function pwError(pw){
+  if(pw.length<8) return t('Password must be at least 8 characters');
+  if(!/[a-z]/.test(pw)) return t('Password must contain a lowercase letter');
+  if(!/[A-Z]/.test(pw)) return t('Password must contain an uppercase letter');
+  return null;
+}
+async function savePassword(){
+  const msgEl = document.getElementById('msg-change');
+  msgEl.textContent=''; msgEl.className='msg';
+  const currentPassword = document.getElementById('cur-pw').value;
+  const password  = document.getElementById('chg-pw').value;
+  const password2 = document.getElementById('chg-pw2').value;
+  if(!currentPassword){ msgEl.textContent=t('Enter current password'); msgEl.className='msg err'; return; }
+  if(!password){ msgEl.textContent=t('Enter new password'); msgEl.className='msg err'; return; }
+  if(password !== password2){ msgEl.textContent=t('Passwords do not match'); msgEl.className='msg err'; return; }
+  { const pe=pwError(password); if(pe){ msgEl.textContent=pe; msgEl.className='msg err'; return; } }
+  const username = '__current__';
+  try {
+    const r = await fetch('/api/set-password',{method:'POST',headers:{'Content-Type':'application/json',...authHeaders()},body:JSON.stringify({username,password,currentPassword})});
+    handleUnauth(r);
+    const d = await r.json();
+    if(!r.ok) throw new Error(d.error||r.statusText);
+    profileMustChange = false;
+    msgEl.textContent=t('Saved!'); msgEl.className='msg ok';
+    document.getElementById('cur-pw').value='';
+    document.getElementById('chg-pw').value='';
+    document.getElementById('chg-pw2').value='';
+  } catch(e){ msgEl.textContent=e.message; msgEl.className='msg err'; }
+}
+
+async function setPassword(hasExisting){
+  const msgEl = document.getElementById(hasExisting?'msg-setup':'msg-setup');
+  msgEl.textContent=''; msgEl.className='msg';
+  const username = document.getElementById('new-user').value.trim();
+  const password = document.getElementById('new-pw').value;
+  const password2 = document.getElementById('new-pw2').value;
+  if(!username){ msgEl.textContent=t('Enter a username'); msgEl.className='msg err'; return; }
+  if(!password){ msgEl.textContent=t('Enter a password'); msgEl.className='msg err'; return; }
+  if(password !== password2){ msgEl.textContent=t('Passwords do not match'); msgEl.className='msg err'; return; }
+  { const pe=pwError(password); if(pe){ msgEl.textContent=pe; msgEl.className='msg err'; return; } }
+  try {
+    const r = await fetch('/api/set-password',{method:'POST',headers:{'Content-Type':'application/json',...authHeaders()},body:JSON.stringify({username,password})});
+    handleUnauth(r);
+    const d = await r.json();
+    if(!r.ok) throw new Error(d.error||r.statusText);
+    document.getElementById('card-setup').style.display='none';
+    document.getElementById('card-change').style.display='';
+    document.getElementById('card-2fa').style.display='';
+    set2FAState(false);
+    document.getElementById('user-display').textContent = username;
+    document.getElementById('chg-user').value = username;
+    renderEmail('');
+    renderAvatar(username, '');
+    notifyProfileChanged({ username, avatar: '' });
+  } catch(e){ msgEl.textContent=e.message; msgEl.className='msg err'; }
+}
+
+applyLanguage();
+
+(async()=>{
+  const r = await fetch('/api/auth-status').catch(()=>null);
+  if(!r) return;
+  handleUnauth(r);
+  const d = await r.json().catch(()=>({}));
+  if(d.required){
+    document.getElementById('card-change').style.display='';
+    document.getElementById('card-2fa').style.display='';
+    try {
+      await loadProfile();
+    } catch(e) {
+      if(d.username) {
+        document.getElementById('user-display').textContent = d.username;
+        document.getElementById('chg-user').value = d.username;
+      }
+      renderAvatar(d.username, '');
+    }
+    set2FAState(!!d.twoFactorEnabled);
+  } else {
+    document.getElementById('card-change').style.display='none';
+    document.getElementById('card-2fa').style.display='none';
+    document.getElementById('card-passkeys').style.display='none';
+    document.getElementById('card-setup').style.display='';
+  }
+})();
+</script>
+</body>
+</html>

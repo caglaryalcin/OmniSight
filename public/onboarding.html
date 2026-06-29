@@ -1,0 +1,104 @@
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>OmniSight - Onboarding</title>
+<link rel="icon" type="image/svg+xml" href="/assets/omnisight-logo.svg">
+<style>
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:#141617;color:#e2e8f2;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;display:flex;align-items:center;justify-content:center;padding:28px;-webkit-user-select:none;user-select:none}
+body::before{content:"";position:fixed;inset:0;z-index:-1;background:radial-gradient(900px 520px at 75% -10%,rgba(99,102,241,.16),transparent 60%),radial-gradient(700px 480px at 0 110%,rgba(52,211,153,.08),transparent 60%)}
+.wrap{width:min(960px,100%);background:#181a1b;border:1px solid #242c3b;border-radius:18px;box-shadow:0 30px 80px rgba(0,0,0,.42);overflow:hidden}
+.head{display:flex;align-items:center;gap:12px;padding:24px 28px;border-bottom:1px solid #242c3b}.head img{width:30px;height:30px}.head h1{font-size:21px;margin:0}.head p{margin:3px 0 0;color:#7d8aa3;font-size:13px}
+.grid{display:grid;grid-template-columns:260px minmax(0,1fr);min-height:560px}.steps{border-right:1px solid #242c3b;padding:20px;background:#161819}.step{display:flex;gap:10px;padding:12px;border:1px solid transparent;border-radius:10px;color:#7d8aa3;font-weight:700;font-size:13px}.step.active{background:#1d222b;border-color:#2c384b;color:#fff}.num{width:22px;height:22px;border-radius:999px;background:#242c3b;display:grid;place-items:center;color:#9fb0cf;font-size:12px}.step.active .num{background:#34d399;color:#07110e}
+.pane{padding:26px 30px}.panel{display:none}.panel.active{display:block}h2{font-size:18px;margin:0 0 6px}p{color:#7d8aa3;line-height:1.5;font-size:13px;margin:0 0 18px}.form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.field{min-width:0}.field.full{grid-column:1/-1}label{display:block;font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:#9fb0cf;margin-bottom:6px}input,select{width:100%;background:#141617;border:1px solid #242c3b;border-radius:8px;color:#fff;padding:10px 12px;font-size:14px;outline:none;-webkit-user-select:text;user-select:text}input:focus,select:focus{border-color:#4a5568}.row{display:flex;gap:10px;align-items:center}.actions{display:flex;justify-content:space-between;gap:12px;margin-top:24px}.btn{border:1px solid #2b3548;border-radius:8px;background:#1d222b;color:#e2e8f2;padding:10px 16px;font-weight:800;cursor:pointer}.btn.primary{background:#34d399;color:#06110e;border-color:#34d399}.btn:disabled{opacity:.55;cursor:default}.msg{min-height:18px;margin-top:16px;color:#f87171;font-size:13px}.msg.ok{color:#34d399}.toggle{display:flex;align-items:center;gap:10px;background:#141617;border:1px solid #242c3b;border-radius:8px;padding:10px 12px}.toggle input{width:auto}.hint{font-size:12px;color:#7d8aa3;margin-top:7px}.platform-extra{margin-top:14px}.restore-box{border:1px solid #242c3b;background:#141617;border-radius:14px;padding:16px;margin-top:14px}.restore-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.restore-file{color:#9fb0cf;font-size:13px}
+@media(max-width:760px){.grid{grid-template-columns:1fr}.steps{border-right:0;border-bottom:1px solid #242c3b}.form{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head"><img src="/assets/omnisight-logo.svg" alt=""><div><h1>Welcome to OmniSight</h1><p>Set up the first admin, defaults, notifications and your first platform.</p></div></div>
+  <div class="grid">
+    <div class="steps">
+      <div class="step active" data-step="0"><div class="num">1</div><div>Restore backup</div></div>
+      <div class="step" data-step="1"><div class="num">2</div><div>Admin account</div></div>
+      <div class="step" data-step="2"><div class="num">3</div><div>Defaults</div></div>
+      <div class="step" data-step="3"><div class="num">4</div><div>Notifications</div></div>
+      <div class="step" data-step="4"><div class="num">5</div><div>First platform</div></div>
+    </div>
+    <div class="pane">
+      <section class="panel active">
+        <h2>Restore backup</h2><p>If you already have a full OmniSight backup, import it first. Users, settings, certificates, secret key and history will be restored, so you can skip the rest of setup.</p>
+        <div class="restore-box">
+          <label>Full backup file</label>
+          <div class="restore-actions">
+            <input id="full-backup-file" type="file" accept=".yaml,.yml,application/x-yaml,text/yaml,text/plain" style="display:none" onchange="setImportFileName()">
+            <button class="btn" type="button" onclick="$('full-backup-file').click()">Choose backup</button>
+            <button class="btn primary" type="button" id="import-backup" onclick="importFullBackup()">Import full backup</button>
+            <span class="restore-file" id="restore-file-name">No file selected</span>
+          </div>
+          <div class="hint">New install? Click Next and create the first admin account.</div>
+        </div>
+      </section>
+      <section class="panel">
+        <h2>Admin account</h2><p>This user receives the admin role. You can add operator and read-only users later from Settings.</p>
+        <div class="form">
+          <div class="field"><label>Username</label><input id="username" autocomplete="username" autofocus></div>
+          <div class="field"><label>E-mail</label><input id="email" type="email" autocomplete="email"></div>
+          <div class="field"><label>Password</label><input id="password" type="password" autocomplete="new-password"></div>
+          <div class="field"><label>Confirm password</label><input id="password2" type="password" autocomplete="new-password"></div>
+        </div>
+      </section>
+      <section class="panel">
+        <h2>Defaults</h2><p>Choose values used by charts, history and display formatting.</p>
+        <div class="form">
+          <div class="field"><label>Timezone</label><select id="timezone"></select></div>
+          <div class="field"><label>Time format</label><select id="timeformat"><option value="24h">24 Hour</option><option value="12h">12 Hour</option></select></div>
+          <div class="field"><label>Default time period</label><select id="period"><option value="0.333333">20 minutes</option><option value="1" selected>1 hour</option><option value="3">3 hours</option><option value="6">6 hours</option><option value="24">24 hours</option></select></div>
+          <div class="field"><label>History retention</label><select id="retention"><option value="1">1 day</option><option value="7">7 days</option><option value="30">30 days</option></select></div>
+          <div class="field"><label>Language</label><select id="language"><option value="en">English</option><option value="tr">Turkish</option></select></div>
+        </div>
+      </section>
+      <section class="panel">
+        <h2>Notifications</h2><p>You can skip this now and configure ntfy, Telegram or SMTP later.</p>
+        <div class="form">
+          <div class="field full"><label class="toggle"><input id="alerts-enabled" type="checkbox"> Enable notifications now</label></div>
+          <div class="field"><label>ntfy server URL</label><input id="ntfy-url" placeholder="https://ntfy.sh"></div>
+          <div class="field"><label>ntfy topic</label><input id="ntfy-topic" placeholder="omnisight-alerts"></div>
+          <div class="field"><label>SMTP host</label><input id="smtp-host" placeholder="smtp.example.com"></div>
+          <div class="field"><label>SMTP recipient</label><input id="smtp-to" placeholder="you@example.com"></div>
+        </div>
+      </section>
+      <section class="panel">
+        <h2>First platform</h2><p>Add one source now, or choose Skip and add platforms later from Settings.</p>
+        <div class="form">
+          <div class="field"><label>Platform type</label><select id="platform-type" onchange="renderPlatformFields()"><option value="">Skip for now</option><option value="proxmox">Proxmox API</option><option value="docker-api">Docker API</option><option value="docker-ssh">Docker SSH</option><option value="dockhand">Dockhand API</option><option value="snmp">SNMP device</option><option value="healthchecks">Healthchecks</option><option value="uptimekuma">Uptime Kuma</option><option value="prometheus">Prometheus</option><option value="check">Service check</option></select></div>
+          <div class="field"><label>Name</label><input id="platform-name" placeholder="optional"></div>
+        </div>
+        <div class="platform-extra form" id="platform-extra"></div>
+      </section>
+      <div class="actions"><button class="btn" id="back" onclick="prevStep()">Back</button><button class="btn primary" id="next" onclick="nextStep()">Next</button></div>
+      <div class="msg" id="msg"></div>
+    </div>
+  </div>
+</div>
+<script>
+let step=0;
+const zones=['UTC','Europe/Istanbul','Europe/London','Europe/Paris','Europe/Berlin','America/New_York','America/Chicago','America/Los_Angeles','Asia/Tokyo','Asia/Singapore'];
+function $(id){return document.getElementById(id)}
+function showMsg(t,ok=false){const m=$('msg');m.textContent=t||'';m.className='msg'+(ok?' ok':'')}
+function setStep(n){step=Math.max(0,Math.min(4,n));document.querySelectorAll('.panel').forEach((p,i)=>p.classList.toggle('active',i===step));document.querySelectorAll('.step').forEach((p,i)=>p.classList.toggle('active',i===step));$('back').disabled=step===0;$('next').textContent=step===4?'Finish setup':'Next';showMsg('')}
+function prevStep(){setStep(step-1)}
+function pwError(p){if(p.length<8)return'Password must be at least 8 characters';if(!/[a-z]/.test(p))return'Password must contain a lowercase letter';if(!/[A-Z]/.test(p))return'Password must contain an uppercase letter';return''}
+function validateStep(){if(step!==1)return true;const u=$('username').value.trim(),p=$('password').value,p2=$('password2').value;if(!u){showMsg('Enter username');return false}const e=pwError(p);if(e){showMsg(e);return false}if(p!==p2){showMsg('Passwords do not match');return false}return true}
+function nextStep(){if(!validateStep())return;if(step<4)setStep(step+1);else finish()}
+document.addEventListener('keydown',e=>{if(e.key==='Enter'&&[1,2,3].includes(step)&&e.target?.matches?.('input,select')){e.preventDefault();nextStep()}})
+function setImportFileName(){const f=$('full-backup-file')?.files?.[0];$('restore-file-name').textContent=f?f.name:'No file selected'}
+async function importFullBackup(){const f=$('full-backup-file')?.files?.[0];if(!f){showMsg('Choose a full backup file first');return}$('import-backup').disabled=true;showMsg('Importing full backup...',true);try{const backup=await f.text();const r=await fetch('/api/onboarding/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({backup})});const d=await r.json().catch(()=>({}));if(!r.ok||!d.ok)throw new Error(d.error||'Import failed');location.href='/login'}catch(e){showMsg(e.message);$('import-backup').disabled=false}}
+function field(id,label,type='text',placeholder=''){return`<div class="field"><label>${label}</label><input id="${id}" type="${type}" placeholder="${placeholder}"></div>`}
+function renderPlatformFields(){const t=$('platform-type').value;let h='';if(['proxmox','docker-api','dockhand','healthchecks','uptimekuma','prometheus','check'].includes(t))h+=field('platform-url','URL','text',t==='check'?'https://example.com':'https://...');if(['docker-ssh','snmp'].includes(t))h+=field('platform-host','Host','text','10.0.0.10');if(t==='proxmox'){h+=field('platform-token-id','Token ID');h+=field('platform-token-secret','Token Secret','password')}if(['dockhand','healthchecks','uptimekuma','prometheus'].includes(t))h+=field('platform-token','API/Bearer token','password');if(t==='docker-ssh'){h+=field('platform-ssh-user','SSH user','text','root');h+=field('platform-ssh-password','SSH password','password')}if(t==='snmp')h+=field('platform-community','Community','text','public');if(t==='check')h+=field('platform-check-type','Check type','text','http');$('platform-extra').innerHTML=h}
+function platformPayload(){const t=$('platform-type').value;if(!t)return{};return{type:t,name:$('platform-name').value.trim(),url:$('platform-url')?.value.trim(),host:$('platform-host')?.value.trim(),token:$('platform-token')?.value.trim(),tokenId:$('platform-token-id')?.value.trim(),tokenSecret:$('platform-token-secret')?.value.trim(),sshUser:$('platform-ssh-user')?.value.trim(),sshPassword:$('platform-ssh-password')?.value,community:$('platform-community')?.value.trim(),checkType:$('platform-check-type')?.value.trim()||'http'}}
+async function finish(){showMsg('');$('next').disabled=true;try{const body={username:$('username').value.trim(),email:$('email').value.trim(),password:$('password').value,timezone:$('timezone').value,timeFormat:$('timeformat').value,preferredLanguage:$('language').value,defaultTimePeriodHours:Number($('period').value),historyRetentionDays:Number($('retention').value),platform:platformPayload(),alerts:{enabled:$('alerts-enabled').checked,ntfy:{url:$('ntfy-url').value.trim(),topic:$('ntfy-topic').value.trim()},smtp:{host:$('smtp-host').value.trim(),to:$('smtp-to').value.trim()}}};const r=await fetch('/api/onboarding/complete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const d=await r.json().catch(()=>({}));if(!r.ok||!d.ok)throw new Error(d.error||'Setup failed');sessionStorage.setItem('os_token',d.token);location.href='/'}catch(e){showMsg(e.message);$('next').disabled=false}}
+(async()=>{try{const r=await fetch('/api/onboarding/status');const d=await r.json();if(!d.required)location.href=d.authenticated?'/':'/login'}catch{}$('timezone').innerHTML=zones.map(z=>`<option value="${z}">${z}</option>`).join('');try{const tz=Intl.DateTimeFormat().resolvedOptions().timeZone;if(tz&&!zones.includes(tz))$('timezone').insertAdjacentHTML('afterbegin',`<option value="${tz}">${tz}</option>`);$('timezone').value=tz||'UTC'}catch{$('timezone').value='UTC'}setStep(0);renderPlatformFields()})();
+</script>
+</body>
+</html>

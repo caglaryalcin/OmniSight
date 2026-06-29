@@ -1,0 +1,23 @@
+# Swarm-ready stack file using the published image (no build step).
+# Nothing to pre-create: the single ./data directory holds all state
+# (config.yaml, secret.key, auth.yaml, sessions.yaml, kube.bin) and Docker
+# creates it automatically. Configure everything from the Settings UI.
+#
+#   docker stack deploy -c docker-stack.yml omnisight
+version: "3.8"
+
+services:
+  omnisight:
+    image: ghcr.io/caglaryalcin/omnisight:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - TZ=${TZ:-UTC}
+      - OMNISIGHT_SECRET=${OMNISIGHT_SECRET:-}
+    volumes:
+      - ./data:/app/data      # all state (config.yaml, secret.key, auth.yaml, sessions.yaml, kube.bin)
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure

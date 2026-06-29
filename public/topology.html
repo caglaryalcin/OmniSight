@@ -1,0 +1,1399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>try{document.documentElement.setAttribute("data-theme",localStorage.getItem("os_theme")||"dark")}catch(e){}</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>OmniSight - Topology</title>
+<link rel="icon" type="image/svg+xml" href="/assets/omnisight-logo.svg">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#141617;--panel:#181A1B;--row:#141617;--border:#242C3B;--border2:#334056;--text:#E2E8F2;--muted:#8CA0BE;--green:#34D399;--red:#F87171;--yellow:#FBBF24;--blue:#60A5FA;--cyan:#22D3EE;--purple:#A78BFA;--shadow:0 16px 50px rgba(0,0,0,.28)}
+html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#dce3ee;--border2:#c8d2e0;--text:#162032;--muted:#64748b;--green:#0e9f6e;--red:#dc2f2f;--yellow:#b7791f;--blue:#2563eb;--cyan:#0891b2;--purple:#7c3aed;--shadow:0 16px 44px rgba(15,23,42,.12)}
+body{height:100vh;background:var(--bg);color:var(--text);font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;display:flex;flex-direction:column;-webkit-user-select:none;user-select:none;overflow:hidden}
+body::before{content:'';position:fixed;inset:0;z-index:-1;background:radial-gradient(900px 500px at 84% -12%,rgba(96,165,250,.10),transparent 62%),radial-gradient(780px 460px at 4% 102%,rgba(52,211,153,.075),transparent 62%)}
+header{height:64px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;background:var(--panel);border-bottom:1px solid var(--border);flex-shrink:0}
+.logo{display:flex;align-items:center;gap:10px;color:inherit;text-decoration:none;font-size:19px;font-weight:850}
+.logo img{width:24px;height:24px;display:block}
+.toolbar{display:flex;align-items:center;gap:8px}
+.btn{height:36px;background:var(--row);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:0 12px;font-size:12px;font-weight:800;cursor:pointer}
+.btn:hover{border-color:var(--border2)}
+.btn.on{color:var(--green);border-color:rgba(52,211,153,.45)}
+.wrap{flex:1;min-height:0;display:flex;flex-direction:column;gap:12px;padding:16px;overflow:hidden}
+.summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;flex:0 0 auto}
+.sum{background:var(--panel);border:1px solid var(--border);border-radius:10px;min-height:58px;display:grid;place-items:center;box-shadow:var(--shadow)}
+.sum>div{width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+.sum-v{width:100%;font-size:22px;font-weight:900;line-height:1;color:var(--green);text-align:center}
+.sum-l{width:100%;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-top:5px;font-weight:800;text-align:center}
+.sum-v-empty{height:22px;color:transparent}
+.map-shell{position:relative;flex:1;min-height:0;background:var(--panel);border:1px solid var(--border);border-radius:14px;overflow:hidden;box-shadow:var(--shadow);cursor:grab;touch-action:none}
+.map-shell.dragging{cursor:grabbing}
+.map{position:relative;width:100%;height:100%;isolation:isolate}
+.map-inner{position:absolute;left:0;top:0;transform-origin:top left}
+.edge-layer{position:absolute;inset:0;z-index:0;pointer-events:none;overflow:visible}
+.edge{fill:none;stroke:rgba(96,165,250,.38);stroke-width:1.7;stroke-linecap:round}
+.edge.good{stroke:rgba(52,211,153,.46)}.edge.warn{stroke:rgba(251,191,36,.48)}.edge.bad{stroke:rgba(248,113,113,.50)}.edge.idle{stroke:rgba(140,160,190,.34)}.edge.manual{stroke:rgba(167,139,250,.62);stroke-width:2.1}
+.edge.layer-switch{stroke:rgba(34,211,238,.58);stroke-width:2.05}
+.edge.layer-nas{stroke:rgba(251,191,36,.64);stroke-width:2.05}
+.edge.layer-platform{stroke:rgba(167,139,250,.66);stroke-width:2.1}
+.edge.layer-proxmox{stroke:rgba(249,115,22,.66);stroke-width:2.1}
+.edge.layer-vm{stroke:rgba(52,211,153,.58);stroke-width:2.05}
+.flow-dots{pointer-events:none}
+.flow-dot{opacity:.88}
+.topo-node{position:absolute;z-index:2;width:148px;min-height:62px;transform:translate(-50%,-50%);display:flex;align-items:center;gap:9px;padding:9px 10px;border:1px solid var(--border);border-radius:12px;background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.008)),var(--row);box-shadow:0 12px 28px rgba(0,0,0,.18)}
+.topo-node{cursor:grab;touch-action:none}
+.topo-node.node-dragging{cursor:grabbing;z-index:7}
+.topo-node.link-target{border-color:rgba(167,139,250,.78);box-shadow:0 0 0 1px rgba(167,139,250,.28),0 16px 36px rgba(0,0,0,.22)}
+.topo-node.root{width:176px;min-height:70px;border-color:rgba(34,211,238,.38);background:linear-gradient(180deg,rgba(34,211,238,.09),rgba(52,211,153,.045)),var(--row)}
+.topo-node.platform{border-color:rgba(96,165,250,.28)}
+.topo-node.leaf{width:132px;min-height:52px;padding:7px 9px}
+.node-icon{width:31px;height:31px;border-radius:9px;border:1px solid var(--border2);background:rgba(96,165,250,.09);display:grid;place-items:center;flex:0 0 auto;color:var(--blue);font-size:15px;font-weight:900}
+.node-icon img{width:100%;height:100%;object-fit:contain;display:block}
+.topo-node.root .node-icon{background:rgba(34,211,238,.10);color:var(--cyan)}
+.topo-node.good .node-icon{color:var(--green);background:rgba(52,211,153,.09)}
+.topo-node.warn .node-icon{color:var(--yellow);background:rgba(251,191,36,.10)}
+.topo-node.bad .node-icon{color:var(--red);background:rgba(248,113,113,.10)}
+.topo-node.idle .node-icon{color:var(--muted);background:rgba(140,160,190,.08)}
+.topo-node .node-icon.icon-mikrotik{background:#eef1f6;border-color:rgba(226,232,242,.42);color:#111827;padding:3px}
+.topo-node .node-icon.icon-mikrotik img{filter:none}
+.node-main{min-width:0;flex:1}
+.node-name{font-size:12.5px;line-height:1.18;font-weight:850;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.topo-node.root .node-name{font-size:15px}
+.node-meta{font-size:10.5px;color:var(--muted);line-height:1.25;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.node-dot{width:8px;height:8px;border-radius:50%;position:absolute;left:10px;top:10px;background:var(--muted)}
+.topo-node.good .node-dot{background:var(--green);box-shadow:0 0 10px rgba(52,211,153,.45)}.topo-node.warn .node-dot{background:var(--yellow)}.topo-node.bad .node-dot{background:var(--red)}
+.node-port{position:absolute;width:13px;height:13px;border-radius:50%;border:2px solid var(--panel);background:var(--purple);box-shadow:0 0 0 1px rgba(167,139,250,.42),0 0 12px rgba(167,139,250,.28);cursor:crosshair;z-index:8;opacity:0;pointer-events:none;transition:opacity .14s ease,box-shadow .14s ease}
+.node-port.left{left:-7px;top:50%;transform:translateY(-50%)}.node-port.right{right:-7px;top:50%;transform:translateY(-50%)}
+.node-port.top{left:50%;top:-7px;transform:translateX(-50%)}.node-port.bottom{left:50%;bottom:-7px;transform:translateX(-50%)}
+.topo-node:hover .node-port{opacity:1;pointer-events:auto}
+.map-shell.linking .node-port,.map-shell.node-moving .node-port,.topo-node.node-dragging .node-port{opacity:0;pointer-events:none}
+.node-port:hover{box-shadow:0 0 0 2px rgba(167,139,250,.48),0 0 16px rgba(167,139,250,.44)}
+.node-delete{position:absolute;right:-10px;top:-10px;z-index:9;width:24px;height:24px;display:grid;place-items:center;border:1px solid rgba(248,113,113,.42);border-radius:8px;background:rgba(20,22,23,.90);color:var(--red);box-shadow:0 10px 26px rgba(0,0,0,.28);cursor:pointer;opacity:0;pointer-events:none;transition:opacity .14s ease,border-color .14s ease,background .14s ease}
+.topo-node:hover .node-delete{opacity:1;pointer-events:auto}
+.map-shell.linking .node-delete,.map-shell.node-moving .node-delete,.topo-node.node-dragging .node-delete{opacity:0;pointer-events:none}
+.node-delete:hover{background:rgba(248,113,113,.16);border-color:rgba(248,113,113,.70)}
+.node-delete svg{width:13px;height:13px;display:block}
+html[data-theme="light"] .node-delete{background:rgba(255,255,255,.92)}
+.edge.temp{stroke:var(--purple);stroke-width:2.2;stroke-dasharray:7 9;filter:drop-shadow(0 0 4px rgba(167,139,250,.38))}
+.edge-hit{fill:none;stroke:transparent;stroke-width:28;stroke-linecap:round;pointer-events:stroke;cursor:pointer}
+.edge-delete{position:absolute;z-index:6;width:34px;height:30px;display:none;place-items:center;transform:translate(-50%,-50%);border:1px solid rgba(248,113,113,.42);border-radius:8px;background:rgba(20,22,23,.88);color:var(--red);box-shadow:0 10px 28px rgba(0,0,0,.32);backdrop-filter:blur(10px);cursor:pointer}
+.edge-delete.show{display:grid}.edge-delete:hover{background:rgba(248,113,113,.16);border-color:rgba(248,113,113,.70)}
+.edge-delete svg{width:15px;height:15px;display:block}
+html[data-theme="light"] .edge-delete{background:rgba(255,255,255,.92)}
+.legend{position:absolute;right:14px;bottom:14px;z-index:4;display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--border);border-radius:999px;background:rgba(20,22,23,.74);backdrop-filter:blur(10px);font-size:11px;color:var(--muted);font-weight:800}
+html[data-theme="light"] .legend{background:rgba(255,255,255,.78)}
+.legend span{display:flex;align-items:center;gap:5px}.legend i{width:8px;height:8px;border-radius:50%;display:block}
+.map-hint{position:absolute;left:14px;bottom:14px;z-index:4;padding:8px 10px;border:1px solid var(--border);border-radius:999px;background:rgba(20,22,23,.74);backdrop-filter:blur(10px);font-size:11px;color:var(--muted);font-weight:800;pointer-events:none}
+html[data-theme="light"] .map-hint{background:rgba(255,255,255,.78)}
+.map-link-toggle{position:absolute;left:14px;top:14px;z-index:4;height:34px;background:rgba(20,22,23,.76);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:0 12px;font-size:12px;font-weight:850;cursor:pointer;backdrop-filter:blur(10px)}
+.map-link-toggle:hover,.map-link-toggle.on{border-color:rgba(52,211,153,.48);color:var(--green)}
+html[data-theme="light"] .map-link-toggle{background:rgba(255,255,255,.80)}
+.link-panel{display:none;position:absolute;left:14px;top:58px;z-index:5;width:min(420px,calc(100% - 28px));background:rgba(20,22,23,.88);border:1px solid var(--border);border-radius:12px;box-shadow:0 18px 55px rgba(0,0,0,.34);backdrop-filter:blur(12px);padding:12px;cursor:default}
+.link-panel.open{display:block}
+html[data-theme="light"] .link-panel{background:rgba(255,255,255,.92)}
+.link-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.link-head strong{font-size:13px}
+.link-head-actions{display:flex;align-items:center;gap:8px}
+.link-close{border:0;background:transparent;color:var(--muted);font-size:18px;line-height:1;cursor:pointer}
+.link-clear{height:28px;border:1px solid rgba(248,113,113,.35);background:rgba(248,113,113,.08);color:var(--red);border-radius:7px;padding:0 9px;font-size:11px;font-weight:850;cursor:pointer}
+.link-clear:hover{background:rgba(248,113,113,.14);border-color:rgba(248,113,113,.55)}
+.link-help{font-size:11px;line-height:1.45;color:var(--muted);margin:-2px 0 10px}
+.link-grid{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:end}
+.node-grid{grid-template-columns:1fr auto;margin-top:12px;padding-top:10px;border-top:1px solid var(--border)}
+.link-panel label{display:block;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;font-weight:800}
+.link-panel select{width:100%;height:34px;background:var(--row);border:1px solid var(--border);border-radius:7px;color:var(--text);padding:0 8px;font-size:12px;outline:none}
+.link-add{height:34px;background:var(--green);border:0;border-radius:7px;color:#06120d;font-size:12px;font-weight:850;padding:0 12px;cursor:pointer}
+.link-add:disabled{opacity:.45;cursor:not-allowed}
+.layout-control{margin-top:10px;padding-top:10px;border-top:1px solid var(--border);display:grid;gap:7px}
+.layout-control label{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:800}
+.layout-control output{color:var(--text);font-size:11px;letter-spacing:0}
+.layout-control input[type=range]{width:100%;accent-color:var(--green)}
+.link-list{display:grid;gap:7px;max-height:170px;overflow:auto;margin-top:10px}
+.link-row{display:flex;align-items:center;gap:8px;border:1px solid var(--border);background:var(--row);border-radius:8px;padding:8px 9px;font-size:12px}
+.link-row span{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.link-row button{border:1px solid var(--border);background:transparent;color:var(--muted);border-radius:7px;height:26px;padding:0 8px;font-size:11px;font-weight:850;cursor:pointer;line-height:1}
+.link-row button:hover{color:var(--red);border-color:rgba(248,113,113,.45);background:rgba(248,113,113,.08)}
+.link-kind{flex:0 0 auto;color:var(--muted);font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.06em}
+.empty{padding:58px 16px;color:var(--muted);text-align:center}
+html.embed header{display:none}
+*{scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border);border:2px solid transparent;border-radius:999px;background-clip:content-box}
+@media (max-width:900px){.summary{grid-template-columns:repeat(2,minmax(0,1fr))}.wrap{padding:12px}.topo-node{width:148px}.topo-node.root{width:174px}}
+</style>
+<script>if(window.self!==window.top)document.documentElement.classList.add('embed');</script>
+</head>
+<body>
+<header>
+  <a class="logo" href="/"><img src="/assets/omnisight-logo.svg" alt="">OmniSight</a>
+  <div class="toolbar">
+    <button class="btn" id="links-btn" onclick="toggleLinkPanel()">Add platform/node</button>
+    <button class="btn on" id="traffic-btn" onclick="toggleTraffic()">Traffic</button>
+    <button class="btn on" id="empty-btn" onclick="toggleEmpty()">Hide empty</button>
+    <button class="btn" onclick="load()">Refresh</button>
+  </div>
+</header>
+<div class="wrap">
+  <div class="summary" id="summary">
+    <div class="sum"><div><div class="sum-v sum-v-empty">&nbsp;</div><div class="sum-l">Platforms</div></div></div>
+    <div class="sum"><div><div class="sum-v sum-v-empty">&nbsp;</div><div class="sum-l">Hosts</div></div></div>
+    <div class="sum"><div><div class="sum-v sum-v-empty">&nbsp;</div><div class="sum-l">Workloads</div></div></div>
+    <div class="sum"><div><div class="sum-v sum-v-empty">&nbsp;</div><div class="sum-l">Links</div></div></div>
+  </div>
+  <div class="map-shell">
+    <div class="map" id="map"><div class="empty">Loading topology...</div></div>
+    <button class="map-link-toggle" id="links-map-btn" type="button">Add platform/node</button>
+    <div class="link-panel" id="link-panel">
+      <div class="link-head">
+        <strong>Add platform/node</strong>
+        <button class="link-close" type="button" onclick="toggleLinkPanel(false)">&times;</button>
+      </div>
+      <div class="link-help">Add a platform or host that is not already visible. Remove it later with the trash icon on the node.</div>
+      <div class="link-grid node-grid">
+        <div><label>Platform or node</label><select id="node-add"></select></div>
+        <button class="link-add" id="node-add-btn" type="button" onclick="addTopologyNode()">Add</button>
+      </div>
+      <div class="layout-control">
+        <label for="px-vm-gap">Proxmox host / VM gap <output id="px-vm-gap-out">150px</output></label>
+        <input id="px-vm-gap" type="range" min="110" max="260" step="10" value="150" oninput="setProxmoxVmGap(this.value)">
+      </div>
+      <div class="link-list" id="link-list"></div>
+    </div>
+    <div class="map-hint">Drag nodes to move · Drag handles to connect · Ctrl + scroll to zoom</div>
+    <div class="legend"><span><i style="background:var(--green)"></i>Healthy</span><span><i style="background:var(--yellow)"></i>Degraded</span><span><i style="background:var(--red)"></i>Down</span></div>
+  </div>
+</div>
+<script src="/i18n.js"></script>
+<script>
+let hideEmpty = true;
+let trafficEnabled = true;
+let lastData = null;
+const TOPOLOGY_CACHE_KEY = 'os_topology_cache_v2';
+const TOPOLOGY_VIEW_KEY = 'omnisight_topology_view';
+const savedTopologyView = loadTopologyView();
+const topoView = {
+  scale: savedTopologyView?.scale || 1,
+  minScale: .25,
+  maxScale: 2.8,
+  x: savedTopologyView?.x || 0,
+  y: savedTopologyView?.y || 0,
+  initialized: !!savedTopologyView,
+  userMoved: !!savedTopologyView
+};
+let currentNodes = [];
+let topologyLinks = [];
+let topologyNodes = [];
+let topologyHidden = [];
+let topologySpacing = { proxmoxVmGap: 150 };
+let topologyCandidates = [];
+const TOPOLOGY_POS_KEY = 'omnisight_topology_positions';
+let topologyPositions = loadTopologyPositions();
+let topologyPersistTimer = null;
+let topologySavingUntil = 0;
+let embedPaused = false;
+let topologyPollTimer = null;
+let topologyLoading = false;
+let topologyAbort = null;
+let topologyLastLoadedAt = 0;
+let topologyRenderSignature = '';
+function abortTopologyFetch(){
+  try { topologyAbort?.abort(); } catch {}
+  topologyAbort = null;
+  topologyLoading = false;
+}
+window.addEventListener('message', event => {
+  if(event.origin !== window.location.origin) return;
+  if(event.data?.type !== 'omnisight-embed-visibility') return;
+  embedPaused = event.data.visible === false;
+  if(embedPaused) {
+    clearTimeout(topologyPollTimer);
+    abortTopologyFetch();
+    return;
+  }
+  if(!embedPaused) scheduleTopologyPoll(50);
+});
+function scheduleTopologyPoll(delay=15000){
+  clearTimeout(topologyPollTimer);
+  topologyPollTimer = setTimeout(async () => {
+    if(!embedPaused) await load();
+    scheduleTopologyPoll(embedPaused ? 5000 : 15000);
+  }, delay);
+}
+document.addEventListener('visibilitychange', () => {
+  if(document.hidden) {
+    return;
+  }
+});
+const ICONS = {
+  proxmox:'PX', kubernetes:'K8', docker:'D', dockhand:'DH', snmp:'SN', synology:'SY', mikrotik:'MT', unifi:'UI', router:'RT', switch:'SW', nas:'NAS', linux:'LX', node:'N', host:'H', guest:'G'
+};
+const ICON_URLS = {
+  proxmox:'https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/proxmox.svg',
+  kubernetes:'https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/kubernetes.svg',
+  dockhand:'https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/dockhand.png',
+  synology:'https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/synology.svg',
+  mikrotik:'https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/mikrotik.svg',
+  unifi:'https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/unifi.svg'
+};
+function authHeaders(){const t=sessionStorage.getItem('os_token')||localStorage.getItem('os_token');return t?{'x-session-token':t}:{}}
+function handleUnauth(r){if(r.status===401){sessionStorage.removeItem('os_token');localStorage.removeItem('os_token');document.cookie='session=; path=/; max-age=0';(window.top||window).location.href='/login';throw new Error('Unauthorized')}}
+function topologyCacheKey(){
+  const token = sessionStorage.getItem('os_token') || localStorage.getItem('os_token') || 'anon';
+  return `${TOPOLOGY_CACHE_KEY}:${String(token).slice(-18)}`;
+}
+function readTopologyCache(maxAgeMs = 10 * 60 * 1000){
+  try{
+    const key = topologyCacheKey();
+    const raw = sessionStorage.getItem(key) || localStorage.getItem(key);
+    if(!raw) return null;
+    const box = JSON.parse(raw);
+    if(!box || Date.now() - Number(box.t || 0) > maxAgeMs) return null;
+    return box.data || null;
+  }catch{ return null; }
+}
+function writeTopologyCache(data){
+  try{
+    if(!data) return;
+    const key = topologyCacheKey();
+    const raw = JSON.stringify({ t: Date.now(), data });
+    sessionStorage.setItem(key, raw);
+    localStorage.setItem(key, raw);
+  }catch{}
+}
+async function readJsonResponse(r){
+  const text = await r.text();
+  if(!text) return {};
+  try { return JSON.parse(text); }
+  catch {
+    const clean = text.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim();
+    throw new Error(clean ? `HTTP ${r.status}: ${clean.slice(0,220)}` : `HTTP ${r.status}: Invalid JSON response`);
+  }
+}
+function lang(){return window.OmniI18n?OmniI18n.currentLang('en'):'en'}
+function tr(s){return window.OmniI18n?OmniI18n.t(s,lang()):s}
+function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function safeId(s){return String(s||'node').toLowerCase().replace(/[^a-z0-9_-]+/g,'-').replace(/^-+|-+$/g,'') || 'node'}
+function cssEscapeValue(v){return window.CSS?.escape ? CSS.escape(String(v ?? '')) : String(v ?? '').replace(/["\\]/g,'\\$&')}
+function clamp(n, min, max){return Math.max(min, Math.min(max, n))}
+function normalizeTopologySpacing(raw){
+  const src = raw && typeof raw === 'object' ? raw : {};
+  return { proxmoxVmGap: clamp(Math.round(Number(src.proxmoxVmGap || src.proxmoxGuestGap || 150)), 110, 260) };
+}
+function proxmoxVmGap(){return normalizeTopologySpacing(topologySpacing).proxmoxVmGap}
+function syncTopologySpacingUi(){
+  const gap = proxmoxVmGap();
+  const input = document.getElementById('px-vm-gap');
+  const out = document.getElementById('px-vm-gap-out');
+  if(input && input.value !== String(gap)) input.value = String(gap);
+  if(out) out.textContent = `${gap}px`;
+}
+let topologySpacingSaveTimer = null;
+function setProxmoxVmGap(value){
+  topologySpacing = { ...normalizeTopologySpacing(topologySpacing), proxmoxVmGap: clamp(Math.round(Number(value || 150)), 110, 260) };
+  syncTopologySpacingUi();
+  if(!lastData) return;
+  lastData.topologySpacing = topologySpacing;
+  topologyRenderSignature = '';
+  renderTopology(lastData);
+  clearTimeout(topologySpacingSaveTimer);
+  topologySpacingSaveTimer = setTimeout(() => {
+    saveTopologyState(topologyLinks, topologyNodes, { render:false }).catch(() => {});
+  }, 450);
+}
+function loadTopologyPositions(){
+  try {
+    const raw = localStorage.getItem(TOPOLOGY_POS_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch { return {}; }
+}
+function loadTopologyView(){
+  try {
+    const raw = localStorage.getItem(TOPOLOGY_VIEW_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    if(!parsed || typeof parsed !== 'object') return null;
+    const scale = Number(parsed.scale);
+    const x = Number(parsed.x);
+    const y = Number(parsed.y);
+    if(!Number.isFinite(scale) || !Number.isFinite(x) || !Number.isFinite(y)) return null;
+    return { scale, x, y };
+  } catch { return null; }
+}
+function saveTopologyView(){
+  if(!topoView.userMoved) return;
+  try { localStorage.setItem(TOPOLOGY_VIEW_KEY, JSON.stringify({ scale: topoView.scale, x: topoView.x, y: topoView.y })); } catch {}
+  scheduleTopologyPersist();
+}
+function clearTopologyView(){
+  try { localStorage.removeItem(TOPOLOGY_VIEW_KEY); } catch {}
+}
+function saveTopologyPositions(){
+  try { localStorage.setItem(TOPOLOGY_POS_KEY, JSON.stringify(topologyPositions)); } catch {}
+  scheduleTopologyPersist();
+}
+function scheduleTopologyPersist(){
+  clearTimeout(topologyPersistTimer);
+  topologyPersistTimer = setTimeout(() => {
+    if(lastData) saveTopologyState(topologyLinks, topologyNodes, { render:false }).catch(() => {});
+  }, 800);
+}
+function applyTopologyStaticState(d){
+  const serverPositions = d?.topologyPositions && typeof d.topologyPositions === 'object' ? d.topologyPositions : null;
+  if(serverPositions && Object.keys(serverPositions).length) {
+    topologyPositions = serverPositions;
+    try { localStorage.setItem(TOPOLOGY_POS_KEY, JSON.stringify(topologyPositions)); } catch {}
+  }
+  const serverView = d?.topologyView && typeof d.topologyView === 'object' ? d.topologyView : null;
+  if(serverView && !topoView.userMoved) {
+    const scale = Number(serverView.scale);
+    const x = Number(serverView.x);
+    const y = Number(serverView.y);
+    if(Number.isFinite(scale) && Number.isFinite(x) && Number.isFinite(y)) {
+      topoView.scale = scale;
+      topoView.x = x;
+      topoView.y = y;
+      topoView.initialized = true;
+      topoView.userMoved = true;
+      try { localStorage.setItem(TOPOLOGY_VIEW_KEY, JSON.stringify({ scale, x, y })); } catch {}
+    }
+  }
+}
+function isGood(v){return ['up','online','running','healthy','ok','succeeded'].includes(String(v||'').toLowerCase())}
+function isBad(v){return ['down','offline','failed','error','critical','stopped'].includes(String(v||'').toLowerCase())}
+function cls(status, connecting){
+  if(connecting) return 'idle';
+  if(status === 'warn' || status === 'degraded') return 'warn';
+  if(status === 'down' || status === 'bad' || status === false) return 'bad';
+  if(status === 'idle' || status == null) return 'idle';
+  return 'good';
+}
+function platformStatus(total, good, connecting){
+  if(connecting) return 'idle';
+  if(!total) return 'idle';
+  if(good <= 0) return 'bad';
+  return good < total ? 'warn' : 'good';
+}
+function addNode(nodes, parent, level, key, label, meta, status, icon, kind, refKey){
+  const id = safeId(`${level}-${key}-${nodes.length}`);
+  const baseRef = refKey || `${level}:${safeId(key)}`;
+  if(refKey){
+    const existing = nodes.find(item => item.ref === baseRef);
+    if(existing) return existing.id;
+  }
+  let ref = baseRef;
+  let n = 2;
+  while(nodes.some(item => item.ref === ref)) ref = `${baseRef}-${n++}`;
+  nodes.push({id,parent,ref,level,label,meta,status,icon:icon||kind||'node',kind:kind||''});
+  return id;
+}
+function dashboardIconUrl(key){
+  if(!key) return '';
+  return `https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/${key}.svg`;
+}
+function guestOsIcon(v){
+  const source = [
+    v?.os,
+    v?.ostype,
+    v?.osType,
+    v?.tags,
+    v?.name,
+    v?.type,
+  ].filter(Boolean).join(' ').toLowerCase();
+  const tests = [
+    [/debian|bookworm|bullseye|buster/, 'debian'],
+    [/ubuntu|jammy|noble|focal|bionic/, 'ubuntu'],
+    [/windows|win10|win11|win2019|win2022|microsoft/, 'windows'],
+    [/alpine/, 'alpine-linux'],
+    [/fedora/, 'fedora'],
+    [/centos/, 'centos'],
+    [/rocky/, 'rocky-linux'],
+    [/alma/, 'alma-linux'],
+    [/red\s*hat|rhel/, 'redhat'],
+    [/arch/, 'arch-linux'],
+    [/opensuse|suse/, 'opensuse'],
+    [/freebsd/, 'freebsd'],
+    [/opnsense/, 'opnsense'],
+    [/pfsense/, 'pfsense'],
+    [/truenas/, 'truenas'],
+    [/homeassistant|home-assistant|hass/, 'home-assistant'],
+    [/synology|dsm/, 'synology'],
+    [/proxmox/, 'proxmox'],
+    [/docker/, 'docker'],
+    [/kubernetes|k8s/, 'kubernetes'],
+    [/linux/, 'linux'],
+  ];
+  const match = tests.find(([re]) => re.test(source));
+  return match ? match[1] : '';
+}
+function snmpDeviceSource(s){
+  return [
+    s?.profile,
+    s?.preset,
+    s?.type,
+    s?.vendor,
+    s?.model,
+    s?.sysDescr,
+    s?.systemDescription,
+    s?.name,
+    s?.host,
+  ].filter(Boolean).join(' ').toLowerCase();
+}
+function snmpDeviceIcon(s){
+  const source = snmpDeviceSource(s);
+  if(/mikrotik|routeros|routerboard/.test(source)) return 'mikrotik';
+  if(/unifi|ubiquiti|dream\s*(machine|router|wall)|cloud\s*gateway/.test(source)) return 'unifi';
+  if(/synology|diskstation|rackstation|dsm|\bnas\b/.test(source)) return 'synology';
+  if(/router|gateway|firewall/.test(source)) return 'router';
+  if(/switch|bridge/.test(source)) return 'switch';
+  if(/linux/.test(source)) return 'linux';
+  return 'snmp';
+}
+function snmpDeviceLevel(s){
+  const source = snmpDeviceSource(s);
+  return /mikrotik|routeros|routerboard|unifi|ubiquiti|dream\s*(machine|router|wall)|cloud\s*gateway|router|gateway|firewall|switch|bridge/.test(source) ? -1 : 2;
+}
+function proxmoxGuestTypeLabel(v){
+  const raw = String(v?.type || v?.ostype || '').toLowerCase();
+  if(raw.includes('lxc') || raw === 'ct' || raw.includes('container')) return 'LXC';
+  return 'VM';
+}
+function nodeIconHtml(n){
+  const url = ICON_URLS[n.icon] || (n.icon && !ICONS[n.icon] ? dashboardIconUrl(n.icon) : '');
+  const fallback = esc(ICONS[n.icon]||ICONS[n.kind]||'N');
+  if(!url) return fallback;
+  return `<img src="${esc(url)}" alt="" onerror="this.replaceWith(document.createTextNode('${fallback}'))">`;
+}
+function candidate(level, key, label, meta, status, icon, kind, refKey){
+  return { parent:null, level, key, label, meta, status, icon:icon||kind||'node', kind:kind||'', ref:refKey || `${level}:${safeId(key)}` };
+}
+function addCandidate(nodes, c){
+  return addNode(nodes, c.parent, c.level, c.key, c.label, c.meta, c.status, c.icon, c.kind, c.ref);
+}
+function limited(items, max){return Array.isArray(items) ? items.slice(0,max) : []}
+function plusNode(nodes, parent, level, total, shown){
+  if(total > shown) addNode(nodes,parent,level,`${parent}-more`,`${total-shown} more`,'hidden in compact view','idle','node','leaf');
+}
+function buildGraph(d){
+  const nodes=[];
+  topologyCandidates = [];
+  const linkedRefs = new Set((Array.isArray(topologyLinks) ? topologyLinks : []).flatMap(l => [l.from, l.to]).filter(Boolean));
+  const standaloneRefs = new Set(Array.isArray(topologyNodes) ? topologyNodes : []);
+  const hiddenRefs = new Set(Array.isArray(topologyHidden) ? topologyHidden : []);
+  const px = d.proxmox?.nodes || [];
+  const k8s = d.kubernetes || null;
+  const docker = Array.isArray(d.docker)?d.docker:[];
+  const dockhand = d.dockhand || null;
+  const snmp = Array.isArray(d.snmp)?d.snmp:[];
+  const configured = new Set(Array.isArray(d.configured)?d.configured:[]);
+  function shouldShowProxmox(count){return count || !hideEmpty || configured.has('proxmox')}
+  function maybeLinked(c){
+    topologyCandidates.push(c);
+    if(hiddenRefs.has(c.ref)) return;
+    if(linkedRefs.has(c.ref) || standaloneRefs.has(c.ref)) addCandidate(nodes, c);
+  }
+  if(shouldShowProxmox(px.length)){
+    limited(px,20).forEach(n=>{
+      const online = n.node?.online || n.online;
+      const hostName = n.node?.name || n.name || 'node';
+      const hostRef = `proxmox-host:${safeId(hostName)}`;
+      topologyCandidates.push(candidate(0,`px-${hostName}`,hostName,`${n.vms?.length||0} guests`,online?'good':n._connecting?'idle':'bad','proxmox','host',hostRef));
+      if(hiddenRefs.has(hostRef)) return;
+      const h = addNode(nodes,null,0,`px-${hostName}`,hostName,`${n.vms?.length||0} guests`,online?'good':n._connecting?'idle':'bad','proxmox','host',hostRef);
+      limited(n.vms,40).forEach(v=>{
+        const vmName = v.name || v.id || 'guest';
+        const vmKey = `${hostName}-${v.id || vmName}`;
+        const guestRef = `proxmox-guest:${safeId(hostName)}:${safeId(v.id || vmName)}`;
+        topologyCandidates.push(candidate(1,`vm-${vmKey}`,vmName,[hostName, proxmoxGuestTypeLabel(v), v.status || ''].filter(Boolean).join(' - '),isGood(v.status)?'good':isBad(v.status)?'bad':'warn',guestOsIcon(v) || 'node','guest',guestRef));
+        if(hiddenRefs.has(guestRef)) return;
+        const osIcon = guestOsIcon(v);
+        const osLabel = [proxmoxGuestTypeLabel(v), v.status || ''].filter(Boolean).join(' - ');
+        addNode(nodes,h,1,`vm-${vmKey}`,vmName,osLabel,isGood(v.status)?'good':isBad(v.status)?'bad':'warn',osIcon || 'node','guest',guestRef);
+      });
+      plusNode(nodes,h,1,n.vms?.length||0,40);
+    });
+    plusNode(nodes,null,0,px.length,20);
+  }
+  if(k8s){
+    const pods = k8s?.pods || [];
+    maybeLinked(candidate(2,'kubernetes','Kubernetes',`${k8s?.summary?.running||0}/${pods.length || k8s?.summary?.total || 0} pods`,k8s?.online===false?'bad':(k8s?.summary?.failed||0)>0?'warn':'good','kubernetes','platform','kubernetes:cluster'));
+  }
+  if(docker.length){
+    limited(docker,50).forEach(h=>{
+      const name = h.name || h.host || 'docker';
+      const total = h.summary?.total || h.containers?.length || 0;
+      maybeLinked(candidate(2,`docker-${name}`,name,`${h.summary?.running||0}/${total} running`,h.online?'good':h._connecting?'idle':'bad','docker','host',`docker:${safeId(name)}`));
+    });
+  }
+  if(dockhand?.instances?.length){
+    const inst = dockhand?.instances || [];
+    limited(inst,50).forEach(i=>{
+      const name = i.name || i.url || 'dockhand';
+      const rows = (dockhand?.containers||[]).filter(c=>c.sourceName===i.name || c.sourceUrl===i.url);
+      maybeLinked(candidate(2,`dh-${name}`,name,`${rows.filter(c=>c.state==='running').length}/${rows.length} running`,i.online?'good':i._connecting?'idle':'bad','dockhand','host',`dockhand:${safeId(name)}`));
+    });
+  }
+  if(snmp.length){
+    limited(snmp,80).forEach(s=>{
+      const name = s.name || s.host || 'device';
+      const icon = snmpDeviceIcon(s);
+      const level = snmpDeviceLevel(s);
+      maybeLinked(candidate(level,`snmp-${name}`,name,s.host || '',s.online?'good':s._connecting?'idle':'bad',icon,'host',`snmp:${safeId(name)}`));
+    });
+  }
+  return nodes;
+}
+function layoutNodes(nodes, viewportWidth, viewportHeight){
+  const levels = new Map();
+  nodes.forEach(n=>{ if(!levels.has(n.level)) levels.set(n.level,[]); levels.get(n.level).push(n); });
+  const maxCount = Math.max(...[...levels.values()].map(v=>v.length),1);
+  const width = Math.max(viewportWidth || 1100, maxCount * 154 + 140);
+  const levelGap = 150;
+  const pxVmGap = proxmoxVmGap();
+  const top = 64;
+  const levelKeys = [...levels.keys()];
+  const minLevel = Math.min(...levelKeys, 0);
+  const maxLevel = Math.max(...levelKeys, 0);
+  const height = Math.max(viewportHeight || 520, 520, top * 2 + (maxLevel - minLevel) * levelGap + Math.max(0, pxVmGap - levelGap));
+  levels.forEach((arr, level)=>{
+    const y = top + (level - minLevel) * levelGap;
+    arr.forEach((n,i)=>{
+      n.x = Math.round((i + 1) * width / (arr.length + 1));
+      n.y = y;
+    });
+  });
+  packProxmoxClusters(nodes, width);
+  nodes.forEach(n => {
+    const pos = topologyPositions[n.ref];
+    if(pos && Number.isFinite(pos.x)) n.x = pos.x;
+    if(pos && Number.isFinite(pos.y)) n.y = pos.y;
+  });
+  packProxmoxClusters(nodes, width, true);
+  return {width,height};
+}
+function packProxmoxClusters(nodes, width, compactSaved = false){
+  const hosts = nodes.filter(n => /^proxmox-host:/.test(String(n.ref || ''))).sort((a,b)=>a.x-b.x);
+  if(hosts.length < 2) return;
+  const childGap = 154;
+  const clusterGap = 18;
+  const clusters = hosts.map(host => {
+    const children = nodes.filter(n => n.parent === host.id).sort((a,b)=>a.x-b.x);
+    const visibleChildren = children.filter(n => !/more$/.test(String(n.ref || '')));
+    const count = Math.max(1, visibleChildren.length || children.length);
+    const width = Math.max(148, count * childGap - 22);
+    return { host, children, width };
+  });
+  const totalWidth = clusters.reduce((sum,c)=>sum+c.width,0) + clusterGap * (clusters.length - 1);
+  const all = clusters.flatMap(c => [c.host, ...c.children]);
+  const currentCenter = compactSaved && all.length
+    ? (Math.min(...all.map(n => n.x)) + Math.max(...all.map(n => n.x))) / 2
+    : width / 2;
+  let left = Math.max(90, Math.round(currentCenter - totalWidth / 2));
+  clusters.forEach(cluster => {
+    const center = Math.round(left + cluster.width / 2);
+    cluster.host.x = center;
+    const children = cluster.children;
+    if(children.length) {
+      const start = center - ((children.length - 1) * childGap) / 2;
+      children.forEach((child, i) => {
+        child.x = Math.round(start + i * childGap);
+        child.y = Math.round(cluster.host.y + proxmoxVmGap());
+      });
+    }
+    left += cluster.width + clusterGap;
+  });
+}
+function edgePath(a,b){
+  if(Math.abs(a.y - b.y) < 10){
+    const left = a.x <= b.x ? a : b;
+    const right = a.x <= b.x ? b : a;
+    const y = left.y;
+    const x1 = left.x + 74;
+    const x2 = right.x - 74;
+    const mid = Math.round((x1 + x2) / 2);
+    return `M ${x1} ${y} C ${mid} ${y - 70}, ${mid} ${y - 70}, ${x2} ${y}`;
+  }
+  const y1 = a.y + 31;
+  const y2 = b.y - 31;
+  const mid = Math.round((y1 + y2) / 2);
+  return `M ${a.x} ${y1} C ${a.x} ${mid}, ${b.x} ${mid}, ${b.x} ${y2}`;
+}
+function tempEdgePath(a,b){
+  const x1 = a.x + 74;
+  const y1 = a.y;
+  const mid = Math.round((x1 + b.x) / 2);
+  return `M ${x1} ${y1} C ${mid} ${y1}, ${mid} ${b.y}, ${b.x} ${b.y}`;
+}
+function edgeClass(node){
+  return node.status === 'good' ? 'good' : node.status === 'warn' ? 'warn' : node.status === 'bad' ? 'bad' : 'idle';
+}
+function topologyNodeLayer(node){
+  const ref = String(node?.ref || '');
+  const icon = String(node?.icon || '').toLowerCase();
+  const label = String(node?.label || '').toLowerCase();
+  if(/^proxmox-guest:/.test(ref) || node?.kind === 'guest') return 'vm';
+  if(/^proxmox-host:/.test(ref) || icon === 'proxmox') return 'proxmox';
+  if(icon === 'synology' || /\bnas\b|synology|diskstation|rackstation/.test(label) || /^snmp:.*nas/.test(ref)) return 'nas';
+  if(icon === 'switch' || icon === 'router' || icon === 'mikrotik' || icon === 'unifi') return 'switch';
+  if(/^kubernetes:/.test(ref) || /^docker:/.test(ref) || /^dockhand:/.test(ref) || ['kubernetes','docker','dockhand'].includes(icon) || node?.kind === 'platform') return 'platform';
+  return node?.kind === 'host' ? 'host' : 'node';
+}
+function edgeLayerClass(a,b, manual = false){
+  const la = topologyNodeLayer(a);
+  const lb = topologyNodeLayer(b);
+  const layers = new Set([la, lb]);
+  if(!manual && layers.has('proxmox') && layers.has('vm')) return 'layer-vm';
+  if(layers.has('platform')) return 'layer-platform';
+  if(layers.has('nas')) return 'layer-nas';
+  if(layers.has('proxmox')) return 'layer-proxmox';
+  if(layers.has('switch')) return 'layer-switch';
+  if(layers.has('vm')) return 'layer-vm';
+  return manual ? 'manual' : edgeClass(b || a);
+}
+function edgeSvg(id, path, cls, animate = true, attrs = ''){
+  return `<path id="${id}" class="edge ${cls}" d="${path}" ${attrs}></path>${flowDotsSvg(id, path, cls, animate)}`;
+}
+function edgeShouldAnimate(...nodes){
+  return nodes.every(n => n && n.status !== 'bad' && n.status !== 'idle');
+}
+function edgeFlowColor(cls){
+  if(/\blayer-switch\b/.test(cls)) return '#22D3EE';
+  if(/\blayer-nas\b/.test(cls)) return '#FBBF24';
+  if(/\blayer-platform\b/.test(cls)) return '#A78BFA';
+  if(/\blayer-proxmox\b/.test(cls)) return '#f97316';
+  if(/\blayer-vm\b/.test(cls)) return '#34D399';
+  if(/\bgood\b/.test(cls)) return '#34D399';
+  if(/\bwarn\b/.test(cls)) return '#FBBF24';
+  if(/\bbad\b/.test(cls)) return '#F87171';
+  if(/\bmanual\b/.test(cls)) return '#A78BFA';
+  return '#8CA0BE';
+}
+function flowDotsSvg(id, path, cls, animate = true){
+  if(!animate || !trafficEnabled) return '';
+  const color = edgeFlowColor(cls);
+  const dur = /\blayer-vm\b/.test(cls) ? 3.8 : 4.8;
+  const count = /\blayer-vm\b/.test(cls) ? 2 : 1;
+  let dots = '';
+  for(let i = 0; i < count; i++){
+    const begin = -((dur / count) * i).toFixed(2);
+    dots += `<circle class="flow-dot" r="2.25" fill="${color}" style="color:${color}"><animateMotion class="flow-motion" dur="${dur}s" begin="${begin}s" repeatCount="indefinite" path="${esc(path)}"/></circle>`;
+  }
+  return `<g class="flow-dots" data-edge-id="${esc(id)}" style="color:${color}">${dots}</g>`;
+}
+function linkableNodes(){
+  const merged = [...currentNodes, ...topologyCandidates];
+  const seen = new Set();
+  return merged
+    .filter(n => ['platform','host','guest'].includes(n.kind))
+    .filter(n => {
+      if(seen.has(n.ref)) return false;
+      seen.add(n.ref);
+      return true;
+    });
+}
+function nodeByRef(ref){
+  return currentNodes.find(n => n.ref === ref) || topologyCandidates.find(n => n.ref === ref);
+}
+function nodeTitle(ref){
+  const n = nodeByRef(ref);
+  return n ? `${n.label}${n.meta ? ` (${n.meta})` : ''}` : ref;
+}
+function nodeKindLabel(kind){
+  return kind === 'guest' ? 'VM/LXC' : kind === 'platform' ? 'Platform' : 'Host';
+}
+function updateLinkPanel(){
+  const nodeAdd = document.getElementById('node-add');
+  const nodeAddBtn = document.getElementById('node-add-btn');
+  const list = document.getElementById('link-list');
+  if(!list) return;
+  const previousNode = nodeAdd?.value || '';
+  const candidates = linkableNodes();
+  const visibleRefs = new Set(currentNodes.map(n => n.ref));
+  const available = candidates.filter(n => !visibleRefs.has(n.ref) && !topologyNodes.includes(n.ref));
+  if(nodeAdd) {
+    const optionsHtml = available
+      .map(n => `<option value="${esc(n.ref)}">${esc(n.label)} - ${esc(nodeKindLabel(n.kind))}</option>`)
+      .join('');
+    const optionsSig = available.map(n => `${n.ref}:${n.label}:${n.kind}`).join('|');
+    if(nodeAdd.dataset.renderSignature !== optionsSig){
+      nodeAdd.dataset.renderSignature = optionsSig;
+      nodeAdd.innerHTML = optionsHtml;
+    }
+    nodeAdd.disabled = !available.length;
+  }
+  if(nodeAddBtn) nodeAddBtn.disabled = !available.length;
+  if(nodeAdd && previousNode && [...nodeAdd.options].some(o => o.value === previousNode)) nodeAdd.value = previousNode;
+  const listHtml = available.length
+    ? `<div class="muted" style="font-size:12px;color:var(--muted)">${available.length} node(s) available to add</div>`
+    : `<div class="muted" style="font-size:12px;color:var(--muted)">No hidden platform or node to add</div>`;
+  const listSig = `available:${available.length}`;
+  if(list.dataset.renderSignature !== listSig){
+    list.dataset.renderSignature = listSig;
+    list.innerHTML = listHtml;
+  }
+}
+function toggleLinkPanel(force){
+  const panel = document.getElementById('link-panel');
+  if(!panel) return;
+  const open = force === undefined ? !panel.classList.contains('open') : !!force;
+  panel.classList.toggle('open', open);
+  document.querySelectorAll('#links-btn,#links-map-btn').forEach(btn => btn.classList.toggle('on', open));
+  if(open) {
+    updateLinkPanel();
+    load();
+  }
+}
+async function saveTopologyState(nextLinks = topologyLinks, nextNodes = topologyNodes, opts = {}){
+  topologySavingUntil = Date.now() + 5000;
+  const r = await fetch('/api/topology/links', {
+    method:'POST',
+    headers:{'Content-Type':'application/json',...authHeaders()},
+    body:JSON.stringify({
+      links: nextLinks,
+      nodes: nextNodes,
+      hidden: topologyHidden,
+      spacing: topologySpacing,
+      positions: topologyPositions,
+      view: topoView.userMoved ? { scale: topoView.scale, x: topoView.x, y: topoView.y } : undefined,
+    }),
+  });
+  handleUnauth(r);
+  const data = await readJsonResponse(r);
+  if(!r.ok) throw new Error(data.error || r.statusText);
+  topologyLinks = Array.isArray(data.links) ? data.links : [];
+  topologyNodes = Array.isArray(data.nodes) ? data.nodes : [];
+  topologyHidden = Array.isArray(data.hidden) ? data.hidden : [];
+  topologySpacing = normalizeTopologySpacing(data.spacing || topologySpacing);
+  syncTopologySpacingUi();
+  if(data.positions && typeof data.positions === 'object') topologyPositions = data.positions;
+  if(data.view && typeof data.view === 'object') {
+    const scale = Number(data.view.scale);
+    const x = Number(data.view.x);
+    const y = Number(data.view.y);
+    if(Number.isFinite(scale) && Number.isFinite(x) && Number.isFinite(y)) {
+      topoView.scale = scale;
+      topoView.x = x;
+      topoView.y = y;
+      topoView.initialized = true;
+      topoView.userMoved = true;
+    }
+  }
+  if(lastData) {
+    lastData.topologyLinks = topologyLinks;
+    lastData.topologyNodes = topologyNodes;
+    lastData.topologyHidden = topologyHidden;
+    lastData.topologySpacing = topologySpacing;
+    lastData.topologyPositions = topologyPositions;
+    lastData.topologyView = topoView.userMoved ? { scale: topoView.scale, x: topoView.x, y: topoView.y } : null;
+    writeTopologyCache(lastData);
+    if(opts.render !== false) renderTopology(lastData);
+  }
+}
+async function saveTopologyLinks(next){
+  return saveTopologyState(next, topologyNodes);
+}
+async function addTopologyLink(){
+  const from = document.getElementById('link-from')?.value;
+  const to = document.getElementById('link-to')?.value;
+  if(!from || !to || from === to) return;
+  const prev = topologyLinks.slice();
+  const next = [...topologyLinks, { from, to }];
+  topologyLinks = next;
+  if(lastData){ lastData.topologyLinks = topologyLinks; renderTopology(lastData); }
+  try { await saveTopologyLinks(next); }
+  catch(e){ topologyLinks = prev; if(lastData){ lastData.topologyLinks = prev; renderTopology(lastData); } alert(e.message || 'Could not save topology link'); }
+}
+async function removeTopologyLink(index){
+  try { await saveTopologyLinks(topologyLinks.filter((_, i) => i !== index)); }
+  catch(e){ alert(e.message || 'Could not remove topology link'); }
+}
+async function clearTopologyLinks(){
+  if(!topologyLinks.length) return;
+  try { await saveTopologyLinks([]); }
+  catch(e){ alert(e.message || 'Could not clear topology links'); }
+}
+async function addTopologyNode(){
+  const ref = document.getElementById('node-add')?.value;
+  if(!ref || topologyNodes.includes(ref)) return;
+  const prev = topologyNodes.slice();
+  const prevHidden = topologyHidden.slice();
+  const next = [...topologyNodes, ref];
+  topologyHidden = topologyHidden.filter(nodeRef => nodeRef !== ref);
+  topologyNodes = next;
+  if(lastData){ lastData.topologyNodes = topologyNodes; lastData.topologyHidden = topologyHidden; renderTopology(lastData); }
+  try { await saveTopologyState(topologyLinks, next); }
+  catch(e){ topologyNodes = prev; topologyHidden = prevHidden; if(lastData){ lastData.topologyNodes = prev; lastData.topologyHidden = prevHidden; renderTopology(lastData); } alert(e.message || 'Could not add topology node'); }
+}
+async function removeTopologyNode(index){
+  try { await saveTopologyState(topologyLinks, topologyNodes.filter((_, i) => i !== index)); }
+  catch(e){ alert(e.message || 'Could not remove topology node'); }
+}
+function canRemoveTopologyRef(ref){
+  const node = currentNodes.find(n => n.ref === ref);
+  return !!node && ['platform','host','guest'].includes(node.kind);
+}
+async function removeTopologyNodeByRef(ref){
+  if(!ref || !canRemoveTopologyRef(ref)) return;
+  const prevNodes = topologyNodes.slice();
+  const prevLinks = topologyLinks.slice();
+  const prevHidden = topologyHidden.slice();
+  const prevPositions = { ...topologyPositions };
+  const nextNodes = topologyNodes.filter(nodeRef => nodeRef !== ref);
+  const nextLinks = topologyLinks.filter(link => link.from !== ref && link.to !== ref);
+  const nextHidden = topologyHidden.includes(ref) ? topologyHidden.slice() : [...topologyHidden, ref];
+  topologyNodes = nextNodes;
+  topologyLinks = nextLinks;
+  topologyHidden = nextHidden;
+  delete topologyPositions[ref];
+  if(lastData){ lastData.topologyNodes = topologyNodes; lastData.topologyLinks = topologyLinks; lastData.topologyHidden = topologyHidden; lastData.topologyPositions = topologyPositions; renderTopology(lastData); }
+  try { await saveTopologyState(nextLinks, nextNodes); }
+  catch(e){
+    topologyNodes = prevNodes;
+    topologyLinks = prevLinks;
+    topologyHidden = prevHidden;
+    topologyPositions = prevPositions;
+    if(lastData){
+      lastData.topologyNodes = topologyNodes;
+      lastData.topologyLinks = topologyLinks;
+      lastData.topologyHidden = topologyHidden;
+      lastData.topologyPositions = topologyPositions;
+      renderTopology(lastData);
+    }
+    alert(e.message || 'Could not remove topology node');
+  }
+}
+function topologyInner(){
+  return document.querySelector('.map-inner');
+}
+function applyTopologyTransform(){
+  const inner = topologyInner();
+  if(!inner) return;
+  inner.style.transform = `translate(${topoView.x}px, ${topoView.y}px) scale(${topoView.scale})`;
+}
+function centerTopology(nodes, shell){
+  if(!nodes.length) return;
+  const minX = Math.min(...nodes.map(n => n.x - 74));
+  const maxX = Math.max(...nodes.map(n => n.x + 74));
+  const minY = Math.min(...nodes.map(n => n.y - 35));
+  const maxY = Math.max(...nodes.map(n => n.y + 35));
+  const centerX = (minX + maxX) / 2;
+  const centerY = (minY + maxY) / 2;
+  topoView.x = Math.round(shell.clientWidth / 2 - centerX * topoView.scale);
+  topoView.y = Math.round(shell.clientHeight / 2 - centerY * topoView.scale);
+}
+function topologyPlatformId(ref){
+  if(String(ref || '').startsWith('proxmox-')) return 'proxmox';
+  if(String(ref || '').startsWith('kubernetes:')) return 'kubernetes';
+  if(String(ref || '').startsWith('snmp:')) return 'snmp';
+  if(String(ref || '').startsWith('docker:')) return 'docker';
+  if(String(ref || '').startsWith('dockhand:')) return 'dockhand';
+  return '';
+}
+function visibleTopologyLinks(nodes){
+  const refs = new Set(nodes.map(n => n.ref));
+  return topologyLinks.filter(l => refs.has(l.from) && refs.has(l.to));
+}
+function edgeMidpoint(a,b){
+  if(Math.abs(a.y - b.y) < 10) return { x: (a.x + b.x) / 2, y: a.y - 42 };
+  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+}
+function edgeDeleteButton(index, p){
+  return `<button class="edge-delete" type="button" data-link-index="${index}" style="left:${p.x}px;top:${p.y}px" title="Delete link" onpointerdown="event.stopPropagation()" onclick="event.stopPropagation();removeTopologyLink(${index})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg></button>`;
+}
+function setEdgePathD(id, path, cls){
+  const el = document.getElementById(id);
+  if(!el) return;
+  el.setAttribute('d', path);
+  if(cls) el.setAttribute('class', `edge ${cls}`);
+  const group = document.querySelector(`.flow-dots[data-edge-id="${cssEscapeValue(id)}"]`);
+  if(group) {
+    const color = edgeFlowColor(cls || '');
+    group.style.color = color;
+    group.querySelectorAll('.flow-dot').forEach(dot => {
+      dot.setAttribute('fill', color);
+      dot.style.color = color;
+    });
+    group.querySelectorAll('.flow-motion').forEach(motion => motion.setAttribute('path', path));
+  }
+}
+function refreshTopologyEdges(){
+  const inner = topologyInner();
+  if(!inner) return;
+  const byId = new Map(currentNodes.map(n=>[n.id,n]));
+  const byRef = new Map(currentNodes.map(n=>[n.ref,n]));
+  currentNodes.filter(n=>n.parent && byId.has(n.parent)).forEach((n,i)=>{
+    const p = byId.get(n.parent);
+    setEdgePathD(`edge-${i}`, edgePath(p, n), edgeLayerClass(p, n, false));
+  });
+  topologyLinks.forEach((link,i) => {
+    const a = byRef.get(link.from);
+    const b = byRef.get(link.to);
+    if(!a || !b) return;
+    const top = a.y <= b.y ? a : b;
+    const bottom = a.y <= b.y ? b : a;
+    setEdgePathD(`manual-edge-${i}`, edgePath(top,bottom), edgeLayerClass(a, b, true));
+    const mid = edgeMidpoint(top,bottom);
+    const btn = inner.querySelector(`.edge-delete[data-link-index="${i}"]`);
+    if(btn) {
+      btn.style.left = `${mid.x}px`;
+      btn.style.top = `${mid.y}px`;
+    }
+  });
+}
+function topologyStructureSignature(nodes, links, size){
+  return JSON.stringify({
+    size: [Math.round(size?.width || 0), Math.round(size?.height || 0)],
+    nodes: (nodes || []).map(n => [n.ref, n.parent, n.level, Math.round(n.x || 0), Math.round(n.y || 0), n.kind, n.icon]),
+    links: (links || []).map(l => [l.from, l.to])
+  });
+}
+function patchTopologyNodes(nodes){
+  const inner = topologyInner();
+  if(!inner) return false;
+  const expectedRefs = new Set((nodes || []).map(n => n.ref));
+  const seenRefs = new Set();
+  inner.querySelectorAll('.topo-node').forEach(el => {
+    const ref = el.dataset.ref || '';
+    if(!expectedRefs.has(ref) || seenRefs.has(ref)) el.remove();
+    else seenRefs.add(ref);
+  });
+  for(const n of nodes || []){
+    const el = inner.querySelector(`.topo-node[data-ref="${cssEscapeValue(n.ref)}"]`);
+    if(!el) return false;
+    el.className = `topo-node ${n.kind||''} ${edgeClass(n)}`;
+    el.style.left = `${n.x}px`;
+    el.style.top = `${n.y}px`;
+    const icon = el.querySelector('.node-icon');
+    const iconKey = `${n.icon || ''}:${n.kind || ''}`;
+    if(icon && icon.dataset.iconKey !== iconKey){
+      icon.dataset.iconKey = iconKey;
+      icon.className = `node-icon icon-${safeId(n.icon || n.kind || 'node')}`;
+      icon.innerHTML = nodeIconHtml(n);
+    }
+    const name = el.querySelector('.node-name');
+    if(name){
+      const label = String(n.label ?? '');
+      if(name.textContent !== label) name.textContent = label;
+      name.title = label;
+    }
+    const meta = el.querySelector('.node-meta');
+    if(meta){
+      const text = String(n.meta ?? '');
+      if(meta.textContent !== text) meta.textContent = text;
+      meta.title = text;
+    }
+  }
+  return true;
+}
+function renderTopology(d){
+  lastData = d;
+  const map = document.getElementById('map');
+  topologyLinks = Array.isArray(d.topologyLinks) ? d.topologyLinks : [];
+  topologyNodes = Array.isArray(d.topologyNodes) ? d.topologyNodes : [];
+  topologyHidden = Array.isArray(d.topologyHidden) ? d.topologyHidden : [];
+  topologySpacing = normalizeTopologySpacing(d.topologySpacing || topologySpacing);
+  syncTopologySpacingUi();
+  applyTopologyStaticState(d);
+  const nodes = buildGraph(d);
+  if(!nodes.length){currentNodes = []; topologyRenderSignature = ''; buildSummary(d, []); map.innerHTML = '<div class="empty">No topology data yet</div>';return}
+  currentNodes = nodes;
+  const shell = map.parentElement;
+  const size = layoutNodes(nodes, shell.clientWidth - 2, shell.clientHeight - 2);
+  buildSummary(d, nodes);
+  const fitW = Math.max(320, shell.clientWidth - 32);
+  const fitH = Math.max(280, shell.clientHeight - 32);
+  const fitScale = Math.min(1, Math.max(0.42, Math.min(fitW / size.width, fitH / size.height)));
+  topoView.minScale = Math.max(0.2, fitScale * 0.45);
+  if(!topoView.initialized || !topoView.userMoved){
+    topoView.scale = fitScale;
+    centerTopology(nodes, shell);
+    topoView.initialized = true;
+  } else {
+    topoView.scale = clamp(topoView.scale, topoView.minScale, topoView.maxScale);
+  }
+  const structureSignature = topologyStructureSignature(nodes, visibleTopologyLinks(nodes), size);
+  if(structureSignature === topologyRenderSignature && topologyInner()){
+    buildSummary(d, nodes);
+    if(patchTopologyNodes(nodes)){
+      refreshTopologyEdges();
+      updateLinkPanel();
+      return;
+    }
+  }
+  topologyRenderSignature = structureSignature;
+  const byId = new Map(nodes.map(n=>[n.id,n]));
+  const byRef = new Map(nodes.map(n=>[n.ref,n]));
+  const edges = nodes.filter(n=>n.parent && byId.has(n.parent)).map((n,i)=>{
+    const p = byId.get(n.parent);
+    const path = edgePath(p,n);
+    const c = edgeLayerClass(p,n,false);
+    return edgeSvg(`edge-${i}`, path, c, edgeShouldAnimate(p,n));
+  }).join('');
+  const customEdgeParts = topologyLinks.map((link,i) => {
+    const a = byRef.get(link.from);
+    const b = byRef.get(link.to);
+    if(!a || !b) return null;
+    const top = a.y <= b.y ? a : b;
+    const bottom = a.y <= b.y ? b : a;
+    const path = edgePath(top,bottom);
+    const cls = edgeLayerClass(a,b,true);
+    return {
+      edge: edgeSvg(`manual-edge-${i}`, path, cls, edgeShouldAnimate(top,bottom), `data-link-index="${i}"`),
+      action: edgeDeleteButton(i, edgeMidpoint(top,bottom)),
+    };
+  }).filter(Boolean);
+  const customEdges = customEdgeParts.map(p => p.edge).join('');
+  const customEdgeActions = customEdgeParts.map(p => p.action).join('');
+  const nodeHtml = nodes.map(n=>`<div class="topo-node ${n.kind||''} ${edgeClass(n)}" data-ref="${esc(n.ref)}" style="left:${n.x}px;top:${n.y}px">
+    <span class="node-dot"></span>
+    ${canRemoveTopologyRef(n.ref) ? '<button class="node-delete" type="button" title="Remove from topology" aria-label="Remove from topology"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg></button>' : ''}
+    <span class="node-port top" title="Drag to connect"></span>
+    <span class="node-port right" title="Drag to connect"></span>
+    <span class="node-port bottom" title="Drag to connect"></span>
+    <span class="node-port left" title="Drag to connect"></span>
+    <div class="node-icon icon-${safeId(n.icon || n.kind || 'node')}" data-icon-key="${esc(`${n.icon || ''}:${n.kind || ''}`)}">${nodeIconHtml(n)}</div>
+    <div class="node-main"><div class="node-name" title="${esc(n.label)}">${esc(n.label)}</div><div class="node-meta" title="${esc(n.meta)}">${esc(n.meta)}</div></div>
+  </div>`).join('');
+  map.innerHTML = `<div class="map-inner" style="width:${size.width}px;height:${size.height}px"><svg class="edge-layer" width="${size.width}" height="${size.height}" viewBox="0 0 ${size.width} ${size.height}" aria-hidden="true">${edges}${customEdges}</svg>${customEdgeActions}${nodeHtml}</div>`;
+  applyTopologyTransform();
+  updateLinkPanel();
+}
+function buildSummary(d, nodes = currentNodes){
+  const platformCount = new Set(nodes.map(n => topologyPlatformId(n.ref)).filter(Boolean)).size;
+  const hostCount = nodes.filter(n => n.kind === 'host').length;
+  const workloadCount = nodes.filter(n => n.kind === 'guest').length;
+  const counts = [
+    ['Platforms',platformCount],
+    ['Hosts',hostCount],
+    ['Workloads',workloadCount],
+    ['Links',visibleTopologyLinks(nodes).length],
+  ];
+  const summary = document.getElementById('summary');
+  const sig = `${lang()}:${counts.map(([label,val]) => `${label}:${val}`).join('|')}`;
+  if(summary && summary.dataset.renderSignature !== sig){
+    summary.dataset.renderSignature = sig;
+    summary.innerHTML = counts.map(([label,val])=>`<div class="sum"><div><div class="sum-v">${val}</div><div class="sum-l">${esc(tr(label))}</div></div></div>`).join('');
+  }
+}
+function toggleEmpty(){
+  hideEmpty = !hideEmpty;
+  const btn = document.getElementById('empty-btn');
+  btn.classList.toggle('on', hideEmpty);
+  btn.textContent = tr(hideEmpty ? 'Hide empty' : 'Show empty');
+  if(lastData) renderTopology(lastData);
+}
+function toggleTraffic(){
+  trafficEnabled = !trafficEnabled;
+  const btn = document.getElementById('traffic-btn');
+  btn.classList.toggle('on', trafficEnabled);
+  btn.textContent = tr('Traffic');
+  if(lastData) renderTopology(lastData);
+}
+async function load(){
+  if(embedPaused) return;
+  if(topologyLoading) return;
+  if(topologyLastLoadedAt && Date.now() - topologyLastLoadedAt < 5000) return;
+  topologyLoading = true;
+  const ctrl = new AbortController();
+  topologyAbort = ctrl;
+  const timer = setTimeout(() => ctrl.abort(), 3000);
+  try{
+    const r = await fetch('/api/status/topology',{headers:authHeaders(),cache:'no-cache',signal:ctrl.signal});
+    handleUnauth(r);
+    const data = await readJsonResponse(r);
+    if(Date.now() < topologySavingUntil && lastData) {
+      data.topologyLinks = topologyLinks;
+      data.topologyNodes = topologyNodes;
+      data.topologyHidden = topologyHidden;
+      data.topologySpacing = topologySpacing;
+      data.topologyPositions = topologyPositions;
+      data.topologyView = topoView.userMoved ? { scale: topoView.scale, x: topoView.x, y: topoView.y } : data.topologyView;
+    }
+    renderTopology(data);
+    writeTopologyCache(data);
+    topologyLastLoadedAt = Date.now();
+    if(window.OmniI18n) OmniI18n.apply(document,lang());
+  }catch(e){
+    if(e.name === 'AbortError') return;
+    if(!lastData) document.getElementById('map').innerHTML = `<div class="empty">${esc(e.message)}</div>`;
+    else console.warn(e);
+  }finally{
+    clearTimeout(timer);
+    if(topologyAbort === ctrl) {
+      topologyAbort = null;
+      topologyLoading = false;
+    }
+  }
+}
+function initTopologyControls(){
+  const shell = document.querySelector('.map-shell');
+  if(!shell || shell.dataset.controlsReady === '1') return;
+  shell.dataset.controlsReady = '1';
+  let dragging = false;
+  let nodeDragging = null;
+  let linkDragging = null;
+  let lastX = 0;
+  let lastY = 0;
+  function graphPoint(e){
+    const rect = shell.getBoundingClientRect();
+    return {
+      x: (e.clientX - rect.left - topoView.x) / topoView.scale,
+      y: (e.clientY - rect.top - topoView.y) / topoView.scale,
+    };
+  }
+  function clearLinkTarget(){
+    shell.querySelectorAll('.topo-node.link-target').forEach(el => el.classList.remove('link-target'));
+  }
+  function updateTempLink(e){
+    if(!linkDragging) return;
+    const p = graphPoint(e);
+    const layer = shell.querySelector('.edge-layer');
+    if(!layer) return;
+    let temp = layer.querySelector('#temp-edge');
+    if(!temp){
+      temp = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      temp.setAttribute('id', 'temp-edge');
+      temp.setAttribute('class', 'edge temp');
+      layer.appendChild(temp);
+    }
+    temp.setAttribute('d', tempEdgePath(linkDragging.source, p));
+    clearLinkTarget();
+    const targetEl = document.elementFromPoint(e.clientX, e.clientY)?.closest?.('.topo-node');
+    if(targetEl && targetEl.dataset.ref !== linkDragging.source.ref) targetEl.classList.add('link-target');
+  }
+  function removeTempLink(){
+    shell.querySelector('#temp-edge')?.remove();
+    clearLinkTarget();
+  }
+  function linkExists(a,b){
+    return topologyLinks.some(l => (l.from === a && l.to === b) || (l.from === b && l.to === a));
+  }
+  function hideEdgeDeleteButtons(){
+    shell.querySelectorAll('.edge-delete.show').forEach(btn => btn.classList.remove('show'));
+  }
+  function showEdgeDeleteButton(index){
+    shell.querySelectorAll('.edge-delete').forEach(btn => btn.classList.toggle('show', btn.dataset.linkIndex === String(index)));
+  }
+  function updateEdgeDeleteHover(e){
+    if(linkDragging || nodeDragging || dragging) {
+      hideEdgeDeleteButtons();
+      return;
+    }
+    const overButton = e.target.closest?.('.edge-delete');
+    if(overButton) {
+      showEdgeDeleteButton(overButton.dataset.linkIndex);
+      return;
+    }
+    const p = graphPoint(e);
+    const threshold = Math.max(16, 28 / topoView.scale);
+    let bestIndex = null;
+    let bestD = Infinity;
+    shell.querySelectorAll('.edge[data-link-index]').forEach(path => {
+      try {
+        const len = path.getTotalLength();
+        const samples = Math.max(10, Math.min(42, Math.ceil(len / 42)));
+        for(let i = 0; i <= samples; i++){
+          const pt = path.getPointAtLength((len * i) / samples);
+          const dx = pt.x - p.x;
+          const dy = pt.y - p.y;
+          const d = Math.sqrt(dx * dx + dy * dy);
+          if(d < bestD) {
+            bestD = d;
+            bestIndex = path.dataset.linkIndex;
+          }
+        }
+      } catch {}
+    });
+    if(bestIndex != null && bestD <= threshold) showEdgeDeleteButton(bestIndex);
+    else hideEdgeDeleteButtons();
+  }
+  function visibleNodeBounds(){
+    return {
+      minX: (74 - topoView.x) / topoView.scale,
+      maxX: (shell.clientWidth - 74 - topoView.x) / topoView.scale,
+      minY: (35 - topoView.y) / topoView.scale,
+      maxY: (shell.clientHeight - 35 - topoView.y) / topoView.scale,
+    };
+  }
+  function isProxmoxTopologyNode(node){
+    return /^proxmox-(host|guest):/.test(String(node?.ref || ''));
+  }
+  function nodeElementByRef(ref){
+    return [...shell.querySelectorAll('.topo-node')].find(el => el.dataset.ref === ref) || null;
+  }
+  function dragItemsForNode(node){
+    const group = isProxmoxTopologyNode(node)
+      ? currentNodes.filter(isProxmoxTopologyNode)
+      : [node];
+    return group.map(item => ({
+      ref: item.ref,
+      startX: item.x,
+      startY: item.y,
+      el: nodeElementByRef(item.ref),
+    }));
+  }
+  function clampGroupDelta(items, dx, dy){
+    const b = visibleNodeBounds();
+    const xs = items.map(item => item.startX);
+    const ys = items.map(item => item.startY);
+    return {
+      dx: clamp(dx, b.minX - Math.min(...xs), b.maxX - Math.max(...xs)),
+      dy: clamp(dy, b.minY - Math.min(...ys), b.maxY - Math.max(...ys)),
+    };
+  }
+  shell.addEventListener('wheel', e => {
+    if(!e.ctrlKey) return;
+    e.preventDefault();
+    const rect = shell.getBoundingClientRect();
+    const px = e.clientX - rect.left;
+    const py = e.clientY - rect.top;
+    const oldScale = topoView.scale;
+    const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
+    const nextScale = Math.min(topoView.maxScale, Math.max(topoView.minScale, oldScale * factor));
+    if(Math.abs(nextScale - oldScale) < 0.001) return;
+    topoView.x = px - ((px - topoView.x) / oldScale) * nextScale;
+    topoView.y = py - ((py - topoView.y) / oldScale) * nextScale;
+    topoView.scale = nextScale;
+    topoView.userMoved = true;
+    applyTopologyTransform();
+    saveTopologyView();
+  }, { passive:false });
+  shell.addEventListener('pointerdown', e => {
+    const deleteBtn = e.target.closest('.node-delete');
+    if(deleteBtn && e.button === 0){
+      const ref = deleteBtn.closest('.topo-node')?.dataset.ref;
+      e.preventDefault();
+      e.stopPropagation();
+      removeTopologyNodeByRef(ref);
+      return;
+    }
+    const port = e.target.closest('.node-port');
+    if(port && e.button === 0){
+      const nodeEl = port.closest('.topo-node');
+      const node = currentNodes.find(n => n.ref === nodeEl?.dataset.ref);
+      if(!node) return;
+      linkDragging = { source: node };
+      shell.classList.add('linking');
+      hideEdgeDeleteButtons();
+      e.preventDefault();
+      e.stopPropagation();
+      try { shell.setPointerCapture(e.pointerId); } catch {}
+      updateTempLink(e);
+      return;
+    }
+    const nodeEl = e.target.closest('.topo-node');
+    if(nodeEl && e.button === 0 && !e.target.closest('.legend,.link-panel,.map-link-toggle,.node-port')){
+      const node = currentNodes.find(n => n.ref === nodeEl.dataset.ref);
+      if(!node) return;
+      const items = dragItemsForNode(node);
+      nodeDragging = { el: nodeEl, ref: node.ref, startClientX: e.clientX, startClientY: e.clientY, startX: node.x, startY: node.y, items };
+      items.forEach(item => item.el?.classList.add('node-dragging'));
+      shell.classList.add('node-moving');
+      topoView.userMoved = true;
+      hideEdgeDeleteButtons();
+      e.preventDefault();
+      e.stopPropagation();
+      try { nodeEl.setPointerCapture(e.pointerId); } catch {}
+      return;
+    }
+    if(e.button !== 0 || e.target.closest('.legend,.link-panel,.map-link-toggle,.topo-node')) return;
+    dragging = true;
+    lastX = e.clientX;
+    lastY = e.clientY;
+    shell.classList.add('dragging');
+    try { shell.setPointerCapture(e.pointerId); } catch {}
+  });
+  shell.addEventListener('pointermove', e => {
+    if(linkDragging){
+      updateTempLink(e);
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    if(nodeDragging){
+      const rawDx = (e.clientX - nodeDragging.startClientX) / topoView.scale;
+      const rawDy = (e.clientY - nodeDragging.startClientY) / topoView.scale;
+      const { dx, dy } = clampGroupDelta(nodeDragging.items || [], rawDx, rawDy);
+      (nodeDragging.items || []).forEach(item => {
+        const node = currentNodes.find(n => n.ref === item.ref);
+        if(!node) return;
+        node.x = item.startX + dx;
+        node.y = item.startY + dy;
+        if(item.el) {
+          item.el.style.left = `${node.x}px`;
+          item.el.style.top = `${node.y}px`;
+        }
+      });
+      refreshTopologyEdges();
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    updateEdgeDeleteHover(e);
+    if(!dragging) return;
+    topoView.x += e.clientX - lastX;
+    topoView.y += e.clientY - lastY;
+    lastX = e.clientX;
+    lastY = e.clientY;
+    topoView.userMoved = true;
+    applyTopologyTransform();
+  });
+  function endDrag(e){
+    if(linkDragging){
+      const sourceRef = linkDragging.source.ref;
+      const targetEl = document.elementFromPoint(e.clientX, e.clientY)?.closest?.('.topo-node');
+      const targetRef = targetEl?.dataset.ref;
+      removeTempLink();
+      linkDragging = null;
+      shell.classList.remove('linking');
+      try { shell.releasePointerCapture(e.pointerId); } catch {}
+      if(targetRef && targetRef !== sourceRef && !linkExists(sourceRef, targetRef)){
+        saveTopologyLinks([...topologyLinks, { from: sourceRef, to: targetRef }])
+          .catch(err => alert(err.message || 'Could not save topology link'));
+      }
+      return;
+    }
+    if(nodeDragging){
+      (nodeDragging.items || []).forEach(item => {
+        const node = currentNodes.find(n => n.ref === item.ref);
+        if(node) topologyPositions[node.ref] = { x: node.x, y: node.y };
+        item.el?.classList.remove('node-dragging');
+      });
+      if(lastData) lastData.topologyPositions = topologyPositions;
+      saveTopologyPositions();
+      shell.classList.remove('node-moving');
+      try { nodeDragging.el.releasePointerCapture(e.pointerId); } catch {}
+      nodeDragging = null;
+      if(lastData) renderTopology(lastData);
+      return;
+    }
+    if(!dragging) return;
+    dragging = false;
+    shell.classList.remove('dragging');
+    saveTopologyView();
+    try { shell.releasePointerCapture(e.pointerId); } catch {}
+  }
+  shell.addEventListener('pointerup', endDrag);
+  shell.addEventListener('pointercancel', endDrag);
+  shell.addEventListener('mouseleave', hideEdgeDeleteButtons);
+  shell.addEventListener('dblclick', () => {
+    topoView.userMoved = false;
+    clearTopologyView();
+    if(lastData) renderTopology(lastData);
+  });
+  document.getElementById('links-map-btn')?.addEventListener('click', e => {
+    e.preventDefault();
+    e.stopPropagation();
+    toggleLinkPanel();
+  });
+}
+initTopologyControls();
+window.addEventListener('resize',()=>{if(!topoView.userMoved) topoView.initialized = false; if(lastData) renderTopology(lastData)});
+const cachedTopology = readTopologyCache();
+if(cachedTopology) {
+  renderTopology(cachedTopology);
+  if(window.OmniI18n) OmniI18n.apply(document,lang());
+}
+load();
+scheduleTopologyPoll(15000);
+</script>
+</body>
+</html>

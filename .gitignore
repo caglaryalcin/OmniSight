@@ -1,0 +1,19 @@
+node_modules/
+
+# runtime config (keep local)
+config.yaml
+
+# persistent state (data/): config, keys, kubeconfig, auth, sessions (keep folder, ignore contents)
+data/*
+!data/.gitkeep
+
+# local/generated UI assets
+public/assets/
+
+.env
+.env.local
+
+*.log
+npm-debug.log*
+
+.fuse_hidden*

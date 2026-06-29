@@ -1,0 +1,172 @@
+# OmniSight configuration
+# Any value may reference an environment variable: ${VAR} or ${VAR:-default}
+# Example:  tokenSecret: ${PVE_TOKEN_SECRET}   |   chatId: "${TG_CHAT_ID}"
+# Useful for Docker / secrets — set the env var and reference it here.
+# Keep key files (kubeconfig, SSH keys) in the ./data/ folder (git-ignored).
+
+# Optional timezone for server-side timestamps/notifications.
+# Can also be set with TZ=Europe/Istanbul (or TIMEZONE=Europe/Istanbul).
+timezone: "${TZ:-UTC}"
+timeFormat: "24h"
+defaultTimePeriodHours: 1
+historyRetentionDays: 7
+preferredLanguage: "en"
+appearance:
+  dashboardSidePanel: true
+performance:
+  lowIoMode: false
+  collectorConcurrency: 3
+  # Optional per-platform refresh intervals in seconds. Backoff is automatic after failures.
+  # refreshIntervals:
+  #   snmp: 30
+  #   docker: 15
+security:
+  redactIpAddresses: false
+  allowedPublicIps: []
+
+# Linux servers, Proxmox nodes and Docker hosts are all monitored by the
+# OmniSight agent (push). Use Settings -> "+ Add System / Node / Host" to get
+# a copy-paste install command (Binary/systemd or Docker) with the token
+# pre-filled. Agents self-register; no per-server config is needed here.
+#   Binary:  curl -fsSL http://<host>:3000/agent/install.sh | \
+#              sudo OMNISIGHT_URL=http://<host>:3000 OMNISIGHT_TOKEN=<token> bash
+#   Self-signed HTTPS: add curl --insecure and OMNISIGHT_INSECURE_TLS=1.
+# The same shared token is used by every agent (linux.agentToken).
+linux:
+  enabled: true
+  agentToken: "generate-from-settings-ui"
+
+# Proxmox data (VM/LXC, storage, backups, Ceph) is collected by the agent via
+# pvesh on each node - no API token needed. Just install the agent on the node.
+proxmox:
+  enabled: true
+
+kubernetes:
+  kubeconfig: './data/kube.bin'   # put your kubeconfig in data/
+  namespaces:
+    - default
+    - production
+
+snmp:
+  devices:
+    - name: "NAS-01"
+      host: "192.168.1.5"
+      profile: "synology" # generic, synology, mikrotik, unifi, linux
+      community: "CHANGE_ME"
+
+healthchecks:
+  url: "https://healthchecks.yourdomain.com"
+  apiKey: "your-api-key-here"
+  pingBaseUrl: "https://healthchecks.yourdomain.com/ping"
+  pingKey: "" # optional, needed to build ping URLs when using a read-only API key
+
+uptimekuma:
+  url: "https://kuma.yourdomain.com"
+  slug: "default"
+  username: ""
+  password: ""
+  historyHours: 1
+
+# Optional built-in checks, independent from external status tools.
+checks:
+  enabled: true
+  services:
+    - name: "Homepage"
+      type: "http"      # http, tcp, ping, dns
+      target: "https://example.com"
+      timeoutMs: 5000
+    - name: "SSH"
+      type: "tcp"
+      target: "10.0.0.10"
+      port: 22
+
+# Docker containers are reported by the same agent when docker is present on
+# the host (or run the agent itself as a container - see Settings -> Docker).
+docker:
+  enabled: true
+  # Optional SSH host example:
+  # hosts:
+  #   - type: ssh
+  #     name: docker01
+  #     sshHost: 10.0.0.20
+  #     sshUser: root
+
+dockhand:
+  enabled: false
+  # instances:
+  #   - name: Dockhand
+  #     url: "https://dockhand.example.com"
+  #     token: "dh_..."
+  #     insecureTLS: false
+
+publicStatus: false
+publicTitle: "OmniSight Status"
+publicDescription: ""
+publicStatusShowDetails: false
+publicStatusShowHistory: false
+publicPlatforms:
+  - proxmox
+  - linux
+  - kubernetes
+  - snmp
+  - healthchecks
+  - uptimekuma
+  - checks
+  - prometheus
+  - docker
+  - dockhand
+  - database
+
+alerts:
+  enabled: true
+  thresholds:
+    cpu:
+      warning: 80
+      critical: 90
+    ram:
+      warning: 80
+      critical: 90
+    disk:
+      warning: 80
+      critical: 90
+  rules:
+    cpu:
+      durationSeconds: 60
+    ram:
+      durationSeconds: 60
+    disk:
+      durationSeconds: 60
+    pod:
+      durationSeconds: 60
+    container:
+      durationSeconds: 60
+    target:
+      durationSeconds: 60
+  maintenanceWindows:
+    # days: mon,tue,wed,thu,fri  |  wrap-around windows such as 23:00 -> 02:00 are supported
+    - start: "23:00"
+      end: "23:30"
+      days: ["sun"]
+  webhook:
+    enabled: false
+    token: "change-me-long-random-token"
+  ntfy:
+    url: "https://ntfy.sh"
+    topic: "omnisight-CHANGE-ME"
+    priority: "default"
+  telegram:
+    botToken: "123456:ABC-your-bot-token"
+    chatId: "123456789"
+  smtp:
+    host: "smtp.gmail.com"
+    port: 587
+    secure: false
+    user: "you@gmail.com"
+    password: "app-password"
+    from: "OmniSight <you@gmail.com>"
+    to:
+      - "alerts@yourdomain.com"
+
+# Optional: expose a read-only public status page at /status
+# publicStatus: true
+# publicTitle: "OmniSight Status"

@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>try{document.documentElement.setAttribute("data-theme",localStorage.getItem("os_theme")||"dark")}catch(e){}</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>OmniSight — Event Center</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%230B0E14' stroke='%2334D399' stroke-width='2'/><circle cx='16' cy='16' r='6' fill='%2334D399'/><circle cx='16' cy='16' r='10' fill='none' stroke='%2334D399' stroke-width='1.5' stroke-opacity='.4'/></svg>">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#141617;--panel:#181A1B;--row:#141617;--border:#242C3B;--text:#E2E8F2;--muted:#7D8AA3;--green:#34D399;--red:#F87171;--yellow:#FBBF24}
+body{background:var(--bg);color:var(--text);font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;display:flex;flex-direction:column;height:100vh}
+*{scrollbar-width:thin;scrollbar-color:var(--border) var(--bg)}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border);border:2px solid var(--bg);border-radius:999px}
+::-webkit-scrollbar-thumb:hover{background:var(--muted)}
+::-webkit-scrollbar-corner{background:var(--bg)}
+header{background:var(--panel);border-bottom:1px solid var(--border);height:64px;padding:0 24px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.logo{font-size:19px;font-weight:700;display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit}
+.ldot{width:12px;height:12px;border-radius:50%;background:var(--green)}
+.hdr-r{display:flex;align-items:center;gap:8px}
+.btn{background:var(--row);border:1px solid var(--border);color:var(--text);padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;display:flex;align-items:center;gap:6px}
+.btn:hover{border-color:#4a5568}
+.btn.active{border-color:var(--yellow);color:var(--yellow)}
+.filter-bar{background:var(--panel);border-bottom:1px solid var(--border);padding:8px 20px;display:flex;align-items:center;gap:8px;flex-shrink:0}
+.filter-btn{padding:3px 10px;border-radius:20px;border:1px solid var(--border);background:none;color:var(--muted);font-size:11px;font-weight:600;cursor:pointer}
+.filter-btn.on{background:var(--row);color:var(--text);border-color:#4a5568}
+.filter-btn.info.on{color:var(--text)}
+.filter-btn.warn.on{color:var(--yellow);border-color:var(--yellow)}
+.filter-btn.error.on{color:var(--red);border-color:var(--red)}
+.filter-btn.problem.on{color:var(--red);border-color:var(--red)}
+.filter-btn.recovery.on{color:var(--green);border-color:var(--green)}
+.filter-btn.test.on{color:var(--blue,#60A5FA);border-color:var(--blue,#60A5FA)}
+.alert-filter{display:none}
+.filter-sep{width:1px;height:20px;background:var(--border);margin:0 4px;pointer-events:none;user-select:none;flex-shrink:0}
+#search{background:var(--row);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:4px 10px;outline:none;margin-left:auto;width:200px}
+#search:focus{border-color:#4a5568}
+#log-wrap{flex:1;overflow-y:auto;padding:12px 20px;font-family:'SF Mono','Fira Code',monospace;font-size:12px;line-height:1.6}
+.log-line{display:flex;gap:10px;padding:2px 0;border-bottom:1px solid rgba(255,255,255,.03)}
+.log-line:hover{background:rgba(255,255,255,.03)}
+.log-time{color:var(--muted);white-space:nowrap;flex-shrink:0}
+.log-lvl{width:36px;flex-shrink:0;font-weight:700;font-size:10px;text-transform:uppercase}
+.log-lvl.info{color:var(--text)}
+.log-lvl.warn{color:var(--yellow)}
+.log-lvl.error{color:var(--red)}
+.log-msg{word-break:break-all;white-space:pre-wrap}
+.log-msg.error{color:var(--red)}
+.log-msg.warn{color:var(--yellow)}
+.alert-row{display:grid;grid-template-columns:178px 82px 92px minmax(220px,1fr) 220px;gap:12px;align-items:start;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.055);font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:12px;line-height:1.45}
+.alert-row:hover{background:rgba(255,255,255,.03)}
+.alert-time{color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+.pill{display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--border);border-radius:999px;padding:2px 9px;font-size:10px;font-weight:800;text-transform:uppercase;line-height:1.4;width:max-content}
+.pill.problem{color:var(--red);border-color:rgba(248,113,113,.45);background:rgba(248,113,113,.10)}
+.pill.recovery{color:var(--green);border-color:rgba(52,211,153,.45);background:rgba(52,211,153,.10)}
+.pill.test{color:var(--blue,#60A5FA);border-color:rgba(96,165,250,.45);background:rgba(96,165,250,.10)}
+.sev{font-weight:800;text-transform:uppercase;font-size:10px}
+.sev.critical{color:var(--red)}
+.sev.warning{color:var(--yellow)}
+.sev.normal{color:var(--green)}
+.alert-main{min-width:0}
+.alert-title{font-weight:750;color:var(--text);font-size:13px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.alert-msg{color:var(--muted);white-space:pre-wrap;word-break:break-word}
+.channels{display:flex;flex-wrap:wrap;gap:5px;justify-content:flex-end}
+.channel{border:1px solid var(--border);border-radius:999px;padding:2px 7px;color:var(--muted);font-size:10px;font-weight:700}
+.channel.ok{color:var(--green);border-color:rgba(52,211,153,.45)}
+.channel.fail{color:var(--red);border-color:rgba(248,113,113,.45)}
+.mini-action{border:1px solid var(--border);background:var(--row);color:var(--muted);border-radius:999px;padding:2px 8px;font-size:10px;font-weight:800;cursor:pointer}
+.mini-action:hover{color:var(--text);border-color:#4a5568}
+.mini-action.green{color:var(--green);border-color:rgba(52,211,153,.35)}
+.mini-action.yellow{color:var(--yellow);border-color:rgba(251,191,36,.35)}
+.alert-row.acked .alert-title::after{content:' acknowledged';margin-left:8px;color:var(--green);font-size:10px;text-transform:uppercase}
+.modal-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.58);z-index:500;align-items:center;justify-content:center;padding:20px}
+.modal-backdrop.open{display:flex}
+.modal{width:min(760px,96vw);max-height:82vh;overflow:hidden;background:var(--panel);border:1px solid var(--border);border-radius:12px;box-shadow:0 28px 80px rgba(0,0,0,.5);display:flex;flex-direction:column}
+.modal-h{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px}
+.modal-h strong{font-size:15px}
+.modal-body{overflow:auto;padding:10px 16px}
+.timeline-row{display:grid;grid-template-columns:160px 90px minmax(0,1fr);gap:12px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.055);font-size:12px}
+.timeline-msg{color:var(--muted);white-space:pre-wrap;word-break:break-word}
+.empty-msg{color:var(--muted);text-align:center;padding:40px}
+.count{font-size:11px;color:var(--muted)}
+.menu-wrap{position:relative}
+.menu-btn{background:var(--row);border:1px solid var(--border);color:var(--text);padding:8px 13px;border-radius:7px;cursor:pointer;font-size:14px;display:flex;align-items:center;gap:6px}
+.menu-btn:hover{border-color:#4a5568}
+.menu-drop{display:none;position:absolute;right:0;top:calc(100% + 6px);background:var(--panel);border:1px solid var(--border);border-radius:8px;min-width:140px;overflow:hidden;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.menu-drop.open{display:block}
+.menu-item{display:block;padding:10px 16px;font-size:13px;color:var(--text);text-decoration:none;cursor:pointer;border:none;background:none;width:100%;text-align:left}
+.menu-item:hover{background:rgba(255,255,255,.05)}
+.menu-item.danger{color:var(--red)}
+html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#dde3ec;--text:#1c2433;--muted:#64748b;--green:#0e9f6e;--red:#dc2f2f;--yellow:#b7791f;--blue:#3b82f6;}
+html.embed header{display:none}
+.lg-ts{color:var(--muted)}
+.lg-err{color:var(--red);font-weight:600}
+.lg-warn{color:var(--yellow);font-weight:600}
+.lg-info{color:var(--green)}
+.lg-dbg{color:var(--muted)}
+.lg-ip{color:var(--blue,#60A5FA)}
+.lg-str{color:#d9a05b}
+.lg-num{color:var(--blue,#60A5FA)}
+@media(max-width:900px){.alert-row{grid-template-columns:1fr}.channels{justify-content:flex-start}}
+</style>
+<script>if(window.self!==window.top)document.documentElement.classList.add("embed");</script>
+</head>
+<body>
+<header>
+  <a href="/" class="logo"><div class="ldot"></div>OmniSight</a>
+  <div class="hdr-r">
+    <span class="count" id="count"></span>
+    <button class="btn" id="follow-btn" onclick="toggleFollow()">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+      Follow
+    </button>
+    <button class="btn" onclick="clearLogs()">Clear</button>
+    <div class="menu-wrap">
+      <button class="menu-btn" onclick="toggleMenu()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+      </button>
+      <div class="menu-drop" id="menu-drop">
+        <a class="menu-item" href="/profile">Profile</a>
+        <a class="menu-item" href="/settings">Settings</a>
+        <a class="menu-item" href="/event-center#alerts">Alerts</a>
+        <button class="menu-item danger" onclick="doLogout()">Sign out</button>
+      </div>
+    </div>
+  </div>
+</header>
+<div class="filter-bar">
+  <button class="filter-btn on" id="mode-runtime" onclick="setViewMode('runtime')">Runtime</button>
+  <button class="filter-btn" id="mode-audit" onclick="setViewMode('audit')">Audit</button>
+  <button class="filter-btn" id="mode-alerts" onclick="setViewMode('alerts')">Alerts</button>
+  <span class="filter-sep"></span>
+  <button class="filter-btn info on level-filter" onclick="toggleFilter('info',this)">INFO</button>
+  <button class="filter-btn warn on level-filter" onclick="toggleFilter('warn',this)">WARN</button>
+  <button class="filter-btn error on level-filter" onclick="toggleFilter('error',this)">ERROR</button>
+  <button class="filter-btn problem on alert-filter" onclick="toggleAlertFilter('problem',this)">Problem</button>
+  <button class="filter-btn recovery on alert-filter" onclick="toggleAlertFilter('recovery',this)">Recovery</button>
+  <button class="filter-btn test on alert-filter" onclick="toggleAlertFilter('test',this)">Test</button>
+  <button class="btn" id="copy-btn" onclick="copyLogs()">Copy all</button>
+  <input id="search" type="text" placeholder="Filter…" oninput="applyFilter()">
+</div>
+<div id="log-wrap"><div class="empty-msg">No logs yet…</div></div>
+<div class="modal-backdrop" id="timeline-modal" onclick="if(event.target===this)closeTimeline()">
+  <div class="modal">
+    <div class="modal-h">
+      <strong id="timeline-title">Alert timeline</strong>
+      <button class="btn" onclick="closeTimeline()">Close</button>
+    </div>
+    <div class="modal-body" id="timeline-body"></div>
+  </div>
+</div>
+
+<script src="/i18n.js"></script>
+<script>
+function currentLang(){ return OmniI18n.currentLang('en'); }
+function t(text){ return OmniI18n.t(text, currentLang()); }
+let appliedLangKey = '';
+function applyLanguage(){
+  const lang = currentLang();
+  const key = `${lang}:${viewMode}`;
+  if(appliedLangKey === key) return;
+  OmniI18n.apply(document, lang);
+  appliedLangKey = key;
+  const titles = {
+    runtime: lang === 'tr' ? 'OmniSight — Olay Merkezi' : 'OmniSight — Event Center',
+    audit: lang === 'tr' ? 'OmniSight — Olay Merkezi / Denetim' : 'OmniSight — Event Center / Audit',
+    alerts: lang === 'tr' ? 'OmniSight — Olay Merkezi / Bildirimler' : 'OmniSight — Event Center / Alerts',
+  };
+  document.title = titles[viewMode] || titles.runtime;
+}
+function toggleMenu(){ document.getElementById('menu-drop').classList.toggle('open'); }
+document.addEventListener('click', e => { if(!e.target.closest('.menu-wrap')) document.getElementById('menu-drop')?.classList.remove('open'); });
+function authHeaders(){ const t=sessionStorage.getItem('os_token')||localStorage.getItem('os_token'); return t?{'x-session-token':t}:{}; }
+function handleUnauth(r){ if(r.status===401){ sessionStorage.removeItem('os_token'); localStorage.removeItem('os_token'); document.cookie='session=; path=/; max-age=0'; (window.top || window).location.href='/login'; throw new Error('Unauthorized'); } }
+async function doLogout(){ await fetch('/api/logout',{method:'POST',headers:authHeaders()}).catch(()=>{}); sessionStorage.removeItem('os_token'); localStorage.removeItem('os_token'); document.cookie='session=; path=/; max-age=0'; window.location.href='/login'; }
+
+let allLogs = [];
+let auditLogs = [];
+let allAlerts = [];
+let lastTs = 0;
+let auditLastTs = 0;
+let alertLastTs = 0;
+let follow = true;
+let filters = { info: true, warn: true, error: true };
+let alertFilters = { problem: true, recovery: true, test: true };
+let cleared = 0;
+let auditCleared = 0;
+let viewMode = 'runtime';
+const MAX_DOM_ROWS = 500;
+const EVENTS_CACHE_KEY = 'os_event_center_cache_v3';
+let embedPaused = false;
+let pollTimer = null;
+let pollBusy = false;
+let pollAbort = null;
+let initialAbort = null;
+let lastPollAt = 0;
+
+function abortEventCenterFetches(){
+  [pollAbort, initialAbort].forEach(ctrl => {
+    try { ctrl?.abort(); } catch {}
+  });
+  pollAbort = null;
+  initialAbort = null;
+}
+
+window.addEventListener('message', event => {
+  if(event.origin !== window.location.origin) return;
+  if(event.data?.type !== 'omnisight-embed-visibility') return;
+  embedPaused = event.data.visible === false;
+  if(embedPaused) {
+    clearTimeout(pollTimer);
+    abortEventCenterFetches();
+    return;
+  }
+  if(!embedPaused) {
+    schedulePoll(Date.now() - lastPollAt < 2500 ? 1200 : 50);
+  }
+});
+function schedulePoll(delay = 2500){ clearTimeout(pollTimer); pollTimer = setTimeout(poll, delay); }
+
+function eventsCacheKey(){
+  const token = sessionStorage.getItem('os_token') || localStorage.getItem('os_token') || 'anon';
+  return `${EVENTS_CACHE_KEY}:${String(token).slice(-18)}`;
+}
+
+function readEventsCache(maxAgeMs = 10 * 60 * 1000){
+  try{
+    const key = eventsCacheKey();
+    const raw = sessionStorage.getItem(key) || localStorage.getItem(key);
+    if(!raw) return null;
+    const box = JSON.parse(raw);
+    if(!box || Date.now() - Number(box.t || 0) > maxAgeMs) return null;
+    return box.data || null;
+  }catch{ return null; }
+}
+
+function saveEventsCache(){
+  try{
+    const key = eventsCacheKey();
+    const raw = JSON.stringify({
+      t: Date.now(),
+      data: {
+        logs: allLogs.slice(-180),
+        audit: auditLogs.slice(-180),
+        alerts: allAlerts.slice(-180),
+      },
+    });
+    sessionStorage.setItem(key, raw);
+    localStorage.setItem(key, raw);
+  }catch{}
+}
+
+function domWindow(rows){
+  return Array.isArray(rows) ? rows.slice(0, MAX_DOM_ROWS) : [];
+}
+function setStableHtml(el, signature, html){
+  if(!el) return;
+  if(el.dataset.renderSignature === signature) return;
+  el.dataset.renderSignature = signature;
+  el.innerHTML = html;
+}
+
+function countLabel(total){
+  return total > MAX_DOM_ROWS ? `${MAX_DOM_ROWS}/${total} ${t('entries')}` : `${total} ${t('entries')}`;
+}
+
+function toggleFollow(){
+  follow = !follow;
+  document.getElementById('follow-btn').classList.toggle('active', follow);
+  if(follow) scrollToBottom();
+}
+
+function toggleFilter(level, btn){
+  filters[level] = !filters[level];
+  btn.classList.toggle('on', filters[level]);
+  renderLogs();
+}
+function toggleAlertFilter(type, btn){
+  alertFilters[type] = !alertFilters[type];
+  btn.classList.toggle('on', alertFilters[type]);
+  renderLogs();
+}
+
+function applyFilter(){ renderLogs(); }
+
+function setViewMode(mode){
+  viewMode = mode === 'audit' ? 'audit' : mode === 'alerts' ? 'alerts' : 'runtime';
+  document.getElementById('mode-runtime').classList.toggle('on', viewMode === 'runtime');
+  document.getElementById('mode-audit').classList.toggle('on', viewMode === 'audit');
+  document.getElementById('mode-alerts').classList.toggle('on', viewMode === 'alerts');
+  document.querySelectorAll('.level-filter').forEach(el => { el.style.display = viewMode === 'runtime' ? '' : 'none'; });
+  document.querySelectorAll('.alert-filter').forEach(el => { el.style.display = viewMode === 'alerts' ? '' : 'none'; });
+  document.getElementById('search').placeholder = viewMode === 'alerts' ? 'Filter alerts...' : 'Filter…';
+  renderLogs();
+}
+
+function visibleLogs(){
+  const search = document.getElementById('search').value.toLowerCase();
+  return allLogs
+    .filter(l => l.t > cleared && filters[l.level] && (!search || l.msg.toLowerCase().includes(search)))
+    .sort((a,b) => b.t - a.t);
+}
+
+function visibleAudit(){
+  const search = document.getElementById('search').value.toLowerCase();
+  return auditLogs
+    .filter(a => a.t > auditCleared)
+    .filter(a => {
+      if(!search) return true;
+      const hay = [a.action, a.actor, a.ip, a.publicIp, JSON.stringify(a.detail || {})].join(' ').toLowerCase();
+      return hay.includes(search);
+    })
+    .sort((a,b) => b.t - a.t);
+}
+function visibleAlerts(){
+  const search = document.getElementById('search').value.toLowerCase();
+  return allAlerts
+    .filter(a => alertFilters[a.type || 'problem'])
+    .filter(a => !search || [a.title,a.message,a.label,a.detail,a.severity,a.status,a.key].some(v => String(v || '').toLowerCase().includes(search)))
+    .sort((a,b) => Number(b.t || 0) - Number(a.t || 0));
+}
+
+function fmt(ts){
+  const d = new Date(ts);
+  return d.toLocaleTimeString('en-GB',{hour12:false}) + '.' + String(d.getMilliseconds()).padStart(3,'0');
+}
+
+function fmtFull(ts){
+  const lang = currentLang() === 'tr' ? 'tr-TR' : 'en-GB';
+  return new Date(ts).toLocaleString(lang, { year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false });
+}
+
+function renderLogs(){
+  if(viewMode === 'alerts') return renderAlerts();
+  if(viewMode === 'audit') return renderAudit();
+  const wrap = document.getElementById('log-wrap');
+  const visible = visibleLogs();
+  const rows = domWindow(visible);
+  document.getElementById('count').textContent = countLabel(visible.length);
+  if(!visible.length){ setStableHtml(wrap, `logs-empty:${currentLang()}`, `<div class="empty-msg">${t('No matching logs')}</div>`); applyLanguage(); return; }
+  const html = rows.map(l => `
+    <div class="log-line">
+      <span class="log-time">${fmt(l.t)}</span>
+      <span class="log-lvl ${l.level}">${l.level}</span>
+      <span class="log-msg ${l.level}">${highlightLog(l.msg)}</span>
+    </div>`).join('');
+  setStableHtml(wrap, `logs:${currentLang()}:${visible.length}:${rows.map(l => `${l.t}:${l.level}:${l.msg}`).join('|')}`, html);
+  applyLanguage();
+  if(follow) scrollToBottom();
+}
+
+function jsStr(s){ return `'${String(s ?? '').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\r/g,'\\r').replace(/\n/g,'\\n')}'`; }
+function channelHtml(a){
+  const channels = Array.isArray(a.channels) ? a.channels : [];
+  const base = channels.length
+    ? channels.map(c => `<span class="channel ${c.ok?'ok':'fail'}" title="${escHtml(c.error || '')}">${escHtml(c.channel)} ${c.ok?'OK':'FAIL'}</span>`).join('')
+    : `<span class="channel">${escHtml(t(a.status || 'sending'))}</span>`;
+  const actions = a.key ? `
+    <button class="mini-action" onclick="event.stopPropagation();openTimeline(${jsStr(a.key)})">Timeline</button>
+    ${a.type === 'problem' && !a.acknowledgedAt ? `<button class="mini-action green" onclick="event.stopPropagation();ackAlert(${jsStr(a.id || '')},${jsStr(a.key || '')})">Ack</button>` : ''}
+    <button class="mini-action yellow" onclick="event.stopPropagation();muteAlert(${jsStr(a.key || '')},60)">Mute 1h</button>
+  ` : '';
+  return base + actions;
+}
+function renderAlerts(){
+  const wrap = document.getElementById('log-wrap');
+  const rows = visibleAlerts();
+  const renderRows = domWindow(rows);
+  document.getElementById('count').textContent = countLabel(rows.length);
+  if(!rows.length){ setStableHtml(wrap, `alerts-empty:${currentLang()}`, `<div class="empty-msg">${t('No alerts yet')}</div>`); applyLanguage(); return; }
+  const html = renderRows.map(a => {
+    const type = a.type || 'problem';
+    const sev = a.severity || 'normal';
+    const title = a.title || a.label || type;
+    const msg = a.message || [a.label, a.detail].filter(Boolean).join(' - ');
+    return `<div class="alert-row ${a.acknowledgedAt?'acked':''}" ondblclick="openTimeline(${jsStr(a.key || '')})">
+      <span class="alert-time">${fmtFull(a.t)}</span>
+      <span class="pill ${escHtml(type)}">${escHtml(t(type))}</span>
+      <span class="sev ${escHtml(sev)}">${escHtml(t(sev))}</span>
+      <div class="alert-main">
+        <div class="alert-title">${escHtml(title)}</div>
+        <div class="alert-msg">${escHtml(msg)}</div>
+      </div>
+      <div class="channels">${channelHtml(a)}</div>
+    </div>`;
+  }).join('');
+  setStableHtml(wrap, `alerts:${currentLang()}:${rows.length}:${renderRows.map(a => `${a.id || a.key || a.t}:${a.t}:${a.type}:${a.status}:${a.acknowledgedAt || ''}`).join('|')}`, html);
+  applyLanguage();
+  if(follow) scrollToBottom();
+}
+
+function auditDetailSummary(a){
+  const action = String(a.action || 'audit');
+  const detail = a.detail && typeof a.detail === 'object' ? a.detail : {};
+  if(action === 'settings.changed'){
+    const list = Array.isArray(detail.settings) ? detail.settings.filter(Boolean) : [];
+    const count = Number(detail.count || list.length || 0);
+    if(!list.length) return t('settings updated');
+    const more = count > list.length ? ` +${count - list.length}` : '';
+    return `${t('changed')}: ${list.join(', ')}${more}`;
+  }
+  if(action === 'config.save' && Array.isArray(detail.sections)){
+    return `${t('settings updated')}: ${detail.sections.length} ${t('sections')}`;
+  }
+  if(action === 'auth.login'){
+    return [detail.outcome, detail.reason].filter(Boolean).join(' - ');
+  }
+  try { return Object.keys(detail).length ? JSON.stringify(detail) : ''; }
+  catch { return ''; }
+}
+
+function auditActionLabel(a){
+  const action = String(a.action || 'audit');
+  if(action === 'settings.changed' || action === 'config.save') return t('Settings changed');
+  if(action === 'auth.login') return t('Sign in');
+  if(action === 'auth.logout') return t('Sign out');
+  return action;
+}
+
+function renderAudit(){
+  const wrap = document.getElementById('log-wrap');
+  const visible = visibleAudit();
+  const rows = domWindow(visible);
+  document.getElementById('count').textContent = countLabel(visible.length);
+  if(!visible.length){ setStableHtml(wrap, `audit-empty:${currentLang()}`, `<div class="empty-msg">${t('No audit events')}</div>`); applyLanguage(); return; }
+  const html = rows.map(a => {
+    const detail = auditDetailSummary(a);
+    const pub = a.publicIp && a.publicIp !== a.ip ? `<span class="lg-ip">public=${escHtml(String(a.publicIp))}</span>` : '';
+    return `<div class="log-line">
+      <span class="log-time">${fmtFull(a.t)}</span>
+      <span class="log-lvl info">AUDIT</span>
+      <span class="log-msg"><span class="lg-info">${escHtml(auditActionLabel(a))}</span> <span class="lg-dbg">actor=${escHtml(String(a.actor || 'system'))}</span> ${a.ip ? `<span class="lg-ip">${escHtml(String(a.ip))}</span>` : ''} ${pub} ${detail ? `<span class="lg-str">${escHtml(detail)}</span>` : ''}</span>
+    </div>`;
+  }).join('');
+  setStableHtml(wrap, `audit:${currentLang()}:${visible.length}:${rows.map(a => `${a.t}:${a.action}:${a.actor}:${JSON.stringify(a.detail || {})}`).join('|')}`, html);
+  applyLanguage();
+  if(follow) scrollToBottom();
+}
+
+async function copyLogs(){
+  const text = viewMode === 'alerts'
+    ? visibleAlerts().map(a => `${fmtFull(a.t)} ${String(a.type || '').toUpperCase()} ${String(a.severity || '').toUpperCase()} ${a.title || a.label || ''} ${a.message || a.detail || ''}`).join('\n')
+    : viewMode === 'audit'
+    ? visibleAudit().map(a => `${fmtFull(a.t)} AUDIT ${auditActionLabel(a)} actor=${a.actor || ''} ip=${a.ip || ''} public=${a.publicIp || ''} ${auditDetailSummary(a)}`).join('\n')
+    : visibleLogs().map(l => `${fmt(l.t)} ${String(l.level || '').toUpperCase().padEnd(5)} ${l.msg || ''}`).join('\n');
+  const btn = document.getElementById('copy-btn');
+  try {
+    await navigator.clipboard.writeText(text);
+    const old = btn.textContent;
+    btn.textContent = t('Copied');
+    setTimeout(() => { btn.textContent = old; }, 1200);
+  } catch {
+    const old = btn.textContent;
+    btn.textContent = t('Copy failed');
+    setTimeout(() => { btn.textContent = old; }, 1200);
+  }
+}
+
+function escHtml(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function highlightLog(text){
+  const re=/(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?)|\b(ERROR|ERR|FATAL|CRITICAL|WARNING|WARN|INFO|NOTICE|DEBUG|TRACE)\b|(\b\d{1,3}(?:\.\d{1,3}){3}(?::\d+)?\b)|("[^"]*"|'+"'"+'[^'+"'"+']*'+"'"+')|(\b\d+(?:\.\d+)?\b)/g;
+  let out='',last=0,m;
+  while((m=re.exec(text))){
+    out+=escHtml(text.slice(last,m.index));
+    let cls;
+    if(m[1]) cls='lg-ts';
+    else if(m[2]){ const L=m[2].toUpperCase(); cls=/ERR|FATAL|CRIT/.test(L)?'lg-err':/WARN/.test(L)?'lg-warn':(L==='INFO'||L==='NOTICE')?'lg-info':'lg-dbg'; }
+    else if(m[3]) cls='lg-ip';
+    else if(m[4]) cls='lg-str';
+    else cls='lg-num';
+    out+='<span class="'+cls+'">'+escHtml(m[0])+'</span>';
+    last=m.index+m[0].length;
+  }
+  out+=escHtml(text.slice(last));
+  return out;
+}
+function scrollToBottom(){ const w=document.getElementById('log-wrap'); w.scrollTop=0; }
+
+function clearLogs(){
+  if(viewMode === 'alerts') { clearAlertHistory(); return; }
+  if(viewMode === 'audit') auditCleared = Date.now();
+  else cleared = Date.now();
+  renderLogs();
+}
+
+async function openTimeline(key){
+  if(!key) return;
+  const modal = document.getElementById('timeline-modal');
+  const body = document.getElementById('timeline-body');
+  document.getElementById('timeline-title').textContent = key;
+  body.innerHTML = `<div class="empty-msg">${t('Loading alerts...')}</div>`;
+  modal.classList.add('open');
+  try {
+    const r = await fetch('/api/alerts/timeline?key=' + encodeURIComponent(key), { headers:authHeaders(), cache:'no-store' });
+    handleUnauth(r);
+    const payload = await r.json();
+    const rows = Array.isArray(payload) ? payload : (Array.isArray(payload?.events) ? payload.events : []);
+    body.innerHTML = rows.length ? rows.sort((a,b)=>Number(b.t||0)-Number(a.t||0)).map(a => `
+      <div class="timeline-row">
+        <span class="alert-time">${fmtFull(a.t)}</span>
+        <span class="pill ${escHtml(a.type || 'problem')}">${escHtml(t(a.type || 'problem'))}</span>
+        <div>
+          <div class="alert-title">${escHtml(a.title || a.label || '')}</div>
+          <div class="timeline-msg">${escHtml(a.message || a.detail || '')}</div>
+          ${a.acknowledgedAt ? `<div class="sev normal">${t('Acknowledged')} ${fmtFull(a.acknowledgedAt)}</div>` : ''}
+        </div>
+      </div>
+    `).join('') : `<div class="empty-msg">${t('No alerts yet')}</div>`;
+    applyLanguage();
+  } catch(e) {
+    body.innerHTML = `<div class="empty-msg">${escHtml(e.message)}</div>`;
+  }
+}
+function closeTimeline(){ document.getElementById('timeline-modal').classList.remove('open'); }
+async function ackAlert(id, key){
+  const r = await fetch('/api/alerts/ack', { method:'POST', headers:{'Content-Type':'application/json', ...authHeaders()}, body:JSON.stringify({ id, key }) });
+  handleUnauth(r);
+  allAlerts = allAlerts.map(a => (id && a.id === id) || (key && a.key === key && a.type === 'problem') ? { ...a, acknowledgedAt: Date.now() } : a);
+  renderLogs();
+}
+async function muteAlert(key, minutes){
+  const r = await fetch('/api/alerts/mute', { method:'POST', headers:{'Content-Type':'application/json', ...authHeaders()}, body:JSON.stringify({ key, minutes }) });
+  handleUnauth(r);
+  const btn = document.getElementById('follow-btn');
+  const old = btn.textContent;
+  btn.textContent = t('Muted');
+  setTimeout(() => { btn.textContent = old; }, 1200);
+}
+async function clearAlertHistory(){
+  if(!confirm(t('Clear alert history?'))) return;
+  const r = await fetch('/api/alerts/history/clear', { method:'POST', headers:authHeaders() });
+  handleUnauth(r);
+  allAlerts = [];
+  alertLastTs = 0;
+  renderLogs();
+}
+
+async function poll(){
+  if(embedPaused){ schedulePoll(5000); return; }
+  if(initialAbort){ schedulePoll(1000); return; }
+  if(pollBusy){ schedulePoll(1500); return; }
+  pollBusy = true;
+  try {
+    pollAbort = new AbortController();
+    const qs = new URLSearchParams({
+      logsSince: String(lastTs || 0),
+      auditSince: String(auditLastTs || 0),
+      alertsSince: String(alertLastTs || 0),
+    });
+    const r = await fetch(`/api/events/delta?${qs.toString()}`, {headers: authHeaders(), cache:'no-store', signal: pollAbort.signal});
+    handleUnauth(r);
+    const d = await r.json();
+    const newLogs = Array.isArray(d?.logs) ? d.logs : [];
+    const newAudit = Array.isArray(d?.audit) ? d.audit : [];
+    const newAlerts = Array.isArray(d?.alerts) ? d.alerts : [];
+    let changed = false;
+    if(newLogs.length){
+      allLogs.push(...newLogs);
+      if(allLogs.length > 2000) allLogs = allLogs.slice(-2000);
+      lastTs = allLogs[allLogs.length-1].t;
+      changed = true;
+    }
+    if(newAudit.length){
+      const seen = new Set(auditLogs.map(a => a.id));
+      newAudit.forEach(a => { if(!seen.has(a.id)){ auditLogs.push(a); seen.add(a.id); changed = true; } });
+      if(auditLogs.length > 2000) auditLogs = auditLogs.slice(-2000);
+      auditLastTs = Math.max(...auditLogs.map(a => Number(a.t || 0)));
+    }
+    if(newAlerts.length){
+      const seen = new Set(allAlerts.map(a => a.id));
+      newAlerts.forEach(a => { if(!seen.has(a.id)){ allAlerts.push(a); seen.add(a.id); changed = true; } });
+      if(allAlerts.length > 2000) allAlerts = allAlerts.slice(-2000);
+      alertLastTs = Math.max(...allAlerts.map(a => Number(a.t || 0)));
+    }
+    if(changed){
+      saveEventsCache();
+      renderLogs();
+    } else if((viewMode === 'audit' && !auditLogs.length) || (viewMode === 'alerts' && !allAlerts.length)) {
+      renderLogs();
+    }
+  } catch(e){ if(e.name !== 'AbortError' && e.message !== 'Unauthorized') console.error(e); }
+  finally { lastPollAt = Date.now(); pollAbort = null; pollBusy = false; if(!embedPaused) schedulePoll(2500); }
+}
+
+async function loadInitialEvents(){
+  try {
+    initialAbort = new AbortController();
+    const r = await fetch('/api/events/initial?limit=90', { headers: authHeaders(), cache:'no-store', signal: initialAbort.signal });
+    handleUnauth(r);
+    const d = await r.json();
+    applyInitialEvents(d, true);
+  } catch(e) {
+    if(e.name !== 'AbortError' && e.message !== 'Unauthorized') console.error(e);
+    if(!allLogs.length && !auditLogs.length && !allAlerts.length) {
+      renderLogs();
+    }
+  } finally {
+    initialAbort = null;
+  }
+}
+
+function applyInitialEvents(d, shouldCache = false){
+  allLogs = Array.isArray(d?.logs) ? d.logs : [];
+  auditLogs = Array.isArray(d?.audit) ? d.audit : [];
+  allAlerts = Array.isArray(d?.alerts) ? d.alerts : [];
+  lastTs = allLogs.length ? Math.max(...allLogs.map(l => Number(l.t || 0))) : 0;
+  auditLastTs = auditLogs.length ? Math.max(...auditLogs.map(a => Number(a.t || 0))) : 0;
+  alertLastTs = allAlerts.length ? Math.max(...allAlerts.map(a => Number(a.t || 0))) : 0;
+  if(shouldCache) saveEventsCache();
+  renderLogs();
+}
+
+(async()=>{
+  document.getElementById('follow-btn').classList.add('active');
+  applyLanguage();
+  setViewMode(String(window.location.hash || '').toLowerCase().includes('alerts') ? 'alerts' : 'runtime');
+  const cachedEvents = readEventsCache();
+  if(cachedEvents) applyInitialEvents(cachedEvents, false);
+  if(cachedEvents) loadInitialEvents();
+  else await loadInitialEvents();
+  schedulePoll(2500);
+})();
+</script>
+</body>
+</html>
