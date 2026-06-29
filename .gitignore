@@ -8,7 +8,12 @@ data/*
 !data/.gitkeep
 
 # local/generated UI assets
-public/assets/
+public/assets/*
+!public/assets/
+!public/assets/omnisight-logo.svg
+!public/assets/omnisight-logo.png
+!public/assets/omnisight-wordmark.svg
+!public/assets/omnisight-wordmark.png
 
 .env
 .env.local

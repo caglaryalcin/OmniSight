@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 260" role="img" aria-labelledby="title desc">
+  <title id="title">OmniSight wordmark</title>
+  <desc id="desc">OmniSight wordmark with a minimal transparent eye icon.</desc>
+  <defs>
+    <linearGradient id="eye" x1="52" y1="78" x2="208" y2="182" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#34D399"/>
+      <stop offset="0.52" stop-color="#22D3EE"/>
+      <stop offset="1" stop-color="#6366F1"/>
+    </linearGradient>
+    <radialGradient id="iris" cx="0" cy="0" r="1" gradientTransform="matrix(0 38 -38 0 130 130)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ECFDF5"/>
+      <stop offset="0.45" stop-color="#34D399"/>
+      <stop offset="1" stop-color="#0891B2"/>
+    </radialGradient>
+  </defs>
+  <path d="M46 130c21-35 49-52 84-52s63 17 84 52c-21 35-49 52-84 52s-63-17-84-52Z" fill="none" stroke="url(#eye)" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="130" cy="130" r="31" fill="url(#iris)"/>
+  <circle cx="130" cy="130" r="13" fill="#0B0E14"/>
+  <circle cx="139" cy="120" r="5" fill="#ECFDF5"/>
+  <text x="290" y="142" fill="#E2E8F2" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="88" font-weight="800" letter-spacing="0">OmniSight</text>
+  <text x="294" y="190" fill="#7D8AA3" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="28" font-weight="600" letter-spacing="4">UNIFIED MONITORING</text>
+</svg>
