@@ -19,7 +19,6 @@ RUN mkdir -p /app/data \
   && chmod +x /usr/local/bin/omnisight-entrypoint
 
 ENV OMNISIGHT_MODE=prod
-ENV OMNISIGHT_START_DEMO=0
 ENV PORT=3000
 ENV TZ=UTC
 EXPOSE 3000 4000
