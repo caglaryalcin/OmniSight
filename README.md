@@ -22,7 +22,7 @@ A simple, single-glance monitoring dashboard for Proxmox, Linux servers, Kuberne
 
 - **SNMP** — status of any SNMP v2c/v3 device (Synology, UniFi, switches, routers, …) with CPU/RAM/system or CPU temperature, bandwidth and disk I/O history where exposed, plus dynamic MB/GB memory display
 
-![](https://raw.githubusercontent.com/caglaryalcin/OmniSight/refs/heads/main/screenshots/gifs/smmp.gif)
+![](https://raw.githubusercontent.com/caglaryalcin/OmniSight/refs/heads/main/screenshots/gifs/snmp.gif)
 
 - **Docker** — container status, ports, CPU/memory, network I/O, block I/O, host-level CPU/RAM history, image update status, unused image count with a **Prune** action, sortable container columns and live container log viewer — via agent, Docker API host or SSH host
 
