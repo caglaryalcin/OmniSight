@@ -70,7 +70,7 @@ A simple, single-glance monitoring dashboard for Proxmox, Linux servers, Kuberne
 
 - **Topology** — relationship map for platforms, hosts and workloads
 
-![](https://raw.githubusercontent.com/caglaryalcin/OmniSight/refs/heads/main/screenshots/topology.png)
+![](https://github.com/caglaryalcin/OmniSight/blob/main/screenshots/gifs/topology.gif)
 
 - **Event Center** — live runtime log/warning/error stream plus audit and alert history at `/event-center`; admins can export audit events from `/api/audit/export?format=json|csv|syslog`
 
