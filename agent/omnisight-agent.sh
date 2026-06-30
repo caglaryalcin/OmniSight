@@ -9,7 +9,7 @@ URL="${URL%/}"
 TOKEN="${OMNISIGHT_TOKEN:?OMNISIGHT_TOKEN required}"
 INTERVAL="${OMNISIGHT_INTERVAL:-15}"
 AGENT_ROLE="${OMNISIGHT_AGENT_ROLE:-auto}"
-VERSION="1.2.3"
+VERSION="1.2.4"
 HOST_ROOT="${OMNISIGHT_HOST_ROOT:-/}"
 INSECURE_TLS="${OMNISIGHT_INSECURE_TLS:-}"
 CURL_TLS_ARGS=""
@@ -84,9 +84,15 @@ cpu_pct() {
 
 cpu_cores() { grep -c ^processor /proc/cpuinfo 2>/dev/null || echo 0; }
 
+is_metric_block_device() {
+  case "$1" in loop*|ram*|zram*|fd*|sr*|nbd*) return 1;; esac
+  case "$1" in sd[a-z]*|hd[a-z]*|vd[a-z]*|xvd[a-z]*|nvme[0-9]*n[0-9]*|mmcblk[0-9]*|md[0-9]*|dm-[0-9]*|dasd[a-z]*|cciss!c[0-9]*d[0-9]*) return 0;; esac
+  return 1
+}
+
 disk_counters() {
   awk '
-    $3 ~ /^(sd[a-z]+|vd[a-z]+|xvd[a-z]+|nvme[0-9]+n[0-9]+|mmcblk[0-9]+)$/ {
+    $3 ~ /^(sd[a-z]+|hd[a-z]+|vd[a-z]+|xvd[a-z]+|nvme[0-9]+n[0-9]+|mmcblk[0-9]+|md[0-9]+|dm-[0-9]+|dasd[a-z]+|cciss!c[0-9]+d[0-9]+)$/ {
       readSectors += $6; writeSectors += $10; ops += $4 + $8; ioMs += $13
     }
     END { printf "%d %d %d %d", readSectors * 512, writeSectors * 512, ops, ioMs }
@@ -97,7 +103,7 @@ net_counters() {
   awk -F'[: ]+' '
     NR > 2 {
       iface = $2
-      if (iface == "lo" || iface ~ /^(docker|br-|veth|virbr|cni|flannel|kube|tunl|gre|sit)/) next
+      if (iface == "lo" || iface ~ /^(docker|br-[0-9a-f]|veth|virbr|cni|flannel|kube|tunl|gre|sit|wg|tun|tap|tailscale|zt)/) next
       rx += $3; tx += $11
     }
     END { printf "%d %d", rx, tx }
@@ -131,16 +137,17 @@ temps_json() {
   command -v smartctl >/dev/null 2>&1 || return 0
   local first=1 b dev info model out temp label
   printf '"temps":['
-  for b in /sys/block/nvme*n*; do
+  for b in /sys/block/*; do
     [ -e "$b" ] || continue
     dev=${b##*/}
+    is_metric_block_device "$dev" || continue
     info=$(smartctl -i "/dev/$dev" 2>/dev/null || true)
     model=$(printf "%s\n" "$info" | awk -F: '/Model Number|Device Model|Product/ {gsub(/^[ \t]+|[ \t]+$/, "", $2); print $2; exit}')
     [ -z "$model" ] && model=$(cat "$b/device/model" 2>/dev/null | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
     out=$(smartctl -A "/dev/$dev" 2>/dev/null || true)
     temp=$(printf "%s\n" "$out" | awk '/Temperature Sensor [0-9]+:/ {print $(NF-1); exit} /Composite Temperature:/ {print $(NF-1); exit} /Temperature:/ && $0 !~ /Warning|Critical/ {print $(NF-1); exit} /Temperature_Celsius/ {print $10; exit}')
     case "$temp" in ''|*[!0-9.]* ) continue;; esac
-    label="NVMe ${model:-$dev} temp"
+    case "$dev" in nvme*) label="NVMe ${model:-$dev} temp";; *) label="${model:-$dev} temp";; esac
     [ "$first" -eq 0 ] && printf ','
     first=0
     printf '{"label":"%s","value":%s}' "$(json_escape "$label")" "$temp"
@@ -155,7 +162,7 @@ smart_json() {
   for b in /sys/block/*; do
     [ -e "$b" ] || continue
     dev=${b##*/}
-    case "$dev" in loop*|ram*|zram*|fd*|sr*|nbd*) continue;; esac
+    is_metric_block_device "$dev" || continue
     info=$(smartctl -i "/dev/$dev" 2>/dev/null || true)
     model=$(printf "%s\n" "$info" | awk -F: '/Model Number|Device Model|Product/ {gsub(/^[ \t]+|[ \t]+$/, "", $2); print $2; exit}')
     serial=$(printf "%s\n" "$info" | awk -F: '/Serial Number/ {gsub(/^[ \t]+|[ \t]+$/, "", $2); print $2; exit}')
@@ -222,7 +229,7 @@ docker_unused_count() {
       if (v ~ /@/ || v ~ /^sha256:/) return 1
       n = split(v, parts, "/")
       last = parts[n]
-      return last ~ /:[^/]+$/
+      return index(last, ":") > 0
     }
     function add_used(v, w) {
       v = clean(v)

@@ -4219,7 +4219,7 @@ const STATIC_GZIP_TYPES = new Map([
 ]);
 const staticGzipCache = new Map();
 const staticHtmlCache = new Map();
-const PREFETCHABLE_HTML_PATHS = new Set(['/about', '/agents', '/docs', '/event-center', '/profile', '/settings', '/topology']);
+const PREFETCHABLE_HTML_PATHS = new Set(['/', '/about', '/agents', '/docs', '/event-center', '/profile', '/settings', '/topology']);
 function requestCachePath(req) {
   return String(req?.path || '').replace(/\/+$/, '') || '/';
 }
@@ -4231,7 +4231,7 @@ function setPublicStaticCacheHeaders(res, filePath, req = null) {
   if (filePath.endsWith('.html')) {
     if (req && PREFETCHABLE_HTML_PATHS.has(requestCachePath(req))) {
       if (versionedStaticRequest(req)) res.setHeader('Cache-Control', 'private, max-age=31536000, immutable');
-      else res.setHeader('Cache-Control', 'private, max-age=60, stale-while-revalidate=300');
+      else res.setHeader('Cache-Control', 'private, max-age=300, stale-while-revalidate=86400');
       res.removeHeader('Pragma');
       res.removeHeader('Expires');
     } else {

@@ -543,14 +543,14 @@ html[data-theme="light"] .topbar{background:rgba(255,255,255,.78)}
 .mini-hist{width:100%;height:24px;display:block;opacity:.9}
 .mini-hist-bg{fill:rgba(255,255,255,.025)}
 html[data-theme="light"] .mini-hist-bg{fill:rgba(15,23,42,.035)}
-.snmp-head-main{display:grid;grid-template-columns:fit-content(260px) minmax(150px,.78fr) minmax(190px,1fr) minmax(190px,1fr) minmax(190px,1fr)}
+.snmp-head-main{display:grid;grid-template-columns:fit-content(220px) minmax(140px,.7fr) repeat(5,minmax(140px,1fr))}
 .docker-head-main{display:grid;grid-template-columns:fit-content(220px) minmax(220px,1.1fr) minmax(82px,.36fr) minmax(156px,.74fr) minmax(156px,.74fr) minmax(108px,.48fr);grid-auto-flow:column;grid-auto-columns:minmax(82px,.42fr);align-items:stretch;overflow:hidden}
 .docker-head-main.docker-head-7{grid-template-columns:fit-content(190px) minmax(210px,1.05fr) minmax(74px,.34fr) minmax(136px,.7fr) minmax(136px,.7fr) minmax(104px,.46fr) minmax(72px,.34fr)}
 .docker-head-main .pve-head-title,.docker-head-main .pve-head-stat{margin:0}
 .docker-head-main.docker-head-7 .pve-head-stat{padding-left:9px;padding-right:9px}
 @media (max-width:1200px){
   .docker-row{grid-template-columns:9px minmax(130px,1.2fr) minmax(140px,1fr) 62px 70px minmax(110px,1fr) minmax(90px,1fr) minmax(110px,1fr) 106px 86px}
-  .snmp-head-main{grid-template-columns:fit-content(220px) minmax(130px,.78fr) minmax(150px,1fr) minmax(150px,1fr) minmax(150px,1fr)}
+  .snmp-head-main{grid-template-columns:fit-content(180px) minmax(120px,.7fr) repeat(5,minmax(118px,1fr))}
   .docker-head-main{grid-template-columns:fit-content(190px) minmax(200px,1fr) minmax(74px,.35fr) minmax(122px,.66fr) minmax(122px,.66fr) minmax(92px,.45fr)}
   .docker-head-main.docker-head-7{grid-template-columns:fit-content(160px) minmax(180px,.95fr) minmax(68px,.34fr) minmax(112px,.62fr) minmax(112px,.62fr) minmax(86px,.42fr) minmax(66px,.34fr)}
 }
@@ -2182,6 +2182,13 @@ function rateHistoryMBps(history, sourceKey, targetKey) {
     [targetKey]: hasNum(h?.[sourceKey]) ? rateToMBps(h[sourceKey]) : null,
   })) : [];
 }
+function latestHistoryValue(history, key) {
+  if (!Array.isArray(history)) return null;
+  for (let i = history.length - 1; i >= 0; i--) {
+    if (hasNum(history[i]?.[key])) return Number(history[i][key]);
+  }
+  return null;
+}
 function pveTempRows(temps, fallbackTemp, fallbackLabel) {
   const rows = Array.isArray(temps) && temps.length
     ? temps
@@ -2964,6 +2971,10 @@ function buildSynology(syn){
     const bwTx = hasNum(dev.metrics?.bandwidth?.txBps) ? Number(dev.metrics.bandwidth.txBps) : null;
     const diskIOHistory = rateHistoryMBps(dev.history, 'diskIO', 'diskIOMbps');
     const bandwidthHistory = rateHistoryMBps(dev.history, 'bandwidth', 'bandwidthMbps');
+    const diskIOHeaderMbps = diskIOMbps != null ? diskIOMbps : latestHistoryValue(diskIOHistory, 'diskIOMbps');
+    const bandwidthHeaderMbps = bandwidthMbps != null ? bandwidthMbps : latestHistoryValue(bandwidthHistory, 'bandwidthMbps');
+    const diskIOTxt = diskRate != null ? fmtRate(diskRate) : (diskIOHeaderMbps != null ? fmtRate(diskIOHeaderMbps * 1024 * 1024) : '');
+    const bandwidthTxt = bandwidthRate != null ? fmtRate(bandwidthRate) : (bandwidthHeaderMbps != null ? fmtRate(bandwidthHeaderMbps * 1024 * 1024) : '');
     const isOpen = panelOpenState(stateKey, snmpOpen[stateKey]);
     snmpOpen[stateKey] = isOpen;
     const snmpStats = [
@@ -2971,6 +2982,8 @@ function buildSynology(syn){
       dev.cpu != null ? pveHeadStat('CPU', `${dev.cpu}%`, bc(dev.cpu), miniSparkline(dev.history, 'cpu', dev.cpu)) : pveHeadStat('CPU', '--', 'var(--muted)'),
       dev.ram ? pveHeadStat('RAM', `${dev.ram.percent}%`, bc(dev.ram.percent), miniSparkline(dev.history, 'ram', dev.ram.percent)) : pveHeadStat('RAM', '--', 'var(--muted)'),
       dev.systemTemp != null ? pveHeadStat('CPU temp', `${dev.systemTemp}°C`, pveTempColor(dev.systemTemp), miniSparkline(dev.history, 'temp', dev.systemTemp, pveTempHex, 100, '°C', 'CPU temp')) : pveHeadStat('CPU temp', '--', 'var(--muted)'),
+      pveHeadStat('Disk I/O', diskIOTxt || '--', diskIOTxt ? 'var(--cyan)' : 'var(--muted)', diskIOHeaderMbps != null ? miniSparkline(diskIOHistory, 'diskIOMbps', diskIOHeaderMbps, rateColor, rateSparkMax(diskIOHistory, 'diskIOMbps', diskIOHeaderMbps), ' MB/s', 'Disk I/O') : ''),
+      pveHeadStat('Bandwidth', bandwidthTxt || '--', bandwidthTxt ? 'var(--green)' : 'var(--muted)', bandwidthHeaderMbps != null ? miniSparkline(bandwidthHistory, 'bandwidthMbps', bandwidthHeaderMbps, () => '#34D399', rateSparkMax(bandwidthHistory, 'bandwidthMbps', bandwidthHeaderMbps), ' MB/s', 'Bandwidth') : ''),
     ].join('');
     return `
       <div class="node-hdr pve-node-hdr" onclick="toggleSnmp(${jsStr(skey)},${jsStr(stateKey)})">

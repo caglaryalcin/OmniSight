@@ -1,7 +1,17 @@
-const CACHE_NAME = 'omnisight-static-assets-2.6.2';
+const CACHE_NAME = 'omnisight-static-assets-3.0.0';
 const CACHEABLE_EXT = /\.(svg|png|webp|jpg|jpeg|ico|webmanifest)$/i;
 const CACHEABLE_ROUTES = new Set([
   '/manifest.webmanifest',
+]);
+const CACHEABLE_DOCUMENT_ROUTES = new Set([
+  '/',
+  '/about',
+  '/agents',
+  '/docs',
+  '/event-center',
+  '/profile',
+  '/settings',
+  '/topology',
 ]);
 
 function sameOrigin(url) {
@@ -24,7 +34,7 @@ function isCacheableRequest(request) {
   if (url.pathname === '/sw.js') return false;
   if (url.pathname.startsWith('/api/')) return false;
   if (url.pathname.startsWith('/agent/')) return false;
-  if (url.pathname.startsWith('/api/')) return false;
+  if (isDocumentRequest(request)) return CACHEABLE_DOCUMENT_ROUTES.has(url.pathname);
   if (CACHEABLE_ROUTES.has(url.pathname)) return true;
   return CACHEABLE_EXT.test(url.pathname);
 }
@@ -35,7 +45,7 @@ function isCacheableResponse(response) {
   const cc = response.headers.get('cache-control') || '';
   if (/\bno-store\b|\bno-cache\b/i.test(cc)) return false;
   const ct = response.headers.get('content-type') || '';
-  return /image\/|manifest\+json/i.test(ct);
+  return /text\/html|image\/|manifest\+json/i.test(ct);
 }
 
 function isDocumentRequest(request) {
@@ -101,7 +111,11 @@ self.addEventListener('activate', event => {
 
 self.addEventListener('fetch', event => {
   if (!isCacheableRequest(event.request)) return;
-  if (isDocumentRequest(event.request) || bypassesCache(event.request)) {
+  if (isDocumentRequest(event.request)) {
+    event.respondWith(bypassesCache(event.request) ? networkFirst(event.request) : staleWhileRevalidate(event.request));
+    return;
+  }
+  if (bypassesCache(event.request)) {
     event.respondWith(networkFirst(event.request));
     return;
   }

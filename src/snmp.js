@@ -18,6 +18,10 @@ function toNum(val) {
   return Number(val);
 }
 
+function isNum(val) {
+  return val !== null && val !== undefined && Number.isFinite(Number(val));
+}
+
 const AUTH_MAP = {
   sha:    () => snmp.AuthProtocols.sha,
   sha256: () => snmp.AuthProtocols.sha256,
@@ -430,12 +434,14 @@ async function getDiskIoFromTable(session, deviceKey, base, source, readKeys, wr
 async function getDiskIO(session, deviceKey, preferSynology = false) {
   const sources = preferSynology
     ? [
-        ['1.3.6.1.4.1.6574.101.1.1', 'synology-storageio', ['8', '12', '3'], ['9', '13', '4']],
+        ['1.3.6.1.4.1.6574.101.1.1', 'synology-storageio', ['12', '3'], ['13', '4']],
+        ['1.3.6.1.4.1.6574.102.1.1', 'synology-spaceio', ['12', '3'], ['13', '4']],
         ['1.3.6.1.4.1.2021.13.15.1.1', 'ucd-diskio', ['12', '3'], ['13', '4']],
       ]
     : [
         ['1.3.6.1.4.1.2021.13.15.1.1', 'ucd-diskio', ['12', '3'], ['13', '4']],
-        ['1.3.6.1.4.1.6574.101.1.1', 'synology-storageio', ['8', '12', '3'], ['9', '13', '4']],
+        ['1.3.6.1.4.1.6574.101.1.1', 'synology-storageio', ['12', '3'], ['13', '4']],
+        ['1.3.6.1.4.1.6574.102.1.1', 'synology-spaceio', ['12', '3'], ['13', '4']],
       ];
   for (const [base, source, readKeys, writeKeys] of sources) {
     try {
@@ -454,10 +460,10 @@ function sumNetworkBandwidth(network) {
   let txBps = 0;
   let any = false;
   for (const item of network) {
-    const rx = Number(item.rxMBps);
-    const tx = Number(item.txMBps);
-    if (Number.isFinite(rx) && rx >= 0) { rxBps += rx * 1024 * 1024; any = true; }
-    if (Number.isFinite(tx) && tx >= 0) { txBps += tx * 1024 * 1024; any = true; }
+    const rx = isNum(item.rxBps) ? Number(item.rxBps) : (isNum(item.rxMBps) ? Number(item.rxMBps) * 1024 * 1024 : NaN);
+    const tx = isNum(item.txBps) ? Number(item.txBps) : (isNum(item.txMBps) ? Number(item.txMBps) * 1024 * 1024 : NaN);
+    if (Number.isFinite(rx) && rx >= 0) { rxBps += rx; any = true; }
+    if (Number.isFinite(tx) && tx >= 0) { txBps += tx; any = true; }
   }
   return any ? { rxBps, txBps } : null;
 }
@@ -497,20 +503,22 @@ async function getNetwork(session, deviceKey) {
       const tx = toNum(txMap[idx]);
       const oper = toNum(upMap[idx]);
       const rate = rateFromCounters(netPrev, `${deviceKey}:${idx}`, rx, tx);
-      const rxMBps = rate ? (rate.readBps / 1024 / 1024).toFixed(2) : null;
-      const txMBps = rate ? (rate.writeBps / 1024 / 1024).toFixed(2) : null;
-      return { name, ifName, descr, operStatus: oper, rxMBps, txMBps };
+      const rxBps = rate ? rate.readBps : null;
+      const txBps = rate ? rate.writeBps : null;
+      const rxMBps = rxBps != null ? (rxBps / 1024 / 1024).toFixed(2) : null;
+      const txMBps = txBps != null ? (txBps / 1024 / 1024).toFixed(2) : null;
+      return { name, ifName, descr, operStatus: oper, rxBps, txBps, rxMBps, txMBps };
     })
     .filter(iface => {
       const name = iface.ifName || iface.name || '';
       if (!name || /^(lo|dummy|sit|tunl|ip6tnl|veth)/i.test(name)) return false;
-      if (/docker|br-|virbr|vnet|tailscale|wg|zt/i.test(name)) return false;
+      if (/docker|virbr|vnet|tailscale|wg|zt/i.test(name)) return false;
       if (iface.operStatus != null && iface.operStatus !== 1) return false;
-      const wanted = /^(eth|ovs_|bond)/i.test(name);
+      const wanted = /^(eth|en|lan|wan|ovs_|bond|br|bridge|wlan|wl|wifi|sfp|xg|ix|ge|te)/i.test(name);
       if (wanted) return true;
-      return iface.rxMBps != null || iface.txMBps != null;
+      return iface.rxBps != null || iface.txBps != null;
     })
-    .map(({ name, rxMBps, txMBps }) => ({ name, rxMBps, txMBps }));
+    .map(({ name, rxBps, txBps, rxMBps, txMBps }) => ({ name, rxBps, txBps, rxMBps, txMBps }));
 
   return interfaces;
 }
