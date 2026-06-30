@@ -250,7 +250,39 @@ For Helm deployments, expose the main app on container port `3000`. The image al
 
 When running from source with `npm start`, `OMNISIGHT_START_DEMO=1` can start the demo listener alongside the main app.
 
+Recommended probes:
+
+- Liveness: `GET /healthz` — only checks that the Node.js process is alive.
+- Readiness: `GET /readyz` — checks that the `data/` volume and core state files are readable/writable.
+
+Use a probe timeout of at least 5 seconds. A 1-second timeout can restart the pod during short disk I/O or Node.js event-loop stalls:
+
+```yaml
+livenessProbe:
+  httpGet: { path: /healthz, port: http }
+  initialDelaySeconds: 30
+  periodSeconds: 30
+  timeoutSeconds: 5
+  failureThreshold: 6
+readinessProbe:
+  httpGet: { path: /readyz, port: http }
+  initialDelaySeconds: 10
+  periodSeconds: 15
+  timeoutSeconds: 5
+  failureThreshold: 3
+```
+
 > **Docker path note:** Windows paths don't work inside the container. Put `kube.bin` in `./data/` and reference it with a container path, e.g. `kubeconfig: /app/data/kube.bin`.
+
+If nginx shows `503 Service Temporarily Unavailable`, the ingress could not reach a ready OmniSight pod. Check the pod, service endpoints and the in-container probes:
+
+```bash
+kubectl get pods,endpoints -n omnisight -l app=omnisight
+kubectl logs -n omnisight deploy/omnisight --tail=200
+kubectl logs -n omnisight deploy/omnisight --previous --tail=200
+kubectl exec -n omnisight deploy/omnisight -- wget -qO- http://127.0.0.1:3000/healthz
+kubectl exec -n omnisight deploy/omnisight -- wget -qO- http://127.0.0.1:3000/readyz
+```
 
 ### Password recovery
 

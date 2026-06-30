@@ -1516,7 +1516,7 @@ function securityHeaders(req, res, next) {
 
 function httpsRequirement(req, res, next) {
   if (!REQUIRE_HTTPS || isSecureRequest(req) || isLoopbackRequest(req)) return next();
-  if (req.path === '/healthz' || req.path === '/api/healthz') return next();
+  if (['/healthz', '/api/healthz', '/readyz', '/api/readyz'].includes(req.path)) return next();
   const host = String(req.headers.host || '').trim();
   if ((req.method === 'GET' || req.method === 'HEAD') && host && !req.path.startsWith('/api/')) {
     const rawPath = String(req.originalUrl || req.url || '/');
@@ -1528,7 +1528,7 @@ function httpsRequirement(req, res, next) {
 
 const apiRateBuckets = new Map();
 function apiRateLimitConfig(req) {
-  if (!req.path.startsWith('/api/') || req.path === '/api/healthz') return null;
+  if (!req.path.startsWith('/api/') || ['/api/healthz', '/api/readyz'].includes(req.path)) return null;
   if (req.path.startsWith('/api/agent/')) return { name: 'agent', windowMs: 60_000, max: Number(process.env.OMNISIGHT_AGENT_RATE_LIMIT || 600) };
   if (req.path === '/api/webhook/event') return { name: 'webhook', windowMs: 60_000, max: Number(process.env.OMNISIGHT_WEBHOOK_RATE_LIMIT || 120) };
   if (['/api/login', '/api/password-reset/request', '/api/password-reset/confirm', '/api/passkeys/auth/options', '/api/passkeys/auth/verify'].includes(req.path)) {
@@ -1658,6 +1658,7 @@ function cachedDataAccessProblem() {
 }
 
 function dataAccessGuard(req, res, next) {
+  if (['/healthz', '/api/healthz', '/readyz', '/api/readyz'].includes(req.path)) return next();
   const problem = cachedDataAccessProblem();
   if (!problem) return next();
   const message = 'OmniSight data volume is not readable/writable by the container user. Fix /app/data ownership and restart the container.';
@@ -4121,6 +4122,40 @@ if (startupSnapshot) {
 backgroundRefresh();
 setInterval(backgroundRefresh, REFRESH_INTERVAL);
 
+function sendHealthz(req, res) {
+  res.setHeader('Cache-Control', 'no-store');
+  res.type('application/json; charset=utf-8').send(JSON.stringify({
+    ok: true,
+    timestamp: new Date().toISOString(),
+    pid: process.pid,
+    uptime: Math.round(process.uptime()),
+  }));
+}
+
+function sendReadyz(req, res) {
+  const problem = cachedDataAccessProblem();
+  res.setHeader('Cache-Control', 'no-store');
+  if (problem) {
+    return res.status(503).type('application/json; charset=utf-8').send(JSON.stringify({
+      ok: false,
+      error: 'OmniSight data volume is not readable/writable by the container user',
+      detail: problem,
+      timestamp: new Date().toISOString(),
+      pid: process.pid,
+      uptime: Math.round(process.uptime()),
+    }));
+  }
+  return res.type('application/json; charset=utf-8').send(JSON.stringify({
+    ok: true,
+    timestamp: new Date().toISOString(),
+    pid: process.pid,
+    uptime: Math.round(process.uptime()),
+  }));
+}
+
+app.get(['/healthz', '/api/healthz'], sendHealthz);
+app.get(['/readyz', '/api/readyz'], sendReadyz);
+
 app.use(securityHeaders);
 app.use(httpsRequirement);
 app.use(apiRateLimit);
@@ -4144,17 +4179,6 @@ function isLoopbackRequest(req) {
   const addr = String(req.ip || req.socket?.remoteAddress || '').replace(/^::ffff:/, '');
   return addr === '127.0.0.1' || addr === '::1' || addr === 'localhost';
 }
-
-app.get(['/healthz', '/api/healthz'], (req, res) => {
-  res.setHeader('Cache-Control', 'no-store');
-  res.json({
-    ok: true,
-    timestamp: new Date().toISOString(),
-    refreshing: refreshBusy(),
-    activeTasks: Number(refreshActiveCount || 0),
-    uptime: Math.round(process.uptime()),
-  });
-});
 
 app.get('/api/debug/docker', async (req, res, next) => {
   if (!DEBUG_ENABLED || !isLoopbackRequest(req)) return next();
@@ -7290,7 +7314,13 @@ function startDemoAlongsideMain() {
   }
 }
 
-app.listen(PORT, () => {
+const mainServer = app.listen(PORT, () => {
   console.log(`OmniSight running at http://localhost:${PORT}`);
   startDemoAlongsideMain();
+});
+mainServer.on('error', err => {
+  console.error(`[runtime] server error on port ${PORT}: ${err?.stack || err?.message || err}\n[runtime] ${diagnosticSnapshot()}`);
+});
+mainServer.on('close', () => {
+  console.warn(`[runtime] server closed on port ${PORT}; ${diagnosticSnapshot()}`);
 });

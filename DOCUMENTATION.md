@@ -622,7 +622,8 @@ Check these before production use:
 - Image tag.
 - PVC.
 - Service port.
-- Readiness/liveness probe path: `/healthz`.
+- Liveness probe path: `/healthz`.
+- Readiness probe path: `/readyz`.
 - `OMNISIGHT_SECRET` as a Secret if required.
 - CA handling through `data/certs/` or `NODE_EXTRA_CA_CERTS` when needed.
 
@@ -640,7 +641,8 @@ This reduces the need for Ctrl+F5 after updates.
 
 | Endpoint | Purpose |
 |---|---|
-| `GET /healthz` | Probe and simple healthcheck |
+| `GET /healthz` | Lightweight liveness probe; confirms the Node.js process is responding |
+| `GET /readyz` | Readiness probe; confirms the data volume and core state files are readable/writable |
 | `GET /api/status` | Full runtime status |
 | `GET /api/status/dashboard` | Dashboard-optimized status |
 | `GET /api/status/summary` | Lightweight summary |
@@ -733,7 +735,8 @@ Check:
 
 - `data/` volume is persistent.
 - `data/secret.key` is backed up.
-- `/healthz` probe is configured.
+- `/healthz` liveness probe is configured.
+- `/readyz` readiness probe is configured.
 - TLS/CA is correct.
 - Agent token exists.
 - Config or full backup exists.
