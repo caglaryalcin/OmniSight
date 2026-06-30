@@ -5110,9 +5110,11 @@ app.delete('/api/users/:id', (req, res) => {
     const doc = ensureUsersDoc();
     const idx = doc.users.findIndex(u => u.id === req.params.id || u.username === req.params.id);
     if (idx < 0) return res.status(404).json({ error: 'User not found' });
+    const removed = doc.users[idx];
+    const current = currentAuthUser(req);
+    if (current && removed.username === current.username) return res.status(400).json({ error: 'You cannot delete your own user' });
     const nextUsers = doc.users.filter((_, i) => i !== idx);
     if (adminCount(nextUsers) < 1) return res.status(400).json({ error: 'At least one active admin is required' });
-    const removed = doc.users[idx];
     doc.users = nextUsers;
     saveUsersDoc(doc);
     for (const [token, session] of sessions) {
