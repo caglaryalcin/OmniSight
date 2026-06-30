@@ -161,6 +161,8 @@
       'No Linux agent token is configured. Generate a token in Settings before reinstalling agents.':'Linux agent token yapılandırılmamış. Ajanları yeniden kurmadan önce Settings üzerinden token oluşturun.',
       'Manual update required.':'Manuel güncelleme gerekli.',
       'Update command sent. Waiting for next report...':'Güncelleme komutu gönderildi. Sonraki rapor bekleniyor...',
+      'Live agent refresh timed out; showing cached data.':'Canlı ajan yenilemesi zaman aşımına uğradı; önbellekteki veri gösteriliyor.',
+      'old':'eski',
       'never':'hiç',
       'ago':'önce',
       'Follow':'Takip et',

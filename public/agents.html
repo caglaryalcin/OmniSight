@@ -211,15 +211,18 @@ function agentsCacheKey(){
   const token = sessionStorage.getItem('os_token') || localStorage.getItem('os_token') || 'anon';
   return `${AGENTS_CACHE_KEY}:${String(token).slice(-18)}`;
 }
-function readAgentsCache(maxAgeMs = 10 * 60 * 1000){
+function readAgentsCacheBox(maxAgeMs = 10 * 60 * 1000){
   try{
     const key = agentsCacheKey();
     const raw = sessionStorage.getItem(key) || localStorage.getItem(key);
     if(!raw) return null;
     const box = JSON.parse(raw);
     if(!box || Date.now() - Number(box.t || 0) > maxAgeMs) return null;
-    return box.data || null;
+    return box;
   }catch{ return null; }
+}
+function readAgentsCache(maxAgeMs = 10 * 60 * 1000){
+  return readAgentsCacheBox(maxAgeMs)?.data || null;
 }
 function writeAgentsCache(data){
   try{
@@ -388,18 +391,24 @@ async function loadAgents(){
   agentsLoading = true;
   clearMsg();
   try{
-    const d = await fetchJson('/api/agents', { headers:authHeaders() }, 3500);
+    const d = await fetchJson('/api/agents', { headers:authHeaders() }, 8000);
     writeAgentsCache(d);
     renderAgents(d);
     agentsLastLoadedAt = Date.now();
   }catch(e){
     if(e.message === 'Agents request cancelled') return;
-    const cached = readAgentsCache(30 * 60 * 1000);
-    if(cached){
-      renderAgents(cached);
+    const cachedBox = readAgentsCacheBox(30 * 60 * 1000);
+    if(cachedBox?.data){
+      renderAgents(cachedBox.data);
       const msg = document.getElementById('msg');
-      msg.textContent = e.message === 'Agents request timed out' ? t('Agents request timed out; showing last cached data.') : e.message;
-      msg.className = 'msg err';
+      if(e.message === 'Agents request timed out'){
+        const age = Math.max(0, Math.round((Date.now() - Number(cachedBox.t || Date.now())) / 1000));
+        msg.textContent = `${t('Live agent refresh timed out; showing cached data.')} ${age < 60 ? `${age}s` : `${Math.round(age / 60)}m`} ${t('old')}.`;
+        msg.className = age < 300 ? 'msg' : 'msg err';
+      } else {
+        msg.textContent = e.message;
+        msg.className = 'msg err';
+      }
       return;
     }
     const msg = document.getElementById('msg');
