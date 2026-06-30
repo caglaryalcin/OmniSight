@@ -3772,18 +3772,19 @@ function preserveUptimeKumaOnTransient(next, err) {
 function backgroundRefresh(opts = {}) {
   const force = opts === true || opts.force === true;
   if (refreshActiveCount >= maxRefreshActiveTasks()) {
-    return refreshPromise || Promise.resolve(cache.data || { ...EMPTY, timestamp: new Date().toISOString(), configured: configuredList() });
+    return refreshPromise || Promise.resolve(ensureRuntimeShell(cache.data));
   }
   if (force && refreshBusy()) {
-    return refreshPromise || Promise.resolve(cache.data || { ...EMPTY, timestamp: new Date().toISOString(), configured: configuredList(), refreshing: true });
+    return refreshPromise || Promise.resolve({ ...ensureRuntimeShell(cache.data), refreshing: true });
   }
   if (force) {
     refreshGeneration += 1;
   }
   const enabled = c => c && c.enabled !== false;
-  if (!cache.data) cache.data = { timestamp: new Date().toISOString(), proxmox: { clusterSummary: null, nodes: [] }, linux: [], kubernetes: null, snmp: [], healthchecks: null, uptimekuma: null, checks: null, prometheus: null, docker: [], dockhand: null, database: [], publicStatus: false, loading: true };
+  cache.data = ensureRuntimeShell(cache.data);
   const base = cache.data;
   const generation = refreshGeneration;
+  base.loading = false;
   assignStatic(base);
   broadcastStatusEvent('refreshing');
 
@@ -3892,7 +3893,7 @@ function backgroundRefresh(opts = {}) {
 }
 
 const EMPTY = {
-  loading: true,
+  loading: false,
   proxmox: { clusterSummary: null, nodes: [] },
   linux: [],
   kubernetes: null,
@@ -3921,6 +3922,104 @@ function runtimeEmptyFor(id) {
     dockhand: null,
     database: [],
   }[id];
+}
+
+function ensureRuntimeShell(data = cache.data) {
+  const out = data && typeof data === 'object'
+    ? data
+    : { ...EMPTY, timestamp: new Date().toISOString() };
+  const en = c => c && c.enabled !== false;
+  out.loading = false;
+  out.timestamp = out.timestamp || new Date().toISOString();
+
+  if (en(config.proxmox)) {
+    if (hasProxmoxApi()) {
+      const prev = out.proxmox && typeof out.proxmox === 'object' ? out.proxmox : null;
+      out.proxmox = prev && Array.isArray(prev.nodes)
+        ? { clusterSummary: prev.clusterSummary || null, ...prev, _connecting: prev.nodes.length ? !!prev._connecting : true }
+        : { clusterSummary: null, nodes: [], _connecting: true };
+    } else {
+      out.proxmox = preserveProxmoxOnTransient(agents.getProxmoxData({ excludedServices: config.excludedServices }));
+    }
+  } else {
+    out.proxmox = { clusterSummary: null, nodes: [] };
+  }
+
+  if (en(config.linux)) out.linux = filterLinuxProxmoxRows(Array.isArray(out.linux) ? out.linux : getLinuxData(out.proxmox), out.proxmox);
+  else out.linux = [];
+
+  if (en(config.kubernetes)) {
+    if (!out.kubernetes) out.kubernetes = kubernetesConnectingData();
+  } else {
+    out.kubernetes = null;
+  }
+
+  if (en(config.snmp)) {
+    const current = Array.isArray(out.snmp) ? out.snmp : [];
+    const devices = Array.isArray(config.snmp?.devices) ? config.snmp.devices : [];
+    out.snmp = devices.map(dev => {
+      const existing = current.find(d => d.name === dev.name || d.host === dev.host);
+      return {
+        ...(existing || {}),
+        name: dev.name || existing?.name || dev.host || 'SNMP',
+        host: dev.host || existing?.host || '',
+        profile: dev.profile || dev.preset || existing?.profile || 'generic',
+        snmpVersion: dev.snmpVersion || existing?.snmpVersion,
+        online: existing ? !!existing.online : false,
+        _connecting: existing ? !!existing._connecting : true,
+      };
+    });
+  } else {
+    out.snmp = [];
+  }
+
+  if (en(config.healthchecks)) {
+    out.healthchecks = out.healthchecks || { _connecting: true, online: false, summary: { total: 0, up: 0, down: 0, grace: 0, paused: 0 }, checks: [] };
+  } else {
+    out.healthchecks = null;
+  }
+
+  if (en(config.uptimekuma)) {
+    out.uptimekuma = out.uptimekuma || { _connecting: true, online: false, summary: { total: 0, up: 0, down: 0, pending: 0, maintenance: 0, unknown: 0 }, monitors: [] };
+    out.uptimekuma.historyHours = uptimeKumaConfig().historyHours;
+  } else {
+    out.uptimekuma = null;
+  }
+
+  if (en(config.checks)) {
+    const services = config.checks.services || config.checks.checks || [];
+    const current = out.checks && typeof out.checks === 'object' ? out.checks : { _connecting: true, online: true, summary: { total: 0, up: 0, down: 0 }, checks: [] };
+    const existingChecks = Array.isArray(current.checks) ? current.checks : [];
+    current.checks = services.map(s => {
+      const name = s.name || s.target || s.host || 'check';
+      const target = s.target || s.url || s.host || '';
+      const existing = existingChecks.find(c => c.name === name || c.target === target);
+      return existing || { name, type: s.type || 'http', target, status: 'connecting', healthy: false, _connecting: true };
+    });
+    current.summary = { ...(current.summary || {}), total: services.length };
+    current.historyHours = checksConfig().historyHours;
+    out.checks = current;
+  } else {
+    out.checks = null;
+  }
+
+  out.prometheus = en(config.prometheus) ? mergePrometheusConfigured(out.prometheus, config.prometheus) : null;
+  out.docker = en(config.docker) ? mergeDockerHistory(mergeDockerConfiguredRows(Array.isArray(out.docker) ? out.docker : [], agents.getDockerData())) : [];
+  out.dockhand = en(config.dockhand) ? mergeDockhandConfigured(out.dockhand, config.dockhand) : null;
+
+  if (en(config.database)) {
+    const current = Array.isArray(out.database) ? out.database : [];
+    const instances = Array.isArray(config.database?.instances) ? config.database.instances : [];
+    out.database = instances.map(i => {
+      const existing = current.find(d => d.name === i.name || (d.host && d.host === i.host));
+      return existing || { name: i.name, type: i.type, host: i.host, online: false, _connecting: true };
+    });
+  } else {
+    out.database = [];
+  }
+
+  assignStatic(out);
+  return out;
 }
 
 function pruneRuntimeSnapshot(data = {}) {
@@ -4029,8 +4128,9 @@ function flushRuntimeSnapshotSave() {
 
 function getCachedData() {
   if (!cache.data) {
+    cache.data = ensureRuntimeShell(null);
     backgroundRefresh();
-    return Promise.resolve(cache.data || { ...EMPTY, timestamp: new Date().toISOString(), configured: configuredList() });
+    return Promise.resolve(cache.data);
   }
   return Promise.resolve(cache.data);
 }
@@ -4186,6 +4286,8 @@ if (startupSnapshot) {
   }
   assignStatic(cache.data);
   console.log(`Loaded runtime snapshot from ${path.relative(__dirname, RUNTIME_SNAPSHOT_PATH)}`);
+} else {
+  cache.data = ensureRuntimeShell(null);
 }
 backgroundRefresh();
 setInterval(backgroundRefresh, REFRESH_INTERVAL);

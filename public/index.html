@@ -7114,11 +7114,28 @@ function scheduleAppUpdateFooter(){
 scheduleAppUpdateFooter();
 setInterval(scheduleAppUpdateFooter, APP_UPDATE_FOOTER_TTL_MS);
 
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register(`/sw.js?v=${encodeURIComponent(APP_VERSION)}`).then(reg => reg.update?.()).catch(() => {});
+function cleanupLegacyServiceWorkers(){
+  if (!('serviceWorker' in navigator)) return;
+  const deleteOldCaches = () => {
+    if (!window.caches?.keys) return Promise.resolve();
+    return caches.keys()
+      .then(keys => Promise.all(keys.map(key => caches.delete(key))))
+      .catch(() => {});
+  };
+  const unregisterWorkers = () => navigator.serviceWorker.getRegistrations()
+    .then(regs => Promise.all(regs.map(reg => reg.unregister().catch(() => false))))
+    .catch(() => {});
+  deleteOldCaches();
+  unregisterWorkers().then(deleteOldCaches);
+  navigator.serviceWorker.addEventListener?.('controllerchange', () => {
+    try {
+      if (sessionStorage.getItem('omnisight_sw_cleanup_reload') === APP_VERSION) return;
+      sessionStorage.setItem('omnisight_sw_cleanup_reload', APP_VERSION);
+      window.location.reload();
+    } catch {}
   });
 }
+cleanupLegacyServiceWorkers();
 </script>
 <div id="os-tooltip"></div>
 <div id="os-hover-dot"></div>

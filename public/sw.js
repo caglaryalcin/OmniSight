@@ -1,14 +1,17 @@
-// OmniSight previously cached full HTML shells through the service worker.
-// That made old releases survive deployments and could leave the app stuck on
-// stale "Loading..." screens. Keep the worker as an update/cleanup shim only.
-const CACHE_PREFIXES = ['omnisight-', 'omnisight_static', 'omnisight-static'];
-
+// OmniSight no longer uses a service worker for app-shell/data caching.
+// Older releases cached full HTML shells and API responses, which could make a
+// deployed image keep serving stale "Loading..." screens. This worker exists
+// only to clean up those old caches and unregister itself.
 function shouldDeleteCache(name) {
-  return CACHE_PREFIXES.some(prefix => String(name || '').startsWith(prefix));
+  return true;
 }
 
 self.addEventListener('install', event => {
-  event.waitUntil(self.skipWaiting());
+  event.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(keys.filter(shouldDeleteCache).map(key => caches.delete(key)));
+    await self.skipWaiting();
+  })());
 });
 
 self.addEventListener('activate', event => {
@@ -17,6 +20,7 @@ self.addEventListener('activate', event => {
     await Promise.all(keys.filter(shouldDeleteCache).map(key => caches.delete(key)));
     await self.clients.claim();
     const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    await self.registration.unregister();
     await Promise.all(windows.map(client => {
       try {
         const url = new URL(client.url);
@@ -28,11 +32,5 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('fetch', event => {
-  const req = event.request;
-  if (req.method !== 'GET') return;
-  const url = new URL(req.url);
-  if (url.origin !== self.location.origin) return;
-  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/agent/') || req.mode === 'navigate') {
-    event.respondWith(fetch(new Request(req, { cache: 'no-store' })));
-  }
+  // Intentionally do not intercept requests.
 });
