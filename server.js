@@ -10,7 +10,7 @@ let nodemailer = null;
 try { nodemailer = require('nodemailer'); } catch {}
 const agents = require('./src/agents');
 const { getAllKubernetesData, getPodLogs } = require('./src/kubernetes');
-const { getAllSynologyData } = require('./src/snmp');
+const { getAllSynologyData, sampleSnmpBandwidth } = require('./src/snmp');
 const { getAllHealthchecks } = require('./src/healthchecks');
 const { getAllUptimeKuma, debugUptimeKuma } = require('./src/uptimekuma');
 const { getPrometheusData } = require('./src/prometheus');
@@ -1742,6 +1742,7 @@ function publicProfileSummary(auth) {
 
 function authMiddleware(req, res, next) {
   const authPublicPaths = ['/login', '/onboarding', '/api/login', '/api/auth-status', '/api/onboarding/status', '/api/onboarding/complete', '/api/onboarding/import', '/api/backup/import', '/api/password-reset/request', '/api/password-reset/confirm', '/api/passkeys/auth/options', '/api/passkeys/auth/verify', '/api/webhook/event'];
+  if (req.path === '/sw.js' || req.path === '/manifest.webmanifest') return next();
   if (req.path.startsWith('/assets/')) return next();
   if (req.path === '/i18n.js') return next();
   if (req.path.startsWith('/api/icons/')) return next();
@@ -2290,10 +2291,14 @@ function sendCachedJson(req, res, name, signature, factory, opts = {}) {
       if (first) jsonResponseCache.delete(first);
     }
   }
-  res.setHeader('Cache-Control', opts.cacheControl || 'no-store');
+  const cacheControl = opts.cacheControl || 'no-store';
+  res.setHeader('Cache-Control', cacheControl);
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
-  res.setHeader('ETag', hit.etag);
-  if (opts.allow304 && req.headers['if-none-match'] === hit.etag) return res.status(304).end();
+  const can304 = opts.allow304 && !/\bno-store\b/i.test(cacheControl);
+  if (can304) {
+    res.setHeader('ETag', hit.etag);
+    if (req.headers['if-none-match'] === hit.etag) return res.status(304).end();
+  }
   if (hit.gzip && /\bgzip\b/i.test(req.headers['accept-encoding'] || '')) {
     appendVary(res, 'Accept-Encoding');
     res.setHeader('Content-Encoding', 'gzip');
@@ -4103,6 +4108,69 @@ function scheduleUptimeKumaHistoryHeal() {
   });
 }
 
+let snmpBandwidthSamplePromise = null;
+let snmpBandwidthLastSampleAt = 0;
+
+function snmpBandwidthSampleIntervalMs() {
+  const raw = config.performance?.snmpBandwidthSampleSeconds ?? config.snmp?.bandwidthSampleSeconds ?? 5;
+  const seconds = Number(raw);
+  if (!Number.isFinite(seconds) || seconds <= 0) return 0;
+  return Math.max(3, Math.min(60, seconds)) * 1000;
+}
+
+function sameSnmpDevice(row = {}, sample = {}) {
+  const a = [row.host, row.name].filter(Boolean).map(v => String(v).trim().toLowerCase());
+  const b = [sample.host, sample.name].filter(Boolean).map(v => String(v).trim().toLowerCase());
+  return a.some(x => b.includes(x));
+}
+
+function mergeSnmpBandwidthSamples(samples = []) {
+  if (!cache.data || !Array.isArray(cache.data.snmp) || !samples.length) return false;
+  const now = Date.now();
+  let changed = false;
+  for (const sample of samples) {
+    const bandwidth = sample?.metrics?.bandwidth;
+    if (!sample?.online || !bandwidth) continue;
+    const row = cache.data.snmp.find(d => sameSnmpDevice(d, sample));
+    if (!row) continue;
+    const total = (Number(bandwidth.rxBps) || 0) + (Number(bandwidth.txBps) || 0);
+    row.online = true;
+    row._connecting = false;
+    row.network = sample.network || row.network;
+    row.networkDiagnostics = sample.networkDiagnostics || row.networkDiagnostics;
+    row.metrics = { ...(row.metrics || {}), bandwidth };
+    if (Number.isFinite(total) && total >= 0) {
+      const history = Array.isArray(row.history) ? row.history : [];
+      const last = history[history.length - 1];
+      if (!last || now - Number(last.time || 0) >= 2500) {
+        history.push({ time: now, cpu: null, ram: null, temp: null, diskIO: null, bandwidth: total });
+        if (history.length > 5760) history.splice(0, history.length - 5760);
+        row.history = history;
+      }
+    }
+    changed = true;
+  }
+  if (changed) {
+    cache.data.timestamp = new Date().toISOString();
+    clearViewCache();
+    broadcastStatusEvent('updated');
+  }
+  return changed;
+}
+
+function maybeSampleSnmpBandwidth() {
+  const interval = snmpBandwidthSampleIntervalMs();
+  if (!interval) return;
+  if (!config.snmp || config.snmp.enabled === false || !(config.snmp.devices || []).length) return;
+  if (Date.now() - snmpBandwidthLastSampleAt < interval) return;
+  if (snmpBandwidthSamplePromise || platformRefreshState.snmp?.inFlight) return;
+  snmpBandwidthLastSampleAt = Date.now();
+  snmpBandwidthSamplePromise = sampleSnmpBandwidth(config.snmp)
+    .then(samples => mergeSnmpBandwidthSamples(samples))
+    .catch(err => console.warn(`SNMP bandwidth sample failed: ${err.message}`))
+    .finally(() => { snmpBandwidthSamplePromise = null; });
+}
+
 const startupSnapshot = loadRuntimeSnapshot();
 if (startupSnapshot) {
   cache.data = startupSnapshot;
@@ -4121,6 +4189,7 @@ if (startupSnapshot) {
 }
 backgroundRefresh();
 setInterval(backgroundRefresh, REFRESH_INTERVAL);
+setInterval(maybeSampleSnmpBandwidth, 1000);
 
 function sendHealthz(req, res) {
   res.setHeader('Cache-Control', 'no-store');
@@ -4229,16 +4298,9 @@ function versionedStaticRequest(req) {
 }
 function setPublicStaticCacheHeaders(res, filePath, req = null) {
   if (filePath.endsWith('.html')) {
-    if (req && PREFETCHABLE_HTML_PATHS.has(requestCachePath(req))) {
-      if (versionedStaticRequest(req)) res.setHeader('Cache-Control', 'private, max-age=31536000, immutable');
-      else res.setHeader('Cache-Control', 'private, max-age=300, stale-while-revalidate=86400');
-      res.removeHeader('Pragma');
-      res.removeHeader('Expires');
-    } else {
-      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-      res.setHeader('Pragma', 'no-cache');
-      res.setHeader('Expires', '0');
-    }
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
   } else if (filePath.endsWith('sw.js')) {
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.setHeader('Pragma', 'no-cache');
@@ -5153,8 +5215,7 @@ app.get('/api/status/dashboard', async (req, res) => {
     const role = sessionRole(req);
     const uiKey = uiPreferenceKeyFromRequest(req) || 'global';
     sendCachedJson(req, res, `status:dashboard:${role}:${uiKey}:${detailed ? 'full' : 'compact'}:${historyLimit}`, sig, () => redactForRole(req, view), {
-      allow304: true,
-      cacheControl: 'private, no-cache, max-age=0, must-revalidate',
+      cacheControl: 'no-store',
     });
   } catch (err) { sendServerError(res, err); }
 });
@@ -5185,8 +5246,7 @@ app.get('/api/status/summary', async (req, res) => {
     const role = sessionRole(req);
     const uiKey = uiPreferenceKeyFromRequest(req) || 'global';
     sendCachedJson(req, res, `status:summary:${role}:${uiKey}`, sig, () => redactForRole(req, view), {
-      allow304: true,
-      cacheControl: 'private, no-cache, max-age=0, must-revalidate',
+      cacheControl: 'no-store',
     });
   } catch (err) { sendServerError(res, err); }
 });
@@ -5198,8 +5258,7 @@ app.get('/api/status/topology', async (req, res) => {
     const view = cachedView('status:topology', sig, () => topologyStatusData(data));
     const role = sessionRole(req);
     sendCachedJson(req, res, `status:topology:${role}`, sig, () => redactForRole(req, view), {
-      allow304: true,
-      cacheControl: 'private, no-cache, max-age=0, must-revalidate',
+      cacheControl: 'no-store',
     });
   } catch (err) { sendServerError(res, err); }
 });
@@ -6600,8 +6659,7 @@ app.get('/api/agents', (req, res) => {
     const view = cachedView('agents:list', sig, () => ({ latestVersion: agentLatestVersion(), agents: agents.listAgents() }));
     const role = sessionRole(req);
     sendCachedJson(req, res, `agents:list:${role}`, sig, () => redactForRole(req, view), {
-      allow304: true,
-      cacheControl: 'private, no-cache, max-age=0, must-revalidate',
+      cacheControl: 'no-store',
     });
   } catch (err) {
     console.warn('agents list failed:', err.message);

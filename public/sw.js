@@ -1,100 +1,10 @@
-const CACHE_NAME = 'omnisight-static-assets-3.0.0';
-const CACHEABLE_EXT = /\.(svg|png|webp|jpg|jpeg|ico|webmanifest)$/i;
-const CACHEABLE_ROUTES = new Set([
-  '/manifest.webmanifest',
-]);
-const CACHEABLE_DOCUMENT_ROUTES = new Set([
-  '/',
-  '/about',
-  '/agents',
-  '/docs',
-  '/event-center',
-  '/profile',
-  '/settings',
-  '/topology',
-]);
+// OmniSight previously cached full HTML shells through the service worker.
+// That made old releases survive deployments and could leave the app stuck on
+// stale "Loading..." screens. Keep the worker as an update/cleanup shim only.
+const CACHE_PREFIXES = ['omnisight-', 'omnisight_static', 'omnisight-static'];
 
-function sameOrigin(url) {
-  return url.origin === self.location.origin;
-}
-
-function normalizedCacheRequest(request) {
-  const url = new URL(request.url);
-  url.hash = '';
-  if (request.destination === 'document' || !CACHEABLE_EXT.test(url.pathname)) {
-    url.search = '';
-  }
-  return new Request(url.toString(), { credentials: 'same-origin' });
-}
-
-function isCacheableRequest(request) {
-  if (request.method !== 'GET') return false;
-  const url = new URL(request.url);
-  if (!sameOrigin(url)) return false;
-  if (url.pathname === '/sw.js') return false;
-  if (url.pathname.startsWith('/api/')) return false;
-  if (url.pathname.startsWith('/agent/')) return false;
-  if (isDocumentRequest(request)) return CACHEABLE_DOCUMENT_ROUTES.has(url.pathname);
-  if (CACHEABLE_ROUTES.has(url.pathname)) return true;
-  return CACHEABLE_EXT.test(url.pathname);
-}
-
-function isCacheableResponse(response) {
-  if (!response || !response.ok) return false;
-  if (response.type && !['basic', 'default'].includes(response.type)) return false;
-  const cc = response.headers.get('cache-control') || '';
-  if (/\bno-store\b|\bno-cache\b/i.test(cc)) return false;
-  const ct = response.headers.get('content-type') || '';
-  return /text\/html|image\/|manifest\+json/i.test(ct);
-}
-
-function isDocumentRequest(request) {
-  const accept = request.headers.get('accept') || '';
-  return request.mode === 'navigate' || request.destination === 'document' || accept.includes('text/html');
-}
-
-function bypassesCache(request) {
-  const cc = request.headers.get('cache-control') || '';
-  return request.cache === 'reload' || cc.includes('no-cache') || cc.includes('no-store');
-}
-
-async function fetchAndCache(request) {
-  const cache = await caches.open(CACHE_NAME);
-  const cacheReq = normalizedCacheRequest(request);
-  const response = await fetch(request);
-  if (isCacheableResponse(response)) cache.put(cacheReq, response.clone()).catch(() => undefined);
-  return response;
-}
-
-async function networkFirst(request) {
-  const cache = await caches.open(CACHE_NAME);
-  const cacheReq = normalizedCacheRequest(request);
-  try {
-    return await fetchAndCache(request);
-  } catch (err) {
-    const cached = await cache.match(cacheReq);
-    return cached || new Response('Offline', { status: 503, headers: { 'content-type': 'text/plain; charset=utf-8' } });
-  }
-}
-
-async function staleWhileRevalidate(request) {
-  const cache = await caches.open(CACHE_NAME);
-  const cacheReq = normalizedCacheRequest(request);
-  const cached = await cache.match(cacheReq);
-  const network = fetch(request)
-    .then(response => {
-      if (isCacheableResponse(response)) cache.put(cacheReq, response.clone()).catch(() => undefined);
-      return response;
-    })
-    .catch(() => null);
-
-  if (cached) {
-    network.catch(() => undefined);
-    return cached;
-  }
-
-  const response = await network;
-  return response || new Response('Offline', { status: 503, headers: { 'content-type': 'text/plain; charset=utf-8' } });
+function shouldDeleteCache(name) {
+  return CACHE_PREFIXES.some(prefix => String(name || '').startsWith(prefix));
 }
 
 self.addEventListener('install', event => {
@@ -102,22 +12,27 @@ self.addEventListener('install', event => {
 });
 
 self.addEventListener('activate', event => {
-  event.waitUntil(
-    caches.keys()
-      .then(keys => Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))))
-      .then(() => self.clients.claim())
-  );
+  event.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(keys.filter(shouldDeleteCache).map(key => caches.delete(key)));
+    await self.clients.claim();
+    const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    await Promise.all(windows.map(client => {
+      try {
+        const url = new URL(client.url);
+        if (url.origin === self.location.origin) return client.navigate(client.url);
+      } catch {}
+      return null;
+    }));
+  })());
 });
 
 self.addEventListener('fetch', event => {
-  if (!isCacheableRequest(event.request)) return;
-  if (isDocumentRequest(event.request)) {
-    event.respondWith(bypassesCache(event.request) ? networkFirst(event.request) : staleWhileRevalidate(event.request));
-    return;
+  const req = event.request;
+  if (req.method !== 'GET') return;
+  const url = new URL(req.url);
+  if (url.origin !== self.location.origin) return;
+  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/agent/') || req.mode === 'navigate') {
+    event.respondWith(fetch(new Request(req, { cache: 'no-store' })));
   }
-  if (bypassesCache(event.request)) {
-    event.respondWith(networkFirst(event.request));
-    return;
-  }
-  event.respondWith(staleWhileRevalidate(event.request));
 });

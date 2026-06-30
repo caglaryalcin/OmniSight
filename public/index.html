@@ -2176,11 +2176,16 @@ function rateToMBps(value) {
   if (!hasNum(value)) return null;
   return Math.round((Number(value) / 1024 / 1024) * 100) / 100;
 }
-function rateHistoryMBps(history, sourceKey, targetKey) {
-  return Array.isArray(history) ? history.map(h => ({
-    time: h?.time,
-    [targetKey]: hasNum(h?.[sourceKey]) ? rateToMBps(h[sourceKey]) : null,
-  })) : [];
+function rateHistoryMBps(history, sourceKey, targetKey, maxBps = null) {
+  const limit = hasNum(maxBps) && Number(maxBps) > 0 ? Number(maxBps) * 1.08 : null;
+  return Array.isArray(history) ? history.map(h => {
+    const raw = hasNum(h?.[sourceKey]) ? Number(h[sourceKey]) : null;
+    const value = raw != null && (!limit || (raw >= 0 && raw <= limit)) ? rateToMBps(raw) : null;
+    return {
+      time: h?.time,
+      [targetKey]: value,
+    };
+  }) : [];
 }
 function latestHistoryValue(history, key) {
   if (!Array.isArray(history)) return null;
@@ -2970,7 +2975,12 @@ function buildSynology(syn){
     const bwRx = hasNum(dev.metrics?.bandwidth?.rxBps) ? Number(dev.metrics.bandwidth.rxBps) : null;
     const bwTx = hasNum(dev.metrics?.bandwidth?.txBps) ? Number(dev.metrics.bandwidth.txBps) : null;
     const diskIOHistory = rateHistoryMBps(dev.history, 'diskIO', 'diskIOMbps');
-    const bandwidthHistory = rateHistoryMBps(dev.history, 'bandwidth', 'bandwidthMbps');
+    const bandwidthCapacityBps = hasNum(dev.metrics?.bandwidth?.historyCapacityBps) ? Number(dev.metrics.bandwidth.historyCapacityBps)
+      : hasNum(dev.metrics?.bandwidth?.activeCapacityBps) ? Number(dev.metrics.bandwidth.activeCapacityBps)
+      : hasNum(dev.metrics?.bandwidth?.largestCapacityBps) ? Number(dev.metrics.bandwidth.largestCapacityBps)
+      : hasNum(dev.metrics?.bandwidth?.capacityBps) ? Number(dev.metrics.bandwidth.capacityBps)
+      : null;
+    const bandwidthHistory = rateHistoryMBps(dev.history, 'bandwidth', 'bandwidthMbps', bandwidthCapacityBps);
     const diskIOHeaderMbps = diskIOMbps != null ? diskIOMbps : latestHistoryValue(diskIOHistory, 'diskIOMbps');
     const bandwidthHeaderMbps = bandwidthMbps != null ? bandwidthMbps : latestHistoryValue(bandwidthHistory, 'bandwidthMbps');
     const diskIOTxt = diskRate != null ? fmtRate(diskRate) : (diskIOHeaderMbps != null ? fmtRate(diskIOHeaderMbps * 1024 * 1024) : '');
@@ -4564,6 +4574,14 @@ function overviewRateHistory(data, platform, metric){
   const linuxOnline = (data.linux||[]).filter(s=>s.online);
   const snmpOnline = (data.snmp||[]).filter(s=>s.online);
   const pveRows = (data.proxmox?.nodes||[]).filter(n=>n.node?.online);
+  const rowBandwidthLimit = row => {
+    const bw = row?.metrics?.bandwidth;
+    if(hasNum(bw?.historyCapacityBps)) return Number(bw.historyCapacityBps);
+    if(hasNum(bw?.activeCapacityBps)) return Number(bw.activeCapacityBps);
+    if(hasNum(bw?.largestCapacityBps)) return Number(bw.largestCapacityBps);
+    if(hasNum(bw?.capacityBps)) return Number(bw.capacityBps);
+    return null;
+  };
   const mapRate = (rows) => rows.map(row => Array.isArray(row.history) ? row.history.map(h => {
     let total = null;
     if(metric === 'bandwidth'){
@@ -4573,7 +4591,9 @@ function overviewRateHistory(data, platform, metric){
       if(hasNum(h?.diskIO)) total = Number(h.diskIO);
       else if(hasNum(h?.diskReadBps) || hasNum(h?.diskWriteBps)) total = (Number(h.diskReadBps)||0) + (Number(h.diskWriteBps)||0);
     }
-    return { time: h?.time, value: hasNum(total) ? rateToMBps(total) : null };
+    const limit = metric === 'bandwidth' ? rowBandwidthLimit(row) : null;
+    const valid = hasNum(total) && (!limit || (Number(total) >= 0 && Number(total) <= limit * 1.08));
+    return { time: h?.time, value: valid ? rateToMBps(total) : null };
   }) : []);
   const series = {
     proxmox: mapRate(pveRows),
@@ -6600,7 +6620,7 @@ async function fetchStatus(opts = {}){
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try{
     const url = opts.detail || opts.full ? '/api/status/dashboard?detail=1' : '/api/status/dashboard';
-    const r = await fetch(url,{headers:authHeaders(), cache:'no-cache', signal:ctrl.signal});
+    const r = await fetch(url,{headers:{...authHeaders(), 'Cache-Control':'no-store'}, cache:'no-store', signal:ctrl.signal});
     handleUnauth(r);
     if(!r.ok) throw new Error('HTTP ' + r.status);
     const ct = r.headers.get('content-type') || '';
@@ -6619,7 +6639,7 @@ async function fetchStatusSummary(opts = {}){
   const timeoutMs = Math.max(1000, Number(opts.timeoutMs || 4000));
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try{
-    const r = await fetch('/api/status/summary',{headers:authHeaders(), cache:'no-cache', signal:ctrl.signal});
+    const r = await fetch('/api/status/summary',{headers:{...authHeaders(), 'Cache-Control':'no-store'}, cache:'no-store', signal:ctrl.signal});
     handleUnauth(r);
     if(!r.ok) throw new Error('HTTP ' + r.status);
     const ct = r.headers.get('content-type') || '';
@@ -7007,7 +7027,7 @@ window.addEventListener('popstate', () => { applyHashRoute(); });
     scheduleDemoEmbedWarmup();
     return;
   }
-  const r = await fetch('/api/auth-status', { headers: authHeaders() }).catch(()=>null);
+  const r = await fetch('/api/auth-status', { headers: {...authHeaders(), 'Cache-Control':'no-store'}, cache:'no-store' }).catch(()=>null);
   if(!r){
     if(cachedStatus) applyFreshStatus();
     scheduleDashboardLoadingGuards();
@@ -7096,7 +7116,7 @@ setInterval(scheduleAppUpdateFooter, APP_UPDATE_FOOTER_TTL_MS);
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
+    navigator.serviceWorker.register(`/sw.js?v=${encodeURIComponent(APP_VERSION)}`).then(reg => reg.update?.()).catch(() => {});
   });
 }
 </script>
