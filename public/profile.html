@@ -308,6 +308,27 @@ function prepareCreationOptions(publicKey){
 let currentAvatar = '';
 const profileUrlParams = new URLSearchParams(location.search);
 let profileMustChange = profileUrlParams.has('mustChangePassword');
+let profileDemoMode = false;
+function demoCredentialsLockedMessage(){
+  return t('Demo credentials cannot be changed.');
+}
+function applyDemoAccountLock(){
+  if(!profileDemoMode) return;
+  const lockIds = ['chg-user','cur-pw','chg-pw','chg-pw2','new-user','new-pw','new-pw2'];
+  lockIds.forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.disabled = true;
+  });
+  document.querySelectorAll('[onclick="toggleUserEdit()"],[onclick="saveUsername()"],[onclick="savePassword()"],[onclick="setPassword(false)"]').forEach(btn => {
+    btn.disabled = true;
+    btn.title = demoCredentialsLockedMessage();
+  });
+  const msgUser = document.getElementById('msg-user');
+  if(msgUser && !msgUser.textContent){
+    msgUser.textContent = demoCredentialsLockedMessage();
+    msgUser.className = 'msg';
+  }
+}
 function initials(name){
   const parts = String(name || 'OS').trim().split(/\s+/).filter(Boolean);
   const chars = (parts.length > 1 ? parts[0][0] + parts[parts.length - 1][0] : (parts[0] || 'OS').slice(0,2));
@@ -632,6 +653,7 @@ async function disable2FA(){
 }
 
 function toggleUserEdit(){
+  if(profileDemoMode) return;
   const row = document.getElementById('user-row');
   const input = document.getElementById('chg-user');
   const open = row.classList.toggle('editing');
@@ -657,6 +679,7 @@ function toggleEmailEdit(){
 async function saveUsername(){
   const msgEl = document.getElementById('msg-user');
   msgEl.textContent=''; msgEl.className='msg';
+  if(profileDemoMode){ msgEl.textContent=demoCredentialsLockedMessage(); msgEl.className='msg err'; return; }
   const username = document.getElementById('chg-user').value.trim();
   if(!username){ msgEl.textContent=t('Enter a username'); msgEl.className='msg err'; return; }
   try {
@@ -682,6 +705,7 @@ function pwError(pw){
 async function savePassword(){
   const msgEl = document.getElementById('msg-change');
   msgEl.textContent=''; msgEl.className='msg';
+  if(profileDemoMode){ msgEl.textContent=demoCredentialsLockedMessage(); msgEl.className='msg err'; return; }
   const currentPassword = document.getElementById('cur-pw').value;
   const password  = document.getElementById('chg-pw').value;
   const password2 = document.getElementById('chg-pw2').value;
@@ -706,6 +730,7 @@ async function savePassword(){
 async function setPassword(hasExisting){
   const msgEl = document.getElementById(hasExisting?'msg-setup':'msg-setup');
   msgEl.textContent=''; msgEl.className='msg';
+  if(profileDemoMode){ msgEl.textContent=demoCredentialsLockedMessage(); msgEl.className='msg err'; return; }
   const username = document.getElementById('new-user').value.trim();
   const password = document.getElementById('new-pw').value;
   const password2 = document.getElementById('new-pw2').value;
@@ -737,6 +762,7 @@ applyLanguage();
   if(!r) return;
   handleUnauth(r);
   const d = await r.json().catch(()=>({}));
+  profileDemoMode = d.demo === true;
   if(d.required){
     document.getElementById('card-change').style.display='';
     document.getElementById('card-2fa').style.display='';
@@ -750,6 +776,7 @@ applyLanguage();
       renderAvatar(d.username, '');
     }
     set2FAState(!!d.twoFactorEnabled);
+    applyDemoAccountLock();
   } else {
     document.getElementById('card-change').style.display='none';
     document.getElementById('card-2fa').style.display='none';

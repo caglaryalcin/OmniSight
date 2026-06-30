@@ -970,6 +970,7 @@ app.use('/api', (req, res, next) => {
 
 app.get('/api/profile', (req, res) => res.json({ username: demoUser.username, email: demoUser.email, role: demoUser.role, avatar: '', twoFactorEnabled: false, passkeys: [] }));
 app.get('/api/profile/summary', (req, res) => res.json({ username: demoUser.username, role: demoUser.role, avatar: '', mustChangePassword: false }));
+app.post('/api/set-password', (req, res) => res.status(403).json({ ok: false, demo: true, error: 'Demo credentials cannot be changed.' }));
 
 app.get('/api/config', (req, res) => res.json(demoConfig()));
 app.post('/api/config', (req, res) => res.json({ ok: true, fullData: false, data: demoStatus(), demo: true }));
@@ -990,8 +991,10 @@ app.get('/api/agent/repair-commands', (req, res) => res.json({
 }));
 app.post('/api/agent/ping', (req, res) => res.json({ ok: true, demo: true, id: req.body?.id || '' }));
 app.get('/api/users', (req, res) => res.json([demoUser]));
-app.put('/api/users/:id', (req, res) => res.json({ ok: true, demo: true, user: { ...demoUser, ...(req.body || {}) } }));
-app.delete('/api/users/:id', (req, res) => res.json({ ok: true, demo: true }));
+app.post('/api/users', (req, res) => res.status(403).json({ ok: false, demo: true, error: 'Demo users cannot be changed.' }));
+app.post('/api/users/batch', (req, res) => res.status(403).json({ ok: false, demo: true, error: 'Demo users cannot be changed.' }));
+app.put('/api/users/:id', (req, res) => res.status(403).json({ ok: false, demo: true, error: 'Demo users cannot be changed.', user: demoUser }));
+app.delete('/api/users/:id', (req, res) => res.status(403).json({ ok: false, demo: true, error: 'Demo users cannot be changed.' }));
 app.get('/api/sessions', (req, res) => res.json({
   currentPublicIp: '127.0.0.1',
   sessions: [{

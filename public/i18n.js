@@ -162,6 +162,7 @@
       'Manual update required.':'Manuel güncelleme gerekli.',
       'Update command sent. Waiting for next report...':'Güncelleme komutu gönderildi. Sonraki rapor bekleniyor...',
       'Live agent refresh timed out; showing cached data.':'Canlı ajan yenilemesi zaman aşımına uğradı; önbellekteki veri gösteriliyor.',
+      'Demo credentials cannot be changed.':'Demo kullanıcı adı ve şifresi değiştirilemez.',
       'old':'eski',
       'never':'hiç',
       'ago':'önce',
