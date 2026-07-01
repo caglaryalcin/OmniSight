@@ -284,7 +284,7 @@ docker_json() {
   unused=$(docker_unused_count)
   statsf=$(mktemp)
   docker_cmd stats --no-stream --no-trunc --format '{{.ID}}|{{.CPUPerc}}|{{.MemPerc}}|{{.NetIO}}|{{.BlockIO}}' > "$statsf" 2>/dev/null || true
-  rows=$(docker_cmd ps -a --no-trunc --format '{{.ID}}|{{.Names}}|{{.Image}}|{{.State}}|{{.Status}}|{{.Ports}}' 2>/dev/null)
+  rows=$(docker_cmd ps -a --no-trunc --format '{{.ID}}|{{.Names}}|{{.Image}}|{{.State}}|{{.Status}}|{{.Ports}}|{{.Labels}}' 2>/dev/null)
   printf '"docker":{"unused":%s,"containers":[' "${unused:-0}"
   [ -n "$rows" ] && printf '%s\n' "$rows" | awk -F'|' -v statsf="$statsf" '
   BEGIN {
@@ -301,6 +301,7 @@ docker_json() {
     full=$1
     printf "%s{\"id\":\"%s\",\"name\":\"%s\",\"image\":\"%s\",\"state\":\"%s\",\"status\":\"%s\",\"ports\":\"%s\"",
       (c++?",":""), substr($1,1,12), $2, $3, $4, $5, $6
+    if ($7 != "") printf ",\"labelsText\":\"%s\"", $7
     if (cpu[full] != "") printf ",\"cpu\":%s", cpu[full]
     if (mem[full] != "") printf ",\"memPercent\":%s", mem[full]
     if (net[full] != "") printf ",\"netIO\":\"%s\"", net[full]

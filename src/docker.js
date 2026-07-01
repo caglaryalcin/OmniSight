@@ -89,6 +89,14 @@ function pct(v) {
   return Number.isFinite(n) ? Math.round(n * 10) / 10 : null;
 }
 
+function cleanLabels(labels) {
+  if (!labels || typeof labels !== 'object' || Array.isArray(labels)) return {};
+  return Object.fromEntries(Object.entries(labels).slice(0, 80).map(([k, v]) => [
+    String(k).slice(0, 160),
+    String(v ?? '').slice(0, 500),
+  ]));
+}
+
 function cleanSshError(message) {
   const lines = String(message || '')
     .split(/\r?\n/)
@@ -343,8 +351,13 @@ async function getDockerSshHost(host) {
     const inspectIds = containers.map(c => String(c.id || '').replace(/[^\w]/g, '')).filter(Boolean);
     if (inspectIds.length) {
       const inspectTxt = await execDockerCli(host, `inspect --format '{{json .}}' ${inspectIds.join(' ')}`).catch(() => '');
-      const imageIds = new Map(parseJsonLines(inspectTxt).map(row => [String(row.Id || '').slice(0, 12), String(row.Image || '')]));
-      containers.forEach(c => { c.imageID = imageIds.get(c.id) || ''; });
+      const inspectRows = parseJsonLines(inspectTxt);
+      const imageIds = new Map(inspectRows.map(row => [String(row.Id || '').slice(0, 12), String(row.Image || '')]));
+      const labelsById = new Map(inspectRows.map(row => [String(row.Id || '').slice(0, 12), cleanLabels(row.Config?.Labels || row.Labels)]));
+      containers.forEach(c => {
+        c.imageID = imageIds.get(c.id) || '';
+        c.labels = labelsById.get(c.id) || {};
+      });
     }
     const unusedImages = unusedImageCount(parseJsonLines(imagesTxt), containers, cliImageRefs);
     const uniqueImages = [...new Set(containers.map(c => c.image).filter(Boolean))].slice(0, 80);
@@ -408,6 +421,7 @@ async function getDockerHost(host) {
         imageShort: String(image).split('/').pop().slice(0, 40),
         state: String(c.State || '').toLowerCase(),
         status: c.Status || '',
+        labels: cleanLabels(c.Labels),
         ports: ports(c.Ports),
         color: c.State === 'running' ? 'green' : (c.State === 'exited' || c.State === 'dead') ? 'red' : 'yellow',
         cpu: stats ? cpuPercent(stats) : null,

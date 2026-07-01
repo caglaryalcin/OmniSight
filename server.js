@@ -3236,6 +3236,24 @@ function mergePrometheusConfigured(current, cfg) {
 function extractChecks(data) {
   const m = new Map();
   const add = (key, ok, label, detail, extra = {}) => m.set(key, { ok, label, detail, ...extra });
+  const dockerContainerLabels = (c = {}) => {
+    if (c.labels && typeof c.labels === 'object' && !Array.isArray(c.labels)) return c.labels;
+    if (c.Labels && typeof c.Labels === 'object' && !Array.isArray(c.Labels)) return c.Labels;
+    const out = {};
+    String(c.labelsText || c.labels || c.Labels || '').split(',').forEach(part => {
+      const idx = part.indexOf('=');
+      if (idx > 0) out[part.slice(0, idx).trim()] = part.slice(idx + 1).trim();
+    });
+    return out;
+  };
+  const suppressDockerContainerAlert = (c = {}) => {
+    const state = String(c.state || '').toLowerCase();
+    if (state === 'created') return true;
+    const labels = dockerContainerLabels(c);
+    if (Object.keys(labels).some(k => k.startsWith('io.kubernetes.') || k.startsWith('io.cri-containerd.'))) return true;
+    const name = String(c.name || '');
+    return /^k8s[_-]/i.test(name) || /(?:^|[_.-])k8s[_.-]/i.test(name);
+  };
   const suppressKubernetesPodAlert = (p) => {
     const phase = String(p?.phase || '');
     const reason = String(p?.reason || '');
@@ -3338,6 +3356,7 @@ function extractChecks(data) {
       addAnomaly('dk:' + h.name + ':cpu:anomaly', 'Docker host ' + h.name, 'CPU usage', h.summary?.cpu, h.history, 'cpu');
       addAnomaly('dk:' + h.name + ':ram:anomaly', 'Docker host ' + h.name, 'RAM usage', h.summary?.memPercent, h.history, 'mem');
       (h.containers || []).forEach(c => {
+        if (suppressDockerContainerAlert(c)) return;
         const ok = c.state === 'running';
         add('dk:' + h.name + ':' + c.name, ok, 'Container ' + c.name + ' @ ' + h.name, c.state);
       });
