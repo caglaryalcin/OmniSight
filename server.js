@@ -314,6 +314,32 @@ function requestLogIp(req) {
 const DIAG_SLOW_REQUEST_MS = Math.max(1000, Number(process.env.OMNISIGHT_SLOW_REQUEST_MS || 5000));
 const DIAG_SLOW_API_MS = Math.max(250, Number(process.env.OMNISIGHT_SLOW_API_MS || 1500));
 const DIAG_EVENT_LOOP_LAG_MS = Math.max(500, Number(process.env.OMNISIGHT_EVENT_LOOP_LAG_MS || 2500));
+const DIAG_LOG_WINDOW_MS = Math.max(5000, Number(process.env.OMNISIGHT_DIAG_LOG_WINDOW_MS || 60000));
+const DIAG_LOG_BURST = Math.max(1, Number(process.env.OMNISIGHT_DIAG_LOG_BURST || 3));
+const diagnosticLogState = new Map();
+
+function warnDiagnostic(key, message) {
+  if (DEBUG_ENABLED) {
+    console.warn(message);
+    return;
+  }
+  const now = Date.now();
+  let state = diagnosticLogState.get(key);
+  if (!state || now - state.startedAt >= DIAG_LOG_WINDOW_MS) {
+    if (state?.suppressed) {
+      const seconds = Math.max(1, Math.round((now - state.startedAt) / 1000));
+      console.warn(`[diag] suppressed ${state.suppressed} repeated ${key} log(s) over ${seconds}s`);
+    }
+    state = { startedAt: now, emitted: 0, suppressed: 0 };
+    diagnosticLogState.set(key, state);
+  }
+  if (state.emitted < DIAG_LOG_BURST) {
+    state.emitted += 1;
+    console.warn(message);
+  } else {
+    state.suppressed += 1;
+  }
+}
 
 function diagnosticSnapshot() {
   let configured = '-';
@@ -360,7 +386,7 @@ function requestDiagnostics(req, res, next) {
 
   req.on('aborted', () => {
     const ms = Date.now() - start;
-    console.warn(`[http] aborted ${method} ${route} ${ms}ms ip=${requestLogIp(req)} actor=${requestDiagnosticActor(req)} ${diagnosticSnapshot()}`);
+    warnDiagnostic(`http:aborted:${method}:${route}`, `[http] aborted ${method} ${route} ${ms}ms ip=${requestLogIp(req)} actor=${requestDiagnosticActor(req)} ${diagnosticSnapshot()}`);
   });
 
   res.on('finish', () => {
@@ -370,14 +396,14 @@ function requestDiagnostics(req, res, next) {
     const slowLimit = route.startsWith('/api/') ? DIAG_SLOW_API_MS : DIAG_SLOW_REQUEST_MS;
     if (status >= 500 || ms >= slowLimit) {
       const kind = status >= 500 ? 'error' : 'slow';
-      console.warn(`[http] ${kind} status=${status} ${method} ${route} ${ms}ms ip=${requestLogIp(req)} actor=${requestDiagnosticActor(req)} role=${requestDiagnosticRole(req)} ${diagnosticSnapshot()}`);
+      warnDiagnostic(`http:${kind}:${status}:${method}:${route}`, `[http] ${kind} status=${status} ${method} ${route} ${ms}ms ip=${requestLogIp(req)} actor=${requestDiagnosticActor(req)} role=${requestDiagnosticRole(req)} ${diagnosticSnapshot()}`);
     }
   });
 
   res.on('close', () => {
     if (finished || res.writableEnded) return;
     const ms = Date.now() - start;
-    console.warn(`[http] closed ${method} ${route} ${ms}ms ip=${requestLogIp(req)} actor=${requestDiagnosticActor(req)} ${diagnosticSnapshot()}`);
+    warnDiagnostic(`http:closed:${method}:${route}`, `[http] closed ${method} ${route} ${ms}ms ip=${requestLogIp(req)} actor=${requestDiagnosticActor(req)} ${diagnosticSnapshot()}`);
   });
 
   next();
@@ -5621,6 +5647,7 @@ function importFullBackupText(text) {
     count += 1;
   }
   yamlFileCache.clear();
+  normalizedUsersCache = null;
   reloadExtraCA();
   notifyState = loadNotify();
   notifyDisabled = notifyState.disabled;
@@ -7446,7 +7473,7 @@ function startRuntimeDiagnostics() {
     const lag = now - last - 1000;
     last = now;
     if (lag >= DIAG_EVENT_LOOP_LAG_MS) {
-      console.warn(`[runtime] event-loop-lag lag=${Math.round(lag)}ms ${diagnosticSnapshot()}`);
+      warnDiagnostic('runtime:event-loop-lag', `[runtime] event-loop-lag lag=${Math.round(lag)}ms ${diagnosticSnapshot()}`);
     }
   }, 1000);
   timer.unref?.();

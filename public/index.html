@@ -6586,7 +6586,10 @@ function dashboardDetailIsBlank(){
   if(!detail) return false;
   if(detail.querySelector(':scope > .overview')) return false;
   if(detail.querySelector('iframe.embed-frame.active')) return false;
-  return !String(detail.textContent || '').trim() && detail.children.length === 0;
+  const text = String(detail.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
+  if(!text && detail.children.length === 0) return true;
+  const onlyEmptyPlaceholder = detail.children.length === 1 && detail.firstElementChild?.classList.contains('empty');
+  return onlyEmptyPlaceholder && (text === 'loading' || text === 'loading...' || text === 'loading…');
 }
 function ensureDashboardContent(reason = ''){
   if(currentHashRoute() !== 'dashboard') return false;
@@ -6606,6 +6609,7 @@ function ensureDashboardContent(reason = ''){
       render(window._lastData, { soft:true });
     } else {
       showDashboardLoading();
+      scheduleInitialLoadRetry(0);
     }
   }catch(e){
     console.warn('dashboard blank guard failed:', reason, e);
@@ -6924,7 +6928,8 @@ function clearInitialLoadRetry(){
   initialLoadRetryTimer = null;
 }
 function scheduleInitialLoadRetry(attempt = 0){
-  if(currentHashRoute() !== 'dashboard') return;
+  const route = currentHashRoute();
+  if(route !== 'dashboard' && !ALL_IDS.includes(route)) return;
   clearInitialLoadRetry();
   const delay = Math.min(5000, 1200 + attempt * 800);
   initialLoadRetryTimer = setTimeout(() => {
@@ -6935,7 +6940,9 @@ async function initialLoad(preloadedData, attempt = 0){
   try {
     let data = preloadedData;
     if(data && typeof data.then === 'function') data = await data;
-    if(embedOpen || currentHashRoute() !== 'dashboard') return;
+    const route = currentHashRoute();
+    const routeNeedsDashboardData = route === 'dashboard' || ALL_IDS.includes(route);
+    if(embedOpen || !routeNeedsDashboardData) return;
     if(data instanceof Error || !data) {
       if(window._lastData && !window._lastData.loading){
         connectStatusStream();

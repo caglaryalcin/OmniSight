@@ -113,6 +113,64 @@ function cleanSnmpText(value) {
   return Buffer.isBuffer(value) ? value.toString('utf8').replace(/\0/g, '') : String(value || '');
 }
 
+function snmpNumber(value) {
+  if (value == null) return null;
+  if (Buffer.isBuffer(value)) {
+    const text = value.toString('utf8').replace(/\0/g, '').trim();
+    if (/^-?\d+(\.\d+)?$/.test(text)) return Number(text);
+  }
+  const n = toNum(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function diskTempNum(value) {
+  const n = snmpNumber(value);
+  if (!Number.isFinite(n) || n <= 0 || n >= 200) return null;
+  return Math.round(n);
+}
+
+function normalizeTemperature(value) {
+  let n = snmpNumber(value);
+  if (!Number.isFinite(n)) return null;
+  if (Math.abs(n) > 1000) n /= 1000;
+  else if (Math.abs(n) > 200) n /= 10;
+  if (n <= -50 || n >= 200) return null;
+  return Math.round(n);
+}
+
+function entitySensorScale(scale) {
+  const factors = {
+    1: 1e-24, 2: 1e-21, 3: 1e-18, 4: 1e-15, 5: 1e-12, 6: 1e-9,
+    7: 1e-6, 8: 1e-3, 9: 1, 10: 1e3, 11: 1e6, 12: 1e9,
+    13: 1e12, 14: 1e15, 15: 1e18, 16: 1e21, 17: 1e24,
+  };
+  return factors[Number(scale)] || 1;
+}
+
+function normalizeEntityTemperature(value, scale, precision) {
+  const raw = snmpNumber(value);
+  if (!Number.isFinite(raw)) return null;
+  let n = raw * entitySensorScale(snmpNumber(scale));
+  const p = snmpNumber(precision);
+  if (Number.isFinite(p) && p > 0 && Math.abs(n) > 200) n /= 10 ** p;
+  return normalizeTemperature(n);
+}
+
+function tempCandidateScore(label) {
+  const s = String(label || '').toLowerCase();
+  if (/\bcpu\b|processor/.test(s)) return 100;
+  if (/system|board|main|chassis|ambient/.test(s)) return 90;
+  if (/temp|thermal|sensor/.test(s)) return 70;
+  return 40;
+}
+
+function chooseTemperature(candidates) {
+  const valid = (candidates || [])
+    .filter(c => c && Number.isFinite(Number(c.value)))
+    .sort((a, b) => tempCandidateScore(b.label) - tempCandidateScore(a.label) || Number(b.value) - Number(a.value));
+  return valid[0] || null;
+}
+
 function clampPercent(n) {
   if (!Number.isFinite(n)) return null;
   return Math.max(0, Math.min(100, Math.round(n)));
@@ -179,6 +237,85 @@ async function ucdRawCpu(session, key) {
   } catch { return null; }
 }
 
+async function getEntitySensorTemperatures(session) {
+  const sensorBase = '1.3.6.1.2.1.99.1.1.1';
+  const sensorRows = await snmpWalk(session, sensorBase);
+  const sensorCols = parseTableRows(sensorRows, sensorBase);
+  const typeMap = sensorCols['1'] || {};
+  const scaleMap = sensorCols['2'] || {};
+  const precisionMap = sensorCols['3'] || {};
+  const valueMap = sensorCols['4'] || {};
+  const statusMap = sensorCols['5'] || {};
+  const unitMap = sensorCols['6'] || {};
+  if (!Object.keys(valueMap).length) return [];
+
+  let physicalCols = {};
+  try {
+    physicalCols = parseTableRows(await snmpWalk(session, '1.3.6.1.2.1.47.1.1.1.1'), '1.3.6.1.2.1.47.1.1.1.1');
+  } catch {
+    physicalCols = {};
+  }
+  const descrMap = physicalCols['2'] || {};
+  const nameMap = physicalCols['7'] || {};
+
+  const indexes = [...new Set([
+    ...Object.keys(typeMap),
+    ...Object.keys(valueMap),
+    ...Object.keys(statusMap),
+  ])];
+  return indexes.map(idx => {
+    const type = snmpNumber(typeMap[idx]);
+    const status = snmpNumber(statusMap[idx]);
+    const units = cleanSnmpText(unitMap[idx]).trim();
+    const isCelsius = type === 8 || /celsius|centigrade|deg\s*c|°c/i.test(units);
+    if (!isCelsius || (status != null && status !== 1)) return null;
+    const value = normalizeEntityTemperature(valueMap[idx], scaleMap[idx], precisionMap[idx]);
+    if (value == null) return null;
+    const label = cleanSnmpText(nameMap[idx]).trim() || cleanSnmpText(descrMap[idx]).trim() || `Sensor ${idx}`;
+    return { value, label: /temp|thermal|celsius/i.test(label) ? label : `${label} temperature` };
+  }).filter(Boolean);
+}
+
+async function getUcdSensorTemperatures(session) {
+  const base = '1.3.6.1.4.1.2021.13.16.2.1';
+  const rows = await snmpWalk(session, base);
+  const cols = parseTableRows(rows, base);
+  const nameMap = cols['2'] || {};
+  const valueMap = cols['3'] || {};
+  const indexes = [...new Set([...Object.keys(nameMap), ...Object.keys(valueMap)])];
+  return indexes.map(idx => {
+    const value = normalizeTemperature(valueMap[idx]);
+    if (value == null) return null;
+    const label = cleanSnmpText(nameMap[idx]).trim() || `Sensor ${idx}`;
+    return { value, label: /temp|thermal/i.test(label) ? label : `${label} temperature` };
+  }).filter(Boolean);
+}
+
+async function getScalarTemperatures(session) {
+  const scalarOids = [
+    ['1.3.6.1.4.1.6574.1.2.0', 'CPU temperature'],
+    ['1.3.6.1.4.1.14988.1.1.3.10.0', 'System temperature'],
+    ['1.3.6.1.4.1.14988.1.1.3.11.0', 'CPU temperature'],
+  ];
+  const values = await snmpGet(session, scalarOids.map(([oid]) => oid));
+  return scalarOids.map(([oid, label]) => {
+    const value = normalizeTemperature(values[oid]);
+    return value == null ? null : { value, label };
+  }).filter(Boolean);
+}
+
+async function getSensorTemperature(session) {
+  const candidates = [];
+  for (const reader of [getEntitySensorTemperatures, getUcdSensorTemperatures, getScalarTemperatures]) {
+    try {
+      candidates.push(...await reader(session));
+    } catch {
+      // Many devices expose only one of these tables.
+    }
+  }
+  return chooseTemperature(candidates);
+}
+
 async function getSystemInfo(session, deviceKey) {
   const synVals = await snmpGet(session, [
     '1.3.6.1.4.1.6574.1.4.1.0',
@@ -192,7 +329,12 @@ async function getSystemInfo(session, deviceKey) {
   let memTotalKB = synVals['1.3.6.1.4.1.6574.1.1.1.0'];
   let memFreeKB  = synVals['1.3.6.1.4.1.6574.1.1.2.0'];
   let memSource = memTotalKB != null ? 'synology' : null;
-  const systemTemp = toNum(synVals['1.3.6.1.4.1.6574.1.2.0']);
+  let tempInfo = chooseTemperature([{ value: normalizeTemperature(synVals['1.3.6.1.4.1.6574.1.2.0']), label: 'CPU temperature' }]);
+  if (!tempInfo) {
+    try {
+      tempInfo = await getSensorTemperature(session);
+    } catch (e) { console.error(`[SNMP ${deviceKey} sensors]`, e.message); }
+  }
 
 
   if (cpuUser == null) {
@@ -283,8 +425,8 @@ async function getSystemInfo(session, deviceKey) {
 
   return {
     cpu: cpuUser != null ? cpuUser + (cpuSystem || 0) : null,
-    systemTemp: systemTemp != null ? systemTemp : null,
-    systemTempLabel: systemTemp != null ? 'CPU temperature' : null,
+    systemTemp: tempInfo?.value ?? null,
+    systemTempLabel: tempInfo?.label ?? null,
     ram,
   };
 }
@@ -305,18 +447,26 @@ async function getDisks(session) {
   });
 
   const nameMap = cols['2'] || {};
+  const modelMap = cols['3'] || {};
   const statMap = cols['5'] || {};
   const tempMap = cols['6'] || {};
+  const indexes = [...new Set([
+    ...Object.keys(nameMap),
+    ...Object.keys(modelMap),
+    ...Object.keys(statMap),
+    ...Object.keys(tempMap),
+  ])].sort((a, b) => Number(a) - Number(b));
 
-  return Object.keys(nameMap).map(idx => {
+  return indexes.map(idx => {
     const rawName = nameMap[idx];
-    const name = Buffer.isBuffer(rawName) ? rawName.toString('utf8').replace(/\0/g, '') : String(rawName || `Disk ${idx}`);
-    const statusCode = toNum(statMap[idx]) || 1;
+    const rawModel = modelMap[idx];
+    const name = cleanSnmpText(rawName).trim() || cleanSnmpText(rawModel).trim() || `Disk ${idx}`;
+    const statusCode = snmpNumber(statMap[idx]) || 1;
     return {
       name,
       status: DISK_STATUS[statusCode] || 'unknown',
       healthy: statusCode === 1,
-      temp: toNum(tempMap[idx]),
+      temp: diskTempNum(tempMap[idx]),
     };
   });
 }
