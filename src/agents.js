@@ -422,6 +422,18 @@ function isConnecting(a, now) {
   return !isOnline(a, now) && Number(a._connectingUntil || 0) > now;
 }
 
+function agentHistoryForUi(id) {
+  return [...(history.get(id) || [])].map(h => {
+    const read = h.diskReadBps == null ? null : Number(h.diskReadBps);
+    const write = h.diskWriteBps == null ? null : Number(h.diskWriteBps);
+    const hasDiskIO = Number.isFinite(read) || Number.isFinite(write);
+    return {
+      ...h,
+      diskIO: hasDiskIO ? (Number.isFinite(read) ? read : 0) + (Number.isFinite(write) ? write : 0) : h.diskIO,
+    };
+  });
+}
+
 function getAllAgentData(config) {
   const excluded = (config && config.excludedServices?.linux) || {};
   const now = Date.now();
@@ -472,7 +484,7 @@ function getAllAgentData(config) {
       uptime: online ? a.uptime : null,
       lastSeen: a.lastSeen || null,
       services: online ? services : [],
-      history: [...(history.get(a.id) || [])],
+      history: agentHistoryForUi(a.id),
     };
   });
   pendingByKind('linux').forEach(p => rows.push({

@@ -858,12 +858,12 @@ async function getDeviceData(device) {
       console.error(`[SNMP ${device.name}] sysInfo:`, e.message);
       return {};
     });
-    const disks = isSynology
-      ? await getDisks(session).catch(e => { console.error(`[SNMP ${device.name}] disks:`, e.message); return []; })
-      : [];
-    const volumes = isSynology
-      ? await getVolumes(session).catch(e => { console.error(`[SNMP ${device.name}] volumes:`, e.message); return []; })
-      : [];
+    const readSynologyTable = (label, fn) => fn().catch(e => {
+      if (isSynology) console.error(`[SNMP ${device.name}] ${label}:`, e.message);
+      return [];
+    });
+    const disks = await readSynologyTable('disks', () => getDisks(session));
+    const volumes = await readSynologyTable('volumes', () => getVolumes(session));
     const network = await getNetwork(session, device.host).catch(e => { console.error(`[SNMP ${device.name}] network:`, e.message); return []; });
     const networkDiagnostics = network?._diagnostics || null;
     const diskIO = await getDiskIO(session, device.host, isSynology || !!(disks.length || volumes.length))
