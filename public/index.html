@@ -5309,6 +5309,25 @@ function morphDetailHtml(detail, html){
   return true;
 }
 
+function panelDetailHtml(panel){
+  const iconSvg = platformIcon(panel);
+  const headerSummary = panel.sbSummary && panel.sbSummary.includes('sb-csum')
+    ? `<div class="det-platform-summary">${panel.sbSummary}</div>`
+    : '';
+  const detailBadge = panel.detailBadge !== undefined ? panel.detailBadge : panel.badge;
+  return `
+    <div class="det-hdr">
+      <div class="det-icon">${iconSvg}</div>
+      <span class="det-title">${panel.title}</span>
+      ${headerSummary}
+      <div class="det-summary">
+        ${panel.meta?`<span class="det-meta">${panel.meta}</span>`:''}
+        ${detailBadge}
+      </div>
+    </div>
+    <div class="det-body">${panel.body}</div>`;
+}
+
 function selectPanel(id, opts = {}){
   if(!opts.soft) setHashRoute(id, opts);
   const wasEmbedOpen = embedOpen;
@@ -5325,15 +5344,30 @@ function selectPanel(id, opts = {}){
     parkEmbedFrames(detail, { abortInflight: true });
     detail.dataset.embedUrl = '';
     detail.dataset.panelId = id;
-    detail.dataset.panelHtml = '';
-    detail.innerHTML = '<div class="empty" style="padding:48px">Loading platform details...</div>';
-    fetchStatus({ detail: true, timeoutMs: 10000 })
+    const compactPanel = window._panels?.[id] || buildPanels(window._lastData)[id];
+    if(compactPanel){
+      const compactHtml = panelDetailHtml(compactPanel);
+      if(detail.dataset.panelHtml !== compactHtml){
+        detail.innerHTML = compactHtml;
+        detail.dataset.panelHtml = compactHtml;
+      }
+    } else {
+      detail.dataset.panelHtml = '';
+      detail.innerHTML = '<div class="empty" style="padding:48px">Loading platform details...</div>';
+    }
+    const fullStatusPromise = pendingFullStatusPromise || fetchStatus({ detail: true, timeoutMs: 10000 }).catch(e => e);
+    if(!pendingFullStatusPromise) pendingFullStatusPromise = fullStatusPromise;
+    fullStatusPromise
       .then(data => {
+        if(data instanceof Error) throw data;
         render(data);
         selectPanel(id, { ...opts, _fullRetry: true });
       })
       .catch(err => {
         detail.innerHTML = `<div class="empty" style="padding:48px">Could not load platform details. ${escHtml(err?.message || '')}</div>`;
+      })
+      .finally(() => {
+        if(pendingFullStatusPromise === fullStatusPromise) pendingFullStatusPromise = null;
       });
     return;
   }
@@ -5343,25 +5377,10 @@ function selectPanel(id, opts = {}){
     if(window._lastData) render(window._lastData);
     return;
   }
-  const iconSvg = platformIcon(panel);
   const detail = document.getElementById('detail');
   parkEmbedFrames(detail, { abortInflight: true });
   detail.dataset.embedUrl = '';
-  const headerSummary = panel.sbSummary && panel.sbSummary.includes('sb-csum')
-    ? `<div class="det-platform-summary">${panel.sbSummary}</div>`
-    : '';
-  const detailBadge = panel.detailBadge !== undefined ? panel.detailBadge : panel.badge;
-  const html = `
-    <div class="det-hdr">
-      <div class="det-icon">${iconSvg}</div>
-      <span class="det-title">${panel.title}</span>
-      ${headerSummary}
-      <div class="det-summary">
-        ${panel.meta?`<span class="det-meta">${panel.meta}</span>`:''}
-        ${detailBadge}
-      </div>
-    </div>
-    <div class="det-body">${panel.body}</div>`;
+  const html = panelDetailHtml(panel);
   const canSoftPatch = opts.soft && !wasEmbedOpen && detail.dataset.panelId === id && detail.dataset.panelHtml !== html;
   if(canSoftPatch && morphDetailHtml(detail, html)){
     detail.dataset.panelHtml = html;
@@ -6923,6 +6942,7 @@ async function doRefresh(){
 
 let initialRouteApplied = false;
 let initialLoadRetryTimer = null;
+let pendingFullStatusPromise = null;
 function clearInitialLoadRetry(){
   if(initialLoadRetryTimer) clearTimeout(initialLoadRetryTimer);
   initialLoadRetryTimer = null;
@@ -6933,7 +6953,7 @@ function scheduleInitialLoadRetry(attempt = 0){
   clearInitialLoadRetry();
   const delay = Math.min(5000, 1200 + attempt * 800);
   initialLoadRetryTimer = setTimeout(() => {
-    initialLoad(fetchStatus({ timeoutMs: 12000 }).catch(e => e), attempt + 1);
+    initialLoad(fetchStatus({ detail: ALL_IDS.includes(route), timeoutMs: 12000 }).catch(e => e), attempt + 1);
   }, delay);
 }
 async function initialLoad(preloadedData, attempt = 0){
@@ -7004,6 +7024,12 @@ window.addEventListener('popstate', () => { applyHashRoute(); });
   const cachedStatus = readStatusCache();
   const startRoute = currentHashRoute();
   const startInEmbed = startRoute !== 'dashboard' && !!embedRoutes[startRoute];
+  const startInPlatform = ALL_IDS.includes(startRoute);
+  const statusPromise = (startInEmbed
+    ? fetchStatus({ timeoutMs: 8000 })
+    : fetchStatus({ detail: startInPlatform, timeoutMs: cachedStatus ? 6000 : 10000 })
+  ).catch(e => e);
+  if(startInPlatform) pendingFullStatusPromise = statusPromise;
   if(startInEmbed){
     initialRouteApplied = true;
     applyHashRoute();
@@ -7012,10 +7038,6 @@ window.addEventListener('popstate', () => { applyHashRoute(); });
     if(!cachedStatus) showDashboardLoading();
     if(cachedStatus) initialLoad(cachedStatus);
   }
-  const statusPromise = (startInEmbed
-    ? fetchStatus({ timeoutMs: 8000 })
-    : fetchStatus({ timeoutMs: cachedStatus ? 6000 : 10000 })
-  ).catch(e => e);
   const firstRenderPromise = cachedStatus || startInEmbed ? null : initialLoad(statusPromise);
   const applyFreshStatus = () => {
     if(startInEmbed) {
