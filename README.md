@@ -411,6 +411,7 @@ alerts:
     pod: { durationSeconds: 60 }
     container: { durationSeconds: 60 }
     target: { durationSeconds: 60 }
+    snmp: { durationSeconds: 120 }
   maintenanceWindows:
     - start: "23:00"
       end: "23:30"
@@ -435,7 +436,7 @@ alerts:
     to: ["alerts@domain.com"]
 ```
 
-Notifications are sent on **state changes** (running→down = DOWN, down→running = UP) and resource threshold changes (CPU/RAM/disk crossing the configured percentages). Pre-existing problems at startup do not trigger a flood. Alert rules can add per-metric duration delays for CPU/RAM/disk, Kubernetes pods, Docker containers and Prometheus targets, plus maintenance windows. The Alerts page keeps a timeline, supports acknowledgement and temporary mute. Healthchecks `grace` is treated as degraded/warning; the DOWN notification is sent only after the check becomes `down`. Each channel can be tested individually from the Settings page.
+Notifications are sent on **state changes** (running→down = DOWN, down→running = UP) and resource threshold changes (CPU/RAM/disk crossing the configured percentages). Pre-existing problems at startup do not trigger a flood. Alert rules can add per-metric duration delays for CPU/RAM/disk, Kubernetes pods, Docker containers, Prometheus targets and SNMP reachability, plus maintenance windows. Short SNMP refresh failures keep the previous healthy row briefly as stale data so UDP packet loss does not immediately turn the dashboard red. The Alerts page keeps a timeline, supports acknowledgement and temporary mute. Healthchecks `grace` is treated as degraded/warning; the DOWN notification is sent only after the check becomes `down`. Each channel can be tested individually from the Settings page.
 
 External systems can send events into Event Center:
 

@@ -889,6 +889,7 @@ html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#dd
           <div class="form-group"><label>Pod duration sec</label><input type="number" id="al-rule-pod-duration" min="0" max="3600" value="60"></div>
           <div class="form-group"><label>Container duration sec</label><input type="number" id="al-rule-container-duration" min="0" max="3600" value="60"></div>
           <div class="form-group"><label>Target duration sec</label><input type="number" id="al-rule-target-duration" min="0" max="3600" value="60"></div>
+          <div class="form-group"><label>SNMP duration sec</label><input type="number" id="al-rule-snmp-duration" min="0" max="3600" value="120"></div>
         </div>
         <div class="form-grid g3">
           <div class="form-group"><label>Maintenance start</label><input type="time" id="al-maint-start"></div>
@@ -2816,6 +2817,7 @@ function populate(cfg) {
     document.getElementById('al-rule-pod-duration').value = ruleDurationValue(a.rules, 'pod', 60);
     document.getElementById('al-rule-container-duration').value = ruleDurationValue(a.rules, 'container', 60);
     document.getElementById('al-rule-target-duration').value = ruleDurationValue(a.rules, 'target', 60);
+    document.getElementById('al-rule-snmp-duration').value = ruleDurationValue(a.rules, 'snmp', 120);
     const an = a.anomaly || {};
     document.getElementById('al-anomaly-en').checked = an.enabled === true;
     document.getElementById('al-anomaly-samples').value = an.minSamples || 12;
@@ -3153,6 +3155,7 @@ function collect() {
         pod: { durationSeconds: clampedSecondsInput('al-rule-pod-duration', 60) },
         container: { durationSeconds: clampedSecondsInput('al-rule-container-duration', 60) },
         target: { durationSeconds: clampedSecondsInput('al-rule-target-duration', 60) },
+        snmp: { durationSeconds: clampedSecondsInput('al-rule-snmp-duration', 120) },
       },
       anomaly: {
         enabled: document.getElementById('al-anomaly-en').checked,

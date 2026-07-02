@@ -2426,7 +2426,7 @@ function markPlatformRefreshDone(key, ok = true) {
 
 function platformResultLooksFailed(key, value, enabled) {
   if (!enabled) return false;
-  if (key === 'snmp') return Array.isArray(value) && value.length > 0 && value.every(d => d.online === false || d.error || d._connecting);
+  if (key === 'snmp') return Array.isArray(value) && value.length > 0 && value.every(d => !d._stale && (d.online === false || d.error || d._connecting));
   if (key === 'docker') return Array.isArray(value) && value.length > 0 && value.every(d => d.online === false || d.error || d._connecting);
   if (key === 'dockhand') return value?.instances?.length && value.instances.every(i => i.online === false || i.error || i._connecting);
   if (key === 'prometheus') return value?.instances?.length && value.instances.every(i => i.online === false || i.error || i._connecting);
@@ -3340,8 +3340,9 @@ function extractChecks(data) {
     });
   }
   (data.snmp || []).forEach(s => {
-    add('snmp:' + s.name, !!s.online, 'SNMP ' + s.name, 'unreachable');
-    if (s.online) {
+    const snmpOk = !!s.online && !s._stale;
+    add('snmp:' + s.name, snmpOk, 'SNMP ' + s.name, s._stale ? (s.error || 'temporary SNMP refresh failure') : 'unreachable');
+    if (s.online && !s._stale) {
       addPct('snmp:' + s.name + ':cpu', 'SNMP ' + s.name, 'CPU usage', s.cpu, thresholds.cpu);
       addPct('snmp:' + s.name + ':ram', 'SNMP ' + s.name, 'RAM usage', s.ram?.percent, thresholds.ram);
       addAnomaly('snmp:' + s.name + ':cpu:anomaly', 'SNMP ' + s.name, 'CPU usage', s.cpu, s.history, 'cpu');
@@ -3483,6 +3484,7 @@ function alertRuleForCheck(key, check = {}) {
   const metric = String(check.metric || '').toLowerCase();
   if (check.kind === 'anomaly') return config.alerts?.anomaly?.rules?.[metric] || config.alerts?.anomaly || rules.anomaly || {};
   if (check.kind === 'threshold' && metric) return rules[metric] || {};
+  if (String(key || '').startsWith('snmp:')) return rules.snmp || { durationSeconds: 120 };
   if (String(key || '').startsWith('k8s:')) return rules.pod || {};
   if (String(key || '').startsWith('dk:') && String(key || '').split(':').length >= 3) return rules.container || {};
   if (String(key || '').startsWith('prom:') && !String(key || '').startsWith('prom:instance:')) return rules.target || {};
@@ -3652,6 +3654,47 @@ function runAlertChecks(data) {
 }
 
 const STALE_KEEP_MS = 120000;
+function preserveSnmpOnTransient(nextRows, err) {
+  const prevRows = Array.isArray(cache.data?.snmp) ? cache.data.snmp : [];
+  if (!prevRows.some(row => row?.online)) return nextRows;
+  const rows = Array.isArray(nextRows) ? nextRows : [];
+  const now = Date.now();
+  if (!rows.length && err) {
+    return prevRows.map(row => {
+      if (!row?.online) return row;
+      const staleSince = row._staleSince || now;
+      const error = err?.message || 'temporary SNMP refresh failure';
+      if (now - staleSince > STALE_KEEP_MS) {
+        return {
+          name: row.name,
+          host: row.host,
+          profile: row.profile,
+          snmpVersion: row.snmpVersion,
+          online: false,
+          error,
+          _stale: false,
+          _staleSince: null,
+        };
+      }
+      return { ...row, _stale: true, _staleSince: staleSince, error };
+    });
+  }
+  return rows.map(row => {
+    if (!row) return row;
+    const prev = prevRows.find(old => sameSnmpDevice(old, row));
+    const failed = row.online === false || row._connecting || (!!row.error && !row.online);
+    if (!failed || !prev?.online) return { ...row, _stale: false, _staleSince: null };
+    const staleSince = prev._staleSince || now;
+    if (now - staleSince > STALE_KEEP_MS) return { ...row, _stale: false, _staleSince: null };
+    return {
+      ...prev,
+      _stale: true,
+      _staleSince: staleSince,
+      error: row.error || err?.message || 'temporary SNMP refresh failure',
+    };
+  });
+}
+
 function preserveHealthchecksOnTransient(next, err) {
   const prev = cache.data?.healthchecks;
   const hasPrevious = prev?.online && Array.isArray(prev.checks) && prev.checks.length;
@@ -3867,6 +3910,7 @@ function backgroundRefresh(opts = {}) {
           : key === 'docker' ? mergeDockerHistory(preserveDockerOnTransient(next))
           : key === 'healthchecks' ? preserveHealthchecksOnTransient(next)
           : key === 'uptimekuma' ? preserveUptimeKumaOnTransient(mergeUptimeKumaHistory(next))
+          : key === 'snmp' ? preserveSnmpOnTransient(next)
           : key === 'checks' && next ? { ...next, historyHours: checksConfig().historyHours }
           : next;
         ok = !platformResultLooksFailed(key, base[key], isEnabled);
@@ -3886,6 +3930,9 @@ function backgroundRefresh(opts = {}) {
         } else if (key === 'healthchecks') {
           base[key] = preserveHealthchecksOnTransient(fb, err);
           if (base[key]?._stale) console.warn(`Healthchecks refresh failed; keeping last data: ${err.message}`);
+        } else if (key === 'snmp') {
+          base[key] = preserveSnmpOnTransient(fb, err);
+          if ((base[key] || []).some(row => row._stale)) console.warn(`SNMP refresh failed; keeping last data: ${err.message}`);
         } else {
           base[key] = fb;
         }

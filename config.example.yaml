@@ -142,6 +142,8 @@ alerts:
       durationSeconds: 60
     target:
       durationSeconds: 60
+    snmp:
+      durationSeconds: 120
   maintenanceWindows:
     # days: mon,tue,wed,thu,fri  |  wrap-around windows such as 23:00 -> 02:00 are supported
     - start: "23:00"

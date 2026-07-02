@@ -210,6 +210,7 @@
       'Pod duration sec':'Pod süre sn',
       'Container duration sec':'Container süre sn',
       'Target duration sec':'Target süre sn',
+      'SNMP duration sec':'SNMP süre sn',
       'Maintenance start':'Bakım başlangıcı',
       'Maintenance end':'Bakım bitişi',
       'Maintenance days':'Bakım günleri',
