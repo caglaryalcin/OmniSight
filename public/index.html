@@ -2158,6 +2158,15 @@ function pveHeadStat(label, value, color = 'var(--text)', spark = '', extraClass
     ${spark}
   </div>`;
 }
+function snmpPrimaryFan(fans = []) {
+  const rows = Array.isArray(fans) ? fans.filter(f => hasNum(f?.value)) : [];
+  return rows.find(f => Number(f.value) > 0) || rows[0] || null;
+}
+function snmpFanLabel(fan, fallback = 'Fan') {
+  const s = String(fan?.label || fallback || 'Fan').replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
+  const m = s.match(/\bfan\s*([0-9]+)/i);
+  return m ? `Fan ${m[1]}` : fallback;
+}
 function pveTempHistorySource(history, temp, index = 0) {
   const key = temp?.historyKey || tempHistoryKey(temp?.label || 'Temperature');
   const hasKeyHistory = Array.isArray(history) && history.some(d => hasNum(d?.[key]));
@@ -2575,6 +2584,7 @@ function buildLinux(linux){
       cpuPct != null ? pveHeadStat('CPU', `${cpuPct}%`, bc(cpuPct), miniSparkline(srv.history, 'cpu', cpuPct)) : '',
       ramPct != null ? pveHeadStat('RAM', `${ramPct}%`, bc(ramPct), miniSparkline(srv.history, 'ram', ramPct)) : '',
       srv.disk ? pveHeadStat('Disk', `${srv.disk.percent}%`, bc(srv.disk.percent), miniSparkline(srv.history, 'disk', srv.disk.percent)) : '',
+      pveHeadStat('Disk I/O', diskIOTxt || '--', diskIOTxt ? 'var(--cyan)' : 'var(--muted)', diskIOMbps != null ? miniSparkline(diskIOHistory, 'diskIOMbps', diskIOMbps, rateColor, rateSparkMax(diskIOHistory, 'diskIOMbps', diskIOMbps), ' MB/s', 'Disk I/O') : ''),
       srv.temp != null ? pveHeadStat('Temp', `${srv.temp}°C`, tempColor(srv.temp), miniSparkline(srv.history, 'temp', srv.temp, tempHex, 100, '°C', 'Temperature')) : '',
       srvSvcTotal ? pveHeadStat('Services', `${srvSvcUp}/${srvSvcTotal}`) : '',
       srv.uptime ? pveHeadStat('Uptime', fmtUptime(srv.uptime)) : '',
@@ -2980,7 +2990,7 @@ function buildSynology(syn){
       : (dev.systemTempLabel && !/cpu|processor/i.test(dev.systemTempLabel) && hasNum(dev.systemTemp) ? Number(dev.systemTemp) : null);
     const fanSpeeds = Array.isArray(dev.fanSpeeds) ? dev.fanSpeeds : (Array.isArray(dev.sensors?.fanSpeeds) ? dev.sensors.fanSpeeds : []);
     const nvmeTemps = Array.isArray(dev.nvmeTemps) ? dev.nvmeTemps : [];
-    const fanHeadText = fanSpeeds.length ? fanSpeeds.map(f => `${f.value} RPM`).join(' / ') : '';
+    const primaryFan = snmpPrimaryFan(fanSpeeds);
     const extraTempRows = [
       ...(systemTemperature != null ? [{ label: dev.systemTemperatureLabel || 'System Temp', value: systemTemperature }] : []),
       ...nvmeTemps.map((t, idx) => ({ label: t.label || t.name || `NVMe ${idx + 1}`, value: t.value })),
@@ -3003,7 +3013,7 @@ function buildSynology(syn){
       dev.cpu != null ? pveHeadStat('CPU', `${dev.cpu}%`, bc(dev.cpu), miniSparkline(dev.history, 'cpu', dev.cpu)) : pveHeadStat('CPU', '--', 'var(--muted)'),
       dev.ram ? pveHeadStat('RAM', `${dev.ram.percent}%`, bc(dev.ram.percent), miniSparkline(dev.history, 'ram', dev.ram.percent)) : pveHeadStat('RAM', '--', 'var(--muted)'),
       cpuTemp != null ? pveHeadStat('CPU temp', `${cpuTemp}°C`, pveTempColor(cpuTemp), miniSparkline(dev.history, 'temp', cpuTemp, pveTempHex, 100, '°C', 'CPU temp')) : pveHeadStat('CPU temp', '--', 'var(--muted)'),
-      fanHeadText ? pveHeadStat('Fan', fanHeadText, 'var(--text)') : (systemTemperature != null ? pveHeadStat('Sys temp', `${systemTemperature}°C`, pveTempColor(systemTemperature)) : (dev.uptimeSeconds != null ? pveHeadStat('Uptime', fmtUptime(dev.uptimeSeconds)) : pveHeadStat('Fan', '--', 'var(--muted)'))),
+      primaryFan ? pveHeadStat(snmpFanLabel(primaryFan), `${primaryFan.value} RPM`, 'var(--text)') : (systemTemperature != null ? pveHeadStat('Sys temp', `${systemTemperature}°C`, pveTempColor(systemTemperature)) : (dev.uptimeSeconds != null ? pveHeadStat('Uptime', fmtUptime(dev.uptimeSeconds)) : pveHeadStat('Fan', '--', 'var(--muted)'))),
       pveHeadStat('Disk I/O', diskIOTxt || '--', diskIOTxt ? 'var(--cyan)' : 'var(--muted)', diskIOHeaderMbps != null ? miniSparkline(diskIOHistory, 'diskIOMbps', diskIOHeaderMbps, rateColor, rateSparkMax(diskIOHistory, 'diskIOMbps', diskIOHeaderMbps), ' MB/s', 'Disk I/O') : ''),
       pveHeadStat('Bandwidth', bandwidthTxt || '--', bandwidthTxt ? 'var(--green)' : 'var(--muted)', bandwidthHeaderMbps != null ? miniSparkline(bandwidthHistory, 'bandwidthMbps', bandwidthHeaderMbps, () => '#34D399', rateSparkMax(bandwidthHistory, 'bandwidthMbps', bandwidthHeaderMbps), ' MB/s', 'Bandwidth') : ''),
     ].join('');
@@ -4766,8 +4776,9 @@ function overviewRows(id, data){
   }
   if(id === 'snmp'){
     const rows = (data.snmp||[]).slice(0,6).map(dev => {
+      const primaryFan = snmpPrimaryFan(dev.fanSpeeds || dev.sensors?.fanSpeeds || []);
       const sub = dev._connecting ? (dev.host||'Connecting') :
-        dev.online ? [dev.host, dev.cpu!=null?`CPU ${dev.cpu}%`:'', dev.ram?`RAM ${dev.ram.percent}%`:'', (dev.cpuTemp ?? dev.systemTemp)!=null?`CPU temp ${dev.cpuTemp ?? dev.systemTemp}°C`:'', (dev.fanSpeeds||[]).length?`Fan ${(dev.fanSpeeds||[]).map(f=>`${f.value} RPM`).join('/')}`:'' ].filter(Boolean).join(' · ') :
+        dev.online ? [dev.host, dev.cpu!=null?`CPU ${dev.cpu}%`:'', dev.ram?`RAM ${dev.ram.percent}%`:'', (dev.cpuTemp ?? dev.systemTemp)!=null?`CPU temp ${dev.cpuTemp ?? dev.systemTemp}°C`:'', primaryFan?`${snmpFanLabel(primaryFan)} ${primaryFan.value} RPM`:'' ].filter(Boolean).join(' · ') :
         (dev.error || 'SNMP unreachable');
       return overviewRow('snmp', dev.name, sub, dev._connecting?'gray':dev.online?'green':'red', dev._connecting?'connecting':dev.online?'online':'offline', dev._connecting?'md-gray':dev.online?'md-green':'md-red');
     }).join('');
