@@ -2773,6 +2773,18 @@ function selfRegistrationEnabled() {
   return config.security?.selfRegistrationEnabled !== false;
 }
 
+function publicIconValue(icon) {
+  const value = String(icon || '').trim();
+  if (!value) return undefined;
+  const match = value.match(/^\/api\/icons\/([^?#/]+)/);
+  if (!match) return value;
+  let file = match[1];
+  try { file = decodeURIComponent(file); } catch {}
+  const dir = path.resolve(__dirname, 'data', 'icons');
+  const fp = path.resolve(dir, path.basename(file));
+  return fp !== dir && fp.startsWith(dir + path.sep) && fs.existsSync(fp) ? value : undefined;
+}
+
 function assignStatic(base) {
   base.publicStatus = !!config.publicStatus;
   base.configured = configuredList();
@@ -2799,9 +2811,9 @@ function assignStatic(base) {
   };
   base.ui = cleanUiPreferences(config.ui || {});
   base.icons = {
-    proxmox: config.proxmox?.icon, linux: config.linux?.icon, kubernetes: config.kubernetes?.icon,
-    snmp: config.snmp?.icon, healthchecks: config.healthchecks?.icon, uptimekuma: config.uptimekuma?.icon, checks: config.checks?.icon, prometheus: config.prometheus?.icon, docker: config.docker?.icon, dockhand: config.dockhand?.icon,
-    database: config.database?.icon,
+    proxmox: publicIconValue(config.proxmox?.icon), linux: publicIconValue(config.linux?.icon), kubernetes: publicIconValue(config.kubernetes?.icon),
+    snmp: publicIconValue(config.snmp?.icon), healthchecks: publicIconValue(config.healthchecks?.icon), uptimekuma: publicIconValue(config.uptimekuma?.icon), checks: publicIconValue(config.checks?.icon), prometheus: publicIconValue(config.prometheus?.icon), docker: publicIconValue(config.docker?.icon), dockhand: publicIconValue(config.dockhand?.icon),
+    database: publicIconValue(config.database?.icon),
   };
 }
 
@@ -7820,7 +7832,9 @@ app.get('/api/kubernetes/logs', async (req, res) => {
     }
     const logs = await getPodLogs(config.kubernetes, namespace, pod, container, req.query.tail);
     res.type('text/plain; charset=utf-8').send(logs || '');
-  } catch (err) { sendServerError(res, err); }
+  } catch (err) {
+    res.status(502).json({ error: err?.message || 'Kubernetes logs unavailable' });
+  }
 });
 
 app.use('/api', (req, res) => {

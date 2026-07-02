@@ -533,6 +533,7 @@ html[data-theme="light"] .topbar{background:rgba(255,255,255,.78)}
 .pve-head-stat{flex:1 1 86px}
 .pve-head-stat.is-host{flex:0 1 auto;width:max-content;max-width:min(230px,22vw)}
 .pve-head-stat.is-vms,.pve-head-stat.is-uptime{flex:0 0 auto;width:max-content}
+.pve-head-stat.is-version-wrap{flex:1.35 1 150px}
 .pve-head-stat.has-spark{flex:1.55 1 150px;display:grid;grid-template-columns:minmax(52px,auto) minmax(70px,1fr);align-items:center;column-gap:10px}
 .pve-head-stat.is-temp.has-spark{flex:1.28 1 136px}
 .pve-node-hdr .badge + .nbell{margin-left:-3px}
@@ -540,6 +541,7 @@ html[data-theme="light"] .topbar{background:rgba(255,255,255,.78)}
 .pve-head-title .node-name{width:auto;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pve-head-sub,.pve-head-lbl{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.055em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pve-head-val{font-size:14px;font-weight:800;color:var(--text);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pve-head-stat.is-version-wrap .pve-head-val{white-space:normal;overflow-wrap:anywhere;word-break:break-word;line-height:1.18;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical}
 .mini-hist{width:100%;height:24px;display:block;opacity:.9}
 .mini-hist-bg{fill:rgba(255,255,255,.025)}
 html[data-theme="light"] .mini-hist-bg{fill:rgba(15,23,42,.035)}
@@ -548,11 +550,37 @@ html[data-theme="light"] .mini-hist-bg{fill:rgba(15,23,42,.035)}
 .docker-head-main.docker-head-7{grid-template-columns:fit-content(190px) minmax(210px,1.05fr) minmax(74px,.34fr) minmax(136px,.7fr) minmax(136px,.7fr) minmax(104px,.46fr) minmax(72px,.34fr)}
 .docker-head-main .pve-head-title,.docker-head-main .pve-head-stat{margin:0}
 .docker-head-main.docker-head-7 .pve-head-stat{padding-left:9px;padding-right:9px}
+.db-node-hdr,.service-node-hdr{
+  position:relative;overflow:hidden;border-bottom:1px solid var(--border);
+  background:linear-gradient(180deg,rgba(255,255,255,.028),rgba(255,255,255,.006));
+  box-shadow:inset 3px 0 0 rgba(96,165,250,.25),inset 0 0 0 1px rgba(255,255,255,.018);
+}
+.db-node-hdr.online,.service-node-hdr.online{background:linear-gradient(180deg,rgba(45,212,191,.075),rgba(96,165,250,.025));box-shadow:inset 3px 0 0 rgba(45,212,191,.72),inset 0 0 0 1px rgba(45,212,191,.09)}
+.db-node-hdr.offline,.service-node-hdr.offline{background:linear-gradient(180deg,rgba(248,113,113,.082),rgba(248,113,113,.018));box-shadow:inset 3px 0 0 rgba(248,113,113,.72),inset 0 0 0 1px rgba(248,113,113,.1)}
+.db-node-hdr.connecting,.service-node-hdr.connecting{background:linear-gradient(180deg,rgba(148,163,184,.07),rgba(148,163,184,.015));box-shadow:inset 3px 0 0 rgba(148,163,184,.5),inset 0 0 0 1px rgba(148,163,184,.08)}
+.service-node-hdr.warn{background:linear-gradient(180deg,rgba(251,191,36,.085),rgba(96,165,250,.018));box-shadow:inset 3px 0 0 rgba(251,191,36,.74),inset 0 0 0 1px rgba(251,191,36,.1)}
+.db-head-main{display:grid;grid-template-columns:fit-content(220px) minmax(82px,.42fr) minmax(170px,.95fr);grid-auto-flow:column;grid-auto-columns:minmax(86px,.48fr);align-items:stretch;overflow:hidden}
+.db-head-main .pve-head-title,.db-head-main .pve-head-stat,.service-head-main .pve-head-title,.service-head-main .pve-head-stat{margin:0;background:rgba(255,255,255,.018)}
+.db-head-main .pve-head-title,.service-head-main .pve-head-title{gap:5px}
+.db-type-chip{display:inline-flex;align-items:center;width:max-content;max-width:100%;height:19px;padding:0 7px;border-radius:7px;font-size:10px;font-weight:850;letter-spacing:.04em;text-transform:uppercase;background:rgba(96,165,250,.12);color:var(--blue);border:1px solid rgba(96,165,250,.25);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.db-type-chip.mysql{background:rgba(96,165,250,.14);color:var(--blue);border-color:rgba(96,165,250,.28)}
+.db-type-chip.postgres,.db-type-chip.postgresql{background:rgba(34,211,238,.13);color:var(--cyan);border-color:rgba(34,211,238,.28)}
+.db-type-chip.mongo,.db-type-chip.mongodb{background:rgba(52,211,153,.13);color:var(--green);border-color:rgba(52,211,153,.28)}
+.db-head-main .pve-head-stat.is-db-primary .pve-head-val{color:var(--green)}
+.db-head-main .pve-head-stat.is-db-warn .pve-head-val{color:var(--yellow)}
+.db-head-main .pve-head-stat.is-db-size .pve-head-val{color:var(--cyan)}
+.db-head-main .pve-head-stat.is-host,.service-head-main .pve-head-stat.is-host{width:auto;max-width:none}
+html[data-theme="light"] .db-node-hdr,html[data-theme="light"] .service-node-hdr{background:linear-gradient(180deg,rgba(255,255,255,.96),rgba(239,246,255,.5));box-shadow:inset 3px 0 0 rgba(59,130,246,.24),inset 0 0 0 1px rgba(59,130,246,.08)}
+html[data-theme="light"] .db-node-hdr.online,html[data-theme="light"] .service-node-hdr.online{background:linear-gradient(180deg,rgba(236,253,245,.92),rgba(239,246,255,.58));box-shadow:inset 3px 0 0 rgba(14,159,110,.65),inset 0 0 0 1px rgba(14,159,110,.12)}
+html[data-theme="light"] .db-node-hdr.offline,html[data-theme="light"] .service-node-hdr.offline{background:linear-gradient(180deg,rgba(254,242,242,.94),rgba(255,247,247,.66));box-shadow:inset 3px 0 0 rgba(220,47,47,.65),inset 0 0 0 1px rgba(220,47,47,.12)}
+html[data-theme="light"] .service-node-hdr.warn{background:linear-gradient(180deg,rgba(255,251,235,.96),rgba(239,246,255,.56));box-shadow:inset 3px 0 0 rgba(183,121,31,.68),inset 0 0 0 1px rgba(183,121,31,.12)}
+html[data-theme="light"] .db-head-main .pve-head-title,html[data-theme="light"] .db-head-main .pve-head-stat,html[data-theme="light"] .service-head-main .pve-head-title,html[data-theme="light"] .service-head-main .pve-head-stat{background:rgba(255,255,255,.42)}
 @media (max-width:1200px){
   .docker-row{grid-template-columns:9px minmax(130px,1.2fr) minmax(140px,1fr) 62px 70px minmax(110px,1fr) minmax(90px,1fr) minmax(110px,1fr) 106px 86px}
   .snmp-head-main{grid-template-columns:fit-content(180px) minmax(112px,.64fr) repeat(6,minmax(104px,1fr))}
   .docker-head-main{grid-template-columns:fit-content(190px) minmax(200px,1fr) minmax(74px,.35fr) minmax(122px,.66fr) minmax(122px,.66fr) minmax(92px,.45fr)}
   .docker-head-main.docker-head-7{grid-template-columns:fit-content(160px) minmax(180px,.95fr) minmax(68px,.34fr) minmax(112px,.62fr) minmax(112px,.62fr) minmax(86px,.42fr) minmax(66px,.34fr)}
+  .db-head-main{grid-template-columns:fit-content(180px) minmax(76px,.38fr) minmax(148px,.9fr)}
 }
 .lg-ts{color:var(--muted)}
 .lg-err{color:var(--red);font-weight:600}
@@ -1077,6 +1105,25 @@ const DASHBOARD_HIDDEN_KEY = 'os_dashboard_hidden_platforms';
 const DASHBOARD_HIDDEN_CLEARED_KEY = 'os_dashboard_hidden_platforms_cleared_at';
 let dashboardHiddenPlatforms = new Set();
 try { dashboardHiddenPlatforms = new Set(JSON.parse(localStorage.getItem(DASHBOARD_HIDDEN_KEY) || '[]')); } catch {}
+let dashboardHiddenLocalEditUntil = 0;
+let dashboardHiddenLocalEditRevision = 0;
+let dashboardHiddenSavedRevision = 0;
+function markDashboardHiddenLocalEdit(){
+  dashboardHiddenLocalEditRevision += 1;
+  dashboardHiddenLocalEditUntil = Date.now() + 10000;
+}
+function dashboardHiddenLocalEditPending(){
+  return dashboardHiddenSavedRevision < dashboardHiddenLocalEditRevision || Date.now() < dashboardHiddenLocalEditUntil;
+}
+function normalizedDashboardHiddenList(list){
+  const values = list instanceof Set ? [...list] : (Array.isArray(list) ? list : []);
+  return values.filter(validUiPlatform).sort((a, b) => ALL_IDS.indexOf(a) - ALL_IDS.indexOf(b));
+}
+function sameDashboardHiddenList(a, b){
+  const left = normalizedDashboardHiddenList(a);
+  const right = normalizedDashboardHiddenList(b);
+  return left.length === right.length && left.every((id, idx) => id === right[idx]);
+}
 function markDashboardHiddenClearPending(){
   try { localStorage.setItem(DASHBOARD_HIDDEN_CLEARED_KEY, String(Date.now())); } catch {}
 }
@@ -1592,8 +1639,9 @@ async function saveUiPreferences(){
     if(r.ok && uiPrefsSaveController === ctrl) {
       const savedUi = b.ui || ui;
       uiPrefsLastSignature = JSON.stringify(savedUi);
-      if(Array.isArray(savedUi.dashboardHiddenPlatforms) && savedUi.dashboardHiddenPlatforms.length === 0) {
-        clearDashboardHiddenClearPending();
+      if(sameDashboardHiddenList(savedUi.dashboardHiddenPlatforms, dashboardHiddenPlatforms)) {
+        dashboardHiddenSavedRevision = dashboardHiddenLocalEditRevision;
+        dashboardHiddenLocalEditUntil = 0;
       }
     }
   }catch(e){
@@ -1606,6 +1654,7 @@ function applyServerUiPreferences(data = {}){
   const ui = data.ui && typeof data.ui === 'object' ? data.ui : {};
   const signature = JSON.stringify(ui || {});
   if(uiPrefsReady && signature === uiPrefsLastSignature) return;
+  let resaveAfterHydration = false;
   uiPrefsHydrating = true;
   try{
     if(ui.overviewGroupOpen && typeof ui.overviewGroupOpen === 'object') {
@@ -1613,13 +1662,19 @@ function applyServerUiPreferences(data = {}){
     }
     if(ui.overviewCardCollapsed && typeof ui.overviewCardCollapsed === 'object') overviewCardCollapsed = { ...ui.overviewCardCollapsed };
     if(Array.isArray(ui.dashboardHiddenPlatforms)) {
-      const serverHidden = ui.dashboardHiddenPlatforms.filter(validUiPlatform);
-      if(serverHidden.length && dashboardHiddenClearPending()){
+      const serverHidden = normalizedDashboardHiddenList(ui.dashboardHiddenPlatforms);
+      const localHidden = normalizedDashboardHiddenList(dashboardHiddenPlatforms);
+      if(dashboardHiddenLocalEditPending() && !sameDashboardHiddenList(serverHidden, localHidden)){
+        persistDashboardHiddenPlatforms(dashboardHiddenClearPending() && !localHidden.length);
+        resaveAfterHydration = true;
+      } else if(serverHidden.length && dashboardHiddenClearPending()){
         dashboardHiddenPlatforms = new Set();
-        persistDashboardHiddenPlatforms();
-        scheduleUiPreferencesSave(true);
+        persistDashboardHiddenPlatforms(true);
+        resaveAfterHydration = true;
       } else {
         dashboardHiddenPlatforms = new Set(serverHidden);
+        dashboardHiddenSavedRevision = dashboardHiddenLocalEditRevision;
+        dashboardHiddenLocalEditUntil = 0;
         if(!serverHidden.length) clearDashboardHiddenClearPending();
         persistDashboardHiddenPlatforms();
       }
@@ -1655,7 +1710,7 @@ function applyServerUiPreferences(data = {}){
   }
   uiPrefsReady = true;
   uiPrefsLastSignature = signature || '{}';
-  if(JSON.stringify(uiPreferencesSnapshot()) !== uiPrefsLastSignature) scheduleUiPreferencesSave(true);
+  if(resaveAfterHydration || JSON.stringify(uiPreferencesSnapshot()) !== uiPrefsLastSignature) scheduleUiPreferencesSave(true);
 }
 
 let activePanel = null;
@@ -3707,8 +3762,9 @@ function buildPrometheus(prom){
       : (inst._connecting ? 'waiting for first check' : 'unreachable');
     const instKey = inst.url || inst.name || String(idx);
     const isOpen = userOverride['prometheus:' + instKey] !== undefined ? userOverride['prometheus:' + instKey] : true;
+    const instStateClass = inst._connecting ? 'connecting' : !inst.online ? 'offline' : (instDown > 0 || instUnknown > 0) ? 'warn' : 'online';
     return `<section class="prom-instance">
-      <div class="prom-instance-h" onclick="togglePrometheusInstance(${idx},${jsStr(instKey)})">
+      <div class="prom-instance-h service-node-hdr ${instStateClass}" onclick="togglePrometheusInstance(${idx},${jsStr(instKey)})">
         <div class="mon-dot ${instDot}"></div>
         <div class="prom-instance-main">
           <div class="prom-instance-name">${escHtml(inst.name || inst.url || 'Prometheus')}</div>
@@ -3799,29 +3855,29 @@ function buildDocker(docker){
 
   const body = docker.map(host=>{
     if(isConnectingHost(host)) return `
-      <div class="node-hdr pve-node-hdr" style="cursor:default">
+      <div class="node-hdr pve-node-hdr service-node-hdr connecting" style="cursor:default">
         <div class="mon-dot md-gray"></div>
-        <div class="pve-head-main docker-head-main">
+        <div class="pve-head-main docker-head-main service-head-main">
           <div class="pve-head-title">
             <div class="node-name">${escHtml(host.name)}</div>
             <div class="pve-head-sub">connecting</div>
           </div>
-          ${pveHeadStat('Host', host.host || '-')}
+          ${pveHeadStat('Host', host.host || '-', 'var(--text)', '', 'is-host')}
           ${pveHeadStat('Status', 'Connecting', 'var(--muted)')}
         </div>
         ${bdg('gray','connecting…')}
         ${host.id ? `<button class="btn-act" onclick="event.stopPropagation();removePendingAgent(${jsStr(host.id)},this)">Remove</button>` : ''}
       </div>`;
     if(!host.online) return `
-      <div class="node-hdr pve-node-hdr" style="cursor:default">
+      <div class="node-hdr pve-node-hdr service-node-hdr offline" style="cursor:default">
         <div class="mon-dot md-red"></div>
-        <div class="pve-head-main docker-head-main">
+        <div class="pve-head-main docker-head-main service-head-main">
           <div class="pve-head-title">
             <div class="node-name">${escHtml(host.name)}</div>
             <div class="pve-head-sub">offline</div>
           </div>
-          ${pveHeadStat('Host', host.host || '-')}
-          ${pveHeadStat('Error', host.error || 'Connection failed', 'var(--red)')}
+          ${pveHeadStat('Host', host.host || '-', 'var(--text)', '', 'is-host')}
+          ${pveHeadStat('Error', host.error || 'Connection failed', 'var(--red)', '', 'is-version-wrap')}
         </div>
         ${bdg('red','offline')}
       </div>`;
@@ -3833,8 +3889,8 @@ function buildDocker(docker){
     const isOpen = panelOpenState('docker:'+dkey, dockerOpen[dkey]);
     dockerOpen[dkey] = isOpen;
     const dockerStatsArr = [
-      pveHeadStat('Host', host.host || '-'),
-      pveHeadStat('Containers', `${host.summary.running}/${host.summary.total}`),
+      pveHeadStat('Host', host.host || '-', 'var(--text)', '', 'is-host'),
+      pveHeadStat('Containers', `${host.summary.running}/${host.summary.total}`, 'var(--green)', '', 'is-db-primary'),
       hasNum(host.summary?.cpu) ? pveHeadStat('CPU', `${host.summary.cpu}%`, bc(host.summary.cpu), miniSparkline(host.history, 'cpu', host.summary.cpu)) : '',
       hasNum(host.summary?.memPercent) ? pveHeadStat('RAM', `${host.summary.memPercent}%`, bc(host.summary.memPercent), miniSparkline(host.history, 'mem', host.summary.memPercent)) : '',
       host.summary?.updates ? pveHeadStat('Image updates', host.summary.updates, 'var(--yellow)') : '',
@@ -3842,9 +3898,9 @@ function buildDocker(docker){
     const dockerStats = dockerStatsArr.join('');
     const dockerHeadClass = dockerStatsArr.length >= 6 ? ' docker-head-7' : '';
     return `
-      <div class="node-hdr pve-node-hdr" onclick="toggleDocker(${jsStr(dkey)})">
+      <div class="node-hdr pve-node-hdr service-node-hdr ${stopped?'warn':'online'}" onclick="toggleDocker(${jsStr(dkey)})">
         <div class="mon-dot ${stopped?'md-yellow':'md-green'}"></div>
-        <div class="pve-head-main docker-head-main${dockerHeadClass}">
+        <div class="pve-head-main docker-head-main service-head-main${dockerHeadClass}">
           <div class="pve-head-title">
             <div class="node-name">${escHtml(host.name)}</div>
             <div class="pve-head-sub">online</div>
@@ -3940,8 +3996,9 @@ function buildDockhand(dockhand){
     const instStopped = rows.filter(c=>['exited','dead'].includes(c.state)).length;
     const instNoContainers = inst.online && !rows.length;
     const instBadge = inst._connecting ? bdg('gray','connecting...') : inst.online ? bdg(instNoContainers?'gray':instStopped?'yellow':'green', instNoContainers?'no containers':instStopped?`${instStopped} stopped`:'online') : bdg('red','offline');
+    const instStateClass = inst._connecting ? 'connecting' : !inst.online ? 'offline' : instStopped ? 'warn' : 'online';
     return `<section class="prom-instance">
-      <div class="prom-instance-h" onclick="toggleDockhandInstance(${idx},${jsStr(key)})">
+      <div class="prom-instance-h service-node-hdr ${instStateClass}" onclick="toggleDockhandInstance(${idx},${jsStr(key)})">
         <div class="mon-dot ${inst._connecting?'md-gray':inst.online?'md-green':'md-red'}"></div>
         <div class="prom-instance-main">
           <div class="prom-instance-name">${escHtml(inst.name || inst.url || 'Dockhand')}</div>
@@ -4013,63 +4070,70 @@ function buildDatabase(dbs){
 
   const totalConns = onlineDevs.reduce((a,d)=>a+(d.connections||0),0);
   const totalSize = onlineDevs.reduce((a,d)=>a+(d.sizeBytes||0),0);
+  const dbTypeClass = (type) => String(type || 'db').toLowerCase().replace(/[^a-z0-9_-]+/g, '');
+  const dbTypeChip = (type) => {
+    const label = String(type || 'db');
+    return `<span class="db-type-chip ${dbTypeClass(label)}" title="${escAttr(label)}">${escHtml(label)}</span>`;
+  };
 
   const sbSummaryHtml = `<div class="sb-csum">
     <div class="sb-csum-item"><div class="sb-csum-val">${online}/${dbs.length}</div><div class="sb-csum-lbl">Online</div></div>
-    ${totalConns?`<div class="sb-csum-item"><div class="sb-csum-val">${totalConns}</div><div class="sb-csum-lbl">Conns</div></div>`:''}
-    ${totalSize?`<div class="sb-csum-item"><div class="sb-csum-val">${fmtBytes(totalSize)}</div><div class="sb-csum-lbl">Size</div></div>`:''}
+    ${connecting?`<div class="sb-csum-item"><div class="sb-csum-val" style="color:var(--muted)">${connecting}</div><div class="sb-csum-lbl">Connecting</div></div>`:''}
+    ${offline?`<div class="sb-csum-item"><div class="sb-csum-val" style="color:var(--red)">${offline}</div><div class="sb-csum-lbl">Offline</div></div>`:''}
+    ${totalConns?`<div class="sb-csum-item"><div class="sb-csum-val" style="color:var(--green)">${totalConns}</div><div class="sb-csum-lbl">Conns</div></div>`:''}
+    ${totalSize?`<div class="sb-csum-item"><div class="sb-csum-val" style="color:var(--cyan)">${fmtBytes(totalSize)}</div><div class="sb-csum-lbl">Size</div></div>`:''}
   </div>`;
 
   const body = dbs.map(d=>{
     if(d._connecting) return `
-      <div class="node-hdr pve-node-hdr" style="cursor:default">
+      <div class="node-hdr pve-node-hdr db-node-hdr connecting" style="cursor:default">
         <div class="mon-dot md-gray"></div>
-        <div class="pve-head-main">
+        <div class="pve-head-main db-head-main">
           <div class="pve-head-title">
             <div class="node-name">${escHtml(d.name)}</div>
             <div class="pve-head-sub">connecting</div>
+            ${dbTypeChip(d.type)}
           </div>
-          ${pveHeadStat('Type', d.type || 'db')}
-          ${pveHeadStat('Host', d.host || '-')}
+          ${pveHeadStat('Host', d.host || '-', 'var(--text)', '', 'is-host')}
           ${pveHeadStat('Status', 'Connecting', 'var(--muted)')}
         </div>
         ${bdg('gray','connecting…')}
       </div>`;
     if(!d.online) return `
-      <div class="node-hdr pve-node-hdr" style="cursor:default">
+      <div class="node-hdr pve-node-hdr db-node-hdr offline" style="cursor:default">
         <div class="mon-dot md-red"></div>
-        <div class="pve-head-main">
+        <div class="pve-head-main db-head-main">
           <div class="pve-head-title">
             <div class="node-name">${escHtml(d.name)}</div>
             <div class="pve-head-sub">offline</div>
+            ${dbTypeChip(d.type)}
           </div>
-          ${pveHeadStat('Type', d.type || 'db')}
-          ${pveHeadStat('Host', d.host || '-')}
-          ${pveHeadStat('Error', d.error || 'Unreachable', 'var(--red)')}
+          ${pveHeadStat('Host', d.host || '-', 'var(--text)', '', 'is-host')}
+          ${pveHeadStat('Error', d.error || 'Unreachable', 'var(--red)', '', 'is-version-wrap')}
         </div>
         ${bdg('red','offline')}
       </div>`;
     const dbStats = [
-      pveHeadStat('Type', d.type || 'db'),
-      pveHeadStat('Host', d.host || '-'),
-      d.connections != null ? pveHeadStat('Conns', `${d.connections}${d.maxConnections?`/${d.maxConnections}`:''}`) : '',
-      d.activeConnections != null ? pveHeadStat('Active', d.activeConnections) : '',
+      pveHeadStat('Host', d.host || '-', 'var(--text)', '', 'is-host'),
+      d.connections != null ? pveHeadStat('Conns', `${d.connections}${d.maxConnections?`/${d.maxConnections}`:''}`, 'var(--green)', '', 'is-db-primary') : '',
+      d.activeConnections != null ? pveHeadStat('Active', d.activeConnections, 'var(--green)', '', 'is-db-primary') : '',
       d.idleConnections != null ? pveHeadStat('Idle', d.idleConnections) : '',
-      d.sizeBytes != null ? pveHeadStat('Size', fmtBytes(d.sizeBytes)) : '',
+      d.sizeBytes != null ? pveHeadStat('Size', fmtBytes(d.sizeBytes), 'var(--cyan)', '', 'is-db-size') : '',
       d.uptimeSeconds != null ? pveHeadStat('Uptime', fmtUptime(d.uptimeSeconds)) : '',
       d.databaseCount != null ? pveHeadStat('Databases', d.databaseCount) : '',
       (d.collectionCount ?? d.tableCount) != null ? pveHeadStat(d.type === 'mongodb' || d.type === 'mongo' ? 'Collections' : 'Tables', d.collectionCount ?? d.tableCount) : '',
       d.queryCount != null ? pveHeadStat('Queries', d.queryCount) : '',
-      d.slowQueries != null ? pveHeadStat('Slow queries', d.slowQueries) : '',
-      d.version ? pveHeadStat('Version', d.version) : '',
+      d.slowQueries != null ? pveHeadStat('Slow queries', d.slowQueries, d.slowQueries ? 'var(--yellow)' : 'var(--text)', '', d.slowQueries ? 'is-db-warn' : '') : '',
+      d.version ? pveHeadStat('Version', d.version, 'var(--text)', '', 'is-version-wrap') : '',
     ].filter(Boolean).join('');
     return `
-      <div class="node-hdr pve-node-hdr" style="cursor:default">
+      <div class="node-hdr pve-node-hdr db-node-hdr online" style="cursor:default">
         <div class="mon-dot md-green"></div>
-        <div class="pve-head-main">
+        <div class="pve-head-main db-head-main">
           <div class="pve-head-title">
             <div class="node-name">${escHtml(d.name)}</div>
             <div class="pve-head-sub">online</div>
+            ${dbTypeChip(d.type)}
           </div>
           ${dbStats}
         </div>
@@ -5233,6 +5297,7 @@ function saveDashboardHiddenPlatforms(){
 function hideDashboardPlatform(id, event){
   event?.preventDefault?.();
   event?.stopPropagation?.();
+  markDashboardHiddenLocalEdit();
   dashboardHiddenPlatforms.add(id);
   clearDashboardHiddenClearPending();
   persistDashboardHiddenPlatforms();
@@ -5241,6 +5306,7 @@ function hideDashboardPlatform(id, event){
   if(window._lastData && dashboardOpen) render(window._lastData);
 }
 function restoreDashboardPlatforms(){
+  markDashboardHiddenLocalEdit();
   dashboardHiddenPlatforms.clear();
   persistDashboardHiddenPlatforms(true);
   saveDashboardHiddenPlatforms();

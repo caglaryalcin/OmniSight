@@ -150,6 +150,7 @@ async function getPods(kc, namespaces) {
     const phase = pod.status?.phase || 'Unknown';
     const owner = (pod.metadata?.ownerReferences || []).find(o => o.controller) || (pod.metadata?.ownerReferences || [])[0] || {};
     const containerStatuses = pod.status?.containerStatuses || [];
+    const containers = (pod.spec?.containers || []).map(c => c.name).filter(Boolean);
     const ready = containerStatuses.length > 0 && containerStatuses.every(c => c.ready);
     const restarts = containerStatuses.reduce((sum, c) => sum + (c.restartCount || 0), 0);
     return {
@@ -160,6 +161,7 @@ async function getPods(kc, namespaces) {
       ownerKind: owner.kind || '',
       ownerName: owner.name || '',
       restartPolicy: pod.spec?.restartPolicy || '',
+      containers,
       ready,
       restarts,
       running: phase === 'Running' && ready,
@@ -286,17 +288,30 @@ async function getPodLogs(config, namespace, pod, container, tail) {
   const kc = createK8sClient(config.kubeconfig);
   const coreV1 = kc.makeApiClient(k8s.CoreV1Api);
   const t = Math.min(2000, Math.max(1, parseInt(tail) || 300));
-  const res = await coreV1.readNamespacedPodLog({
-    name: pod,
-    namespace,
-    container: container || undefined,
-    follow: false,
-    previous: false,
-    tailLines: t,
-    timestamps: true,
-  });
-  const body = res && res.body !== undefined ? res.body : res;
-  return typeof body === 'string' ? body : JSON.stringify(body);
+  let targetContainer = container || '';
+  if (!targetContainer) {
+    try {
+      const podRes = await coreV1.readNamespacedPod({ name: pod, namespace });
+      const body = podRes && podRes.body !== undefined ? podRes.body : podRes;
+      const names = (body?.spec?.containers || []).map(c => c.name).filter(Boolean);
+      if (names.length) targetContainer = names[0];
+    } catch {}
+  }
+  try {
+    const res = await coreV1.readNamespacedPodLog({
+      name: pod,
+      namespace,
+      container: targetContainer || undefined,
+      follow: false,
+      previous: false,
+      tailLines: t,
+      timestamps: true,
+    });
+    const body = res && res.body !== undefined ? res.body : res;
+    return typeof body === 'string' ? body : JSON.stringify(body);
+  } catch (err) {
+    throw new Error(`Kubernetes logs unavailable for ${namespace}/${pod}${targetContainer ? ` (${targetContainer})` : ''}: ${errText(err)}`);
+  }
 }
 
 module.exports = { getAllKubernetesData, getPodLogs };
