@@ -1924,9 +1924,13 @@ function showSplitRateTooltip(e, el) {
   const readColor = el.dataset.readColor || '#22D3EE';
   const writeColor = el.dataset.writeColor || '#34D399';
   const chartH = Number(el.dataset.chartH || 50) || 50;
-  const y = pt.readY ?? pt.writeY ?? chartH;
+  const readVal = pt.read == null ? null : Number(pt.read);
+  const writeVal = pt.write == null ? null : Number(pt.write);
+  const activeSeries = writeVal != null && (readVal == null || writeVal > readVal) ? 'write' : 'read';
+  const y = activeSeries === 'write' ? (pt.writeY ?? pt.readY ?? chartH) : (pt.readY ?? pt.writeY ?? chartH);
+  const dotColor = activeSeries === 'write' ? writeColor : readColor;
   if (hDot) {
-    hDot.style.background = pt.readY != null ? readColor : writeColor;
+    hDot.style.background = dotColor;
     hDot.style.left = (rect.left + (idx / (pts.length - 1)) * rect.width) + 'px';
     hDot.style.top = (rect.top + (y / chartH) * rect.height) + 'px';
     hDot.style.opacity = 1;
