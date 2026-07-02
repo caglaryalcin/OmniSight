@@ -543,14 +543,14 @@ html[data-theme="light"] .topbar{background:rgba(255,255,255,.78)}
 .mini-hist{width:100%;height:24px;display:block;opacity:.9}
 .mini-hist-bg{fill:rgba(255,255,255,.025)}
 html[data-theme="light"] .mini-hist-bg{fill:rgba(15,23,42,.035)}
-.snmp-head-main{display:grid;grid-template-columns:fit-content(220px) minmax(140px,.7fr) repeat(5,minmax(140px,1fr))}
+.snmp-head-main{display:grid;grid-template-columns:fit-content(220px) minmax(128px,.64fr) repeat(6,minmax(118px,1fr))}
 .docker-head-main{display:grid;grid-template-columns:fit-content(220px) minmax(220px,1.1fr) minmax(82px,.36fr) minmax(156px,.74fr) minmax(156px,.74fr) minmax(108px,.48fr);grid-auto-flow:column;grid-auto-columns:minmax(82px,.42fr);align-items:stretch;overflow:hidden}
 .docker-head-main.docker-head-7{grid-template-columns:fit-content(190px) minmax(210px,1.05fr) minmax(74px,.34fr) minmax(136px,.7fr) minmax(136px,.7fr) minmax(104px,.46fr) minmax(72px,.34fr)}
 .docker-head-main .pve-head-title,.docker-head-main .pve-head-stat{margin:0}
 .docker-head-main.docker-head-7 .pve-head-stat{padding-left:9px;padding-right:9px}
 @media (max-width:1200px){
   .docker-row{grid-template-columns:9px minmax(130px,1.2fr) minmax(140px,1fr) 62px 70px minmax(110px,1fr) minmax(90px,1fr) minmax(110px,1fr) 106px 86px}
-  .snmp-head-main{grid-template-columns:fit-content(180px) minmax(120px,.7fr) repeat(5,minmax(118px,1fr))}
+  .snmp-head-main{grid-template-columns:fit-content(180px) minmax(112px,.64fr) repeat(6,minmax(104px,1fr))}
   .docker-head-main{grid-template-columns:fit-content(190px) minmax(200px,1fr) minmax(74px,.35fr) minmax(122px,.66fr) minmax(122px,.66fr) minmax(92px,.45fr)}
   .docker-head-main.docker-head-7{grid-template-columns:fit-content(160px) minmax(180px,.95fr) minmax(68px,.34fr) minmax(112px,.62fr) minmax(112px,.62fr) minmax(86px,.42fr) minmax(66px,.34fr)}
 }
@@ -2974,6 +2974,17 @@ function buildSynology(syn){
     const diskWrite = hasNum(dev.metrics?.diskIO?.writeBps) ? Number(dev.metrics.diskIO.writeBps) : null;
     const bwRx = hasNum(dev.metrics?.bandwidth?.rxBps) ? Number(dev.metrics.bandwidth.rxBps) : null;
     const bwTx = hasNum(dev.metrics?.bandwidth?.txBps) ? Number(dev.metrics.bandwidth.txBps) : null;
+    const cpuTemp = hasNum(dev.cpuTemp) ? Number(dev.cpuTemp)
+      : (/cpu|processor/i.test(dev.systemTempLabel || '') && hasNum(dev.systemTemp) ? Number(dev.systemTemp) : null);
+    const systemTemperature = hasNum(dev.systemTemperature) ? Number(dev.systemTemperature)
+      : (dev.systemTempLabel && !/cpu|processor/i.test(dev.systemTempLabel) && hasNum(dev.systemTemp) ? Number(dev.systemTemp) : null);
+    const fanSpeeds = Array.isArray(dev.fanSpeeds) ? dev.fanSpeeds : (Array.isArray(dev.sensors?.fanSpeeds) ? dev.sensors.fanSpeeds : []);
+    const nvmeTemps = Array.isArray(dev.nvmeTemps) ? dev.nvmeTemps : [];
+    const fanHeadText = fanSpeeds.length ? fanSpeeds.map(f => `${f.value} RPM`).join(' / ') : '';
+    const extraTempRows = [
+      ...(systemTemperature != null ? [{ label: dev.systemTemperatureLabel || 'System Temp', value: systemTemperature }] : []),
+      ...nvmeTemps.map((t, idx) => ({ label: t.label || t.name || `NVMe ${idx + 1}`, value: t.value })),
+    ];
     const diskIOHistory = rateHistoryMBps(dev.history, 'diskIO', 'diskIOMbps');
     const bandwidthCapacityBps = hasNum(dev.metrics?.bandwidth?.historyCapacityBps) ? Number(dev.metrics.bandwidth.historyCapacityBps)
       : hasNum(dev.metrics?.bandwidth?.activeCapacityBps) ? Number(dev.metrics.bandwidth.activeCapacityBps)
@@ -2991,7 +3002,8 @@ function buildSynology(syn){
       pveHeadStat('Host', dev.host || '-'),
       dev.cpu != null ? pveHeadStat('CPU', `${dev.cpu}%`, bc(dev.cpu), miniSparkline(dev.history, 'cpu', dev.cpu)) : pveHeadStat('CPU', '--', 'var(--muted)'),
       dev.ram ? pveHeadStat('RAM', `${dev.ram.percent}%`, bc(dev.ram.percent), miniSparkline(dev.history, 'ram', dev.ram.percent)) : pveHeadStat('RAM', '--', 'var(--muted)'),
-      dev.systemTemp != null ? pveHeadStat('CPU temp', `${dev.systemTemp}°C`, pveTempColor(dev.systemTemp), miniSparkline(dev.history, 'temp', dev.systemTemp, pveTempHex, 100, '°C', 'CPU temp')) : pveHeadStat('CPU temp', '--', 'var(--muted)'),
+      cpuTemp != null ? pveHeadStat('CPU temp', `${cpuTemp}°C`, pveTempColor(cpuTemp), miniSparkline(dev.history, 'temp', cpuTemp, pveTempHex, 100, '°C', 'CPU temp')) : pveHeadStat('CPU temp', '--', 'var(--muted)'),
+      fanHeadText ? pveHeadStat('Fan', fanHeadText, 'var(--text)') : (systemTemperature != null ? pveHeadStat('Sys temp', `${systemTemperature}°C`, pveTempColor(systemTemperature)) : (dev.uptimeSeconds != null ? pveHeadStat('Uptime', fmtUptime(dev.uptimeSeconds)) : pveHeadStat('Fan', '--', 'var(--muted)'))),
       pveHeadStat('Disk I/O', diskIOTxt || '--', diskIOTxt ? 'var(--cyan)' : 'var(--muted)', diskIOHeaderMbps != null ? miniSparkline(diskIOHistory, 'diskIOMbps', diskIOHeaderMbps, rateColor, rateSparkMax(diskIOHistory, 'diskIOMbps', diskIOHeaderMbps), ' MB/s', 'Disk I/O') : ''),
       pveHeadStat('Bandwidth', bandwidthTxt || '--', bandwidthTxt ? 'var(--green)' : 'var(--muted)', bandwidthHeaderMbps != null ? miniSparkline(bandwidthHistory, 'bandwidthMbps', bandwidthHeaderMbps, () => '#34D399', rateSparkMax(bandwidthHistory, 'bandwidthMbps', bandwidthHeaderMbps), ' MB/s', 'Bandwidth') : ''),
     ].join('');
@@ -3009,7 +3021,7 @@ function buildSynology(syn){
         ${notifyBell('snmp:'+dev.name)}
       </div>
       <div class="node-body ${isOpen?'open':''}" id="snmp-${skey}">
-        ${(()=>{ const lim=historyLimitFor('snmp:'+skey); return (dev.cpu!=null||dev.ram!=null||dev.systemTemp!=null||diskIOMbps!=null||bandwidthMbps!=null)?`<div style="display:flex; justify-content:flex-end; margin-bottom:4px;">
+        ${(()=>{ const lim=historyLimitFor('snmp:'+skey); return (dev.cpu!=null||dev.ram!=null||cpuTemp!=null||systemTemperature!=null||diskIOMbps!=null||bandwidthMbps!=null)?`<div style="display:flex; justify-content:flex-end; margin-bottom:4px;">
           ${drawTimeSelect('snmp:'+skey, lim)}
         </div>`:'' })()}
         ${(()=>{ const lim=historyLimitFor('snmp:'+skey); return dev.cpu!=null ? `<div class="chart-row">
@@ -3034,11 +3046,26 @@ function buildSynology(syn){
             <div class="chart-hdr"><span class="nb-label">Bandwidth</span><span class="nb-pct" style="color:var(--green)">↓ ${bwRx != null ? fmtRate(bwRx) : '--'} / ↑ ${bwTx != null ? fmtRate(bwTx) : '--'}</span></div>
             ${histChart(bandwidthHistory,'bandwidthMbps',bandwidthMbps,lim,()=>'#34D399',rateSparkMax(bandwidthHistory,'bandwidthMbps',bandwidthMbps),' MB/s','Bandwidth')}
           </div>` : '' })()}
-        ${(()=>{ const lim=historyLimitFor('snmp:'+skey); return dev.systemTemp!=null ? `
+        ${(()=>{ const lim=historyLimitFor('snmp:'+skey); return cpuTemp!=null ? `
           <div class="chart-row">
-            <div class="chart-hdr"><span class="nb-label">${dev.systemTempLabel || 'CPU temperature'}</span><span class="nb-pct" style="color:${pveTempColor(dev.systemTemp)}">${dev.systemTemp}°C</span></div>
-            ${histChart(dev.history,'temp',dev.systemTemp,lim,pveTempHex,100,'°C','Temperature')}
+            <div class="chart-hdr"><span class="nb-label">${dev.cpuTempLabel || 'CPU temperature'}</span><span class="nb-pct" style="color:${pveTempColor(cpuTemp)}">${cpuTemp}°C</span></div>
+            ${histChart(dev.history,'temp',cpuTemp,lim,pveTempHex,100,'°C','Temperature')}
           </div>` : '' })()}
+        ${(extraTempRows.length || fanSpeeds.length || dev.uptimeSeconds != null) ? `
+          <div class="syn-section" style="margin-top:6px">Sensors</div>
+          ${dev.uptimeSeconds != null ? `<div style="display:flex;align-items:center;gap:10px;padding:5px 0 5px 44px;font-size:14px"><span style="width:150px;flex-shrink:0;color:var(--muted)">Uptime</span><span>${fmtUptime(dev.uptimeSeconds)}</span></div>` : ''}
+          ${extraTempRows.map(t => {
+            const tc = t.value>=70?'var(--red)':t.value>=55?'var(--yellow)':'var(--green)';
+            return `<div style="display:flex;align-items:center;gap:10px;padding:5px 0 5px 44px;font-size:14px">
+              <span style="width:150px;flex-shrink:0;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(t.label)}</span>
+              <span style="color:${tc};font-weight:800">${t.value}°C</span>
+            </div>`;
+          }).join('')}
+          ${fanSpeeds.map(f => `<div style="display:flex;align-items:center;gap:10px;padding:5px 0 5px 44px;font-size:14px">
+            <span style="width:150px;flex-shrink:0;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(f.label || 'Fan')}</span>
+            <span style="font-weight:800">${escHtml(String(f.value))} RPM</span>
+          </div>`).join('')}
+        ` : ''}
         ${dev.volumes?.length ? `
           <div class="syn-section" style="margin-top:6px">Volumes</div>
           ${dev.volumes.map(v => {
@@ -4740,7 +4767,7 @@ function overviewRows(id, data){
   if(id === 'snmp'){
     const rows = (data.snmp||[]).slice(0,6).map(dev => {
       const sub = dev._connecting ? (dev.host||'Connecting') :
-        dev.online ? [dev.host, dev.cpu!=null?`CPU ${dev.cpu}%`:'', dev.ram?`RAM ${dev.ram.percent}%`:'', dev.systemTemp!=null?`CPU temp ${dev.systemTemp}°C`:'' ].filter(Boolean).join(' · ') :
+        dev.online ? [dev.host, dev.cpu!=null?`CPU ${dev.cpu}%`:'', dev.ram?`RAM ${dev.ram.percent}%`:'', (dev.cpuTemp ?? dev.systemTemp)!=null?`CPU temp ${dev.cpuTemp ?? dev.systemTemp}°C`:'', (dev.fanSpeeds||[]).length?`Fan ${(dev.fanSpeeds||[]).map(f=>`${f.value} RPM`).join('/')}`:'' ].filter(Boolean).join(' · ') :
         (dev.error || 'SNMP unreachable');
       return overviewRow('snmp', dev.name, sub, dev._connecting?'gray':dev.online?'green':'red', dev._connecting?'connecting':dev.online?'online':'offline', dev._connecting?'md-gray':dev.online?'md-green':'md-red');
     }).join('');

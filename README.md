@@ -22,7 +22,7 @@ For deeper architecture, operations and troubleshooting notes, see [DOCUMENTATIO
 
 ![](https://raw.githubusercontent.com/caglaryalcin/OmniSight/refs/heads/main/screenshots/gifs/kubernetes.gif)
 
-- **SNMP** — status of any SNMP v2c/v3 device (Synology, UniFi, switches, routers, …) with CPU/RAM/system or CPU temperature, bandwidth and disk I/O history where exposed, plus dynamic MB/GB memory display
+- **SNMP** — status of any SNMP v2c/v3 device (Synology, MikroTik, UniFi, switches, routers, …) with CPU/RAM, CPU/system/NVMe temperatures, fan speed, uptime, bandwidth and disk I/O history where exposed, plus dynamic MB/GB memory display
 
 ![](https://raw.githubusercontent.com/caglaryalcin/OmniSight/refs/heads/main/screenshots/gifs/snmp.gif)
 

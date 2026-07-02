@@ -100,6 +100,10 @@ html.embed .settings-nav{top:20px;height:calc(100vh - 40px);max-height:calc(100v
 .backup-action span{display:block;font-size:12px;color:var(--muted);line-height:1.35;max-width:560px}
 .backup-buttons{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}
 .backup-buttons .btn-sm{min-width:112px;min-height:30px;display:inline-flex;align-items:center;justify-content:center}
+.backup-progress-wrap{border:1px solid var(--border);background:var(--row);border-radius:10px;overflow:hidden;height:14px;margin-top:12px}
+.backup-progress-bar{height:100%;width:0%;background:linear-gradient(90deg,var(--blue),var(--green));transition:width .25s ease}
+.backup-progress-meta{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px;font-size:12px;color:var(--muted)}
+.backup-progress-pct{font-size:22px;font-weight:900;color:var(--text);font-variant-numeric:tabular-nums;margin-top:8px}
 @media (max-width:820px){
   .backup-action{grid-template-columns:1fr}
   .backup-buttons{justify-content:flex-start}
@@ -1064,6 +1068,25 @@ html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#dd
   </div>
 </div>
 
+<div class="amodal" id="backup-progress-modal">
+  <div class="amodal-box" style="width:min(460px,94vw)">
+    <div class="amodal-hdr">
+      <span class="amodal-title">Full backup/export</span>
+    </div>
+    <div class="amodal-body">
+      <div id="backup-progress-phase" style="font-size:13px;color:var(--muted);line-height:1.45">Preparing backup</div>
+      <div class="backup-progress-pct" id="backup-progress-pct">0%</div>
+      <div class="backup-progress-wrap">
+        <div class="backup-progress-bar" id="backup-progress-bar"></div>
+      </div>
+      <div class="backup-progress-meta">
+        <span id="backup-progress-files">0 files</span>
+        <span id="backup-progress-bytes"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="amodal" id="lowio-info-modal" onclick="if(event.target===this)closeLowIoInfo()">
   <div class="amodal-box confirm-box">
     <div class="amodal-hdr">
@@ -2007,6 +2030,56 @@ function closeBackupPasswordModal(value) {
   if (resolve) resolve(value);
 }
 
+function backupBytesText(done, total) {
+  const d = Number(done || 0);
+  const t = Number(total || 0);
+  const fmt = typeof fmtBytes === 'function'
+    ? fmtBytes
+    : (v => {
+      const n = Number(v || 0);
+      if (n >= 1024 * 1024) return (n / 1024 / 1024).toFixed(1) + ' MB';
+      if (n >= 1024) return (n / 1024).toFixed(1) + ' KB';
+      return Math.round(n) + ' B';
+    });
+  return t > 0 ? `${fmt(d)} / ${fmt(t)}` : '';
+}
+
+function showBackupProgress(job = {}) {
+  const modal = document.getElementById('backup-progress-modal');
+  const pct = Math.max(0, Math.min(100, Math.round(Number(job.progress || 0))));
+  document.getElementById('backup-progress-phase').textContent = job.phase || 'Preparing backup';
+  document.getElementById('backup-progress-pct').textContent = `${pct}%`;
+  document.getElementById('backup-progress-bar').style.width = `${pct}%`;
+  const filesDone = Number(job.filesDone || 0);
+  const filesTotal = Number(job.filesTotal || 0);
+  document.getElementById('backup-progress-files').textContent = filesTotal > 0 ? `${filesDone}/${filesTotal} files` : 'Scanning files';
+  document.getElementById('backup-progress-bytes').textContent = backupBytesText(job.bytesDone, job.bytesTotal);
+  modal?.classList.add('open');
+}
+
+function hideBackupProgress() {
+  document.getElementById('backup-progress-modal')?.classList.remove('open');
+}
+
+async function waitFullBackupJob(id) {
+  let lastJob = { progress: 0, phase: 'Queued' };
+  showBackupProgress(lastJob);
+  while (true) {
+    await new Promise(resolve => setTimeout(resolve, 350));
+    const r = await fetch('/api/backup/export/status/' + encodeURIComponent(id), {
+      headers: authHeaders(),
+      cache: 'no-store',
+    });
+    handleUnauth(r);
+    const b = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(b.error || 'Backup export status failed');
+    lastJob = b.job || lastJob;
+    showBackupProgress(lastJob);
+    if (lastJob.status === 'done') return lastJob;
+    if (lastJob.status === 'failed') throw new Error(lastJob.error || 'Full backup failed');
+  }
+}
+
 async function exportFullBackup() {
   try {
     const password = await askBackupPassword({
@@ -2031,18 +2104,29 @@ async function exportFullBackup() {
         saveHandle = null;
       }
     }
-    const r = await fetch('/api/backup/export', {
+    showBackupProgress({ progress: 0, phase: 'Starting export' });
+    const r = await fetch('/api/backup/export/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
       cache: 'no-store',
       body: JSON.stringify({ password }),
     });
     handleUnauth(r);
-    if (!r.ok) throw new Error((await r.json().catch(()=>({}))).error || 'Full backup failed');
-    const blob = await r.blob();
-    const cd = r.headers.get('content-disposition') || '';
+    const start = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(start.error || 'Full backup failed');
+    const jobId = start.job?.id || start.id;
+    if (!jobId) throw new Error('Full backup job did not start');
+    const job = await waitFullBackupJob(jobId);
+    const download = await fetch('/api/backup/export/download/' + encodeURIComponent(job.id), {
+      headers: authHeaders(),
+      cache: 'no-store',
+    });
+    handleUnauth(download);
+    if (!download.ok) throw new Error((await download.json().catch(()=>({}))).error || 'Full backup download failed');
+    const blob = await download.blob();
+    const cd = download.headers.get('content-disposition') || '';
     const m = cd.match(/filename="?([^"]+)"?/i);
-    const filename = m?.[1] || fallbackName;
+    const filename = m?.[1] || job.filename || fallbackName;
     if (saveHandle) {
       const writable = await saveHandle.createWritable();
       await writable.write(blob);
@@ -2057,10 +2141,13 @@ async function exportFullBackup() {
       a.remove();
       URL.revokeObjectURL(url);
     }
+    showBackupProgress({ ...job, progress: 100, phase: 'Export complete' });
     toast('Full backup exported', 'ok');
   } catch (e) {
     if (e?.name === 'AbortError') return;
     toast(e.message, 'err');
+  } finally {
+    setTimeout(hideBackupProgress, 450);
   }
 }
 

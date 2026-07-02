@@ -138,6 +138,23 @@ function normalizeTemperature(value) {
   return Math.round(n);
 }
 
+function normalizeFanSpeed(value) {
+  const n = snmpNumber(value);
+  if (!Number.isFinite(n) || n < 0 || n > 100000) return null;
+  return Math.round(n);
+}
+
+function normalizeUptimeSeconds(value) {
+  const ticks = snmpNumber(value);
+  if (!Number.isFinite(ticks) || ticks < 0) return null;
+  return Math.round(ticks / 100);
+}
+
+function displaySensorLabel(label, fallback = 'Sensor') {
+  const clean = cleanSnmpText(label).trim().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ');
+  return clean || fallback;
+}
+
 function entitySensorScale(scale) {
   const factors = {
     1: 1e-24, 2: 1e-21, 3: 1e-18, 4: 1e-15, 5: 1e-12, 6: 1e-9,
@@ -169,6 +186,42 @@ function chooseTemperature(candidates) {
     .filter(c => c && Number.isFinite(Number(c.value)))
     .sort((a, b) => tempCandidateScore(b.label) - tempCandidateScore(a.label) || Number(b.value) - Number(a.value));
   return valid[0] || null;
+}
+
+function uniqueSensorRows(rows = []) {
+  const seen = new Set();
+  return rows.filter(row => {
+    if (!row) return false;
+    const key = `${String(row.label || '').toLowerCase()}|${row.value}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function isCpuTempLabel(label) {
+  return /\bcpu\b|processor/.test(String(label || '').toLowerCase());
+}
+
+function isNvmeTempLabel(label) {
+  return /\bnvme\b|\bnvm\b|\bssd\b/.test(String(label || '').toLowerCase());
+}
+
+function isSystemTempLabel(label) {
+  const s = String(label || '').toLowerCase();
+  return !isCpuTempLabel(s) && !isNvmeTempLabel(s) && /system|board|pcb|main|chassis|ambient|case/.test(s);
+}
+
+function classifyTemperatureMetrics(temperatures = []) {
+  const rows = uniqueSensorRows(temperatures).filter(t => Number.isFinite(Number(t.value)));
+  const sorted = [...rows].sort((a, b) => tempCandidateScore(b.label) - tempCandidateScore(a.label));
+  const cpu = sorted.find(t => isCpuTempLabel(t.label)) || null;
+  const system = sorted.find(t => isSystemTempLabel(t.label)) || null;
+  const nvmeTemps = rows
+    .filter(t => isNvmeTempLabel(t.label))
+    .map((t, i) => ({ ...t, name: t.name || `NVMe ${i + 1}` }));
+  const primary = cpu || system || chooseTemperature(rows);
+  return { rows, cpu, system, nvmeTemps, primary };
 }
 
 function clampPercent(n) {
@@ -237,6 +290,52 @@ async function ucdRawCpu(session, key) {
   } catch { return null; }
 }
 
+async function getEntitySensorMetrics(session) {
+  const sensorBase = '1.3.6.1.2.1.99.1.1.1';
+  const sensorRows = await snmpWalk(session, sensorBase);
+  const sensorCols = parseTableRows(sensorRows, sensorBase);
+  const typeMap = sensorCols['1'] || {};
+  const scaleMap = sensorCols['2'] || {};
+  const precisionMap = sensorCols['3'] || {};
+  const valueMap = sensorCols['4'] || {};
+  const statusMap = sensorCols['5'] || {};
+  const unitMap = sensorCols['6'] || {};
+  if (!Object.keys(valueMap).length) return { temperatures: [], fanSpeeds: [] };
+
+  let physicalCols = {};
+  try {
+    physicalCols = parseTableRows(await snmpWalk(session, '1.3.6.1.2.1.47.1.1.1.1'), '1.3.6.1.2.1.47.1.1.1.1');
+  } catch {
+    physicalCols = {};
+  }
+  const descrMap = physicalCols['2'] || {};
+  const nameMap = physicalCols['7'] || {};
+  const indexes = [...new Set([
+    ...Object.keys(typeMap),
+    ...Object.keys(valueMap),
+    ...Object.keys(statusMap),
+  ])];
+  const temperatures = [];
+  const fanSpeeds = [];
+  indexes.forEach(idx => {
+    const type = snmpNumber(typeMap[idx]);
+    const status = snmpNumber(statusMap[idx]);
+    if (status != null && status !== 1) return;
+    const units = cleanSnmpText(unitMap[idx]).trim();
+    const label = displaySensorLabel(cleanSnmpText(nameMap[idx]).trim() || cleanSnmpText(descrMap[idx]).trim(), `Sensor ${idx}`);
+    const isCelsius = type === 8 || /celsius|centigrade|deg\s*c|Â°c/i.test(units);
+    const isRpm = type === 10 || /rpm/i.test(units) || /fan/i.test(label);
+    if (isCelsius) {
+      const value = normalizeEntityTemperature(valueMap[idx], scaleMap[idx], precisionMap[idx]);
+      if (value != null) temperatures.push({ value, label: /temp|thermal|celsius/i.test(label) ? label : `${label} temperature` });
+    } else if (isRpm) {
+      const value = normalizeFanSpeed(valueMap[idx]);
+      if (value != null) fanSpeeds.push({ value, label: /fan/i.test(label) ? label : `${label} fan`, unit: 'RPM' });
+    }
+  });
+  return { temperatures, fanSpeeds };
+}
+
 async function getEntitySensorTemperatures(session) {
   const sensorBase = '1.3.6.1.2.1.99.1.1.1';
   const sensorRows = await snmpWalk(session, sensorBase);
@@ -276,6 +375,43 @@ async function getEntitySensorTemperatures(session) {
   }).filter(Boolean);
 }
 
+async function getEntitySensorFanSpeeds(session) {
+  const sensorBase = '1.3.6.1.2.1.99.1.1.1';
+  const sensorRows = await snmpWalk(session, sensorBase);
+  const sensorCols = parseTableRows(sensorRows, sensorBase);
+  const typeMap = sensorCols['1'] || {};
+  const valueMap = sensorCols['4'] || {};
+  const statusMap = sensorCols['5'] || {};
+  const unitMap = sensorCols['6'] || {};
+  if (!Object.keys(valueMap).length) return [];
+
+  let physicalCols = {};
+  try {
+    physicalCols = parseTableRows(await snmpWalk(session, '1.3.6.1.2.1.47.1.1.1.1'), '1.3.6.1.2.1.47.1.1.1.1');
+  } catch {
+    physicalCols = {};
+  }
+  const descrMap = physicalCols['2'] || {};
+  const nameMap = physicalCols['7'] || {};
+
+  const indexes = [...new Set([
+    ...Object.keys(typeMap),
+    ...Object.keys(valueMap),
+    ...Object.keys(statusMap),
+  ])];
+  return indexes.map(idx => {
+    const type = snmpNumber(typeMap[idx]);
+    const status = snmpNumber(statusMap[idx]);
+    const units = cleanSnmpText(unitMap[idx]).trim();
+    const label = displaySensorLabel(cleanSnmpText(nameMap[idx]).trim() || cleanSnmpText(descrMap[idx]).trim(), `Fan ${idx}`);
+    const isRpm = type === 10 || /rpm/i.test(units) || /fan/i.test(label);
+    if (!isRpm || (status != null && status !== 1)) return null;
+    const value = normalizeFanSpeed(valueMap[idx]);
+    if (value == null) return null;
+    return { value, label: /fan/i.test(label) ? label : `${label} fan`, unit: 'RPM' };
+  }).filter(Boolean);
+}
+
 async function getUcdSensorTemperatures(session) {
   const base = '1.3.6.1.4.1.2021.13.16.2.1';
   const rows = await snmpWalk(session, base);
@@ -291,9 +427,48 @@ async function getUcdSensorTemperatures(session) {
   }).filter(Boolean);
 }
 
+async function getRouterOsHealthMetrics(session) {
+  const base = '1.3.6.1.4.1.14988.1.1.3.100.1';
+  const rows = await snmpWalk(session, base);
+  const cols = parseTableRows(rows, base);
+  const nameMap = cols['2'] || {};
+  const valueMap = cols['3'] || {};
+  const unitMap = cols['4'] || {};
+  const indexes = [...new Set([...Object.keys(nameMap), ...Object.keys(valueMap)])];
+  const temperatures = [];
+  const fanSpeeds = [];
+  indexes.forEach((idx, i) => {
+    const rawName = cleanSnmpText(nameMap[idx]).trim();
+    const label = displaySensorLabel(rawName, `Sensor ${idx}`);
+    const lower = label.toLowerCase();
+    if (/temp|thermal/.test(lower)) {
+      const value = normalizeTemperature(valueMap[idx]);
+      if (value != null) temperatures.push({ value, label, oid: `${base}.3.${idx}` });
+      return;
+    }
+    if (/fan.*speed|speed.*fan|\bfan\d*\b/.test(lower)) {
+      const value = normalizeFanSpeed(valueMap[idx]);
+      if (value != null) fanSpeeds.push({ value, label, unit: 'RPM', oid: `${base}.3.${idx}` });
+      return;
+    }
+    const unit = snmpNumber(unitMap[idx]);
+    if (unit === 8) {
+      const value = normalizeTemperature(valueMap[idx]);
+      if (value != null) temperatures.push({ value, label, oid: `${base}.3.${idx}` });
+    } else if (unit === 10) {
+      const value = normalizeFanSpeed(valueMap[idx]);
+      if (value != null) fanSpeeds.push({ value, label: /fan/i.test(label) ? label : `Fan ${i + 1}`, unit: 'RPM', oid: `${base}.3.${idx}` });
+    }
+  });
+  return { temperatures, fanSpeeds };
+}
+
 async function getScalarTemperatures(session) {
   const scalarOids = [
     ['1.3.6.1.4.1.6574.1.2.0', 'CPU temperature'],
+    ['1.3.6.1.4.1.14988.1.1.3.5.0', 'Sensor temperature'],
+    ['1.3.6.1.4.1.14988.1.1.3.6.0', 'CPU temperature'],
+    ['1.3.6.1.4.1.14988.1.1.3.7.0', 'Board temperature'],
     ['1.3.6.1.4.1.14988.1.1.3.10.0', 'System temperature'],
     ['1.3.6.1.4.1.14988.1.1.3.11.0', 'CPU temperature'],
   ];
@@ -304,16 +479,59 @@ async function getScalarTemperatures(session) {
   }).filter(Boolean);
 }
 
-async function getSensorTemperature(session) {
-  const candidates = [];
-  for (const reader of [getEntitySensorTemperatures, getUcdSensorTemperatures, getScalarTemperatures]) {
+async function getScalarFanSpeeds(session) {
+  const scalarOids = [
+    ['1.3.6.1.4.1.14988.1.1.3.17.0', 'Fan 1'],
+    ['1.3.6.1.4.1.14988.1.1.3.18.0', 'Fan 2'],
+  ];
+  const values = await snmpGet(session, scalarOids.map(([oid]) => oid));
+  return scalarOids.map(([oid, label]) => {
+    const value = normalizeFanSpeed(values[oid]);
+    return value == null ? null : { value, label, unit: 'RPM', oid };
+  }).filter(Boolean);
+}
+
+async function getUptimeSeconds(session) {
+  const oid = '1.3.6.1.2.1.1.3.0';
+  const values = await snmpGet(session, [oid]);
+  return normalizeUptimeSeconds(values[oid]);
+}
+
+async function getSensorMetrics(session) {
+  const temperatures = [];
+  const fanSpeeds = [];
+  try {
+    const entity = await getEntitySensorMetrics(session);
+    temperatures.push(...entity.temperatures);
+    fanSpeeds.push(...entity.fanSpeeds);
+  } catch {
+    // ENTITY-SENSOR-MIB is optional.
+  }
+  for (const reader of [getUcdSensorTemperatures, getScalarTemperatures]) {
     try {
-      candidates.push(...await reader(session));
+      temperatures.push(...await reader(session));
     } catch {
       // Many devices expose only one of these tables.
     }
   }
-  return chooseTemperature(candidates);
+  for (const reader of [getScalarFanSpeeds]) {
+    try {
+      fanSpeeds.push(...await reader(session));
+    } catch {
+      // Fan speed is optional and often absent.
+    }
+  }
+  try {
+    const routerOs = await getRouterOsHealthMetrics(session);
+    temperatures.push(...routerOs.temperatures);
+    fanSpeeds.push(...routerOs.fanSpeeds);
+  } catch {
+    // Non-MikroTik devices do not expose the RouterOS health gauge table.
+  }
+  return {
+    temperatures: classifyTemperatureMetrics(temperatures),
+    fanSpeeds: uniqueSensorRows(fanSpeeds),
+  };
 }
 
 async function getSystemInfo(session, deviceKey) {
@@ -329,12 +547,19 @@ async function getSystemInfo(session, deviceKey) {
   let memTotalKB = synVals['1.3.6.1.4.1.6574.1.1.1.0'];
   let memFreeKB  = synVals['1.3.6.1.4.1.6574.1.1.2.0'];
   let memSource = memTotalKB != null ? 'synology' : null;
-  let tempInfo = chooseTemperature([{ value: normalizeTemperature(synVals['1.3.6.1.4.1.6574.1.2.0']), label: 'CPU temperature' }]);
-  if (!tempInfo) {
-    try {
-      tempInfo = await getSensorTemperature(session);
-    } catch (e) { console.error(`[SNMP ${deviceKey} sensors]`, e.message); }
-  }
+  let sensorMetrics = { temperatures: classifyTemperatureMetrics([]), fanSpeeds: [] };
+  try {
+    sensorMetrics = await getSensorMetrics(session);
+  } catch (e) { console.error(`[SNMP ${deviceKey} sensors]`, e.message); }
+  const synologyTemp = { value: normalizeTemperature(synVals['1.3.6.1.4.1.6574.1.2.0']), label: 'CPU temperature' };
+  const temperatureMetrics = classifyTemperatureMetrics([
+    ...(synologyTemp.value != null ? [synologyTemp] : []),
+    ...(sensorMetrics.temperatures?.rows || []),
+  ]);
+  const primaryTemp = temperatureMetrics.primary;
+  const cpuTemp = temperatureMetrics.cpu;
+  const systemTemperature = temperatureMetrics.system;
+  const uptimeSeconds = await getUptimeSeconds(session).catch(() => null);
 
 
   if (cpuUser == null) {
@@ -425,8 +650,19 @@ async function getSystemInfo(session, deviceKey) {
 
   return {
     cpu: cpuUser != null ? cpuUser + (cpuSystem || 0) : null,
-    systemTemp: tempInfo?.value ?? null,
-    systemTempLabel: tempInfo?.label ?? null,
+    cpuTemp: cpuTemp?.value ?? null,
+    cpuTempLabel: cpuTemp?.label ?? null,
+    systemTemperature: systemTemperature?.value ?? null,
+    systemTemperatureLabel: systemTemperature?.label ?? null,
+    systemTemp: primaryTemp?.value ?? null,
+    systemTempLabel: primaryTemp?.label ?? null,
+    nvmeTemps: temperatureMetrics.nvmeTemps,
+    fanSpeeds: sensorMetrics.fanSpeeds || [],
+    sensors: {
+      temperatures: temperatureMetrics.rows,
+      fanSpeeds: sensorMetrics.fanSpeeds || [],
+    },
+    uptimeSeconds,
     ram,
   };
 }
@@ -873,12 +1109,13 @@ async function getDeviceData(device) {
     const sanitized = sanitizeSnmpHistory(rawHist, bandwidth?.historyCapacityBps || bandwidth?.activeCapacityBps || bandwidth?.largestCapacityBps || bandwidth?.capacityBps);
     const hist = sanitized.history;
     let shouldSaveHistory = sanitized.changed;
-    if (sysInfo.cpu != null || sysInfo.ram || sysInfo.systemTemp != null || diskIO || bandwidth) {
+    const historyTemp = sysInfo.cpuTemp ?? sysInfo.systemTemp ?? sysInfo.systemTemperature ?? null;
+    if (sysInfo.cpu != null || sysInfo.ram || historyTemp != null || diskIO || bandwidth) {
       hist.push({
         time: Date.now(),
         cpu: sysInfo.cpu ?? null,
         ram: sysInfo.ram?.percent ?? null,
-        temp: sysInfo.systemTemp ?? null,
+        temp: historyTemp,
         diskIO: diskIO ? (Number(diskIO.readBps) || 0) + (Number(diskIO.writeBps) || 0) : null,
         bandwidth: bandwidth ? (Number(bandwidth.rxBps) || 0) + (Number(bandwidth.txBps) || 0) : null,
       });
@@ -898,9 +1135,17 @@ async function getDeviceData(device) {
       online: true,
       sysDescr,
       cpu:     sysInfo.cpu     ?? null,
+      cpuTemp: sysInfo.cpuTemp ?? null,
+      cpuTempLabel: sysInfo.cpuTempLabel ?? null,
+      systemTemperature: sysInfo.systemTemperature ?? null,
+      systemTemperatureLabel: sysInfo.systemTemperatureLabel ?? null,
       systemTemp: sysInfo.systemTemp ?? null,
       systemTempLabel: sysInfo.systemTempLabel ?? null,
       ram:     sysInfo.ram     ?? null,
+      nvmeTemps: sysInfo.nvmeTemps || [],
+      fanSpeeds: sysInfo.fanSpeeds || [],
+      uptimeSeconds: sysInfo.uptimeSeconds ?? null,
+      sensors: sysInfo.sensors || { temperatures: [], fanSpeeds: [] },
       disks,
       volumes,
       network,

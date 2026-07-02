@@ -94,7 +94,8 @@ const UI_PREFS_PATH = path.join(DATA_DIR, 'ui-preferences.yaml');
 const TOPOLOGY_PATH = path.join(DATA_DIR, 'topology.yaml');
 const CONFIG_BACKUP_DIR = path.join(DATA_DIR, 'config-backups');
 const FULL_BACKUP_MAX_BYTES = 50 * ONE_MB;
-const FULL_BACKUP_SKIP = new Set(['sessions.yaml', 'password-resets.yaml']);
+const FULL_BACKUP_EXPORT_TMP_DIR = path.join(DATA_DIR, '.backup-exports');
+const FULL_BACKUP_SKIP = new Set(['sessions.yaml', 'password-resets.yaml', '.backup-exports']);
 
 function backupConfigBeforeWrite() {
   try {
@@ -5665,6 +5666,35 @@ function collectFullBackupFiles(dir, base = dir, out = {}, state = { total: 0 })
   return out;
 }
 
+async function collectFullBackupEntries(dir, base = dir, out = [], state = { total: 0 }) {
+  let entries = [];
+  try { entries = await fs.promises.readdir(dir, { withFileTypes: true }); }
+  catch (err) {
+    if (err && err.code === 'ENOENT') return out;
+    throw err;
+  }
+  for (const entry of entries) {
+    if (FULL_BACKUP_SKIP.has(entry.name)) continue;
+    const file = path.join(dir, entry.name);
+    const st = await fs.promises.lstat(file);
+    if (st.isSymbolicLink()) continue;
+    if (st.isDirectory()) {
+      await collectFullBackupEntries(file, base, out, state);
+      continue;
+    }
+    if (!st.isFile()) continue;
+    state.total += st.size;
+    if (state.total > FULL_BACKUP_MAX_BYTES) throw new Error('Full backup is larger than 50 MB. Reduce history retention or copy the data volume directly.');
+    out.push({
+      file,
+      rel: path.relative(base, file).split(path.sep).join('/'),
+      mode: (st.mode & 0o777).toString(8),
+      size: st.size,
+    });
+  }
+  return out;
+}
+
 function safeDataRestorePath(rel) {
   const raw = String(rel || '').replace(/\\/g, '/');
   if (!raw || raw.startsWith('/') || /^[A-Za-z]:/.test(raw)) throw new Error(`Unsafe backup path: ${rel}`);
@@ -5752,25 +5782,248 @@ function verifyAdminPassword(req, password) {
   return auth;
 }
 
-app.post('/api/backup/export', (req, res) => {
+function yamlJson(value) {
+  return JSON.stringify(String(value ?? ''));
+}
+
+function backupExportFilename() {
+  return `omnisight-full-backup-${new Date().toISOString().slice(0,10)}.yaml`;
+}
+
+async function writeStreamChunk(stream, chunk) {
+  if (stream.write(chunk)) return;
+  await new Promise((resolve, reject) => {
+    stream.once('drain', resolve);
+    stream.once('error', reject);
+  });
+}
+
+async function endWriteStream(stream) {
+  await new Promise((resolve, reject) => {
+    stream.end(resolve);
+    stream.once('error', reject);
+  });
+}
+
+async function writeBase64FileBlock(stream, file, onBytes) {
+  let carry = Buffer.alloc(0);
+  let line = '';
+  const flushBase64 = async text => {
+    line += text;
+    while (line.length >= 76) {
+      await writeStreamChunk(stream, `      ${line.slice(0, 76)}\n`);
+      line = line.slice(76);
+    }
+  };
+  for await (const chunk of fs.createReadStream(file, { highWaterMark: 64 * 1024 })) {
+    const data = carry.length ? Buffer.concat([carry, chunk]) : chunk;
+    const encodeLen = data.length - (data.length % 3);
+    if (encodeLen > 0) await flushBase64(data.subarray(0, encodeLen).toString('base64'));
+    carry = data.subarray(encodeLen);
+    if (onBytes) onBytes(chunk.length);
+  }
+  if (carry.length) await flushBase64(carry.toString('base64'));
+  if (line.length) await writeStreamChunk(stream, `      ${line}\n`);
+}
+
+function safeUnlink(file) {
+  if (!file) return;
+  try { fs.unlinkSync(file); } catch {}
+}
+
+async function writeFullBackupArchive(job, entries, state) {
+  fs.mkdirSync(FULL_BACKUP_EXPORT_TMP_DIR, { recursive: true, mode: 0o700 });
+  const tmpPath = path.join(FULL_BACKUP_EXPORT_TMP_DIR, `${job.id || crypto.randomBytes(12).toString('hex')}.yaml`);
+  const stream = fs.createWriteStream(tmpPath, { encoding: 'utf8', mode: 0o600 });
+  let bytesDone = 0;
+  let filesDone = 0;
+  const generatedAt = new Date().toISOString();
+  const header = [
+    'kind: omnisight-full-backup',
+    `version: ${yamlJson(backupVersion())}`,
+    `generatedAt: ${yamlJson(generatedAt)}`,
+    `encryptedFields: ${encryptionEnabled() ? 'true' : 'false'}`,
+    'excludedFiles:',
+    ...Array.from(FULL_BACKUP_SKIP).map(name => `  - ${yamlJson(name)}`),
+    `restore: ${yamlJson('Stop OmniSight, restore these files into the data/ volume, keep file permissions private, then start OmniSight.')}`,
+    'files:',
+  ].join('\n') + '\n';
+  try {
+    await writeStreamChunk(stream, header);
+    for (const entry of entries) {
+      await writeStreamChunk(stream, `  ${yamlJson(entry.rel)}:\n`);
+      await writeStreamChunk(stream, '    encoding: base64\n');
+      await writeStreamChunk(stream, `    mode: ${yamlJson(entry.mode)}\n`);
+      await writeStreamChunk(stream, `    size: ${Number(entry.size || 0)}\n`);
+      await writeStreamChunk(stream, '    content: |-\n');
+      await writeBase64FileBlock(stream, entry.file, readBytes => {
+        bytesDone += readBytes;
+        job.bytesDone = bytesDone;
+        const ratio = Number(state.total || 0) > 0 ? bytesDone / state.total : filesDone / Math.max(1, entries.length);
+        job.progress = 5 + Math.floor(Math.max(0, Math.min(1, ratio)) * 83);
+      });
+      filesDone += 1;
+      job.filesDone = filesDone;
+      if (entry.size === 0) await writeStreamChunk(stream, '      \n');
+      await new Promise(resolve => setImmediate(resolve));
+    }
+    await endWriteStream(stream);
+    try { fs.chmodSync(tmpPath, 0o600); } catch {}
+    return tmpPath;
+  } catch (err) {
+    stream.destroy();
+    safeUnlink(tmpPath);
+    throw err;
+  }
+}
+
+const fullBackupExportJobs = new Map();
+const FULL_BACKUP_EXPORT_JOB_TTL_MS = 10 * 60 * 1000;
+
+function fullBackupJobSnapshot(job) {
+  if (!job) return null;
+  return {
+    id: job.id,
+    status: job.status,
+    progress: Math.max(0, Math.min(100, Math.round(Number(job.progress || 0)))),
+    phase: job.phase || '',
+    filesDone: Number(job.filesDone || 0),
+    filesTotal: Number(job.filesTotal || 0),
+    bytesDone: Number(job.bytesDone || 0),
+    bytesTotal: Number(job.bytesTotal || 0),
+    error: job.error || '',
+    filename: job.filename || '',
+  };
+}
+
+function cleanupFullBackupJobs() {
+  const now = Date.now();
+  for (const [id, job] of fullBackupExportJobs) {
+    if (now - Number(job.createdAt || 0) > FULL_BACKUP_EXPORT_JOB_TTL_MS) {
+      safeUnlink(job.path);
+      fullBackupExportJobs.delete(id);
+    }
+  }
+}
+
+async function buildFullBackupExportJob(job) {
+  try {
+    job.status = 'running';
+    job.phase = 'Scanning data files';
+    job.progress = 1;
+    const state = { total: 0 };
+    const entries = await collectFullBackupEntries(DATA_DIR, DATA_DIR, [], state);
+    job.filesTotal = entries.length;
+    job.bytesTotal = state.total;
+    job.progress = 5;
+    job.phase = 'Reading backup files';
+
+    job.path = await writeFullBackupArchive(job, entries, state);
+    job.phase = 'Finalizing backup archive';
+    job.progress = Math.max(job.progress, 95);
+    job.filename = backupExportFilename();
+    try { job.archiveBytes = fs.statSync(job.path).size; } catch {}
+    job.progress = 100;
+    job.phase = 'Ready to download';
+    job.status = 'done';
+    auditEvent('backup.full_export', { files: entries.length, job: true, actor: job.actor || 'system' }, null);
+  } catch (err) {
+    safeUnlink(job.path);
+    job.status = 'failed';
+    job.phase = 'Failed';
+    job.error = err.message || String(err);
+    job.progress = Math.max(1, Number(job.progress || 0));
+  }
+}
+
+app.post('/api/backup/export/start', (req, res) => {
   try {
     if (sessionRole(req) !== 'admin') return res.status(403).json({ error: 'Forbidden' });
     verifyAdminPassword(req, req.body?.password || req.body?.currentPassword);
-    const files = collectFullBackupFiles(path.join(__dirname, 'data'));
-    const backup = {
-      kind: 'omnisight-full-backup',
-      version: backupVersion(),
-      generatedAt: new Date().toISOString(),
-      encryptedFields: encryptionEnabled(),
-      excludedFiles: Array.from(FULL_BACKUP_SKIP),
-      restore: 'Stop OmniSight, restore these files into the data/ volume, keep file permissions private, then start OmniSight.',
-      files,
+    cleanupFullBackupJobs();
+    const id = crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(16).toString('hex');
+    const job = {
+      id,
+      status: 'queued',
+      progress: 0,
+      phase: 'Queued',
+      createdAt: Date.now(),
+      filesDone: 0,
+      filesTotal: 0,
+      bytesDone: 0,
+      bytesTotal: 0,
+      actor: reqActor(req),
     };
-    auditEvent('backup.full_export', { files: Object.keys(files).length }, req);
-    res.setHeader('Content-Type', 'application/x-yaml; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="omnisight-full-backup-${new Date().toISOString().slice(0,10)}.yaml"`);
-    res.send(yaml.dump(backup, { lineWidth: -1 }));
+    fullBackupExportJobs.set(id, job);
+    setImmediate(() => buildFullBackupExportJob(job));
+    res.json({ ok: true, job: fullBackupJobSnapshot(job) });
   } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/backup/export/status/:id', (req, res) => {
+  if (sessionRole(req) !== 'admin') return res.status(403).json({ error: 'Forbidden' });
+  cleanupFullBackupJobs();
+  const job = fullBackupExportJobs.get(String(req.params.id || ''));
+  if (!job) return res.status(404).json({ error: 'Backup export job not found' });
+  res.json({ ok: true, job: fullBackupJobSnapshot(job) });
+});
+
+app.get('/api/backup/export/download/:id', (req, res) => {
+  if (sessionRole(req) !== 'admin') return res.status(403).json({ error: 'Forbidden' });
+  const id = String(req.params.id || '');
+  const job = fullBackupExportJobs.get(id);
+  if (!job) return res.status(404).json({ error: 'Backup export job not found' });
+  if (job.status !== 'done' || !job.path || !fs.existsSync(job.path)) return res.status(409).json({ error: 'Backup export is not ready yet' });
+  res.setHeader('Content-Type', 'application/x-yaml; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${job.filename || `omnisight-full-backup-${new Date().toISOString().slice(0,10)}.yaml`}"`);
+  const stream = fs.createReadStream(job.path);
+  const cleanup = () => {
+    safeUnlink(job.path);
+    fullBackupExportJobs.delete(id);
+  };
+  stream.on('error', err => {
+    cleanup();
+    if (!res.headersSent) res.status(500).json({ error: err.message });
+    else res.destroy(err);
+  });
+  res.on('finish', cleanup);
+  res.on('close', () => { if (!res.writableEnded) cleanup(); });
+  stream.pipe(res);
+});
+
+app.post('/api/backup/export', async (req, res) => {
+  let tmpPath = '';
+  try {
+    if (sessionRole(req) !== 'admin') return res.status(403).json({ error: 'Forbidden' });
+    verifyAdminPassword(req, req.body?.password || req.body?.currentPassword);
+    const state = { total: 0 };
+    const entries = await collectFullBackupEntries(DATA_DIR, DATA_DIR, [], state);
+    const directJob = {
+      id: crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(16).toString('hex'),
+      progress: 0,
+      bytesDone: 0,
+      bytesTotal: state.total,
+      filesDone: 0,
+      filesTotal: entries.length,
+    };
+    tmpPath = await writeFullBackupArchive(directJob, entries, state);
+    auditEvent('backup.full_export', { files: entries.length }, req);
+    res.setHeader('Content-Type', 'application/x-yaml; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${backupExportFilename()}"`);
+    const stream = fs.createReadStream(tmpPath);
+    const cleanup = () => { safeUnlink(tmpPath); tmpPath = ''; };
+    stream.on('error', err => {
+      cleanup();
+      if (!res.headersSent) res.status(500).json({ error: err.message });
+      else res.destroy(err);
+    });
+    res.on('finish', cleanup);
+    res.on('close', () => { if (!res.writableEnded) cleanup(); });
+    stream.pipe(res);
+  } catch (err) {
+    safeUnlink(tmpPath);
     res.status(400).json({ error: err.message });
   }
 });
