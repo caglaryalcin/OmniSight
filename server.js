@@ -1443,6 +1443,18 @@ function webauthnRpId(req) {
   return String(req.headers['x-forwarded-host'] || req.headers.host || 'localhost').split(',')[0].trim().replace(/:\d+$/, '');
 }
 
+function requestHostCandidates(req) {
+  const hosts = [
+    req.headers['x-forwarded-host'],
+    req.headers['x-original-host'],
+    req.headers.host,
+  ]
+    .flatMap(v => String(v || '').split(','))
+    .map(v => v.trim())
+    .filter(Boolean);
+  return [...new Set(hosts)];
+}
+
 function webauthnOrigin(req) {
   const proto = isSecureRequest(req) ? 'https' : 'http';
   const host = String(req.headers['x-forwarded-host'] || req.headers.host || 'localhost').split(',')[0].trim();
@@ -1450,15 +1462,30 @@ function webauthnOrigin(req) {
 }
 
 function browserRequestOrigin(req) {
-  const host = String(req.headers['x-forwarded-host'] || req.headers.host || 'localhost').split(',')[0].trim();
+  const hosts = requestHostCandidates(req);
   const candidates = [req.headers.origin, req.headers.referer];
   for (const candidate of candidates) {
     try {
       const u = new URL(String(candidate || ''));
-      if (u.host === host) return `${u.protocol}//${u.host}`;
+      if (hosts.includes(u.host)) return `${u.protocol}//${u.host}`;
     } catch {}
   }
   return webauthnOrigin(req);
+}
+
+function webauthnExpectedOrigins(req) {
+  const origins = new Set([webauthnOrigin(req)]);
+  const hosts = requestHostCandidates(req);
+  const candidates = [req.headers.origin, req.headers.referer];
+  for (const candidate of candidates) {
+    try {
+      const u = new URL(String(candidate || ''));
+      if ((u.protocol === 'https:' || u.protocol === 'http:') && hosts.includes(u.host)) {
+        origins.add(`${u.protocol}//${u.host}`);
+      }
+    } catch {}
+  }
+  return [...origins];
 }
 
 function passkeyChallenge(type, username = '') {
@@ -1477,7 +1504,7 @@ function takePasskeyChallenge(challenge, type) {
 function verifyClientData(clientDataJSON, type, req) {
   const json = JSON.parse(fromB64url(clientDataJSON).toString('utf8'));
   if (json.type !== type) throw new Error('Unexpected passkey response type');
-  if (json.origin !== webauthnOrigin(req)) throw new Error('Unexpected passkey origin');
+  if (!webauthnExpectedOrigins(req).includes(json.origin)) throw new Error('Unexpected passkey origin');
   return json;
 }
 
@@ -1639,14 +1666,7 @@ function sameOriginGuard(req, res, next) {
   if (!origin) return next();
   try {
     const got = new URL(origin);
-    const expectedHosts = [
-      req.headers.host,
-      req.headers['x-forwarded-host'],
-      req.headers['x-original-host'],
-    ]
-      .flatMap(v => String(v || '').split(','))
-      .map(v => v.trim())
-      .filter(Boolean);
+    const expectedHosts = requestHostCandidates(req);
     const expectedHost = expectedHosts[0] || '';
     const expectedProto = String(req.headers['x-forwarded-proto'] || (req.secure ? 'https' : 'http')).split(',')[0].trim();
     if (expectedHosts.includes(got.host)) return next();
