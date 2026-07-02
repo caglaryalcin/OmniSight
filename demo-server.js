@@ -654,6 +654,7 @@ function demoStatus() {
     cpu,
     ram,
     restarts,
+    containers: name.includes('api-demo') ? ['api', 'sidecar'] : [name.replace(/-[a-z0-9]+(?:-[a-z0-9]+)?$/i, '') || 'app'],
   }));
   const k8sDeployments = [
     { name: 'api-demo', namespace: 'apps', ready: 2, desired: 2, healthy: true, status: 'Running' },
@@ -903,7 +904,7 @@ function topologyData() {
         vms: n.vms.map(v => ({ id: v.id, name: v.name, status: v.status, type: v.type, os: v.os })),
       })),
     },
-    kubernetes: { online: true, summary: d.kubernetes.summary, pods: d.kubernetes.pods.map(p => ({ name: p.name, status: p.status })) },
+    kubernetes: { online: true, summary: d.kubernetes.summary, pods: d.kubernetes.pods.map(p => ({ name: p.name, namespace: p.namespace, status: p.status, containers: p.containers })) },
     docker: d.docker.map(h => ({ name: h.name, host: h.host, online: true, summary: h.summary, containers: h.containers })),
     dockhand: d.dockhand,
     snmp: d.snmp.map(s => ({ name: s.name, host: s.host, online: true, profile: s.profile, vendor: s.vendor, model: s.model })),
@@ -1018,7 +1019,7 @@ app.get('/api/status', (req, res) => res.json(demoStatus()));
 app.get('/api/status/dashboard', (req, res) => res.json(demoStatus()));
 app.get('/api/status/summary', (req, res) => {
   const d = demoStatus();
-  res.json({ timestamp: d.timestamp, loading: false, refreshing: false, configured: d.configured, publicStatus: true, preferredLanguage: 'en', appearance: d.appearance, ui: {}, health: publicSummary(d) });
+  res.json({ timestamp: d.timestamp, loading: false, refreshing: false, configured: d.configured, publicStatus: true, preferredLanguage: 'en', appearance: d.appearance, ui: demoPrefs.ui, health: publicSummary(d) });
 });
 app.get('/api/status/topology', (req, res) => res.json(topologyData()));
 app.get('/api/status/stream', (req, res) => {
@@ -1057,7 +1058,8 @@ app.get('/api/dockhand/logs', (req, res) => {
 });
 app.get('/api/kubernetes/logs', (req, res) => {
   const name = req.query.pod || req.query.name || 'kubernetes-pod';
-  res.type('text/plain').send(demoLogStream('kubernetes', name));
+  const container = req.query.container ? `/${req.query.container}` : '';
+  res.type('text/plain').send(demoLogStream('kubernetes', `${name}${container}`));
 });
 
 app.post('/api/topology/links', (req, res) => {
