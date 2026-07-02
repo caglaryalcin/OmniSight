@@ -1900,6 +1900,59 @@ function hideChartTooltip() {
   if (hDot) hDot.style.opacity = 0;
 }
 
+function showSplitRateTooltip(e, el) {
+  const tt = document.getElementById('os-tooltip');
+  const hDot = document.getElementById('os-hover-dot');
+  if (!tt) return;
+  const rect = el.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const pct = Math.max(0, Math.min(1, x / rect.width));
+  const pts = JSON.parse(el.getAttribute('data-pts') || '[]');
+  const targetIdx = Math.round(pct * (pts.length - 1));
+  let idx = targetIdx;
+  if (!pts[idx]) {
+    let best = -1, bestDist = Infinity;
+    pts.forEach((p, i) => {
+      if (!p) return;
+      const dist = Math.abs(i - targetIdx);
+      if (dist < bestDist) { best = i; bestDist = dist; }
+    });
+    idx = best;
+  }
+  if (idx < 0 || !pts[idx]) { hideChartTooltip(); return; }
+  const pt = pts[idx];
+  const readColor = el.dataset.readColor || '#22D3EE';
+  const writeColor = el.dataset.writeColor || '#34D399';
+  const chartH = Number(el.dataset.chartH || 50) || 50;
+  const y = pt.readY ?? pt.writeY ?? chartH;
+  if (hDot) {
+    hDot.style.background = pt.readY != null ? readColor : writeColor;
+    hDot.style.left = (rect.left + (idx / (pts.length - 1)) * rect.width) + 'px';
+    hDot.style.top = (rect.top + (y / chartH) * rect.height) + 'px';
+    hDot.style.opacity = 1;
+  }
+  const d = new Date(pt.t);
+  const is12h = !!(window._lastData && window._lastData.timeFormat === '12h');
+  const dStr = d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  let tStr = '';
+  try { tStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: is12h }); }
+  catch { tStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
+  const row = (label, color, value) => `<div style="display:flex;align-items:center;justify-content:space-between;gap:18px;">
+    <div style="display:flex;align-items:center;gap:6px"><div style="width:10px;height:10px;border-radius:2px;background:${color}"></div><span>${label}</span></div>
+    <span class="tt-val" style="color:${color}">${value == null ? '--' : fmtRate(Number(value) * 1024 * 1024)}</span>
+  </div>`;
+  tt.innerHTML = `<div class="tt-time">${dStr}, ${tStr}</div>
+    ${row('Read', readColor, pt.read)}
+    ${row('Write', writeColor, pt.write)}`;
+  let tx = e.clientX + 15;
+  let ty = e.clientY + 15;
+  if (tx + 190 > window.innerWidth) tx = e.clientX - 190;
+  if (ty + 100 > window.innerHeight) ty = e.clientY - 100;
+  tt.style.left = tx + 'px';
+  tt.style.top = ty + 'px';
+  tt.style.opacity = 1;
+}
+
 function showUptimeTooltip(e, el) {
   const tt = document.getElementById('os-tooltip');
   if (!tt) return;
@@ -2018,6 +2071,79 @@ function histChart(data, key, pct, limit = 80, colorFn = bchex, maxScale = 100, 
     <path d="${line}" fill="none" stroke="${clr}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
   </svg>`;
 
+  return `<div>${svgHtml}${axisHtml}</div>`;
+}
+
+function splitRateChart(data, readKey, writeKey, currentReadBps, currentWriteBps, limit = 80, label = 'Disk I/O') {
+  const W = 300, H = 50;
+  const readColor = '#22D3EE';
+  const writeColor = '#34D399';
+  const now = Date.now();
+  const is12h = !!(window._lastData && window._lastData.timeFormat === '12h');
+  const fmtTime = ts => {
+    try { return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: is12h }); }
+    catch { return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
+  };
+  const duration = (limit - 1) * 15000;
+  const axisHtml = `<div style="display:flex; justify-content:space-between; font-size:10px; color:var(--muted); margin-top:4px; padding:0 2px;">
+      <span>${fmtTime(now - duration)}</span>
+      <span>${fmtTime(now - duration * 0.75)}</span>
+      <span>${fmtTime(now - duration * 0.5)}</span>
+      <span>${fmtTime(now - duration * 0.25)}</span>
+      <span>${fmtTime(now)}</span>
+    </div>`;
+  const emptySvg = `<svg class="hist-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><rect width="${W}" height="${H}" class="hist-bg" rx="3"/><line x1="0" y1="${H}" x2="${W}" y2="${H}" stroke="${readColor}" stroke-width="1.5" stroke-opacity=".3"/></svg>`;
+  const empty = `<div>${emptySvg}${axisHtml.replace(/<span/g, '<span style="opacity:0.3"')}</div>`;
+  let ptsRaw = Array.isArray(data) ? data.slice(-limit) : [];
+  if (!ptsRaw.length && (hasNum(currentReadBps) || hasNum(currentWriteBps))) {
+    ptsRaw = [{ time: now, [readKey]: rateToMBps(currentReadBps || 0), [writeKey]: rateToMBps(currentWriteBps || 0) }];
+  }
+  if (!ptsRaw.length) return empty;
+  const readValsRaw = ptsRaw.map(d => hasNum(d?.[readKey]) ? Math.max(0, Number(d[readKey])) : null);
+  const writeValsRaw = ptsRaw.map(d => hasNum(d?.[writeKey]) ? Math.max(0, Number(d[writeKey])) : null);
+  const vals = [...readValsRaw, ...writeValsRaw].filter(v => v !== null);
+  if (!vals.length) return empty;
+  const pad = limit - ptsRaw.length;
+  const readVals = pad > 0 ? [...Array(pad).fill(null), ...readValsRaw] : readValsRaw;
+  const writeVals = pad > 0 ? [...Array(pad).fill(null), ...writeValsRaw] : writeValsRaw;
+  const actualPtsRaw = pad > 0 ? [...Array(pad).fill(null), ...ptsRaw] : ptsRaw;
+  const maxV = Math.max(0.01, ...vals) * 1.18;
+  const n = readVals.length;
+  const xStep = W / (n - 1 || 1);
+  const yFor = v => H - (Math.min(maxV, Math.max(0, Number(v))) / maxV) * H;
+  const lineFor = valsArr => valsArr
+    .map((v, i) => v === null ? null : [i * xStep, yFor(v)])
+    .filter(Boolean)
+    .map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(2)},${p[1].toFixed(2)}`)
+    .join('');
+  const readLine = lineFor(readVals);
+  const writeLine = lineFor(writeVals);
+  if (!readLine && !writeLine) return empty;
+  let gridPath = '';
+  for (let i = 1; i < 4; i++) gridPath += `M0,${i * 12.5} L${W},${i * 12.5} `;
+  for (let i = 1; i < 10; i++) gridPath += `M${i * 30},0 L${i * 30},${H} `;
+  const pts = actualPtsRaw.map((d, i) => {
+    const read = readVals[i];
+    const write = writeVals[i];
+    if (read === null && write === null) return null;
+    const t = d?.time ? (d.time > 1e11 ? d.time : d.time * 1000) : (now - (n - 1 - i) * 15000);
+    return {
+      t,
+      read,
+      write,
+      readY: read === null ? null : Number(yFor(read).toFixed(2)),
+      writeY: write === null ? null : Number(yFor(write).toFixed(2)),
+    };
+  });
+  const ptsJson = JSON.stringify(pts).replace(/'/g, "&#39;");
+  const svgHtml = `<svg class="hist-svg" style="cursor:default" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"
+    onmousemove="showSplitRateTooltip(event, this)" onmouseleave="hideChartTooltip()"
+    data-pts='${ptsJson}' data-chart-h="${H}" data-read-color="${readColor}" data-write-color="${writeColor}" data-label="${escAttr(label)}">
+    <rect width="${W}" height="${H}" class="hist-bg" rx="3"/>
+    <path d="${gridPath}" stroke="var(--text)" stroke-width="1" opacity="0.07" vector-effect="non-scaling-stroke" />
+    ${readLine ? `<path d="${readLine}" fill="none" stroke="${readColor}" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>` : ''}
+    ${writeLine ? `<path d="${writeLine}" fill="none" stroke="${writeColor}" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>` : ''}
+  </svg>`;
   return `<div>${svgHtml}${axisHtml}</div>`;
 }
 
@@ -2553,11 +2679,12 @@ function buildLinux(linux){
     const ramPct = srv.ram?.percent ?? null;
     const diskIO = srv.metrics?.diskIO || null;
     const bw = srv.metrics?.bandwidth || null;
-    const diskIOTxt = diskIO ? `${fmtRate(diskIO.readBps)} / ${fmtRate(diskIO.writeBps)}` : '';
     const diskRead = hasNum(diskIO?.readBps) ? Number(diskIO.readBps) : null;
     const diskWrite = hasNum(diskIO?.writeBps) ? Number(diskIO.writeBps) : null;
     const diskIOTotalBps = diskIO && (diskRead != null || diskWrite != null) ? (diskRead || 0) + (diskWrite || 0) : null;
     const diskIOMbps = rateToMBps(diskIOTotalBps);
+    const diskIOTxt = diskIOTotalBps != null ? fmtRate(diskIOTotalBps) : '';
+    const diskIODetailTxt = diskIO ? `${fmtRate(diskIO.readBps)} / ${fmtRate(diskIO.writeBps)}` : '';
     const bwRx = hasNum(bw?.rxBps) ? Number(bw.rxBps) : null;
     const bwTx = hasNum(bw?.txBps) ? Number(bw.txBps) : null;
     const bwTotalBps = bw && (bwRx != null || bwTx != null) ? (bwRx || 0) + (bwTx || 0) : null;
@@ -2565,6 +2692,8 @@ function buildLinux(linux){
     const diskIOHistory = Array.isArray(srv.history) ? srv.history.map(h => ({
       time: h?.time,
       diskIOMbps: hasNum(h?.diskIO) ? rateToMBps(h.diskIO) : null,
+      diskReadMBps: hasNum(h?.diskReadBps) ? rateToMBps(h.diskReadBps) : null,
+      diskWriteMBps: hasNum(h?.diskWriteBps) ? rateToMBps(h.diskWriteBps) : null,
     })) : [];
     const bwHistory = Array.isArray(srv.history) ? srv.history.map(h => {
       const rx = hasNum(h?.bandwidthRxBps) ? Number(h.bandwidthRxBps) : null;
@@ -2632,8 +2761,8 @@ function buildLinux(linux){
           </div>` : '' })()}
         ${(()=>{ const lim=historyLimitFor('lx:'+lkey); return diskIOMbps!=null?`
           <div class="chart-row">
-            <div class="chart-hdr"><span class="nb-label">Disk I/O</span><span class="nb-pct" style="color:var(--cyan)">↓ ${diskRead != null ? fmtRate(diskRead) : '--'} / ↑ ${diskWrite != null ? fmtRate(diskWrite) : '--'}</span></div>
-            ${histChart(diskIOHistory,'diskIOMbps',diskIOMbps,lim,rateColor,rateSparkMax(diskIOHistory,'diskIOMbps',diskIOMbps),' MB/s','Disk I/O')}
+            <div class="chart-hdr"><span class="nb-label">Disk I/O</span><span class="nb-pct"><span style="color:#22D3EE">Read ${diskRead != null ? fmtRate(diskRead) : '--'}</span> <span style="color:var(--muted)">/</span> <span style="color:#34D399">Write ${diskWrite != null ? fmtRate(diskWrite) : '--'}</span></span></div>
+            ${splitRateChart(diskIOHistory,'diskReadMBps','diskWriteMBps',diskRead,diskWrite,lim,'Disk I/O')}
           </div>` : '' })()}
         ${(()=>{ const lim=historyLimitFor('lx:'+lkey); return srv.temp!=null?`
           <div class="chart-row">
@@ -2650,7 +2779,7 @@ function buildLinux(linux){
             ${srv.os?`<span style="font-size:12px;color:var(--muted)">OS <span style="color:var(--text);font-weight:600">${srv.os}</span></span>`:''}
             ${srv.kernel?`<span style="font-size:12px;color:var(--muted)">Kernel <span style="color:var(--text);font-weight:600">${srv.kernel}</span></span>`:''}
             ${srv.load?`<span style="font-size:12px;color:var(--muted)">Load <span style="color:var(--text);font-weight:600">${srv.load.map(x=>x==null?'?':x).join(' / ')}</span></span>`:''}
-            ${diskIOTxt?metricSpan('Disk I/O', diskIOTxt):''}
+            ${diskIODetailTxt?metricSpan('Disk I/O', diskIODetailTxt):''}
             ${hasNum(diskIO?.iops)?metricSpan('IOPS', diskIO.iops):''}
             ${hasNum(diskIO?.util)?metricSpan('Disk busy', diskIO.util+'%'):''}
             ${srv.agentVersion?`<span style="font-size:12px;color:var(--muted)">Agent <span style="color:var(--text);font-weight:600">v${srv.agentVersion}</span></span>`:''}
