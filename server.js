@@ -1585,7 +1585,7 @@ function apiRateLimitConfig(req) {
   if (!req.path.startsWith('/api/') || ['/api/healthz', '/api/readyz'].includes(req.path)) return null;
   if (req.path.startsWith('/api/agent/')) return { name: 'agent', windowMs: 60_000, max: Number(process.env.OMNISIGHT_AGENT_RATE_LIMIT || 600) };
   if (req.path === '/api/webhook/event') return { name: 'webhook', windowMs: 60_000, max: Number(process.env.OMNISIGHT_WEBHOOK_RATE_LIMIT || 120) };
-  if (['/api/login', '/api/password-reset/request', '/api/password-reset/confirm', '/api/passkeys/auth/options', '/api/passkeys/auth/verify'].includes(req.path)) {
+  if (['/api/login', '/api/register', '/api/password-reset/request', '/api/password-reset/confirm', '/api/passkeys/auth/options', '/api/passkeys/auth/verify'].includes(req.path)) {
     return { name: 'auth', windowMs: 60_000, max: Number(process.env.OMNISIGHT_AUTH_RATE_LIMIT || 60) };
   }
   if (req.path.startsWith('/api/status') || req.path.startsWith('/api/events')) {
@@ -1788,7 +1788,7 @@ function publicProfileSummary(auth) {
 }
 
 function authMiddleware(req, res, next) {
-  const authPublicPaths = ['/login', '/onboarding', '/api/login', '/api/auth-status', '/api/onboarding/status', '/api/onboarding/complete', '/api/onboarding/import', '/api/backup/import', '/api/password-reset/request', '/api/password-reset/confirm', '/api/passkeys/auth/options', '/api/passkeys/auth/verify', '/api/webhook/event'];
+  const authPublicPaths = ['/login', '/onboarding', '/api/login', '/api/register', '/api/auth-status', '/api/onboarding/status', '/api/onboarding/complete', '/api/onboarding/import', '/api/backup/import', '/api/password-reset/request', '/api/password-reset/confirm', '/api/passkeys/auth/options', '/api/passkeys/auth/verify', '/api/webhook/event'];
   if (req.path === '/sw.js' || req.path === '/manifest.webmanifest') return next();
   if (req.path.startsWith('/assets/')) return next();
   if (req.path === '/i18n.js') return next();
@@ -1909,7 +1909,7 @@ function ownAccountMutation(path) {
 
 function rbacMiddleware(req, res, next) {
   if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return next();
-  if (['/api/login', '/api/onboarding/complete', '/api/password-reset/request', '/api/password-reset/confirm', '/api/passkeys/auth/options', '/api/passkeys/auth/verify', '/api/webhook/event'].includes(req.path)) return next();
+  if (['/api/login', '/api/register', '/api/onboarding/complete', '/api/password-reset/request', '/api/password-reset/confirm', '/api/passkeys/auth/options', '/api/passkeys/auth/verify', '/api/webhook/event'].includes(req.path)) return next();
   if (!authConfigured() && req.path === '/api/onboarding/import') return next();
   if (!authConfigured() && req.path === '/api/backup/import') return next();
   if (!authConfigured() && req.path === '/api/set-password') return next();
@@ -2765,6 +2765,10 @@ function checksConfig() {
 
 function passwordResetEnabled() {
   return config.security?.passwordResetEnabled !== false;
+}
+
+function selfRegistrationEnabled() {
+  return config.security?.selfRegistrationEnabled !== false;
 }
 
 function assignStatic(base) {
@@ -4914,6 +4918,7 @@ app.get('/api/auth-status', (req, res) => {
     twoFactorEnabled: totpEnabled(auth),
     mustChangePassword: userMustChangePassword(auth),
     passwordResetEnabled: passwordResetEnabled(),
+    selfRegistrationEnabled: required && selfRegistrationEnabled(),
     version: appVersion(),
   });
 });
@@ -5163,6 +5168,30 @@ app.post('/api/password-reset/confirm', (req, res) => {
   console.log(`[auth] password reset success: email="${maskEmail(email)}"`);
   auditEvent('auth.password_reset.success', { email: maskEmail(email), actor: maskEmail(email) });
   res.json({ ok: true });
+});
+
+app.post('/api/register', (req, res) => {
+  try {
+    if (!authConfigured()) return res.status(409).json({ error: 'Initial setup is required first' });
+    if (!selfRegistrationEnabled()) return res.status(404).json({ error: 'Registration is disabled' });
+    const username = String(req.body?.username || '').trim();
+    const password = String(req.body?.password || '');
+    if (!username || !password) return res.status(400).json({ error: 'Username and password are required' });
+    if (findAuthUser(username)) return res.status(400).json({ error: 'Username already exists' });
+    const pErr = validatePassword(password);
+    if (pErr) return res.status(400).json({ error: pErr });
+    const doc = ensureUsersDoc();
+    if (doc.users.some(u => String(u.username).toLowerCase() === username.toLowerCase())) {
+      return res.status(400).json({ error: 'Username already exists' });
+    }
+    const user = createUserRecord(username, password, 'read-only');
+    doc.users.push(user);
+    saveUsersDoc(doc);
+    auditEvent('user.self_register', { username, role: 'read-only' }, req);
+    res.json({ ok: true, user: publicUser(user) });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 app.post('/api/set-password', (req, res) => {

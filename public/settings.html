@@ -110,7 +110,7 @@ html.embed .settings-nav{top:20px;height:calc(100vh - 40px);max-height:calc(100v
 }
 .host-clock{min-height:16px;font-size:12px;color:var(--muted);text-align:right;margin:-2px 0 8px}
 .host-clock-spacer{visibility:hidden}
-.inline-toggle{min-height:37px;background:var(--row);border:1px solid var(--border);border-radius:6px;padding:7px 10px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.inline-toggle{min-height:42px;background:var(--row);border:1px solid var(--border);border-radius:8px;padding:7px 10px;display:flex;align-items:center;justify-content:space-between;gap:12px}
 .inline-toggle span{font-size:13px;color:var(--text);line-height:1.25}
 .inline-toggle .toggle-label{display:flex;align-items:center;gap:7px;min-width:0}
 .info-btn{width:20px;height:20px;border-radius:999px;border:1px solid var(--border);background:rgba(125,138,163,.10);color:var(--muted);display:inline-grid;place-items:center;cursor:pointer;font-size:12px;font-weight:800;line-height:1;padding:0;flex-shrink:0}
@@ -160,12 +160,12 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 .btn-rm{background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:2px 6px;border-radius:4px;line-height:1}
 .btn-rm:hover{color:var(--red);background:rgba(231,76,60,.1)}
 
-.toggle{position:relative;display:inline-block;width:44px;height:24px;flex-shrink:0}
+.toggle{position:relative;display:inline-block;width:50px;height:28px;flex-shrink:0}
 .toggle input{display:none}
-.toggle-t{position:absolute;top:0;left:0;right:0;bottom:0;background:var(--border);border-radius:12px;cursor:pointer;transition:.2s}
-.toggle input:checked+.toggle-t{background:var(--green)}
-.toggle-t::after{content:'';position:absolute;width:20px;height:20px;background:#fff;border-radius:50%;top:2px;left:2px;transition:.2s}
-.toggle input:checked+.toggle-t::after{transform:translateX(20px)}
+.toggle-t{position:absolute;inset:0;background:rgba(125,138,163,.18);border:1px solid rgba(125,138,163,.28);border-radius:999px;cursor:pointer;transition:background .18s,border-color .18s,box-shadow .18s}
+.toggle-t::after{content:'';position:absolute;width:22px;height:22px;background:#fff;border-radius:50%;top:2px;left:2px;box-shadow:0 2px 8px rgba(0,0,0,.28);transition:transform .18s cubic-bezier(.2,.8,.2,1)}
+.toggle input:checked+.toggle-t{background:linear-gradient(135deg,var(--blue),var(--green));border-color:rgba(96,165,250,.48);box-shadow:0 0 0 3px rgba(96,165,250,.08)}
+.toggle input:checked+.toggle-t::after{transform:translateX(22px)}
 
 #toast{position:fixed;bottom:24px;right:24px;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:12px 18px;font-size:13px;transform:translateY(80px);opacity:0;transition:all .3s;z-index:999}
 #toast.show{transform:translateY(0);opacity:1}
@@ -180,7 +180,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 .agent-row:last-child{margin-bottom:0}
 .user-row{position:relative;align-items:flex-start!important;padding-right:48px}
 .user-status-actions{display:flex;align-items:flex-end;justify-content:flex-start;gap:10px;margin-left:0;align-self:flex-start;flex:0 0 100%;min-height:38px}
-.user-status-actions .inline-toggle{height:38px;margin:0!important}
+.user-status-actions .inline-toggle{height:auto;min-height:42px;margin:0!important}
 .user-status-actions .user-disabled{min-width:128px}
 .user-status-actions .user-force-change{min-width:210px}
 .user-actions{position:absolute;right:12px;top:10px;display:flex;align-items:center;gap:6px;z-index:2}
@@ -188,6 +188,14 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 .usr-2fa{align-self:flex-end;height:38px;margin:0;min-width:86px;font-size:12px;font-weight:700;border:1px solid var(--border);border-radius:999px;padding:4px 9px;text-align:center;color:var(--muted);background:rgba(125,138,163,.1);white-space:nowrap;display:inline-flex;align-items:center;justify-content:center}
 .usr-2fa.on{color:var(--green);border-color:rgba(52,211,153,.32);background:rgba(52,211,153,.11)}
 .usr-2fa.off{color:var(--muted)}
+.user-create-panel,.user-access-panel,.users-list-panel{border:1px solid var(--border);background:var(--row);border-radius:12px;padding:14px}
+.user-create-panel{background:linear-gradient(180deg,rgba(96,165,250,.055),rgba(0,0,0,.04))}
+.user-access-panel,.users-list-panel{margin-top:14px}
+.user-access-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px}
+.form-group.required-missing label{color:var(--red)}
+.form-group.required-missing input{border-color:rgba(248,113,113,.78)!important;box-shadow:0 0 0 1px rgba(248,113,113,.18)}
+.field-error{display:none;font-size:11px;color:var(--red);line-height:1.25}
+.form-group.required-missing .field-error{display:block}
 .session-row{align-items:flex-start;justify-content:space-between;gap:12px}
 .session-main{min-width:0;flex:1}
 .session-title{font-weight:750;color:var(--text);line-height:1.25}
@@ -390,18 +398,33 @@ html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#dd
     </div>
   </div>
   <div class="card-body" style="display:flex !important;flex-direction:column">
-    <div class="form-grid g4">
-      <div class="form-group"><label>Username</label><input type="text" id="usr-new-name" placeholder="operator01"></div>
-      <div class="form-group"><label>E-mail</label><input type="email" id="usr-new-email" placeholder="optional"></div>
-      <div class="form-group"><label>Password</label><input type="password" id="usr-new-password" placeholder="temporary password"></div>
-      <div class="form-group"><label>Role</label><select id="usr-new-role"><option value="operator">operator</option><option value="read-only">read-only</option><option value="admin">admin</option></select></div>
+    <div class="user-create-panel">
+      <div class="settings-section-label" style="margin-top:0">Create user</div>
+      <div class="form-grid g4">
+        <div class="form-group" data-new-user-field="username"><label>Username</label><input type="text" id="usr-new-name" placeholder="operator01"><div class="field-error">Username is required</div></div>
+        <div class="form-group" data-new-user-field="email"><label>E-mail</label><input type="email" id="usr-new-email" placeholder="user@example.com"><div class="field-error">E-mail is required</div></div>
+        <div class="form-group" data-new-user-field="password"><label>Password</label><input type="password" id="usr-new-password" placeholder="temporary password"><div class="field-error">Password is required</div></div>
+        <div class="form-group"><label>Role</label><select id="usr-new-role"><option value="operator">operator</option><option value="read-only">read-only</option><option value="admin">admin</option></select></div>
+      </div>
+      <button type="button" class="btn-sm" style="align-self:flex-start;margin-top:10px" onclick="addUser()">+ Add user</button>
     </div>
-    <div class="inline-toggle" style="margin-top:10px;max-width:360px">
-      <span>Password reset via e-mail</span>
-      <label class="toggle"><input type="checkbox" id="security-password-reset" checked><span class="toggle-t"></span></label>
+    <div class="user-access-panel">
+      <div class="settings-section-label" style="margin-top:0">Access options</div>
+      <div class="user-access-grid">
+        <div class="inline-toggle">
+          <span>Password reset via e-mail</span>
+          <label class="toggle"><input type="checkbox" id="security-password-reset" checked><span class="toggle-t"></span></label>
+        </div>
+        <div class="inline-toggle">
+          <span>Allow read-only sign-up</span>
+          <label class="toggle"><input type="checkbox" id="security-self-registration" checked><span class="toggle-t"></span></label>
+        </div>
+      </div>
     </div>
-    <button type="button" class="btn-sm" style="align-self:flex-start;margin-top:10px" onclick="addUser()">+ Add user</button>
-    <div id="users-list" class="sys-list" style="margin-top:14px"><div class="sys-empty">Loading users...</div></div>
+    <div class="users-list-panel">
+      <div class="settings-section-label" style="margin-top:0">Existing users</div>
+      <div id="users-list" class="sys-list"><div class="sys-empty">Loading users...</div></div>
+    </div>
   </div>
 </div>
 
@@ -2777,6 +2800,9 @@ function populate(cfg) {
   if (document.getElementById('security-password-reset')) {
     document.getElementById('security-password-reset').checked = cfg.security?.passwordResetEnabled !== false;
   }
+  if (document.getElementById('security-self-registration')) {
+    document.getElementById('security-self-registration').checked = cfg.security?.selfRegistrationEnabled !== false;
+  }
   if (document.getElementById('security-redact-ips')) {
     document.getElementById('security-redact-ips').checked = cfg.security?.redactIpAddresses === true;
   }
@@ -2983,6 +3009,7 @@ function collect() {
   };
   cfg.security = {
     passwordResetEnabled: document.getElementById('security-password-reset')?.checked !== false,
+    selfRegistrationEnabled: document.getElementById('security-self-registration')?.checked !== false,
     allowedPublicIps: getTagValsWithPending('sec-allowed-ips', 'sec-ip-input'),
     redactIpAddresses: document.getElementById('security-redact-ips')?.checked === true,
   };
@@ -3513,6 +3540,40 @@ function pendingNewUserPayload() {
   return { username, email, password, role };
 }
 
+const NEW_USER_REQUIRED_FIELDS = [
+  ['username', 'usr-new-name'],
+  ['email', 'usr-new-email'],
+  ['password', 'usr-new-password'],
+];
+
+function setNewUserFieldMissing(field, missing) {
+  const group = document.querySelector(`[data-new-user-field="${field}"]`);
+  if (group) group.classList.toggle('required-missing', missing);
+}
+
+function clearNewUserValidation(field = '') {
+  if (field) return setNewUserFieldMissing(field, false);
+  NEW_USER_REQUIRED_FIELDS.forEach(([name]) => setNewUserFieldMissing(name, false));
+}
+
+function validateNewUserRequired({ focus = true } = {}) {
+  const missing = [];
+  NEW_USER_REQUIRED_FIELDS.forEach(([name, id]) => {
+    const el = document.getElementById(id);
+    const isMissing = !String(el?.value || '').trim();
+    setNewUserFieldMissing(name, isMissing);
+    if (isMissing) missing.push(el);
+  });
+  if (focus && missing[0]) missing[0].focus();
+  return missing.length === 0;
+}
+
+function initNewUserValidation() {
+  NEW_USER_REQUIRED_FIELDS.forEach(([name, id]) => {
+    document.getElementById(id)?.addEventListener('input', () => clearNewUserValidation(name));
+  });
+}
+
 async function loadUsers() {
   const card = document.getElementById('card-users');
   const list = document.getElementById('users-list');
@@ -3571,6 +3632,10 @@ function renderUsers(users) {
 }
 
 async function addUser(opts = {}) {
+  if (!validateNewUserRequired()) {
+    if (!opts.silent) toast('Username, e-mail and password are required', 'err');
+    return null;
+  }
   const payload = pendingNewUserPayload();
   if (!payload) {
     if (!opts.silent) toast('Fill the new user fields first', 'err');
@@ -3586,6 +3651,7 @@ async function addUser(opts = {}) {
     const b = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(b.error || r.statusText);
     ['usr-new-name', 'usr-new-email', 'usr-new-password'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    clearNewUserValidation();
     if (!opts.silent) toast('User created', 'ok');
     if (opts.reload !== false) await loadUsers();
     return b.user || b;
@@ -3628,6 +3694,10 @@ async function saveUserRows(opts = {}) {
   const rows = [...document.querySelectorAll('#users-list .user-row')].filter(userRowDirty);
   const updates = rows.map(row => ({ id: row.dataset.userId, ...collectUserPayload(row) }));
   const create = pendingNewUserPayload();
+  if (create && !validateNewUserRequired({ focus: !opts.silent })) {
+    if (!opts.silent) toast('Username, e-mail and password are required', 'err');
+    return null;
+  }
   if (!updates.length && !create) return null;
   try {
     const r = await fetch('/api/users/batch', {
@@ -3639,6 +3709,7 @@ async function saveUserRows(opts = {}) {
     const b = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(b.error || r.statusText);
     ['usr-new-name', 'usr-new-email', 'usr-new-password'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    clearNewUserValidation();
     rows.forEach(row => {
       const passwordInput = row.querySelector('.usr-password');
       if (passwordInput) passwordInput.value = '';
@@ -4129,6 +4200,7 @@ refreshSettingsSectionVisibility();
 (async () => {
   try {
     initTimezoneSelect();
+    initNewUserValidation();
     const rolePromise = loadCurrentRole();
     const cachedCfg = readSessionCache(SETTINGS_CONFIG_CACHE_KEY, 10 * 60 * 1000);
     const cachedStatus = readSessionCache(SETTINGS_STATUS_CACHE_KEY, 5 * 60 * 1000);
@@ -4164,6 +4236,7 @@ refreshSettingsSectionVisibility();
       scheduleSettingsAgentsPoll(10000);
     });
     document.getElementById('security-password-reset')?.addEventListener('change', () => saveConfig({ silent: true, skipUsers: true, reason: 'password-reset-toggle' }));
+    document.getElementById('security-self-registration')?.addEventListener('change', () => saveConfig({ silent: true, skipUsers: true, reason: 'self-registration-toggle' }));
     document.getElementById('security-redact-ips')?.addEventListener('change', () => saveConfig({ silent: true, skipUsers: true, reason: 'redact-ip-toggle' }));
   } catch (e) {
     toast('Could not load config: ' + e.message, 'err');

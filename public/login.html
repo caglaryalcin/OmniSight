@@ -9,7 +9,7 @@
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
   --bg:#141617;--panel:#181A1B;--border:#242C3B;
-  --text:#E2E8F2;--muted:#7D8AA3;--green:#34D399;--red:#F87171;
+  --text:#E2E8F2;--muted:#7D8AA3;--green:#34D399;--blue:#60A5FA;--red:#F87171;
 }
 body{background:var(--bg);color:var(--text);font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;min-height:100vh;padding:20px;-webkit-user-select:none;user-select:none}
@@ -31,14 +31,21 @@ input{
 }
 input:focus{border-color:#4a5568}
 .btn{
-  width:100%;background:var(--green);border:none;border-radius:7px;
-  color:#fff;font-size:14px;font-weight:600;padding:11px;cursor:pointer;
-  transition:opacity .15s;
+  width:100%;min-height:43px;background:linear-gradient(135deg,#34D399,#22C55E);
+  border:1px solid rgba(255,255,255,.08);border-radius:10px;color:#06140F;
+  font-size:14px;font-weight:800;padding:11px 14px;cursor:pointer;
+  box-shadow:0 12px 30px rgba(52,211,153,.22), inset 0 1px 0 rgba(255,255,255,.28);
+  transition:transform .16s ease,box-shadow .16s ease,filter .16s ease,opacity .15s;
 }
-.btn:hover{opacity:.88}
-.btn:disabled{opacity:.5;cursor:default}
-.passkey-btn{width:100%;background:transparent;border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:13px;font-weight:650;padding:10px;cursor:pointer;margin-top:10px}
-.passkey-btn:hover{border-color:#4a5568}
+.btn:hover{transform:translateY(-1px);filter:brightness(1.03);box-shadow:0 16px 36px rgba(52,211,153,.28), inset 0 1px 0 rgba(255,255,255,.32)}
+.btn:active{transform:translateY(0);box-shadow:0 8px 22px rgba(52,211,153,.2), inset 0 1px 0 rgba(255,255,255,.22)}
+.btn:focus-visible,.signup-btn:focus-visible,.passkey-btn:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(96,165,250,.24),0 0 0 1px rgba(96,165,250,.48)}
+.btn:disabled{opacity:.55;cursor:default;transform:none;filter:none}
+.passkey-btn{width:100%;background:rgba(125,138,163,.08);border:1px solid rgba(125,138,163,.24);border-radius:10px;color:var(--text);font-size:13px;font-weight:750;padding:10px 14px;cursor:pointer;margin-top:10px;transition:border-color .16s ease,background .16s ease,transform .16s ease}
+.passkey-btn:hover{border-color:rgba(96,165,250,.48);background:rgba(96,165,250,.10);transform:translateY(-1px)}
+.signup-btn{width:100%;min-height:43px;background:linear-gradient(135deg,rgba(96,165,250,.18),rgba(99,102,241,.18));border:1px solid rgba(96,165,250,.46);border-radius:10px;color:#DCEBFF;font-size:14px;font-weight:800;padding:11px 14px;cursor:pointer;margin-top:10px;box-shadow:inset 0 1px 0 rgba(255,255,255,.08);transition:transform .16s ease,border-color .16s ease,background .16s ease,box-shadow .16s ease}
+.signup-btn:hover{transform:translateY(-1px);border-color:rgba(96,165,250,.78);background:linear-gradient(135deg,rgba(96,165,250,.26),rgba(99,102,241,.24));box-shadow:0 12px 26px rgba(96,165,250,.12),inset 0 1px 0 rgba(255,255,255,.12)}
+.signup-btn:active,.passkey-btn:active{transform:translateY(0)}
 .err{color:var(--red);font-size:13px;text-align:center;margin-top:12px;min-height:18px}
 .remember{display:flex;align-items:center;gap:8px;margin-bottom:16px;cursor:pointer;user-select:none}
 .remember input{width:auto;margin:0;cursor:pointer}
@@ -87,6 +94,7 @@ input:focus{border-color:#4a5568}
   <div id="confirm-wrap" style="display:none">
     <label for="p2">Confirm password</label>
     <input id="p2" type="password" autocomplete="new-password">
+    <div class="hint" id="register-hint" style="display:none">New accounts are read-only until an admin changes their role.</div>
   </div>
   <div id="reset-request-step" style="display:none">
     <label for="reset-email">Recovery e-mail</label>
@@ -107,6 +115,7 @@ input:focus{border-color:#4a5568}
   </div>
   <label class="remember" id="rem-wrap"><input type="checkbox" id="rem"><span>Remember me for 30 days</span></label>
   <button class="btn" id="btn" type="submit">Sign in</button>
+  <div id="register-row" style="display:none"><button class="signup-btn" id="register-link" type="button" onclick="toggleRegisterMode()">Sign Up</button></div>
   <button class="passkey-btn" id="passkey-btn" type="button" onclick="loginPasskey()">Sign in with passkey</button>
   <div class="link-row forgot-row" id="forgot-row"><button class="text-link forgot-link" type="button" onclick="showForgotPassword()">Forgot password?</button></div>
   <div class="err" id="err"></div>
@@ -130,6 +139,8 @@ let pendingLogin = null;
 let loginSubmitting = false;
 let resetEmail = '';
 let passwordResetEnabled = true;
+let selfRegistrationEnabled = false;
+let registrationEndpoint = '/api/set-password';
 function $(id){ return document.getElementById(id); }
 function b64urlToBuffer(s){
   const str = String(s || '');
@@ -163,6 +174,8 @@ function showSignIn(){
   $('login-step').style.display = '';
   $('rem-wrap').style.display = 'flex';
   $('forgot-row').style.display = passwordResetEnabled ? '' : 'none';
+  $('register-row').style.display = selfRegistrationEnabled ? '' : 'none';
+  $('register-link').textContent = 'Sign Up';
   $('btn').style.display = '';
   $('passkey-btn').style.display = '';
   $('title').textContent = 'OmniSight';
@@ -176,6 +189,7 @@ function showTwoFactorStep(creds){
   $('totp-wrap').style.display = '';
   $('rem-wrap').style.display = 'none';
   $('forgot-row').style.display = 'none';
+  $('register-row').style.display = 'none';
   $('btn').style.display = 'none';
   $('passkey-btn').style.display = 'none';
   $('title').textContent = 'Two-factor authentication';
@@ -190,13 +204,20 @@ function setMode(m){
   const reg = m === 'register';
   $('login-step').style.display = '';
   $('confirm-wrap').style.display = reg ? '' : 'none';
+  $('register-hint').style.display = reg && registrationEndpoint === '/api/register' ? '' : 'none';
   $('rem-wrap').style.display = reg ? 'none' : 'flex';
   $('forgot-row').style.display = reg || !passwordResetEnabled ? 'none' : '';
+  $('register-row').style.display = (reg || selfRegistrationEnabled) ? '' : 'none';
+  $('register-link').textContent = reg ? 'Back to sign in' : 'Sign Up';
   $('btn').style.display = '';
   $('passkey-btn').style.display = reg ? 'none' : '';
   $('btn').textContent = reg ? 'Register' : 'Sign in';
-  $('title').textContent = reg ? 'Create account' : 'OmniSight';
+  $('title').textContent = reg && registrationEndpoint === '/api/register' ? 'Sign Up' : reg ? 'Create account' : 'OmniSight';
   setMsg('');
+}
+function toggleRegisterMode(){
+  if(mode === 'register') showSignIn();
+  else setMode('register');
 }
 function showForgotPassword(){
   if(!passwordResetEnabled) return;
@@ -205,6 +226,7 @@ function showForgotPassword(){
   $('reset-request-step').style.display = '';
   $('rem-wrap').style.display = 'none';
   $('forgot-row').style.display = 'none';
+  $('register-row').style.display = 'none';
   $('btn').style.display = 'none';
   $('passkey-btn').style.display = 'none';
   $('title').textContent = 'Reset password';
@@ -218,6 +240,7 @@ function showResetConfirm(email){
   $('reset-confirm-step').style.display = '';
   $('rem-wrap').style.display = 'none';
   $('forgot-row').style.display = 'none';
+  $('register-row').style.display = 'none';
   $('btn').style.display = '';
   $('passkey-btn').style.display = 'none';
   $('title').textContent = 'Reset password';
@@ -337,7 +360,7 @@ async function submitForm(){
   try {
     if(mode === 'register'){
       if(password !== $('p2').value){ setMsg('Passwords do not match'); btn.disabled = false; return; }
-      const rr = await fetch('/api/set-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,password})});
+      const rr = await fetch(registrationEndpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,password})});
       const dd = await rr.json();
       if(!rr.ok || !dd.ok){ setMsg(dd.error || 'Registration failed'); btn.disabled = false; return; }
     }
@@ -385,12 +408,19 @@ document.addEventListener('keydown', e => { if(e.key === 'Escape') closeInstruct
     const versionFoot = $('version-foot');
     if(versionFoot) versionFoot.textContent = d.version ? `OmniSight v${d.version}` : '';
     passwordResetEnabled = d.passwordResetEnabled !== false;
+    selfRegistrationEnabled = d.selfRegistrationEnabled === true;
+    registrationEndpoint = selfRegistrationEnabled ? '/api/register' : '/api/set-password';
     $('forgot-row').style.display = passwordResetEnabled && mode === 'login' ? '' : 'none';
+    $('register-row').style.display = selfRegistrationEnabled && mode === 'login' ? '' : 'none';
     if(d.demo && d.demoDefaultCredentials && mode === 'login'){
       $('u').placeholder = 'demo';
       $('p').placeholder = 'demo';
     }
-    if(r.ok && !d.required) setMode('register');
+    if(r.ok && !d.required){
+      registrationEndpoint = '/api/set-password';
+      selfRegistrationEnabled = false;
+      setMode('register');
+    }
   } catch {}
 })();
 </script>

@@ -468,7 +468,7 @@ The sidebar footer also links to GitHub and opens a new issue form for help/bug 
 - The `data/` folder and `.env` are git-ignored.
 - All state lives in `./data/` (`config.yaml`, `secret.key`, `kube.bin`, `auth.yaml`, `sessions.yaml`, SSH keys) — it never leaves your machine.
 - Login password is set on first run through the onboarding wizard. Passwords must be at least 8 characters and contain both an uppercase and a lowercase letter.
-- Multi-user access is stored in `data/users.yaml` with `admin`, `operator` and `read-only` roles. Existing single-user `auth.yaml` installs are migrated automatically. New users created with a temporary password are forced to change it before accessing the dashboard.
+- Multi-user access is stored in `data/users.yaml` with `admin`, `operator` and `read-only` roles. Existing single-user `auth.yaml` installs are migrated automatically. New users created by admins with a temporary password are forced to change it before accessing the dashboard. Login-page self-registration creates `read-only` users only and can be disabled with `security.selfRegistrationEnabled: false`.
 - Passkeys and optional TOTP two-factor authentication can be enabled from the Profile page.
 - Password reset by e-mail can be enabled or disabled by admins.
 - Sessions use `HttpOnly`, `SameSite=Strict` cookies; login attempts are rate-limited.

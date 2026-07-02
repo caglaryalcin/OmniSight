@@ -476,6 +476,7 @@ If `data/secret.key` is lost, previously encrypted secrets cannot be decrypted.
 ### Authentication
 
 - On first run, onboarding creates the initial admin user.
+- Login-page self-registration creates read-only users only and can be disabled by admins.
 - Passwords are stored as salted hashes.
 - Login attempts are rate-limited.
 - Cookies are `HttpOnly` and `SameSite=Strict`.

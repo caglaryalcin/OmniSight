@@ -21,6 +21,7 @@ performance:
   #   snmp: 30
   #   docker: 15
 security:
+  selfRegistrationEnabled: true
   redactIpAddresses: false
   allowedPublicIps: []
 
