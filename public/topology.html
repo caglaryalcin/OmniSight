@@ -31,15 +31,23 @@ header{height:64px;display:flex;align-items:center;justify-content:space-between
 .map{position:relative;width:100%;height:100%;isolation:isolate}
 .map-inner{position:absolute;left:0;top:0;transform-origin:top left}
 .edge-layer{position:absolute;inset:0;z-index:0;pointer-events:none;overflow:visible}
-.edge{fill:none;stroke:rgba(96,165,250,.38);stroke-width:1.7;stroke-linecap:round}
+.edge{fill:none;stroke:rgba(96,165,250,.38);stroke-width:1.7;stroke-linecap:round;vector-effect:non-scaling-stroke}
 .edge.good{stroke:rgba(52,211,153,.46)}.edge.warn{stroke:rgba(251,191,36,.48)}.edge.bad{stroke:rgba(248,113,113,.50)}.edge.idle{stroke:rgba(140,160,190,.34)}.edge.manual{stroke:rgba(167,139,250,.62);stroke-width:2.1}
 .edge.layer-switch{stroke:rgba(34,211,238,.58);stroke-width:2.05}
 .edge.layer-nas{stroke:rgba(251,191,36,.64);stroke-width:2.05}
 .edge.layer-platform{stroke:rgba(167,139,250,.66);stroke-width:2.1}
 .edge.layer-proxmox{stroke:rgba(249,115,22,.66);stroke-width:2.1}
 .edge.layer-vm{stroke:rgba(52,211,153,.58);stroke-width:2.05}
-.flow-dots{pointer-events:none}
-.flow-dot{opacity:.88}
+.flow-trace{fill:none;stroke:currentColor;stroke-width:4.2;stroke-linecap:round;stroke-dasharray:12 180;stroke-dashoffset:0;opacity:.68;vector-effect:non-scaling-stroke;pointer-events:none;animation:topoFlow var(--flow-speed,1.9s) linear infinite;filter:drop-shadow(0 0 5px currentColor)}
+.flow-trace-glow{stroke-width:11;opacity:.13;filter:drop-shadow(0 0 9px currentColor)}
+.flow-trace-alt{animation-delay:calc(var(--flow-speed,1.9s) * -.5);opacity:.34}
+.flow-dots{pointer-events:none;mix-blend-mode:screen}
+.flow-particle{opacity:.92}
+.flow-packet{fill:currentColor}
+.flow-packet-glow{opacity:.18;filter:drop-shadow(0 0 10px currentColor)}
+.flow-packet-core{opacity:.98}
+@keyframes topoFlow{to{stroke-dashoffset:-192}}
+@media (prefers-reduced-motion: reduce){.flow-dots,.flow-trace{display:none}}
 .topo-node{position:absolute;z-index:2;width:148px;min-height:62px;transform:translate(-50%,-50%);display:flex;align-items:center;gap:9px;padding:9px 10px;border:1px solid var(--border);border-radius:12px;background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.008)),var(--row);box-shadow:0 12px 28px rgba(0,0,0,.18)}
 .topo-node{cursor:grab;touch-action:none}
 .topo-node.node-dragging{cursor:grabbing;z-index:7}
@@ -649,7 +657,7 @@ function edgeLayerClass(a,b, manual = false){
   return manual ? 'manual' : edgeClass(b || a);
 }
 function edgeSvg(id, path, cls, animate = true, attrs = ''){
-  return `<path id="${id}" class="edge ${cls}" d="${path}" ${attrs}></path>${flowDotsSvg(id, path, cls, animate)}`;
+  return `<path id="${id}" class="edge ${cls}" d="${path}" ${attrs}></path>${flowTraceSvg(id, path, cls, animate)}${flowDotsSvg(id, path, cls, animate)}`;
 }
 function edgeShouldAnimate(...nodes){
   return nodes.every(n => n && n.status !== 'bad' && n.status !== 'idle');
@@ -666,15 +674,26 @@ function edgeFlowColor(cls){
   if(/\bmanual\b/.test(cls)) return '#A78BFA';
   return '#8CA0BE';
 }
+function flowTraceSvg(id, path, cls, animate = true){
+  if(!animate || !trafficEnabled) return '';
+  const color = edgeFlowColor(cls);
+  const speed = /\blayer-vm\b/.test(cls) ? 1.55 : 1.95;
+  const style = `color:${color};--flow-speed:${speed}s`;
+  return `<path class="flow-trace flow-trace-glow" data-edge-id="${esc(id)}" d="${path}" style="${style}"></path><path class="flow-trace" data-edge-id="${esc(id)}" d="${path}" style="${style}"></path><path class="flow-trace flow-trace-alt" data-edge-id="${esc(id)}" d="${path}" style="${style}"></path>`;
+}
 function flowDotsSvg(id, path, cls, animate = true){
   if(!animate || !trafficEnabled) return '';
   const color = edgeFlowColor(cls);
-  const dur = /\blayer-vm\b/.test(cls) ? 3.8 : 4.8;
+  const dur = /\blayer-vm\b/.test(cls) ? 2.6 : 3.2;
   const count = /\blayer-vm\b/.test(cls) ? 2 : 1;
   let dots = '';
   for(let i = 0; i < count; i++){
     const begin = -((dur / count) * i).toFixed(2);
-    dots += `<circle class="flow-dot" r="2.25" fill="${color}" style="color:${color}"><animateMotion class="flow-motion" dur="${dur}s" begin="${begin}s" repeatCount="indefinite" path="${esc(path)}"/></circle>`;
+    dots += `<g class="flow-particle" style="color:${color}">
+      <rect class="flow-packet flow-packet-glow" x="-7" y="-4" width="14" height="8" rx="4" fill="${color}"></rect>
+      <rect class="flow-packet flow-packet-core" x="-4" y="-2" width="8" height="4" rx="2" fill="${color}"></rect>
+      <animateMotion class="flow-motion" dur="${dur}s" begin="${begin}s" repeatCount="indefinite" rotate="auto" calcMode="spline" keyTimes="0;1" keySplines=".42 0 .58 1" path="${esc(path)}"/>
+    </g>`;
   }
   return `<g class="flow-dots" data-edge-id="${esc(id)}" style="color:${color}">${dots}</g>`;
 }
@@ -903,13 +922,19 @@ function setEdgePathD(id, path, cls){
   if(!el) return;
   el.setAttribute('d', path);
   if(cls) el.setAttribute('class', `edge ${cls}`);
+  const color = edgeFlowColor(cls || '');
+  const speed = /\blayer-vm\b/.test(cls || '') ? 1.55 : 1.95;
+  document.querySelectorAll(`.flow-trace[data-edge-id="${cssEscapeValue(id)}"]`).forEach(trace => {
+    trace.setAttribute('d', path);
+    trace.style.color = color;
+    trace.style.setProperty('--flow-speed', `${speed}s`);
+  });
   const group = document.querySelector(`.flow-dots[data-edge-id="${cssEscapeValue(id)}"]`);
   if(group) {
-    const color = edgeFlowColor(cls || '');
     group.style.color = color;
-    group.querySelectorAll('.flow-dot').forEach(dot => {
-      dot.setAttribute('fill', color);
-      dot.style.color = color;
+    group.querySelectorAll('.flow-packet').forEach(packet => {
+      packet.setAttribute('fill', color);
+      packet.style.color = color;
     });
     group.querySelectorAll('.flow-motion').forEach(motion => motion.setAttribute('path', path));
   }

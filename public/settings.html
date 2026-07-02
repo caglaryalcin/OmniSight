@@ -1521,6 +1521,44 @@ function changeLanguageNow(lang) {
   } catch {}
   persistPreferencePatch({ preferredLanguage: lang || 'en' });
 }
+function previewConfiguredIds(cfg = {}) {
+  const en = c => !!(c && c.enabled !== false);
+  const hasInstances = c => !!(c && (c.url || (Array.isArray(c.instances) && c.instances.length)));
+  const ids = [];
+  if (en(cfg.proxmox) && (cfg.proxmox?.url || cfg.proxmox?.tokenId || cfg.proxmox?.tokenSecret || (cfg.proxmox?.nodes || []).length)) ids.push('proxmox');
+  if (en(cfg.kubernetes) && cfg.kubernetes?.kubeconfig) ids.push('kubernetes');
+  if (en(cfg.linux) && cfg.linux?.agentToken) ids.push('linux');
+  if (en(cfg.snmp) && (cfg.snmp?.devices || []).length) ids.push('snmp');
+  if (en(cfg.healthchecks) && cfg.healthchecks?.url) ids.push('healthchecks');
+  if (en(cfg.uptimekuma) && cfg.uptimekuma?.url) ids.push('uptimekuma');
+  if (en(cfg.checks) && ((cfg.checks?.services || cfg.checks?.checks || []).length)) ids.push('checks');
+  if (en(cfg.prometheus) && hasInstances(cfg.prometheus)) ids.push('prometheus');
+  if (en(cfg.docker) && (cfg.docker?.hosts || []).length) ids.push('docker');
+  if (en(cfg.dockhand) && hasInstances(cfg.dockhand)) ids.push('dockhand');
+  if (en(cfg.database) && (cfg.database?.instances || []).length) ids.push('database');
+  return ids;
+}
+function settingsSectionChanged(prev = {}, next = {}, key) {
+  try { return JSON.stringify(prev?.[key] || null) !== JSON.stringify(next?.[key] || null); }
+  catch { return true; }
+}
+function previewConnectingPlatform(data, id, cfg = {}) {
+  if (id === 'kubernetes') {
+    data.kubernetes = { _connecting: true, online: false, summary: { total: 0, running: 0, failed: 0, pending: 0 }, pods: [], services: [], deployments: [] };
+  } else if (id === 'healthchecks') {
+    data.healthchecks = { _connecting: true, online: false, summary: { total: 0, up: 0, down: 0, grace: 0, paused: 0 }, checks: [] };
+  } else if (id === 'uptimekuma') {
+    data.uptimekuma = { _connecting: true, online: false, summary: { total: 0, up: 0, down: 0, pending: 0, maintenance: 0, unknown: 0 }, monitors: [] };
+  } else if (id === 'checks') {
+    const services = cfg.checks?.services || cfg.checks?.checks || [];
+    data.checks = { _connecting: true, online: true, summary: { total: services.length, up: 0, down: 0 }, checks: services.map(s => ({ name: s.name || s.target || s.host || 'check', type: s.type || 'http', target: s.target || s.url || s.host || '', status: 'connecting', _connecting: true })) };
+  } else if (id === 'prometheus') {
+    data.prometheus = { _connecting: true, online: false, summary: { instances: 0, instanceUp: 0, instanceDown: 0, total: 0, up: 0, down: 0, unknown: 0 }, instances: [], targets: [] };
+  } else if (id === 'dockhand') {
+    const instances = Array.isArray(cfg.dockhand?.instances) ? cfg.dockhand.instances : (cfg.dockhand?.url ? [cfg.dockhand] : []);
+    data.dockhand = { _connecting: true, online: false, summary: { servers: instances.length, serverUp: 0, serverDown: 0, total: 0, running: 0, stopped: 0, pending: 0 }, instances: instances.map((inst, idx) => ({ name: inst.name || inst.url || `Dockhand ${idx + 1}`, url: inst.url || '', online: false, _connecting: true, summary: { total: 0, running: 0, stopped: 0, pending: 0 }, containers: [] })), containers: [] };
+  }
+}
 function applySettingsPreview(cfgPayload = null) {
   let payload = cfgPayload;
   try { if (!payload) payload = collect(); } catch { payload = {}; }
@@ -1537,6 +1575,23 @@ function applySettingsPreview(cfgPayload = null) {
       data.preferredLanguage = lang;
       data.appearance = { ...(data.appearance || {}), ...(payload.appearance || {}) };
       if (data.uptimekuma) data.uptimekuma.historyHours = ukPeriod;
+      const configured = previewConfiguredIds(payload);
+      const configuredSet = new Set(configured);
+      data.configured = configured;
+      if (!configuredSet.has('proxmox')) data.proxmox = { clusterSummary: null, nodes: [] };
+      if (!configuredSet.has('linux')) data.linux = [];
+      if (!configuredSet.has('kubernetes')) data.kubernetes = null;
+      if (!configuredSet.has('snmp')) data.snmp = [];
+      if (!configuredSet.has('healthchecks')) data.healthchecks = null;
+      if (!configuredSet.has('uptimekuma')) data.uptimekuma = null;
+      if (!configuredSet.has('checks')) data.checks = null;
+      if (!configuredSet.has('prometheus')) data.prometheus = null;
+      if (!configuredSet.has('docker')) data.docker = [];
+      if (!configuredSet.has('dockhand')) data.dockhand = null;
+      if (!configuredSet.has('database')) data.database = [];
+      ['kubernetes','healthchecks','uptimekuma','checks','prometheus','dockhand'].forEach(id => {
+        if (configuredSet.has(id) && (!data[id] || settingsSectionChanged(window._settingsConfig || {}, payload, id))) previewConnectingPlatform(data, id, payload);
+      });
       const dhInstances = Array.isArray(payload.dockhand?.instances) ? payload.dockhand.instances : (payload.dockhand?.url ? [payload.dockhand] : []);
       if (payload.dockhand?.enabled !== false && dhInstances.length) {
         const ids = new Set(data.configured || []);
@@ -4017,6 +4072,7 @@ async function saveConfig(opts = {}) {
       if(p && p !== window && typeof p.render === 'function') {
         if (typeof p.clearOverviewCache === 'function') p.clearOverviewCache();
         if (body.fullData !== false) p.render(body.data);
+        else if (Array.isArray(body.data?.configured) && typeof p.applyConfigured === 'function') p.applyConfigured(body.data.configured, cfgPayload);
       }
     } catch(e){}
   } catch (e) {

@@ -2398,6 +2398,8 @@ function eventsViewSignature(limit) {
 const PLATFORM_REFRESH_KEYS = ['proxmox','linux','kubernetes','snmp','healthchecks','uptimekuma','checks','prometheus','docker','dockhand','database'];
 const platformRefreshState = Object.fromEntries(PLATFORM_REFRESH_KEYS.map(k => [k, { inFlight: false, nextDue: 0, failures: 0, lastStarted: 0, lastFinished: 0 }]));
 const forceConnectingPlatforms = new Set();
+const CONFIG_CHANGE_CONNECTING_MS = Math.max(30000, Number(process.env.OMNISIGHT_CONFIG_CHANGE_CONNECTING_MS || 120000));
+const configChangeConnectingUntil = Object.fromEntries(PLATFORM_REFRESH_KEYS.map(k => [k, 0]));
 
 function refreshBusy() {
   return refreshActiveCount > 0 || !!refreshPromise;
@@ -2814,6 +2816,20 @@ function kubernetesConnectingData() {
   };
 }
 
+function keepKubernetesConnectingAfterConfigChange(next, err) {
+  const deadline = Number(configChangeConnectingUntil.kubernetes || 0);
+  if (!deadline || Date.now() > deadline) return next;
+  const failed = platformResultLooksFailed('kubernetes', next, true) || !!err;
+  if (!failed) {
+    configChangeConnectingUntil.kubernetes = 0;
+    return next;
+  }
+  return {
+    ...kubernetesConnectingData(),
+    error: next?.error || err?.message || 'waiting for Kubernetes API after config change',
+  };
+}
+
 function markKubernetesConnectingForNextConfigSave() {
   forceConnectingPlatforms.add('kubernetes');
 }
@@ -2859,6 +2875,7 @@ function settingsStatusData(data = cache.data || EMPTY) {
   return {
     loading: !!data.loading,
     refreshing: refreshBusy(),
+    configured: data.configured || configuredList(),
     publicStatus: !!config.publicStatus,
     proxmox: { _connecting: !!data.proxmox?._connecting, nodes: pxNodes },
     linux: linuxRows,
@@ -3932,6 +3949,7 @@ function backgroundRefresh(opts = {}) {
         if (generation !== refreshGeneration) return;
         const next = (v == null ? fb : v);
         base[key] = key === 'proxmox' ? preserveProxmoxOnTransient(next)
+          : key === 'kubernetes' ? keepKubernetesConnectingAfterConfigChange(next)
           : key === 'docker' ? mergeDockerHistory(preserveDockerOnTransient(next))
           : key === 'healthchecks' ? preserveHealthchecksOnTransient(next)
           : key === 'uptimekuma' ? preserveUptimeKumaOnTransient(mergeUptimeKumaHistory(next))
@@ -3958,6 +3976,8 @@ function backgroundRefresh(opts = {}) {
         } else if (key === 'snmp') {
           base[key] = preserveSnmpOnTransient(fb, err);
           if ((base[key] || []).some(row => row._stale)) console.warn(`SNMP refresh failed; keeping last data: ${err.message}`);
+        } else if (key === 'kubernetes') {
+          base[key] = keepKubernetesConnectingAfterConfigChange(fb, err);
         } else {
           base[key] = fb;
         }
@@ -6228,6 +6248,9 @@ app.post('/api/config', async (req, res) => {
     const connectingPlatforms = changedConnectionPlatforms(previousConfig || {}, config || {}, incoming || {});
     for (const key of forceConnectingPlatforms) connectingPlatforms.add(key);
     forceConnectingPlatforms.clear();
+    if (connectingPlatforms.has('kubernetes')) {
+      configChangeConnectingUntil.kubernetes = Date.now() + CONFIG_CHANGE_CONNECTING_MS;
+    }
     markConfigChanged();
     refreshGeneration += 1;
     refreshPromise = null;
