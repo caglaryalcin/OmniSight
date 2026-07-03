@@ -266,9 +266,10 @@ html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#dd
   <aside class="settings-nav" aria-label="Settings sections">
     <input class="settings-search" id="settings-search" type="search" placeholder="Search settings..." oninput="filterSettingsNav(this.value)">
     <div class="settings-nav-group">General</div>
-    <button class="settings-nav-btn active" type="button" data-target="appearance" onclick="showSettingsSection('appearance')"><span class="settings-nav-dot" style="background:var(--blue)"></span><span>Appearance</span></button>
+    <button class="settings-nav-btn active" type="button" data-target="appearance" onclick="showSettingsSection('appearance')"><span class="settings-nav-dot" style="background:var(--blue)"></span><span>System</span></button>
     <button class="settings-nav-btn" type="button" data-target="statuspage" onclick="showSettingsSection('statuspage')"><span class="settings-nav-dot" data-nav-dot="statuspage"></span><span>Status Page</span></button>
     <button class="settings-nav-btn" type="button" data-target="certificates" onclick="showSettingsSection('certificates')"><span class="settings-nav-dot" data-nav-dot="certificates"></span><span>Certificates</span></button>
+    <button class="settings-nav-btn" type="button" data-target="alerts" onclick="showSettingsSection('alerts')"><span class="settings-nav-dot" data-nav-dot="alerts"></span><span>Alerts</span></button>
     <div class="settings-nav-group">Security</div>
     <button class="settings-nav-btn" type="button" data-target="users" data-admin-section="1" onclick="showSettingsSection('users')"><span class="settings-nav-dot" data-nav-dot="users"></span><span>Users & roles</span></button>
     <button class="settings-nav-btn" type="button" data-target="sessions" data-admin-section="1" onclick="showSettingsSection('sessions')"><span class="settings-nav-dot" data-nav-dot="sessions"></span><span>Sessions & access</span></button>
@@ -284,8 +285,6 @@ html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#dd
     <button class="settings-nav-btn" type="button" data-target="docker" onclick="showSettingsSection('docker')"><span class="settings-nav-dot" data-nav-dot="docker"></span><span>Docker</span></button>
     <button class="settings-nav-btn" type="button" data-target="dockhand" onclick="showSettingsSection('dockhand')"><span class="settings-nav-dot" data-nav-dot="dockhand"></span><span>Dockhand</span></button>
     <button class="settings-nav-btn" type="button" data-target="database" onclick="showSettingsSection('database')"><span class="settings-nav-dot" data-nav-dot="database"></span><span>Databases</span></button>
-    <div class="settings-nav-group">Operations</div>
-    <button class="settings-nav-btn" type="button" data-target="alerts" onclick="showSettingsSection('alerts')"><span class="settings-nav-dot" data-nav-dot="alerts"></span><span>Alerts</span></button>
   </aside>
   <div class="settings-content" id="settings-content">
 
@@ -294,7 +293,7 @@ html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#dd
   <div class="card-hdr" style="cursor:default">
     <div class="card-left">
       <div class="card-icon" style="background:var(--blue)"></div>
-      <span class="card-title">Appearance</span>
+      <span class="card-title">System</span>
     </div>
   </div>
   <div class="card-body" style="display:flex !important;flex-direction:column">
@@ -906,18 +905,27 @@ html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#dd
 
     <div class="arr-item">
       <div class="arr-hdr">
-        <span class="arr-hdr-name">Alert rules</span>
+        <span class="arr-hdr-name">Alert timing</span>
       </div>
       <div class="arr-body">
         <div class="form-grid g3">
-          <div class="form-group"><label>CPU duration sec</label><input type="number" id="al-rule-cpu-duration" min="0" max="3600" value="60"></div>
-          <div class="form-group"><label>RAM duration sec</label><input type="number" id="al-rule-ram-duration" min="0" max="3600" value="60"></div>
-          <div class="form-group"><label>Disk duration sec</label><input type="number" id="al-rule-disk-duration" min="0" max="3600" value="60"></div>
-          <div class="form-group"><label>Pod duration sec</label><input type="number" id="al-rule-pod-duration" min="0" max="3600" value="60"></div>
-          <div class="form-group"><label>Container duration sec</label><input type="number" id="al-rule-container-duration" min="0" max="3600" value="60"></div>
-          <div class="form-group"><label>Target duration sec</label><input type="number" id="al-rule-target-duration" min="0" max="3600" value="60"></div>
-          <div class="form-group"><label>SNMP duration sec</label><input type="number" id="al-rule-snmp-duration" min="0" max="3600" value="120"></div>
+          <div class="form-group"><label>Default alert duration sec</label><input type="number" id="al-rule-default-duration" min="0" max="3600" value="60"></div>
+          <div class="form-group"><label>CPU alert duration sec</label><input type="number" id="al-rule-cpu-duration" min="0" max="3600" value="60"></div>
+          <div class="form-group"><label>RAM alert duration sec</label><input type="number" id="al-rule-ram-duration" min="0" max="3600" value="60"></div>
+          <div class="form-group"><label>Disk alert duration sec</label><input type="number" id="al-rule-disk-duration" min="0" max="3600" value="60"></div>
+          <div class="form-group"><label>Pod alert duration sec</label><input type="number" id="al-rule-pod-duration" min="0" max="3600" value="60"></div>
+          <div class="form-group"><label>Container alert duration sec</label><input type="number" id="al-rule-container-duration" min="0" max="3600" value="60"></div>
+          <div class="form-group"><label>Target alert duration sec</label><input type="number" id="al-rule-target-duration" min="0" max="3600" value="60"></div>
+          <div class="form-group"><label>SNMP alert duration sec</label><input type="number" id="al-rule-snmp-duration" min="0" max="3600" value="120"></div>
         </div>
+      </div>
+    </div>
+
+    <div class="arr-item">
+      <div class="arr-hdr">
+        <span class="arr-hdr-name">Maintenance window</span>
+      </div>
+      <div class="arr-body">
         <div class="form-grid g3">
           <div class="form-group"><label>Maintenance start</label><input type="time" id="al-maint-start"></div>
           <div class="form-group"><label>Maintenance end</label><input type="time" id="al-maint-end"></div>
@@ -2979,6 +2987,7 @@ function populate(cfg) {
     document.getElementById('al-th-cpu-critical').value = thresholdInputValue(a.thresholds, 'cpu', 'critical', 90);
     document.getElementById('al-th-ram-critical').value = thresholdInputValue(a.thresholds, 'ram', 'critical', 90);
     document.getElementById('al-th-disk-critical').value = thresholdInputValue(a.thresholds, 'disk', 'critical', 90);
+    document.getElementById('al-rule-default-duration').value = ruleDurationValue(a.rules, 'default', 60);
     document.getElementById('al-rule-cpu-duration').value = ruleDurationValue(a.rules, 'cpu', 60);
     document.getElementById('al-rule-ram-duration').value = ruleDurationValue(a.rules, 'ram', 60);
     document.getElementById('al-rule-disk-duration').value = ruleDurationValue(a.rules, 'disk', 60);
@@ -3318,6 +3327,7 @@ function collect() {
         disk: { warning: diskWarning, critical: Math.max(diskWarning, clampedPercentInput('al-th-disk-critical', 90)) },
       },
       rules: {
+        default: { durationSeconds: clampedSecondsInput('al-rule-default-duration', 60) },
         cpu: { durationSeconds: clampedSecondsInput('al-rule-cpu-duration', 60) },
         ram: { durationSeconds: clampedSecondsInput('al-rule-ram-duration', 60) },
         disk: { durationSeconds: clampedSecondsInput('al-rule-disk-duration', 60) },

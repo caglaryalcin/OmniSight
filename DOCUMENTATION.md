@@ -439,12 +439,12 @@ The Settings page is the UI representation of `data/config.yaml`.
 
 | Section | Purpose |
 |---|---|
-| Appearance | Timezone, time format, default period, history retention, low I/O, language, side panel, backup |
+| System | Timezone, time format, default period, history retention, low I/O, language, side panel, backup |
 | Users & roles | Users, roles, password reset setting |
 | Sessions & access | Active sessions, browser/IP, force sign out, public IP allowlist |
 | Certificates | CA upload and trust store |
 | Platform cards | Proxmox, Linux, Kubernetes, SNMP, Healthchecks, Uptime Kuma, Checks, Prometheus, Docker, Dockhand, Database |
-| Alerts | Thresholds, rules, anomaly detection, maintenance windows, webhook, notification channels |
+| Alerts | Thresholds, alert timing, anomaly detection, maintenance windows, webhook, notification channels |
 
 ### Config Save Behavior
 
@@ -511,6 +511,8 @@ The alert engine evaluates runtime cache data for problems and recoveries.
 - CPU/RAM/disk resource thresholds.
 - CPU/RAM anomaly detection.
 - Webhook events.
+
+Alert settings can define `durationSeconds` per category. `rules.default` defaults to 60 seconds and applies to checks without a more specific rule, such as Proxmox service state or Prometheus instance reachability. Set it to `0` for immediate notifications.
 
 ### Notification Channels
 

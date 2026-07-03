@@ -131,6 +131,10 @@ alerts:
       warning: 80
       critical: 90
   rules:
+    # Default debounce for alerts without a more specific rule.
+    # Set to 0 for immediate notifications.
+    default:
+      durationSeconds: 60
     cpu:
       durationSeconds: 60
     ram:

@@ -3170,16 +3170,23 @@ function configuredList() {
   const en = c => c && c.enabled !== false;
   const hasPrometheus = c => !!(c && (c.url || (Array.isArray(c.instances) && c.instances.length)));
   const hasDockhand = c => !!(c && (c.url || (Array.isArray(c.instances) && c.instances.length)));
+  const hasCachedRows = key => {
+    const value = cache.data?.[key];
+    if (Array.isArray(value)) return value.length > 0;
+    if (key === 'proxmox') return (value?.nodes || []).length > 0;
+    if (key === 'dockhand') return (value?.instances || []).length > 0 || (value?.containers || []).length > 0;
+    return !!value;
+  };
   const ids = [];
-  if (en(config.proxmox)      && (agents.hasPve() || (config.proxmox.url && config.proxmox.tokenId && config.proxmox.tokenSecret))) ids.push('proxmox');
+  if (en(config.proxmox)      && (agents.hasPve() || hasCachedRows('proxmox') || (config.proxmox.url && config.proxmox.tokenId && config.proxmox.tokenSecret))) ids.push('proxmox');
   if (en(config.kubernetes)   && config.kubernetes.kubeconfig)          ids.push('kubernetes');
-  if (en(config.linux)        && config.linux.agentToken && agents.hasLinux?.()) ids.push('linux');
+  if (en(config.linux)        && config.linux.agentToken && (agents.hasLinux?.() || hasCachedRows('linux'))) ids.push('linux');
   if (en(config.snmp)         && (config.snmp.devices || []).length)    ids.push('snmp');
   if (en(config.healthchecks) && config.healthchecks.url)               ids.push('healthchecks');
   if (en(config.uptimekuma)   && config.uptimekuma.url)                 ids.push('uptimekuma');
   if (en(config.checks)       && ((config.checks.services || config.checks.checks || []).length)) ids.push('checks');
   if (en(config.prometheus)   && hasPrometheus(config.prometheus))       ids.push('prometheus');
-  if (en(config.docker)       && (agents.hasDocker() || (config.docker.hosts || []).length)) ids.push('docker');
+  if (en(config.docker)       && (agents.hasDocker() || hasCachedRows('docker') || (config.docker.hosts || []).length)) ids.push('docker');
   if (en(config.dockhand)     && hasDockhand(config.dockhand))           ids.push('dockhand');
   if (en(config.database)     && (config.database.instances || []).length) ids.push('database');
   return ids;
@@ -3533,17 +3540,24 @@ function secondsValue(value, fallback = 0) {
   if (!Number.isFinite(n) || n < 0) return fallback;
   return Math.max(0, Math.round(n));
 }
+const DEFAULT_ALERT_RULE = { durationSeconds: 60 };
+const DEFAULT_SNMP_ALERT_RULE = { durationSeconds: 120 };
+function configuredAlertRule(rules, key) {
+  const rule = rules?.[key];
+  return rule && typeof rule === 'object' ? rule : null;
+}
 function alertRuleForCheck(key, check = {}) {
   const rules = config.alerts?.rules || {};
+  const defaultRule = configuredAlertRule(rules, 'default') || DEFAULT_ALERT_RULE;
   const metric = String(check.metric || '').toLowerCase();
-  if (check.kind === 'anomaly') return config.alerts?.anomaly?.rules?.[metric] || config.alerts?.anomaly || rules.anomaly || {};
-  if (check.kind === 'threshold' && metric) return rules[metric] || {};
-  if (String(key || '').startsWith('snmp:')) return rules.snmp || { durationSeconds: 120 };
-  if (String(key || '').startsWith('k8s:')) return rules.pod || {};
-  if (String(key || '').startsWith('dk:') && String(key || '').split(':').length >= 3) return rules.container || {};
-  if (String(key || '').startsWith('prom:') && !String(key || '').startsWith('prom:instance:')) return rules.target || {};
-  if (String(key || '').startsWith('check:')) return rules.target || {};
-  return rules.default || {};
+  if (check.kind === 'anomaly') return config.alerts?.anomaly?.rules?.[metric] || config.alerts?.anomaly || configuredAlertRule(rules, 'anomaly') || defaultRule;
+  if (check.kind === 'threshold' && metric) return configuredAlertRule(rules, metric) || defaultRule;
+  if (String(key || '').startsWith('snmp:')) return configuredAlertRule(rules, 'snmp') || DEFAULT_SNMP_ALERT_RULE;
+  if (String(key || '').startsWith('k8s:')) return configuredAlertRule(rules, 'pod') || defaultRule;
+  if (String(key || '').startsWith('dk:') && String(key || '').split(':').length >= 3) return configuredAlertRule(rules, 'container') || defaultRule;
+  if (String(key || '').startsWith('prom:') && !String(key || '').startsWith('prom:instance:')) return configuredAlertRule(rules, 'target') || defaultRule;
+  if (String(key || '').startsWith('check:')) return configuredAlertRule(rules, 'target') || defaultRule;
+  return defaultRule;
 }
 function alertDelayMs(key, check) {
   if (check && check.durationSeconds != null) return secondsValue(check.durationSeconds, 0) * 1000;

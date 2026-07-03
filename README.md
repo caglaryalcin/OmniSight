@@ -65,7 +65,7 @@ For deeper architecture, operations and troubleshooting notes, see [DOCUMENTATIO
 - **Onboarding** — first-run setup wizard for admin account, timezone, notifications and the first platform
 - **Users & roles** — multi-user access with admin, operator and read-only roles
 - **Profile** — profile image, password changes, password reset support, passkeys and optional TOTP two-factor authentication
-- **Appearance** — dashboard side panel toggle, default history period, 12/24 hour time format, English/Turkish UI language preference and installable PWA manifest
+- **System** — dashboard side panel toggle, default history period, 12/24 hour time format, English/Turkish UI language preference and installable PWA manifest
 - **Backup & restore** — config backup export/restore plus password-gated full backup export for users, secret key, certs and history
 
 ![](https://raw.githubusercontent.com/caglaryalcin/OmniSight/refs/heads/main/screenshots/backup-export.png)
@@ -90,7 +90,7 @@ Node.js + Express backend · vanilla HTML/CSS/JS frontend (no framework).
 
 - Platform cards can be reordered with drag-and-drop and collapsed/expanded in place.
 - CPU, memory, disk I/O and bandwidth overview cards can be filtered by platform.
-- Active alerts and recent logs can be shown or hidden from **Settings → Appearance**; when hidden, the platform grid expands to use the available space.
+- Active alerts and recent logs can be shown or hidden from **Settings → System**; when hidden, the platform grid expands to use the available space.
 - Platform detail pages include the same compact summary counters as the dashboard card header.
 - CPU, RAM and temperature history charts are available where the integration exposes those metrics.
 - Uptime monitor history bars include hover details for status, time range, ping and message data when available.
@@ -284,7 +284,7 @@ If you also lost access to your authenticator app, add `--disable-2fa`.
 
 ## Backup and restore
 
-Settings → Appearance includes backup actions:
+Settings → System includes backup actions:
 
 - **Export config backup** downloads only `data/config.yaml`.
 - **Restore config backup** imports an OmniSight config backup and replaces the current platform/settings configuration.
@@ -405,6 +405,7 @@ alerts:
       warning: 80
       critical: 90
   rules:
+    default: { durationSeconds: 60 }
     cpu: { durationSeconds: 60 }
     ram: { durationSeconds: 60 }
     disk: { durationSeconds: 60 }
@@ -436,7 +437,9 @@ alerts:
     to: ["alerts@domain.com"]
 ```
 
-Notifications are sent on **state changes** (running→down = DOWN, down→running = UP) and resource threshold changes (CPU/RAM/disk crossing the configured percentages). Pre-existing problems at startup do not trigger a flood. Alert rules can add per-metric duration delays for CPU/RAM/disk, Kubernetes pods, Docker containers, Prometheus targets and SNMP reachability, plus maintenance windows. Short SNMP refresh failures keep the previous healthy row briefly as stale data so UDP packet loss does not immediately turn the dashboard red. The Alerts page keeps a timeline, supports acknowledgement and temporary mute. Healthchecks `grace` is treated as degraded/warning; the DOWN notification is sent only after the check becomes `down`. Each channel can be tested individually from the Settings page.
+`rules.default` debounces alerts that do not have a more specific rule, such as platform service or Prometheus instance outages. Set it to `0` if you want immediate notifications.
+
+Notifications are sent on **state changes** (running→down = DOWN, down→running = UP) and resource threshold changes (CPU/RAM/disk crossing the configured percentages). Pre-existing problems at startup do not trigger a flood. Alert settings can add per-metric duration delays for CPU/RAM/disk, Kubernetes pods, Docker containers, Prometheus targets and SNMP reachability, plus maintenance windows. Short SNMP refresh failures keep the previous healthy row briefly as stale data so UDP packet loss does not immediately turn the dashboard red. The Alerts page keeps a timeline, supports acknowledgement and temporary mute. Healthchecks `grace` is treated as degraded/warning; the DOWN notification is sent only after the check becomes `down`. Each channel can be tested individually from the Settings page.
 
 External systems can send events into Event Center:
 

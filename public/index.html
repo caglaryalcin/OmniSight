@@ -1802,9 +1802,12 @@ function writeConfiguredCache(ids){
   try{ localStorage.setItem(CONFIGURED_CACHE_KEY, JSON.stringify(cleanUiOrder(ids))); }catch{}
 }
 function setConfiguredIds(ids, opts = {}){
-  configuredIds = cleanUiOrder(ids);
+  const next = cleanUiOrder(ids);
+  if(!next.length && opts.keepExistingOnEmpty && configuredIds.length) return;
+  configuredIds = next;
   if(opts.persist !== false) writeConfiguredCache(configuredIds);
 }
+configuredIds = readConfiguredCache();
 function placeholderPanel(id){
   const m = PLATFORM_META[id] || { title:id, iconKey:id, color:'var(--muted)' };
   if (id === 'linux') {
@@ -4725,6 +4728,16 @@ function renderSidebar(ids, panels, activeId){
   });
   updateSidebarOverflow();
 }
+function renderConfiguredSidebarShell(){
+  if(!configuredIds.length || window._sidebarDragging) return false;
+  const panels = { ...(window._panels || {}) };
+  configuredIds.forEach(id => { if(!panels[id]) panels[id] = placeholderPanel(id); });
+  const ids = orderedSidebarIds(configuredIds.filter(id => panels[id]));
+  if(!ids.length) return false;
+  window._panels = panels;
+  renderSidebar(ids, panels, null);
+  return true;
+}
 
 function avgPct(vals){
   vals = vals.filter(v => hasNum(v)).map(Number);
@@ -5751,7 +5764,11 @@ function render(data, opts = {}){
   applyServerUiPreferences(data);
   syncDefaultPeriodOverride(data);
   window._lastData = data;
-  if(Array.isArray(data.configured)) setConfiguredIds(data.configured);
+  if(Array.isArray(data.configured)) {
+    setConfiguredIds(data.configured, {
+      keepExistingOnEmpty: embedOpen || !!data.loading || !!data.refreshing || !!data._snapshot,
+    });
+  }
   if(Array.isArray(data.notifyDisabled)) notifyOff = new Set(data.notifyDisabled);
   notifyTopicMap = data.notifyTopics && typeof data.notifyTopics === 'object' ? data.notifyTopics : {};
   ntfyTopics = Array.isArray(data.ntfyTopics) ? data.ntfyTopics : [];
@@ -6458,6 +6475,7 @@ function openEmbed(url, opts = {}){
     ifr = createEmbedFrame(url, 'high');
   }
   showEmbedFrame(ifr, detail, url, navSeq);
+  renderConfiguredSidebarShell();
   applyThemeToEmbed();
 }
 let embedPrefetchStarted = false;
@@ -6950,7 +6968,12 @@ function applyShellSummary(summary){
   if(!summary || typeof summary !== 'object') return;
   const pageScroll = capturePageScroll();
   applyServerUiPreferences(summary);
-  if(Array.isArray(summary.configured)) configuredIds = summary.configured;
+  if(Array.isArray(summary.configured)) {
+    setConfiguredIds(summary.configured, {
+      persist: false,
+      keepExistingOnEmpty: embedOpen || !(summary.health || []).length || !!summary.loading || !!summary.refreshing || !!summary.snapshot,
+    });
+  }
   window._lastSummary = summary;
   const lang = currentLang(summary);
   const health = Array.isArray(summary.health) ? summary.health : [];
@@ -7270,6 +7293,7 @@ window.addEventListener('popstate', () => { applyHashRoute(); });
   if(startInEmbed){
     initialRouteApplied = true;
     applyHashRoute();
+    if(cachedStatus) render(cachedStatus, { soft: true });
   }
   if(!startInEmbed){
     if(!cachedStatus) showDashboardLoading();
