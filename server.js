@@ -5,6 +5,7 @@ const yaml = require('js-yaml');
 const crypto = require('crypto');
 const childProcess = require('child_process');
 const zlib = require('zlib');
+const https = require('https');
 const QRCode = require('qrcode');
 let nodemailer = null;
 try { nodemailer = require('nodemailer'); } catch {}
@@ -265,6 +266,64 @@ function requestPublicIp(req) {
     requestIp(req),
   ].filter(Boolean);
   return candidates.find(ip => !isPrivateIp(ip)) || candidates[0] || '';
+}
+const PUBLIC_IP_LOOKUP_ENABLED = envFlag('OMNISIGHT_PUBLIC_IP_LOOKUP', true);
+const PUBLIC_IP_LOOKUP_URLS = String(process.env.OMNISIGHT_PUBLIC_IP_LOOKUP_URLS || 'https://api.ipify.org,https://ifconfig.me/ip')
+  .split(',')
+  .map(s => s.trim())
+  .filter(Boolean);
+const PUBLIC_IP_LOOKUP_TTL_MS = Math.max(60_000, Number(process.env.OMNISIGHT_PUBLIC_IP_LOOKUP_TTL_MS || 10 * 60_000));
+let publicIpLookupCache = { ip: '', t: 0, pending: null };
+
+function fetchPublicIpUrl(url, timeoutMs = 1800) {
+  return new Promise(resolve => {
+    const req = https.get(url, { headers: { 'user-agent': 'OmniSight public IP lookup' } }, res => {
+      let body = '';
+      res.setEncoding('utf8');
+      res.on('data', chunk => {
+        body += chunk;
+        if (body.length > 256) req.destroy();
+      });
+      res.on('end', () => resolve(cleanIpValue(body.trim())));
+    });
+    req.on('error', () => resolve(''));
+    req.setTimeout(timeoutMs, () => {
+      req.destroy();
+      resolve('');
+    });
+  });
+}
+
+async function detectedOutboundPublicIp() {
+  if (!PUBLIC_IP_LOOKUP_ENABLED || !PUBLIC_IP_LOOKUP_URLS.length) return '';
+  const now = Date.now();
+  if (publicIpLookupCache.ip && now - publicIpLookupCache.t < PUBLIC_IP_LOOKUP_TTL_MS) return publicIpLookupCache.ip;
+  if (publicIpLookupCache.pending) return publicIpLookupCache.pending;
+  publicIpLookupCache.pending = (async () => {
+    for (const url of PUBLIC_IP_LOOKUP_URLS) {
+      const ip = await fetchPublicIpUrl(url);
+      if (ip && !isPrivateIp(ip)) {
+        publicIpLookupCache = { ip, t: Date.now(), pending: null };
+        return ip;
+      }
+    }
+    publicIpLookupCache.pending = null;
+    return '';
+  })();
+  return publicIpLookupCache.pending;
+}
+
+async function effectiveCurrentPublicIp(req) {
+  const seen = cleanIpValue(requestPublicIp(req) || requestIp(req));
+  if (seen && !isPrivateIp(seen)) return seen;
+  return (await detectedOutboundPublicIp()) || seen || '';
+}
+
+async function currentPublicIpCandidates(req) {
+  const seen = cleanIpValue(requestPublicIp(req) || requestIp(req));
+  const direct = cleanIpValue(requestIp(req));
+  const wan = seen && !isPrivateIp(seen) ? '' : await detectedOutboundPublicIp();
+  return Array.from(new Set([wan, seen, direct].filter(Boolean)));
 }
 function privacyRedactIps() {
   let configRedact = false;
@@ -661,11 +720,11 @@ function allowedPublicIpList() {
   return normalizeAllowedPublicIps(config?.security?.allowedPublicIps || []);
 }
 
-function requestMatchesAllowedPublicIps(req) {
+async function requestMatchesAllowedPublicIps(req) {
   const allowed = allowedPublicIpList();
   if (!allowed.length) return true;
-  const ip = cleanIpValue(requestPublicIp(req) || requestIp(req));
-  return !!ip && allowed.includes(ip);
+  const candidates = await currentPublicIpCandidates(req);
+  return candidates.some(ip => allowed.includes(ip));
 }
 
 function ipRestrictionBypass(req) {
@@ -1787,15 +1846,15 @@ function publicProfileSummary(auth) {
   };
 }
 
-function authMiddleware(req, res, next) {
+async function authMiddleware(req, res, next) {
   const authPublicPaths = ['/login', '/onboarding', '/api/login', '/api/register', '/api/auth-status', '/api/onboarding/status', '/api/onboarding/complete', '/api/onboarding/import', '/api/backup/import', '/api/password-reset/request', '/api/password-reset/confirm', '/api/passkeys/auth/options', '/api/passkeys/auth/verify', '/api/webhook/event'];
   if (req.path === '/sw.js' || req.path === '/manifest.webmanifest') return next();
   if (req.path.startsWith('/assets/')) return next();
   if (req.path === '/i18n.js') return next();
   if (req.path.startsWith('/api/icons/')) return next();
   if (req.path.startsWith('/agent/') || ['/api/agent/report', '/api/agent/result', '/api/agent/commands', '/api/agent/ping'].includes(req.path)) return next();
-  if (!ipRestrictionBypass(req) && !requestMatchesAllowedPublicIps(req)) {
-    const publicIp = requestPublicIp(req) || requestIp(req) || '';
+  if (!ipRestrictionBypass(req) && !(await requestMatchesAllowedPublicIps(req))) {
+    const publicIp = await effectiveCurrentPublicIp(req);
     if (req.path.startsWith('/api/')) return res.status(403).json({ error: 'Access from this public IP is not allowed', publicIp });
     return res.status(403).send('Access from this public IP is not allowed');
   }
@@ -4969,7 +5028,7 @@ app.get('/api/auth-status', (req, res) => {
   });
 });
 
-app.get('/api/sessions', (req, res) => {
+app.get('/api/sessions', async (req, res) => {
   if (sessionRole(req) !== 'admin') return res.status(403).json({ error: 'Forbidden' });
   const now = Date.now();
   let changed = false;
@@ -4983,7 +5042,7 @@ app.get('/api/sessions', (req, res) => {
   const currentToken = currentSessionToken(req);
   res.json({
     sessions: [...sessions.entries()].map(([token, session]) => publicSessionRecord(token, session, currentToken)),
-    currentPublicIp: requestPublicIp(req) || requestIp(req) || '',
+    currentPublicIp: await effectiveCurrentPublicIp(req),
     allowedPublicIps: allowedPublicIpList(),
   });
 });
@@ -6251,8 +6310,9 @@ app.post('/api/config', async (req, res) => {
     merged.security = merged.security && typeof merged.security === 'object' ? merged.security : {};
     merged.security.allowedPublicIps = normalizeAllowedPublicIps(merged.security.allowedPublicIps || []);
     if (merged.security.allowedPublicIps.length) {
-      const currentPublicIp = cleanIpValue(requestPublicIp(req) || requestIp(req));
-      if (!currentPublicIp || !merged.security.allowedPublicIps.includes(currentPublicIp)) {
+      const currentPublicIp = cleanIpValue(await effectiveCurrentPublicIp(req));
+      const currentIpCandidates = await currentPublicIpCandidates(req);
+      if (!currentIpCandidates.length || !currentIpCandidates.some(ip => merged.security.allowedPublicIps.includes(ip))) {
         return res.status(400).json({
           error: `Allowed public IPs must include your current public IP (${currentPublicIp || 'unknown'})`,
           currentPublicIp,
@@ -6674,13 +6734,46 @@ app.post('/api/upload/icon', (req, res) => {
   } catch (err) { res.status(400).json({ error: err.message }); }
 });
 
+function certCommonNameFromSubject(subject) {
+  const src = String(subject || '');
+  const match = src.match(/(?:^|\n)CN\s*=\s*([^\n]+)/) || src.match(/(?:^|,\s*)CN\s*=\s*([^,]+)/);
+  return match ? match[1].replace(/\\([,=+<>#;"\\])/g, '$1').trim() : '';
+}
+
+function firstCertificateBlock(text) {
+  const match = String(text || '').match(/-----BEGIN CERTIFICATE-----[\s\S]+?-----END CERTIFICATE-----/);
+  return match ? match[0] : '';
+}
+
+function certificateCommonName(filePath) {
+  try {
+    const buf = fs.readFileSync(filePath);
+    const text = buf.toString('utf8');
+    const pem = firstCertificateBlock(text);
+    const cert = new crypto.X509Certificate(pem || buf);
+    return certCommonNameFromSubject(cert.subject);
+  } catch {
+    return '';
+  }
+}
+
 app.get('/api/certificates', (req, res) => {
   try {
     const dir = path.join(__dirname, 'data', 'certs');
     fs.mkdirSync(dir, { recursive: true });
     const files = fs.readdirSync(dir)
       .filter(f => /\.(crt|pem|cer|pfx|p12)$/i.test(f))
-      .map(f => ({ name: f, size: fs.statSync(path.join(dir, f)).size, trusted: /\.(crt|pem|cer)$/i.test(f) }));
+      .map(f => {
+        const filePath = path.join(dir, f);
+        const extractedPem = path.join(dir, f.replace(/\.(pfx|p12)$/i, '.pem'));
+        const cnPath = /\.(pfx|p12)$/i.test(f) && fs.existsSync(extractedPem) ? extractedPem : filePath;
+        return {
+          name: f,
+          size: fs.statSync(filePath).size,
+          trusted: /\.(crt|pem|cer)$/i.test(f),
+          commonName: certificateCommonName(cnPath),
+        };
+      });
     res.json({ files });
   } catch (err) { sendServerError(res, err); }
 });

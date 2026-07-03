@@ -12,6 +12,7 @@
   --bg:#141617;--panel:#181A1B;--row:#141617;--border:#242C3B;
   --text:#E2E8F2;--muted:#7D8AA3;--green:#34D399;--red:#F87171;
   --yellow:#FBBF24;--blue:#60A5FA;--accent:#6366F1;
+  --save-bg:#2f8f73;--save-bg2:#367f70;--save-hover:#36987c;
 }
 body{background:var(--bg);color:var(--text);font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px}
 body{-webkit-user-select:none;user-select:none}
@@ -37,11 +38,11 @@ header{
 .menu-item:hover{background:rgba(255,255,255,.05)}
 .menu-item.danger{color:var(--red)}
 .btn-save{
-  background:var(--green);color:#fff;border:none;
+  background:linear-gradient(135deg,var(--save-bg),var(--save-bg2));color:#fff;border:1px solid rgba(255,255,255,.08);
   padding:7px 18px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;
-  display:flex;align-items:center;gap:6px;
+  display:flex;align-items:center;gap:6px;box-shadow:0 6px 16px rgba(47,143,115,.18);
 }
-.btn-save:hover{filter:brightness(1.1)}
+.btn-save:hover{background:linear-gradient(135deg,var(--save-hover),var(--save-bg2));box-shadow:0 8px 20px rgba(47,143,115,.22)}
 .btn-save:disabled{opacity:.5;cursor:not-allowed}
 
 main{padding:20px;max-width:1380px;margin:0 auto}
@@ -155,6 +156,7 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 .arr-hdr{display:flex;align-items:center;gap:8px;padding:10px 14px;cursor:pointer;background:var(--row);transition:background .1s;user-select:none}
 .arr-hdr:hover{background:rgba(255,255,255,.05)}
 .arr-hdr-name{font-size:13px;font-weight:600;flex:1}
+.arr-hdr-name.with-info{display:flex;align-items:center;gap:7px;min-width:0}
 .arr-body{padding:14px;border-top:1px solid var(--border)}
 .arr-body.hidden{display:none}
 .btn-rm{background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:2px 6px;border-radius:4px;line-height:1}
@@ -178,6 +180,15 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 .agent-row{display:flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid var(--border);border-radius:10px;margin-bottom:6px;font-size:13px;background:var(--row);transition:border-color .15s}
 .agent-row:hover{border-color:#2E3850}
 .agent-row:last-child{margin-bottom:0}
+.cert-row{align-items:flex-start}
+.cert-main{display:flex;flex-direction:column;gap:6px;min-width:0;flex:1}
+.cert-title{font-weight:600;overflow-wrap:anywhere}
+.cert-badges{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.cert-badge{display:inline-flex;align-items:center;width:fit-content;max-width:100%;padding:3px 8px;border-radius:999px;font-size:12px;font-weight:700;line-height:1.25;overflow-wrap:anywhere}
+.cert-badge.trusted{border:1px solid rgba(52,211,153,.42);background:rgba(52,211,153,.12);color:var(--green)}
+.cert-badge.stored{border:1px solid rgba(125,138,163,.32);background:rgba(125,138,163,.12);color:var(--muted)}
+.cert-badge.common-name{border:1px solid rgba(180,120,42,.34);background:rgba(180,120,42,.11);color:#b4782a}
+.cert-cn-label{color:var(--muted);font-weight:700;margin-right:4px}
 .user-row{position:relative;align-items:flex-start!important;padding-right:48px}
 .user-status-actions{display:flex;align-items:flex-end;justify-content:flex-start;gap:10px;margin-left:0;align-self:flex-start;flex:0 0 100%;min-height:38px}
 .user-status-actions .inline-toggle{height:auto;min-height:42px;margin:0!important}
@@ -236,7 +247,7 @@ body.settings-readonly .btn-save{display:none}
 ::-webkit-scrollbar{width:5px}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
-html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#dde3ec;--text:#1c2433;--muted:#64748b;--green:#0e9f6e;--red:#dc2f2f;--yellow:#b7791f;--blue:#3b82f6;}
+html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#ccd7e6;--text:#1c2433;--muted:#64748b;--green:#0e9f6e;--red:#dc2f2f;--yellow:#b7791f;--blue:#3b82f6;--save-bg:#2f856b;--save-bg2:#3d766b;--save-hover:#347f69;}
 </style>
 <style>html.embed header{display:none}</style>
 <script>if(window.self!==window.top)document.documentElement.classList.add('embed');</script>
@@ -501,7 +512,7 @@ html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#dd
       <span>Show uptime history</span>
       <label class="toggle"><input type="checkbox" id="public-show-history"><span class="toggle-t"></span></label>
     </div>
-    <div class="form-group">
+    <div class="form-group" style="margin-top:14px">
       <label>Visible platforms</label>
       <div class="check-grid" id="public-platforms">
         <label class="check-chip"><input type="checkbox" value="proxmox" checked> Proxmox</label>
@@ -889,7 +900,7 @@ html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#dd
   <div class="card-body hidden" id="cb-alerts">
     <div class="arr-item">
       <div class="arr-hdr">
-        <span class="arr-hdr-name">Resource thresholds</span>
+        <span class="arr-hdr-name with-info">Resource thresholds <button type="button" class="info-btn" onclick="openAlertInfo(event,'resourceThresholds')" aria-label="Resource thresholds info">i</button></span>
       </div>
       <div class="arr-body">
         <div class="form-grid g3">
@@ -905,7 +916,7 @@ html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#dd
 
     <div class="arr-item">
       <div class="arr-hdr">
-        <span class="arr-hdr-name">Alert timing</span>
+        <span class="arr-hdr-name with-info">Alert timing <button type="button" class="info-btn" onclick="openAlertInfo(event,'alertTiming')" aria-label="Alert timing info">i</button></span>
       </div>
       <div class="arr-body">
         <div class="form-grid g3">
@@ -923,7 +934,7 @@ html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#dd
 
     <div class="arr-item">
       <div class="arr-hdr">
-        <span class="arr-hdr-name">Maintenance window</span>
+        <span class="arr-hdr-name with-info">Maintenance window <button type="button" class="info-btn" onclick="openAlertInfo(event,'maintenanceWindow')" aria-label="Maintenance window info">i</button></span>
       </div>
       <div class="arr-body">
         <div class="form-grid g3">
@@ -936,7 +947,7 @@ html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#dd
 
     <div class="arr-item">
       <div class="arr-hdr">
-        <span class="arr-hdr-name">Anomaly detection</span>
+        <span class="arr-hdr-name with-info">Anomaly detection <button type="button" class="info-btn" onclick="openAlertInfo(event,'anomalyDetection')" aria-label="Anomaly detection info">i</button></span>
       </div>
       <div class="arr-body">
         <div class="form-grid g3">
@@ -1213,6 +1224,7 @@ let settingsSessionsLast = 0;
 let settingsAgentsLast = 0;
 let settingsAgentsRequest = null;
 let settingsCertsRequest = null;
+let lastSessionRows = [];
 const activeSettingsFetchControllers = new Set();
 function abortSettingsFetches(){
   activeSettingsFetchControllers.forEach(ctrl => {
@@ -1519,6 +1531,7 @@ async function persistPreferencePatch(patch, throwOnError = false) {
 function changeLanguageNow(lang) {
   localStorage.setItem('os_lang', lang || 'en');
   applyLanguage(lang || 'en');
+  if (Array.isArray(lastSessionRows)) renderSessions(lastSessionRows);
   try {
     const p = window.parent;
     if (p && p !== window) {
@@ -3875,7 +3888,7 @@ async function loadSessions() {
   } catch (e) {
     if (e.name === 'AbortError' || embedPaused) return;
     card.style.display = '';
-    list.innerHTML = `<div class="sys-empty">Could not load sessions: ${escHtml(e.message)}</div>`;
+    list.innerHTML = `<div class="sys-empty">${escHtml(trText('Could not load sessions:'))} ${escHtml(e.message)}</div>`;
     refreshSettingsSectionVisibility();
   } finally {
     activeSettingsFetchControllers.delete(ctrl);
@@ -3886,24 +3899,27 @@ function renderSessions(rows) {
   const list = document.getElementById('sessions-list');
   const dot = document.getElementById('dot-sessions');
   if (!list) return;
+  rows = Array.isArray(rows) ? rows : [];
+  lastSessionRows = rows;
   if (dot) dot.style.background = rows.length ? 'var(--green)' : 'var(--muted)';
   const sorted = [...rows].sort((a, b) => Number(b.lastSeen || 0) - Number(a.lastSeen || 0));
-  const signature = JSON.stringify(sorted.map(s => [s.token, s.username, s.browser, s.publicIp, s.ip, s.lastSeen, s.created, s.expires, s.current, s.userAgent]));
+  const lang = currentLang();
+  const signature = JSON.stringify([lang, sorted.map(s => [s.token, s.username, s.browser, s.publicIp, s.ip, s.lastSeen, s.created, s.expires, s.current, s.userAgent])]);
   const html = sorted.length ? sorted.map(s => {
-    const title = `${s.username || 'unknown'} - ${s.browser || 'Unknown browser'}`;
+    const title = `${s.username || trText('unknown', lang)} - ${s.browser || trText('Unknown browser', lang)}`;
     const where = s.publicIp || s.ip || '-';
     return `
       <div class="agent-row session-row">
         <div class="session-main">
-          <div class="session-title">${escHtml(title)}${s.current ? '<span class="session-badge">current</span>' : ''}</div>
-          <div class="session-meta">IP ${escHtml(where)} - Last seen ${escHtml(fmtSessionTime(s.lastSeen))} - Created ${escHtml(fmtSessionTime(s.created))} - Expires ${escHtml(fmtSessionTime(s.expires))}</div>
+          <div class="session-title">${escHtml(title)}${s.current ? `<span class="session-badge">${escHtml(trText('current', lang))}</span>` : ''}</div>
+          <div class="session-meta">IP ${escHtml(where)} - ${escHtml(trText('Last seen', lang))} ${escHtml(fmtSessionTime(s.lastSeen))} - ${escHtml(trText('Created', lang))} ${escHtml(fmtSessionTime(s.created))} - ${escHtml(trText('Expires', lang))} ${escHtml(fmtSessionTime(s.expires))}</div>
           <div class="session-meta">${escHtml(s.userAgent || '')}</div>
         </div>
         <div class="session-actions">
-          <button type="button" class="btn-danger session-force-signout" data-token="${escHtml(s.token || '')}" data-username="${escHtml(s.username || 'this user')}">Force sign out</button>
+          <button type="button" class="btn-danger session-force-signout" data-token="${escHtml(s.token || '')}" data-username="${escHtml(s.username || trText('this user', lang))}">${escHtml(trText('Force sign out', lang))}</button>
         </div>
       </div>`;
-  }).join('') : '<div class="sys-empty">No active sessions.</div>';
+  }).join('') : `<div class="sys-empty">${escHtml(trText('No active sessions.', lang))}</div>`;
   setStableHtml(list, signature, html);
 }
 
@@ -3928,7 +3944,7 @@ async function forceSignOutSession(token, username) {
     handleUnauth(r);
     const b = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(b.error || r.statusText);
-    toast('Session signed out', 'ok');
+    toast(trText('Session signed out'), 'ok');
     await loadSessions();
   } catch (e) {
     toast(e.message, 'err');
@@ -3981,14 +3997,24 @@ function applyCertificates(files) {
   if (!el) return;
   const list = Array.isArray(files) ? files : [];
   setCertificatesDot(list.length ? 'ok' : 'gray');
-  const signature = JSON.stringify(list.map(f => [f.name, f.size, f.trusted]));
-  const html = list.length ? list.map(f => `
-    <div class="agent-row">
-      <span style="font-weight:600">${escHtml(f.name)}</span>
-      <span style="color:var(--muted);font-size:12px">${Math.round((f.size||0)/1024)} KB · ${f.trusted?'trusted':'stored'}</span>
+  const signature = JSON.stringify(list.map(f => [f.name, f.size, f.trusted, f.commonName]));
+  const html = list.length ? list.map(f => {
+    const commonName = String(f.commonName || '').trim();
+    const trustLabel = f.trusted ? 'trusted' : 'stored';
+    const cnHtml = commonName ? `<span class="cert-badge common-name"><span class="cert-cn-label">${escHtml(trText('Common name'))}</span>${escHtml(commonName)}</span>` : '';
+    return `
+    <div class="agent-row cert-row">
+      <div class="cert-main">
+        <span class="cert-title">${escHtml(f.name)}</span>
+        <span class="cert-badges">
+          <span class="cert-badge ${f.trusted ? 'trusted' : 'stored'}">${escHtml(trText(trustLabel))}</span>
+          ${cnHtml}
+        </span>
+      </div>
       <span style="flex:1"></span>
       <button class="btn-rm" type="button" onclick="deleteCertificate('${escHtml(f.name)}',this)">✕</button>
-    </div>`).join('') : '<div class="sys-empty">No certificates uploaded.</div>';
+    </div>`;
+  }).join('') : '<div class="sys-empty">No certificates uploaded.</div>';
   setStableHtml(el, signature, html);
 }
 
@@ -4122,13 +4148,45 @@ function toast(msg, type) {
 
 function dotColor(st){ return st==='ok'?'var(--green)':st==='bad'?'var(--red)':st==='warn'?'var(--yellow)':'var(--muted)'; }
 
-function openLowIoInfo(event) {
+const SETTINGS_INFO_CONTENT = {
+  lowIo: {
+    title: 'Low I/O mode',
+    copy: 'Low I/O mode reduces disk writes by batching runtime snapshots, history writes and agent state updates. Values can appear a little later, but the UI stays responsive and storage load drops.',
+  },
+  resourceThresholds: {
+    title: 'Resource thresholds',
+    copy: 'Set warning and critical percentages for CPU, RAM and disk usage. When a metric stays beyond its threshold long enough, OmniSight creates the matching alert.',
+  },
+  alertTiming: {
+    title: 'Alert timing',
+    copy: 'Control how many seconds a condition must remain active before a notification is sent. Deployment values are loaded into settings, and the latest saved setting is the active value.',
+  },
+  maintenanceWindow: {
+    title: 'Maintenance window',
+    copy: 'Suppress alert notifications during planned maintenance. Use start and end times, then optionally limit the window to comma-separated days such as mon,tue,wed.',
+  },
+  anomalyDetection: {
+    title: 'Anomaly detection',
+    copy: 'Detect CPU or RAM values that move outside the recent normal range. Minimum samples, duration and sensitivity help prevent noisy one-off spikes.',
+  },
+};
+
+function openSettingsInfo(event, key) {
   event?.stopPropagation?.();
+  const info = SETTINGS_INFO_CONTENT[key] || SETTINGS_INFO_CONTENT.lowIo;
   const title = document.getElementById('lowio-info-title');
   const copy = document.getElementById('lowio-info-copy');
-  if (title) title.textContent = trText('Low I/O mode');
-  if (copy) copy.textContent = trText('Low I/O mode reduces disk writes by batching runtime snapshots, history writes and agent state updates. Values can appear a little later, but the UI stays responsive and storage load drops.');
+  if (title) title.textContent = trText(info.title);
+  if (copy) copy.textContent = trText(info.copy);
   document.getElementById('lowio-info-modal')?.classList.add('open');
+}
+
+function openLowIoInfo(event) {
+  openSettingsInfo(event, 'lowIo');
+}
+
+function openAlertInfo(event, key) {
+  openSettingsInfo(event, key);
 }
 
 function closeLowIoInfo() {
