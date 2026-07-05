@@ -382,6 +382,9 @@ html[data-theme="light"] .ci-help{color:#53657c}
     <button class="settings-nav-btn" type="button" data-nav-parent="infra" data-target="uptimekuma" onclick="showSettingsSection('uptimekuma')"><span class="settings-nav-dot" data-nav-dot="uptimekuma"></span><span>Uptime Kuma</span></button>
     <button class="settings-nav-btn" type="button" data-nav-parent="infra" data-target="checks" onclick="showSettingsSection('checks')"><span class="settings-nav-dot" data-nav-dot="checks"></span><span>Service checks</span></button>
     <button class="settings-nav-btn" type="button" data-nav-parent="infra" data-target="prometheus" onclick="showSettingsSection('prometheus')"><span class="settings-nav-dot" data-nav-dot="prometheus"></span><span>Prometheus</span></button>
+    <button class="settings-nav-btn" type="button" data-nav-parent="infra" data-target="mikrotik" onclick="showSettingsSection('mikrotik')"><span class="settings-nav-dot" data-nav-dot="mikrotik"></span><span>MikroTik</span></button>
+    <button class="settings-nav-btn" type="button" data-nav-parent="infra" data-target="unifi" onclick="showSettingsSection('unifi')"><span class="settings-nav-dot" data-nav-dot="unifi"></span><span>UniFi</span></button>
+    <button class="settings-nav-btn" type="button" data-nav-parent="infra" data-target="snmp" onclick="showSettingsSection('snmp')"><span class="settings-nav-dot" data-nav-dot="snmp"></span><span>SNMP</span></button>
     <button class="settings-nav-btn" type="button" data-nav-parent="infra" data-target="firewall" onclick="showSettingsSection('firewall')"><span class="settings-nav-dot" data-nav-dot="firewall"></span><span>Firewalls</span></button>
     <button class="settings-nav-btn" type="button" data-nav-parent="infra" data-target="cloudflare" onclick="showSettingsSection('cloudflare')"><span class="settings-nav-dot" data-nav-dot="cloudflare"></span><span>Cloudflare</span></button>
     <button class="settings-nav-btn" type="button" data-nav-parent="infra" data-target="cicd" onclick="showSettingsSection('cicd')"><span class="settings-nav-dot" data-nav-dot="cicd"></span><span>GitHub/GitLab CI</span></button>
@@ -782,18 +785,67 @@ html[data-theme="light"] .ci-help{color:#53657c}
       <div class="card-icon" id="dot-synology" style="background:var(--muted)"></div>
       <span class="card-title">Synology</span>
     </div>
-    <label class="toggle"><input type="checkbox" id="en-synology" onchange="toggleCard('synology')"><span class="toggle-t"></span></label>
+    <label class="toggle"><input type="checkbox" id="en-synology" onchange="syncSnmpToggles(this.checked);toggleCard('synology')"><span class="toggle-t"></span></label>
   </div>
   <div class="card-body hidden" id="cb-synology">
+    <div style="font-size:12px;color:var(--muted);line-height:1.35;margin-bottom:10px">Choose the collection method inside the Synology platform. SNMP is active today; API/REST/WebSocket can be stored per system as the integration grows.</div>
+    <div id="syn-list"></div>
+    <button class="btn-sm" style="margin-top:4px" onclick="addSynDevice({profile:'synology'}, 'syn-list', 'synology')">+ Add Synology</button>
+  </div>
+</div>
+
+<!-- MikroTik -->
+<div class="card" data-settings-section="mikrotik">
+  <div class="card-hdr">
+    <div class="card-left">
+      <div class="card-icon" id="dot-mikrotik" style="background:var(--muted)"></div>
+      <span class="card-title">MikroTik</span>
+    </div>
+    <label class="toggle"><input type="checkbox" id="en-mikrotik" onchange="syncSnmpToggles(this.checked);toggleCard('mikrotik')"><span class="toggle-t"></span></label>
+  </div>
+  <div class="card-body hidden" id="cb-mikrotik">
+    <div style="font-size:12px;color:var(--muted);line-height:1.35;margin-bottom:10px">MikroTik devices use the SNMP collector, but appear under their own brand section.</div>
+    <div id="mikrotik-list"></div>
+    <button class="btn-sm" style="margin-top:4px" onclick="addSynDevice({profile:'mikrotik'}, 'mikrotik-list', 'mikrotik')">+ Add MikroTik</button>
+  </div>
+</div>
+
+<!-- UniFi -->
+<div class="card" data-settings-section="unifi">
+  <div class="card-hdr">
+    <div class="card-left">
+      <div class="card-icon" id="dot-unifi" style="background:var(--muted)"></div>
+      <span class="card-title">UniFi</span>
+    </div>
+    <label class="toggle"><input type="checkbox" id="en-unifi" onchange="syncSnmpToggles(this.checked);toggleCard('unifi')"><span class="toggle-t"></span></label>
+  </div>
+  <div class="card-body hidden" id="cb-unifi">
+    <div style="font-size:12px;color:var(--muted);line-height:1.35;margin-bottom:10px">UniFi devices use the SNMP collector, but appear under their own brand section.</div>
+    <div id="unifi-list"></div>
+    <button class="btn-sm" style="margin-top:4px" onclick="addSynDevice({profile:'unifi'}, 'unifi-list', 'unifi')">+ Add UniFi</button>
+  </div>
+</div>
+
+<!-- SNMP -->
+<div class="card" data-settings-section="snmp">
+  <div class="card-hdr">
+    <div class="card-left">
+      <div class="card-icon" id="dot-snmp" style="background:var(--muted)"></div>
+      <span class="card-title">SNMP</span>
+    </div>
+    <label class="toggle"><input type="checkbox" id="en-snmp" onchange="syncSnmpToggles(this.checked);toggleCard('snmp')"><span class="toggle-t"></span></label>
+  </div>
+  <div class="card-body hidden" id="cb-snmp">
     <div class="form-group"><label>Icon (optional)</label>
       <div class="path-row">
-        <input type="text" id="icon-synology" placeholder="e.g. synology or unifi.png — from dashboard-icons">
-        <button type="button" class="btn-sm" onclick="document.getElementById('icon-synology-f').click()">Browse…</button>
-        <input type="file" id="icon-synology-f" accept="image/*,.svg" style="display:none" onchange="uploadIcon(this,'icon-synology')">
+        <input type="text" id="icon-snmp" placeholder="e.g. snmp or network.png — from dashboard-icons">
+        <button type="button" class="btn-sm" onclick="document.getElementById('icon-snmp-f').click()">Browse…</button>
+        <input type="file" id="icon-snmp-f" accept="image/*,.svg" style="display:none" onchange="uploadIcon(this,'icon-snmp')">
       </div>
     </div>
-    <div id="syn-list"></div>
-    <button class="btn-sm" style="margin-top:4px" onclick="addSynDevice()">+ Add Device</button>
+    <div style="font-size:12px;color:var(--muted);line-height:1.35;margin-bottom:10px">Use this section for generic or unknown-brand SNMP devices.</div>
+    <div id="snmp-list"></div>
+    <button class="btn-sm" style="margin-top:4px" onclick="addSynDevice({profile:'generic'}, 'snmp-list', 'generic')">+ Add SNMP Device</button>
   </div>
 </div>
 
@@ -1047,7 +1099,7 @@ html[data-theme="light"] .ci-help{color:#53657c}
         <h3>Storage systems</h3>
         <button class="btn-add" type="button" onclick="addTrueNasInstance()">+ Add TrueNAS</button>
       </div>
-      <div style="font-size:12px;color:var(--muted);line-height:1.35;margin-bottom:10px">Auto mode uses the current TrueNAS WebSocket API first, then falls back to the older REST API when needed.</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.35;margin-bottom:10px">Choose the collection method inside the TrueNAS platform. Auto uses WebSocket first, then falls back to REST when needed.</div>
       <div id="truenas-list"></div>
     </div>
   </div>
@@ -1075,7 +1127,7 @@ html[data-theme="light"] .ci-help{color:#53657c}
         <h3>Storage systems</h3>
         <button class="btn-add" type="button" onclick="addQnapInstance()">+ Add QNAP</button>
       </div>
-      <div style="font-size:12px;color:var(--muted);line-height:1.35;margin-bottom:10px">Uses QNAP QTS authLogin.cgi and File Station SID check from the official HTTP API documentation.</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.35;margin-bottom:10px">Choose the collection method inside the QNAP platform. The default uses QTS HTTP API login and SID checks.</div>
       <div id="qnap-list"></div>
     </div>
   </div>
@@ -1103,7 +1155,7 @@ html[data-theme="light"] .ci-help{color:#53657c}
         <h3>Storage systems</h3>
         <button class="btn-add" type="button" onclick="addUgreenInstance()">+ Add Ugreen</button>
       </div>
-      <div style="font-size:12px;color:var(--muted);line-height:1.35;margin-bottom:10px">UGREEN publishes product documentation but no stable public API; OmniSight checks UGOS Pro web reachability.</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.35;margin-bottom:10px">Choose the collection method inside the Ugreen platform. Web check is the default until a stable UGOS API is available.</div>
       <div id="ugreen-list"></div>
     </div>
   </div>
@@ -2492,7 +2544,7 @@ function addFirewallInstance(data = {}) {
 function addTrueNasInstance(data = {}) {
   const idx = trueNasCount++;
   const id = `truenas-${idx}`;
-  const mode = String(data.apiMode || data.mode || 'auto').toLowerCase();
+  const mode = String(data.apiMode || data.method || data.mode || 'auto').toLowerCase();
   const item = document.createElement('div');
   item.className = 'arr-item';
   item.innerHTML = `
@@ -2503,7 +2555,7 @@ function addTrueNasInstance(data = {}) {
     <div class="arr-body" id="ab-${id}">
       <div class="form-grid">
         <div class="form-group"><label>Name</label><input type="text" class="tn-name" value="${escHtml(data.name||'')}" placeholder="truenas01" oninput="this.closest('.arr-item').querySelector('.arr-hdr-name').textContent=this.value||'TrueNAS'"></div>
-        <div class="form-group"><label>API mode</label><select class="tn-mode">
+        <div class="form-group"><label>Connection method</label><select class="tn-mode">
           <option value="auto" ${mode==='auto'?'selected':''}>Auto</option>
           <option value="websocket" ${['websocket','ws','jsonrpc'].includes(mode)?'selected':''}>WebSocket JSON-RPC</option>
           <option value="rest" ${mode==='rest'?'selected':''}>REST v2.0</option>
@@ -2523,6 +2575,7 @@ function addTrueNasInstance(data = {}) {
 function addQnapInstance(data = {}) {
   const idx = qnapCount++;
   const id = `qnap-${idx}`;
+  const method = String(data.method || data.connectionMethod || 'qts-api').toLowerCase();
   const item = document.createElement('div');
   item.className = 'arr-item';
   item.innerHTML = `
@@ -2533,6 +2586,11 @@ function addQnapInstance(data = {}) {
     <div class="arr-body" id="ab-${id}">
       <div class="form-grid">
         <div class="form-group"><label>Name</label><input type="text" class="qnap-name" value="${escHtml(data.name||'')}" placeholder="qnap01" oninput="this.closest('.arr-item').querySelector('.arr-hdr-name').textContent=this.value||'QNAP'"></div>
+        <div class="form-group"><label>Connection method</label><select class="qnap-method">
+          <option value="qts-api" ${method==='qts-api'||method==='api'?'selected':''}>QTS HTTP API</option>
+          <option value="snmp" ${method==='snmp'?'selected':''}>SNMP</option>
+          <option value="rest" ${method==='rest'?'selected':''}>REST API</option>
+        </select></div>
         <div class="form-group"><label>URL</label><input type="text" class="qnap-url" value="${escHtml(data.url||'')}" placeholder="https://qnap.yourdomain.com:8080"></div>
         <div class="form-group"><label>Username</label><input type="text" class="qnap-user" value="${escHtml(data.username||data.user||'')}" placeholder="monitoring user"></div>
         <div class="form-group"><label>Password</label><input type="password" class="qnap-password" placeholder="leave blank to keep current password"></div>
@@ -2548,6 +2606,7 @@ function addQnapInstance(data = {}) {
 function addUgreenInstance(data = {}) {
   const idx = ugreenCount++;
   const id = `ugreen-${idx}`;
+  const method = String(data.method || data.connectionMethod || 'web').toLowerCase();
   const item = document.createElement('div');
   item.className = 'arr-item';
   item.innerHTML = `
@@ -2558,6 +2617,11 @@ function addUgreenInstance(data = {}) {
     <div class="arr-body" id="ab-${id}">
       <div class="form-grid">
         <div class="form-group"><label>Name</label><input type="text" class="ugreen-name" value="${escHtml(data.name||'')}" placeholder="ugreen01" oninput="this.closest('.arr-item').querySelector('.arr-hdr-name').textContent=this.value||'Ugreen'"></div>
+        <div class="form-group"><label>Connection method</label><select class="ugreen-method">
+          <option value="web" ${method==='web'||method==='web-check'?'selected':''}>UGOS web check</option>
+          <option value="api" ${method==='api'?'selected':''}>UGOS API</option>
+          <option value="snmp" ${method==='snmp'?'selected':''}>SNMP</option>
+        </select></div>
         <div class="form-group"><label>URL</label><input type="text" class="ugreen-url" value="${escHtml(data.url||'')}" placeholder="https://ugreen.yourdomain.com"></div>
         <div class="form-group"><label>TLS</label><select class="ugreen-insecure"><option value="false" ${!data.insecureTLS?'selected':''}>Verify certificate</option><option value="true" ${data.insecureTLS?'selected':''}>Allow self-signed</option></select></div>
       </div>
@@ -3363,13 +3427,29 @@ async function removeAgent(id, btn) {
 
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAddModal(); });
 
-/* ── Synology device form ── */
-function addSynDevice(data = {}) {
+/* ── SNMP-backed device form ── */
+function syncSnmpToggles(checked) {
+  ['en-synology', 'en-mikrotik', 'en-unifi', 'en-snmp'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.checked = !!checked;
+  });
+}
+function addSynDevice(data = {}, targetListId = '', forcedProfile = '') {
   const idx = sCount++;
   const id = `syn-${idx}`;
   const ver = data.snmpVersion === 3 ? '3' : '2c';
-  const rawProfile = data.profile || data.preset || 'generic';
-  const profile = rawProfile === 'linux' ? 'generic' : rawProfile;
+  const profile = normalizeSnmpProfile(forcedProfile || data.profile || data.preset);
+  const method = String(data.method || data.connectionMethod || 'snmp').toLowerCase();
+  const meta = snmpProfileMeta(profile);
+  const listId = targetListId || meta.listId;
+  const methodOptions = profile === 'synology'
+    ? [
+        ['snmp', 'SNMP'],
+        ['api', 'Synology API'],
+        ['rest', 'REST API'],
+        ['websocket', 'WebSocket'],
+      ]
+    : [['snmp', 'SNMP']];
   const el = document.createElement('div');
   el.className = 'arr-item';
   el.id = id;
@@ -3385,7 +3465,7 @@ function addSynDevice(data = {}) {
       <div class="form-grid">
         <div class="form-group">
           <label>Name</label>
-          <input type="text" class="s-name" value="${escHtml(data.name||'')}" placeholder="NAS-01"
+          <input type="text" class="s-name" value="${escHtml(data.name||'')}" placeholder="${escHtml(meta.placeholder)}"
             oninput="this.closest('.arr-item').querySelector('.arr-hdr-name').textContent=this.value||'New Device'">
         </div>
         <div class="form-group">
@@ -3394,12 +3474,14 @@ function addSynDevice(data = {}) {
         </div>
       </div>
       <div class="form-group">
-        <label>Device profile</label>
-        <select class="s-profile" onchange="onSynProfile(this)">
-          <option value="generic" ${profile==='generic'?'selected':''}>Generic SNMP</option>
-          <option value="synology" ${profile==='synology'?'selected':''}>Synology</option>
-          <option value="mikrotik" ${profile==='mikrotik'?'selected':''}>MikroTik</option>
-          <option value="unifi" ${profile==='unifi'?'selected':''}>UniFi</option>
+        <label>Platform</label>
+        <input type="hidden" class="s-profile" value="${escHtml(profile)}">
+        <input type="text" value="${escHtml(meta.label)}" disabled>
+      </div>
+      <div class="form-group">
+        <label>Connection method</label>
+        <select class="s-method">
+          ${methodOptions.map(([value, label]) => `<option value="${value}" ${method===value?'selected':''}>${label}</option>`).join('')}
         </select>
       </div>
       <div class="form-group">
@@ -3450,12 +3532,11 @@ function addSynDevice(data = {}) {
         </div>
       </div>
     </div>`;
-  document.getElementById('syn-list').appendChild(el);
+  document.getElementById(listId)?.appendChild(el);
 }
 
 function profileLabel(profile) {
-  const labels = { generic: 'Generic', synology: 'Synology', mikrotik: 'MikroTik', unifi: 'UniFi' };
-  return labels[profile] || labels.generic;
+  return snmpProfileMeta(profile).label;
 }
 
 function onSynProfile(sel) {
@@ -3600,6 +3681,9 @@ function closeConfirmModal(ok) {
 const DYNAMIC_CONFIG_LIST_IDS = [
   'px-ssh-list',
   'syn-list',
+  'mikrotik-list',
+  'unifi-list',
+  'snmp-list',
   'checks-list',
   'prom-list',
   'docker-api-list',
@@ -3615,6 +3699,21 @@ const DYNAMIC_CONFIG_LIST_IDS = [
   'portainer-list',
   'db-list',
 ];
+
+const SNMP_PROFILE_META = {
+  synology: { label: 'Synology', listId: 'syn-list', placeholder: 'Synology-01' },
+  mikrotik: { label: 'MikroTik', listId: 'mikrotik-list', placeholder: 'MikroTik-01' },
+  unifi: { label: 'UniFi', listId: 'unifi-list', placeholder: 'UniFi-01' },
+  generic: { label: 'SNMP', listId: 'snmp-list', placeholder: 'SNMP-01' },
+};
+function normalizeSnmpProfile(profile) {
+  const value = String(profile || 'generic').trim().toLowerCase();
+  if (value === 'linux') return 'generic';
+  return SNMP_PROFILE_META[value] ? value : 'generic';
+}
+function snmpProfileMeta(profile) {
+  return SNMP_PROFILE_META[normalizeSnmpProfile(profile)] || SNMP_PROFILE_META.generic;
+}
 
 function normalizeConfigKeyPart(value) {
   return String(value ?? '').trim().toLowerCase();
@@ -3742,10 +3841,10 @@ function populate(cfg) {
     (cfg.kubernetes.namespaces || []).forEach(n => appendTag('k8s-ns', n));
   }
   if (cfg.snmp) {
-    document.getElementById('en-synology').checked = cfg.snmp.enabled !== false;
-    document.getElementById('cb-synology').classList.remove('hidden');
-    document.getElementById('icon-synology').value = cfg.snmp.icon || '';
-    uniqueConfigItems(cfg.snmp.devices || [], ['name', 'host']).forEach(addSynDevice);
+    syncSnmpToggles(cfg.snmp.enabled !== false);
+    ['cb-synology', 'cb-mikrotik', 'cb-unifi', 'cb-snmp'].forEach(id => document.getElementById(id)?.classList.remove('hidden'));
+    document.getElementById('icon-snmp').value = cfg.snmp.icon || '';
+    uniqueConfigItems(cfg.snmp.devices || [], ['name', 'host']).forEach(device => addSynDevice(device));
   }
   if (cfg.healthchecks) {
     document.getElementById('en-healthchecks').checked = cfg.healthchecks.enabled !== false;
@@ -4099,14 +4198,15 @@ function collect() {
   }
 
   {
-    const on = document.getElementById('en-synology').checked;
+    const on = ['en-synology', 'en-mikrotik', 'en-unifi', 'en-snmp'].some(id => document.getElementById(id)?.checked);
     const devices = [];
-    document.querySelectorAll('#syn-list .arr-item').forEach(item => {
+    document.querySelectorAll('#syn-list .arr-item,#mikrotik-list .arr-item,#unifi-list .arr-item,#snmp-list .arr-item').forEach(item => {
       const ver = item.querySelector('.s-ver').value;
       const dev = {
         name: item.querySelector('.s-name').value.trim(),
         host: item.querySelector('.s-host').value.trim(),
-        profile: item.querySelector('.s-profile')?.value || 'generic',
+        profile: normalizeSnmpProfile(item.querySelector('.s-profile')?.value || 'generic'),
+        method: item.querySelector('.s-method')?.value || 'snmp',
         snmpVersion: ver === '3' ? 3 : 2,
       };
       if (ver === '3') {
@@ -4122,7 +4222,7 @@ function collect() {
       if (dev.name && dev.host) devices.push(dev);
     });
     const uniqueDevices = uniqueConfigItems(devices, ['name', 'host']);
-    if (on || uniqueDevices.length) cfg.snmp = { enabled: on, devices: uniqueDevices, icon: document.getElementById('icon-synology').value.trim() || undefined };
+    if (on || uniqueDevices.length) cfg.snmp = { enabled: on, devices: uniqueDevices, icon: document.getElementById('icon-snmp').value.trim() || undefined };
   }
 
   {
@@ -4303,6 +4403,7 @@ function collect() {
         name: name || undefined,
         url: url || undefined,
         apiMode: item.querySelector('.tn-mode').value || 'auto',
+        method: item.querySelector('.tn-mode').value || 'auto',
         username: item.querySelector('.tn-user').value.trim() || undefined,
         apiKey: apiKey || undefined,
         password: password || undefined,
@@ -4328,6 +4429,7 @@ function collect() {
       if (url || name) instances.push({
         name: name || undefined,
         url: url || undefined,
+        method: item.querySelector('.qnap-method')?.value || 'qts-api',
         username: item.querySelector('.qnap-user').value.trim() || undefined,
         password: password || undefined,
         sid: sid || undefined,
@@ -4351,6 +4453,7 @@ function collect() {
       if (url || name) instances.push({
         name: name || undefined,
         url: url || undefined,
+        method: item.querySelector('.ugreen-method')?.value || 'web',
         insecureTLS: item.querySelector('.ugreen-insecure').value === 'true' || undefined,
       });
     });
@@ -4733,7 +4836,7 @@ function previewUploadedIcon(targetId, path) {
     'icon-linux': 'linux',
     'icon-windows': 'windows',
     'icon-kubernetes': 'kubernetes',
-    'icon-synology': 'snmp',
+    'icon-snmp': 'snmp',
     'icon-healthchecks': 'healthchecks',
     'icon-uptimekuma': 'uptimekuma',
     'icon-checks': 'checks',
@@ -5160,7 +5263,7 @@ async function loadCertificates(opts = {}) {
     const r = await fetch('/api/certificates', { headers: authHeaders(), cache: 'no-store' });
     handleUnauth(r);
     const b = await r.json();
-    const files = b.files || [];
+    const files = Array.isArray(b) ? b : (b.files || []);
     writeSessionCache(SETTINGS_CERTS_CACHE_KEY, files);
     applyCertificates(files);
     loadCertificates.lastLoaded = Date.now();
@@ -5465,13 +5568,22 @@ async function refreshDots(cfg, newData){
   const kOnline = !!(d.kubernetes && d.kubernetes.online);
   setDot('dot-kubernetes', platformDot(en(cfg.kubernetes), d.kubernetes ? 1 : 0, kOnline ? 1 : 0, !!d.kubernetes?._connecting));
   const snmpRows = d.snmp || [];
-  const snmpTotal = Math.max(snmpRows.length, cfg.snmp?.devices?.length || 0);
-  const snmpConfigured = cfg.snmp?.devices?.length || 0;
-  const snmpOnline = snmpRows.filter(x=>x.online).length;
-  const snmpConnecting = snmpRows.some(x=>x._connecting)
-    || (en(cfg.snmp) && snmpConfigured > 0 && snmpRows.length < snmpConfigured)
-    || (en(cfg.snmp) && snmpConfigured > 0 && snmpOnline === 0 && (d.loading || d.refreshing));
-  setDot('dot-synology', platformDot(en(cfg.snmp), snmpTotal, snmpOnline, snmpConnecting));
+  const snmpDevices = cfg.snmp?.devices || [];
+  const profileStatus = profile => {
+    const key = normalizeSnmpProfile(profile);
+    const configured = snmpDevices.filter(x => normalizeSnmpProfile(x.profile || x.preset) === key);
+    const rows = snmpRows.filter(x => normalizeSnmpProfile(x.profile || x.preset) === key || configured.some(dev => (dev.name && dev.name === x.name) || (dev.host && dev.host === x.host)));
+    const total = Math.max(rows.length, configured.length);
+    const online = rows.filter(x=>x.online).length;
+    const connecting = rows.some(x=>x._connecting)
+      || (en(cfg.snmp) && configured.length > 0 && rows.length < configured.length)
+      || (en(cfg.snmp) && configured.length > 0 && online === 0 && (d.loading || d.refreshing));
+    return platformDot(en(cfg.snmp), total, online, connecting);
+  };
+  setDot('dot-synology', profileStatus('synology'));
+  setDot('dot-mikrotik', profileStatus('mikrotik'));
+  setDot('dot-unifi', profileStatus('unifi'));
+  setDot('dot-snmp', profileStatus('generic'));
   const hcOnline = !!(d.healthchecks && d.healthchecks.online);
   setDot('dot-healthchecks', platformDot(en(cfg.healthchecks), d.healthchecks ? 1 : 0, hcOnline ? 1 : 0, !!d.healthchecks?._connecting));
   const ukOnline = !!(d.uptimekuma && d.uptimekuma.online);
@@ -5626,6 +5738,7 @@ refreshSettingsSectionVisibility();
     afterFirstSettingsPaint(() => {
       refreshDots(cfg);
       scheduleSettingsDotsPoll(7000);
+      idleSettingsTask(() => loadCertificates({ force: true }), 900);
       idleSettingsTask(loadHostClock, 1500);
     });
     document.getElementById('security-password-reset')?.addEventListener('change', () => saveConfig({ silent: true, skipUsers: true, reason: 'password-reset-toggle' }));

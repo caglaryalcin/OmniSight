@@ -2007,8 +2007,8 @@ function stripDeprecatedConfig(obj) {
   return obj;
 }
 
-const UI_PLATFORM_IDS = new Set(['proxmox','kubernetes','linux','windows','snmp','healthchecks','uptimekuma','checks','prometheus','docker','dockhand','database','firewall','truenas','qnap','ugreen','pbs','cloudflare','cicd','veeam','portainer']);
-const UI_GROUP_KEYS = new Set(['pods','deps','svcs','snmpServers','dockerHosts','dockerContainers','checksServices','prometheusServers','prometheusTargets','firewallGateways','firewallLinks','truenasSystems','truenasPools','qnapSystems','ugreenSystems','pbsServers','pbsDatastores','cloudflareZones','cloudflareTunnels','cloudflareDomains','cicdProjects','cicdPipelines','veeamServers','veeamSessions','veeamRepositories','portainerServers','portainerEnvironments','portainerContainers','databaseServers']);
+const UI_PLATFORM_IDS = new Set(['proxmox','kubernetes','linux','windows','synology','mikrotik','unifi','snmp','healthchecks','uptimekuma','checks','prometheus','docker','dockhand','database','firewall','truenas','qnap','ugreen','pbs','cloudflare','cicd','veeam','portainer']);
+const UI_GROUP_KEYS = new Set(['pods','deps','svcs','synologyDevices','mikrotikDevices','unifiDevices','snmpDevices','snmpServers','dockerHosts','dockerContainers','checksServices','prometheusServers','prometheusTargets','firewallGateways','firewallLinks','truenasSystems','truenasPools','qnapSystems','ugreenSystems','pbsServers','pbsDatastores','pbsTasks','cloudflareZones','cloudflareTunnels','cloudflareDomains','cicdProjects','cicdPipelines','veeamServers','veeamSessions','veeamRepositories','portainerServers','portainerEnvironments','portainerContainers','databaseServers']);
 const UI_SORT_KEYS = new Set(['state','name','cpu','memory','disk','network','status','restarts']);
 const UI_KPI_KEYS = new Set(['cpu','memory','disk','bandwidth']);
 
@@ -2997,7 +2997,7 @@ function settingsStatusData(data = cache.data || EMPTY) {
       services: Array.isArray(data.kubernetes.services) ? data.kubernetes.services.length : 0,
       deployments: Array.isArray(data.kubernetes.deployments) ? data.kubernetes.deployments.length : 0,
     } : null,
-    snmp: (data.snmp || []).map(d => ({ name: d.name, host: d.host, online: !!d.online, _connecting: !!d._connecting })),
+    snmp: (data.snmp || []).map(d => ({ name: d.name, host: d.host, profile: d.profile || d.preset || 'generic', online: !!d.online, _connecting: !!d._connecting })),
     healthchecks: data.healthchecks ? {
       online: !!data.healthchecks.online,
       _connecting: !!data.healthchecks._connecting,
@@ -3078,6 +3078,17 @@ function settingsStatusData(data = cache.data || EMPTY) {
         _connecting: !!i._connecting,
         partial: !!i.partial,
         summary: i.summary || {},
+        tasks: Array.isArray(i.tasks) ? i.tasks.slice(0, 10).map(t => ({
+          id: t.id || '',
+          name: t.name || '',
+          taskId: t.taskId || '',
+          type: t.type || '',
+          status: t.status || '',
+          failed: !!t.failed,
+          running: !!t.running,
+          starttime: t.starttime || t.startTime || null,
+          endtime: t.endtime || t.endTime || null,
+        })) : [],
       })),
     } : null,
     cloudflare: data.cloudflare ? {
@@ -3231,6 +3242,17 @@ function topologyStatusData(data = cache.data || EMPTY) {
         _connecting: !!i._connecting,
         partial: !!i.partial,
         datastores: Array.isArray(i.datastores) ? i.datastores.map(d => ({ name: d.name, health: d.health, usedPercent: d.usedPercent })) : [],
+        tasks: Array.isArray(i.tasks) ? i.tasks.slice(0, 10).map(t => ({
+          id: t.id || '',
+          name: t.name || '',
+          taskId: t.taskId || '',
+          type: t.type || '',
+          status: t.status || '',
+          failed: !!t.failed,
+          running: !!t.running,
+          starttime: t.starttime || t.startTime || null,
+          endtime: t.endtime || t.endTime || null,
+        })) : [],
       })),
     } : null,
     portainer: data.portainer ? {
@@ -3444,11 +3466,18 @@ function configuredList() {
     return !!value;
   };
   const ids = [];
+  const snmpProfileId = device => {
+    const p = String(device?.profile || device?.preset || '').trim().toLowerCase();
+    return ['synology', 'mikrotik', 'unifi'].includes(p) ? p : 'snmp';
+  };
   if (en(config.proxmox)      && (agents.hasPve() || hasCachedRows('proxmox') || (config.proxmox.url && config.proxmox.tokenId && config.proxmox.tokenSecret))) ids.push('proxmox');
   if (en(config.kubernetes)   && config.kubernetes.kubeconfig)          ids.push('kubernetes');
   if (en(config.linux)        && config.linux.agentToken && (agents.hasLinux?.() || hasCachedRows('linux'))) ids.push('linux');
   if (en(config.windows)      && config.linux?.agentToken && (agents.hasWindows?.() || hasCachedRows('windows'))) ids.push('windows');
-  if (en(config.snmp)         && (config.snmp.devices || []).length)    ids.push('snmp');
+  if (en(config.snmp)         && (config.snmp.devices || []).length) {
+    const profiles = new Set((config.snmp.devices || []).map(snmpProfileId));
+    ['synology', 'mikrotik', 'unifi', 'snmp'].forEach(id => { if (profiles.has(id)) ids.push(id); });
+  }
   if (en(config.healthchecks) && config.healthchecks.url)               ids.push('healthchecks');
   if (en(config.uptimekuma)   && config.uptimekuma.url)                 ids.push('uptimekuma');
   if (en(config.checks)       && ((config.checks.services || config.checks.checks || []).length)) ids.push('checks');
@@ -8494,14 +8523,23 @@ function buildPublicSummary(data) {
       id: 'kubernetes',
       title: 'Kubernetes',
       status: k._connecting && !k.online ? 'connecting' : !k.online ? 'down' : (issue || sm.failed > 0 ? 'warn' : 'ok'),
-      meta: k._connecting && !k.online ? 'connecting...' : !k.online ? 'unreachable' : issue ? 'no resources found' : `${sm.running || 0}/${sm.total || 0}\npods running`,
+      meta: k._connecting && !k.online ? 'connecting...' : !k.online ? 'unreachable' : issue ? 'no resources found' : `${sm.running || 0}/${sm.total || 0} pods`,
     });
   }
   if ((data.snmp || []).length) {
-    const connecting = data.snmp.filter(d => d._connecting && !d.online).length;
-    const rows = data.snmp.filter(d => !d._connecting || d.online);
-    const up = rows.filter(d => d.online).length;
-    out.push({ id: 'snmp', title: 'SNMP', status: !rows.length && connecting ? 'connecting' : up === rows.length && !connecting ? 'ok' : up > 0 ? 'warn' : 'down', meta: !rows.length && connecting ? 'connecting...' : `${up}/${rows.length} up${connecting ? ` · ${connecting} connecting` : ''}` });
+    const profileId = d => {
+      const p = String(d?.profile || d?.preset || '').trim().toLowerCase();
+      return ['synology', 'mikrotik', 'unifi'].includes(p) ? p : 'snmp';
+    };
+    const titles = { synology: 'Synology', mikrotik: 'MikroTik', unifi: 'UniFi', snmp: 'SNMP' };
+    for (const id of ['synology', 'mikrotik', 'unifi', 'snmp']) {
+      const devices = data.snmp.filter(d => profileId(d) === id);
+      if (!devices.length) continue;
+      const connecting = devices.filter(d => d._connecting && !d.online).length;
+      const rows = devices.filter(d => !d._connecting || d.online);
+      const up = rows.filter(d => d.online).length;
+      out.push({ id, title: titles[id], status: !rows.length && connecting ? 'connecting' : up === rows.length && !connecting ? 'ok' : up > 0 ? 'warn' : 'down', meta: !rows.length && connecting ? 'connecting...' : `${up}/${rows.length} up${connecting ? ` · ${connecting} connecting` : ''}` });
+    }
   }
   const hc = data.healthchecks;
   if (hc && hc.online !== undefined) {
@@ -8552,7 +8590,7 @@ function buildPublicSummary(data) {
     const total = dockerRows.reduce((a, h) => a + (h.summary?.total || 0), 0);
     const stopped = dockerRows.reduce((a, h) => a + (h.summary?.stopped || 0), 0);
     const status = !dockerRows.length && connecting ? 'connecting' : up < dockerRows.length ? (up > 0 ? 'warn' : 'down') : (connecting || stopped > 0 ? 'warn' : 'ok');
-    const meta = stopped > 0 ? `${running}/${total} running\n${stopped} stopped` : `${running}/${total}\ncontainers running`;
+    const meta = stopped > 0 ? `${running}/${total} running\n${stopped} stopped` : `${running}/${total} containers`;
     out.push({ id: 'docker', title: 'Docker', status, meta: dockerRows.length ? meta : 'connecting...' });
   }
   const dh = data.dockhand;
@@ -8620,7 +8658,7 @@ function buildPublicSummary(data) {
     const down = Number(sm.down || 0);
     const warn = Number(sm.datastoresWarn || 0) + Number(sm.failedTasks || 0);
     const status = pbs._connecting && !pbs.online ? 'connecting' : !pbs.online || up === 0 ? 'down' : (down > 0 || warn > 0 ? 'warn' : 'ok');
-    const meta = pbs._connecting && !pbs.online ? 'connecting...' : pbs.online ? `${up}/${sm.instances || 0} servers · ${sm.datastores || 0} datastores` : 'unreachable';
+    const meta = pbs._connecting && !pbs.online ? 'connecting...' : pbs.online ? `${up}/${sm.instances || 0} servers · ${sm.datastores || 0} DST` : 'unreachable';
     out.push({ id: 'pbs', title: 'Proxmox Backup', status, meta });
   }
   const cfPublic = data.cloudflare;
@@ -8634,8 +8672,7 @@ function buildPublicSummary(data) {
     const partial = !!cfPublic.partial || Number(sm.errors || 0) > 0;
     const status = cfPublic._connecting && !cfPublic.online ? 'connecting' : !cfPublic.online ? 'down' : (zoneWarn > 0 || tunnelsDown > 0 || domainWarn > 0 || partial ? 'warn' : 'ok');
     const tunnelMeta = Number(sm.tunnels || 0) ? ` - ${sm.tunnelsHealthy || 0}/${sm.tunnels} tunnels` : '';
-    const domainMeta = Number(sm.domains || 0) ? ` - ${domainWarn}/${sm.domains} domains expiring` : '';
-    const meta = cfPublic._connecting && !cfPublic.online ? 'connecting...' : cfPublic.online ? `${active}/${zones} zones${tunnelMeta}${domainMeta}` : 'unreachable';
+    const meta = cfPublic._connecting && !cfPublic.online ? 'connecting...' : cfPublic.online ? `${active}/${zones} zones${tunnelMeta}` : 'unreachable';
     out.push({ id: 'cloudflare', title: 'Cloudflare', status, meta });
   }
   const ciPublic = data.cicd;
@@ -8660,7 +8697,7 @@ function buildPublicSummary(data) {
     const running = Number(sm.runningSessions || 0);
     const status = veeam._connecting && !veeam.online ? 'connecting' : !veeam.online || up === 0 ? 'down' : (down > 0 || warn > 0 ? 'warn' : 'ok');
     const runMeta = running ? ` - ${running} running` : '';
-    const meta = veeam._connecting && !veeam.online ? 'connecting...' : veeam.online ? `${up}/${sm.instances || 0} servers - ${sm.failedSessions || 0}/${sm.sessions || 0} failed sessions${runMeta}` : 'unreachable';
+    const meta = veeam._connecting && !veeam.online ? 'connecting...' : veeam.online ? `${up}/${sm.instances || 0} servers ${sm.failedSessions || 0}/${sm.sessions || 0} failed${runMeta}` : 'unreachable';
     out.push({ id: 'veeam', title: 'Veeam', status, meta });
   }
   const portainer = data.portainer;
@@ -8670,7 +8707,7 @@ function buildPublicSummary(data) {
     const down = Number(sm.down || 0);
     const warn = Number(sm.environmentsDown || 0) + Number(sm.stacksWarn || 0);
     const status = portainer._connecting && !portainer.online ? 'connecting' : !portainer.online || up === 0 ? 'down' : (down > 0 || warn > 0 ? 'warn' : 'ok');
-    const meta = portainer._connecting && !portainer.online ? 'connecting...' : portainer.online ? `${up}/${sm.instances || 0} servers · ${sm.environmentsUp || 0}/${sm.environments || 0} environments` : 'unreachable';
+    const meta = portainer._connecting && !portainer.online ? 'connecting...' : portainer.online ? `${up}/${sm.instances || 0} servers · ${sm.environmentsUp || 0}/${sm.environments || 0} env` : 'unreachable';
     out.push({ id: 'portainer', title: 'Portainer', status, meta });
   }
   return out;
@@ -8687,7 +8724,7 @@ app.get('/api/public/status', (req, res) => {
     : null;
   const services = buildPublicSummary(data).filter(s => !visible || visible.has(s.id));
   const present = new Set(services.map(s => s.id));
-  const titles = { proxmox: 'Proxmox', linux: 'Linux Server', windows: 'Windows Server', kubernetes: 'Kubernetes', snmp: 'SNMP', healthchecks: 'Healthchecks', uptimekuma: 'Uptime Kuma', checks: 'Service checks', prometheus: 'Prometheus', docker: 'Docker', dockhand: 'Dockhand', database: 'Databases', firewall: 'Firewalls', truenas: 'TrueNAS', qnap: 'QNAP', ugreen: 'Ugreen', pbs: 'Proxmox Backup', cloudflare: 'Cloudflare', cicd: 'GitHub/GitLab CI', veeam: 'Veeam', portainer: 'Portainer' };
+  const titles = { proxmox: 'Proxmox', linux: 'Linux Server', windows: 'Windows Server', kubernetes: 'Kubernetes', synology: 'Synology', mikrotik: 'MikroTik', unifi: 'UniFi', snmp: 'SNMP', healthchecks: 'Healthchecks', uptimekuma: 'Uptime Kuma', checks: 'Service checks', prometheus: 'Prometheus', docker: 'Docker', dockhand: 'Dockhand', database: 'Databases', firewall: 'Firewalls', truenas: 'TrueNAS', qnap: 'QNAP', ugreen: 'Ugreen', pbs: 'Proxmox Backup', cloudflare: 'Cloudflare', cicd: 'GitHub/GitLab CI', veeam: 'Veeam', portainer: 'Portainer' };
   configuredList().forEach(id => {
     if (visible && !visible.has(id)) return;
     if (!present.has(id)) services.push({ id, title: titles[id] || id, status: 'connecting', meta: 'connecting…' });

@@ -202,14 +202,25 @@ function normalizeDatastore(configRow = {}, status = {}) {
 }
 
 function normalizeTasks(rows = []) {
-  return arr(rows).slice(0, 30).map(t => ({
-    id: t.upid || t.id || '',
-    type: t.worker_type || t.type || '',
-    user: t.user || '',
-    starttime: t.starttime || null,
-    endtime: t.endtime || null,
-    status: t.status || '',
-  }));
+  return arr(rows).slice(0, 30).map(t => {
+    const type = t.worker_type || t.type || '';
+    const id = t.upid || t.id || '';
+    const taskId = t.worker_id || t.id || t.task_id || '';
+    const status = t.status || '';
+    return {
+      id,
+      taskId,
+      type,
+      name: [type, taskId].filter(Boolean).join(' - ') || id || 'PBS task',
+      user: t.user || '',
+      node: t.node || '',
+      starttime: t.starttime || null,
+      endtime: t.endtime || null,
+      status,
+      failed: /fail|error/i.test(String(status || '')),
+      running: !t.endtime && /running|active/i.test(String(status || '')),
+    };
+  });
 }
 
 function summarize(instances = []) {
@@ -225,7 +236,7 @@ function summarize(instances = []) {
     datastoresWarn: datastores.filter(d => d.health !== 'online').length,
     snapshots: datastores.reduce((a, d) => a + Number(d.snapshots || 0), 0),
     groups: datastores.reduce((a, d) => a + Number(d.groups || 0), 0),
-    failedTasks: tasks.filter(t => /fail|error/i.test(String(t.status || ''))).length,
+    failedTasks: tasks.filter(t => t.failed || /fail|error/i.test(String(t.status || ''))).length,
     totalBytes,
     usedBytes,
     usedPercent: percentFromPair(usedBytes, totalBytes),

@@ -798,7 +798,7 @@ html[data-theme="light"] body.rail-collapsed .shell .sb-card.active{background:#
 .overview-icon{width:28px;height:28px;display:grid;place-items:center;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:5px;flex-shrink:0}
 .overview-head-main{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;min-width:0}
 .overview-title{font-size:15px;font-weight:750;letter-spacing:0;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.overview-meta{font-size:12px;color:var(--muted);min-width:0;max-width:100%;overflow-wrap:anywhere;line-height:1.25}
+.overview-meta{font-size:12px;color:var(--muted);min-width:0;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.25}
 .overview-card-toggle{width:18px;height:18px;display:grid;place-items:center;color:var(--muted);transition:transform .16s ease,color .16s ease;flex-shrink:0}
 .overview-card-h:hover .overview-card-toggle{color:var(--text)}
 .overview-card-hide{width:24px;height:24px;border:0;background:transparent;color:var(--muted);border-radius:7px;display:grid;place-items:center;cursor:pointer}
@@ -808,8 +808,8 @@ html[data-theme="light"] body.rail-collapsed .shell .sb-card.active{background:#
 .overview-card .csum{border-bottom:1px solid var(--border);padding:10px;background:rgba(0,0,0,.08);grid-template-columns:repeat(auto-fit,minmax(92px,1fr))}
 .overview-card .csum-item{min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
 .overview-card .hc-csum .csum-item{padding:9px 10px;align-items:center;justify-content:center}
-.overview-card .sb-csum{display:grid;grid-template-columns:repeat(auto-fit,minmax(70px,1fr));gap:0;padding:10px 14px 8px;border-bottom:0;background:transparent;text-align:center}
-.overview-card .sb-csum-item{min-width:0;min-height:0;padding:7px 8px;display:flex;flex-direction:column;align-items:center!important;justify-content:center!important;gap:3px;border:1px solid var(--border);background:transparent!important;border-radius:0;text-align:center;margin:-1px 0 0 -1px}
+.overview-card .sb-csum{display:grid;grid-template-columns:repeat(auto-fit,minmax(70px,1fr));gap:0;padding:10px 14px 8px;border-bottom:0;background:transparent;text-align:center;min-height:66px}
+.overview-card .sb-csum-item{min-width:0;min-height:48px;padding:7px 8px;display:flex;flex-direction:column;align-items:center!important;justify-content:center!important;gap:3px;border:1px solid var(--border);background:transparent!important;border-radius:0;text-align:center;margin:-1px 0 0 -1px}
 .overview-card .sb-csum-val{font-size:20px;line-height:1;font-weight:850;white-space:nowrap;overflow:visible;text-overflow:clip}
 .overview-card .sb-csum-lbl{font-size:10px;line-height:1;margin-top:0;min-height:0;display:block;letter-spacing:.06em;white-space:nowrap}
 .overview-card[data-id="proxmox"] .pve-sb-csum{grid-template-columns:minmax(0,.82fr) minmax(0,1.16fr) minmax(0,1.3fr) minmax(0,.78fr) minmax(0,.94fr);padding-left:10px;padding-right:10px}
@@ -836,6 +836,9 @@ html[data-theme="light"] .overview-card .sb-csum-item{background:transparent!imp
 .overview-row-main{flex:1;min-width:0}
 .overview-row-name{font-size:14px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .overview-row-sub{font-size:12px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.veeam-session-row{align-items:flex-start}
+.veeam-session-name{font-size:14px;font-weight:650;line-height:1.25;white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere}
+.veeam-session-sub{font-size:12px;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .overview-empty{padding:18px 14px;color:var(--muted);font-size:13px}
 .overview-hidden-bar{display:flex;align-items:center;gap:8px;justify-content:space-between;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:4px 8px;margin-bottom:9px;color:var(--muted);font-size:10px;line-height:1.1;box-shadow:var(--shadow)}
 .overview-hidden-bar button{height:18px;border-radius:5px;border:1px solid var(--border);background:var(--panel2);color:var(--text);font-size:10px;font-weight:700;padding:0 6px;cursor:pointer}
@@ -1110,7 +1113,7 @@ const windowsOpen = {};
 const hcOpen = {};
 const snmpOpen = {};
 const k8sGrpOpen = {};
-const defaultOverviewGroupOpen = { pods:true, deps:false, svcs:false, snmpServers:true, dockerHosts:true, dockerContainers:true, checksServices:true, prometheusServers:true, prometheusTargets:true, firewallGateways:true, firewallLinks:true, truenasSystems:true, truenasPools:true, qnapSystems:true, ugreenSystems:true, pbsServers:true, pbsDatastores:true, cloudflareZones:true, cloudflareTunnels:true, cloudflareDomains:true, cicdProjects:true, cicdPipelines:true, veeamServers:true, veeamSessions:true, veeamRepositories:true, portainerServers:true, portainerEnvironments:true, portainerContainers:true, databaseServers:true };
+const defaultOverviewGroupOpen = { pods:true, deps:false, svcs:false, synologyDevices:true, mikrotikDevices:true, unifiDevices:true, snmpDevices:true, snmpServers:true, dockerHosts:true, dockerContainers:true, checksServices:true, prometheusServers:true, prometheusTargets:true, firewallGateways:true, firewallLinks:true, truenasSystems:true, truenasPools:true, qnapSystems:true, ugreenSystems:true, pbsServers:true, pbsDatastores:true, pbsTasks:true, cloudflareZones:true, cloudflareTunnels:true, cloudflareDomains:true, cicdProjects:true, cicdPipelines:true, veeamServers:true, veeamSessions:true, veeamRepositories:true, portainerServers:true, portainerEnvironments:true, portainerContainers:true, databaseServers:true };
 let overviewK8sOpen = { ...defaultOverviewGroupOpen };
 try { overviewK8sOpen = { ...overviewK8sOpen, ...JSON.parse(localStorage.getItem('os_overview_group_open') || '{}') }; } catch {}
 function saveOverviewGroupOpen(){
@@ -1741,10 +1744,42 @@ function applyServerUiPreferences(data = {}){
 
 let activePanel = null;
 
-const ALL_IDS = ['proxmox','kubernetes','linux','windows','snmp','healthchecks','uptimekuma','checks','prometheus','docker','dockhand','firewall','truenas','qnap','ugreen','pbs','cloudflare','cicd','veeam','portainer','database'];
+const SNMP_PANEL_IDS = ['synology','mikrotik','unifi','snmp'];
+const SNMP_BRAND_PANEL_IDS = ['synology','mikrotik','unifi'];
+const ALL_IDS = ['proxmox','kubernetes','linux','windows','synology','mikrotik','unifi','snmp','healthchecks','uptimekuma','checks','prometheus','docker','dockhand','firewall','truenas','qnap','ugreen','pbs','cloudflare','cicd','veeam','portainer','database'];
 const CONFIGURED_CACHE_KEY = 'os_configured_ids_v1';
 function platformTitle(id, title){
   return String(title || id || '');
+}
+function normalizeSnmpPanelProfile(profile){
+  const p = String(profile || '').trim().toLowerCase();
+  return SNMP_BRAND_PANEL_IDS.includes(p) ? p : 'snmp';
+}
+function snmpRowsForPanel(rows, id){
+  const key = normalizeSnmpPanelProfile(id);
+  return (rows || []).filter(row => normalizeSnmpPanelProfile(row?.profile || row?.preset) === key);
+}
+function expandSnmpConfiguredIds(ids, source = {}){
+  const clean = cleanUiOrder(ids);
+  const rows = Array.isArray(source?.snmp) ? source.snmp : (Array.isArray(source?.snmp?.devices) ? source.snmp.devices : []);
+  const hadSnmp = clean.some(id => SNMP_PANEL_IDS.includes(id));
+  if(!hadSnmp) return clean;
+  const presentProfiles = new Set(rows.map(row => normalizeSnmpPanelProfile(row?.profile || row?.preset)));
+  const expanded = [];
+  let inserted = false;
+  const insertProfiles = () => {
+    if(inserted) return;
+    const profileIds = SNMP_PANEL_IDS.filter(id => presentProfiles.has(id));
+    (profileIds.length ? profileIds : clean.filter(id => SNMP_PANEL_IDS.includes(id))).forEach(id => {
+      if(!expanded.includes(id)) expanded.push(id);
+    });
+    inserted = true;
+  };
+  clean.forEach(id => {
+    if(SNMP_PANEL_IDS.includes(id)) insertProfiles();
+    else expanded.push(id);
+  });
+  return cleanUiOrder(expanded);
 }
 
 const SEC_ICONS = {
@@ -1753,6 +1788,9 @@ const SEC_ICONS = {
   windows:     (c) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M3 5.5 10 4.5v7H3v-6Z" fill="${c}"/><path d="M11 4.35 21 3v8.5H11V4.35Z" fill="${c}" opacity=".82"/><path d="M3 12.5h7v7L3 18.5v-6Z" fill="${c}" opacity=".82"/><path d="M11 12.5h10V21l-10-1.35V12.5Z" fill="${c}"/></svg>`,
   kubernetes:  () => `<span class="sec-glyph" style="font-size:15px">⎈</span>`,
   snmp:        (c) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4.03 3 9 3s9-1.34 9-3"/></svg>`,
+  synology:    (c) => SEC_ICONS.snmp(c),
+  mikrotik:    (c) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="${c}" aria-hidden="true"><path d="M4 6.5h3.2l2.1 5.2 2.1-5.2h3.2v11h-2.5v-6.4l-1.9 4.6H8.4l-1.9-4.6v6.4H4v-11Z"/><path d="M15.6 6.5H21v2.3h-2.9v8.7h-2.5v-11Z"/></svg>`,
+  unifi:       (c) => SEC_ICONS.snmp(c),
   healthchecks:(c) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>`,
   uptimekuma:  (c) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12c2.8-4.7 5.8-7 9-7s6.2 2.3 9 7c-2.8 4.7-5.8 7-9 7s-6.2-2.3-9-7Z"/><path d="M8 12h2l1.5-3 2.5 6 1.5-3H16"/></svg>`,
   checks:      (c) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7"/><path d="M12 4v3"/><path d="M12 17v3"/><path d="M4 12h3"/><path d="M17 12h3"/><path d="m9 12.5 2 2 4-4.5"/></svg>`,
@@ -1822,6 +1860,9 @@ const PLATFORM_META = {
   kubernetes:  { title:'Kubernetes',    iconKey:'kubernetes',  color:'var(--purple,#9b59b6)' },
   linux:       { title:'Linux Server', iconKey:'linux',       color:'var(--green)' },
   windows:     { title:'Windows Server', iconKey:'windows',   color:'var(--blue)' },
+  synology:    { title:'Synology',      iconKey:'synology',    color:'var(--blue)' },
+  mikrotik:    { title:'MikroTik',      iconKey:'mikrotik',    color:'var(--yellow)' },
+  unifi:       { title:'UniFi',         iconKey:'unifi',       color:'var(--green)' },
   snmp:        { title:'SNMP',          iconKey:'snmp',        color:'var(--yellow)' },
   healthchecks:{ title:'Healthchecks',  iconKey:'healthchecks',color:'var(--green)' },
   uptimekuma:  { title:'Uptime Kuma',   iconKey:'uptimekuma',  color:'var(--green)' },
@@ -1871,14 +1912,15 @@ function placeholderPanel(id){
   return { id, loading:true, title:m.title, iconKey:m.iconKey, color:m.color, meta:'Connecting...', badge:bdg('gray','connecting...'), sbSummary:'', summary:'', body:connBody };
 }
 function applyConfigured(ids, cfg){
-  setConfiguredIds(ids);
+  const nextIds = expandSnmpConfiguredIds(ids, cfg);
+  setConfiguredIds(nextIds);
   const d = window._lastData || { timestamp:new Date().toISOString(), proxmox:{nodes:[]}, linux:[], windows:[], kubernetes:null, snmp:[], healthchecks:null, uptimekuma:null, checks:null, prometheus:null, docker:[], dockhand:null, firewall:null, truenas:null, qnap:null, ugreen:null, pbs:null, cloudflare:null, cicd:null, veeam:null, portainer:null, database:[] };
-  d.configured = ids;
+  d.configured = nextIds;
   if(!ids.includes('proxmox')) d.proxmox = { clusterSummary:null, nodes:[] };
   if(!ids.includes('linux')) d.linux = [];
   if(!ids.includes('windows')) d.windows = [];
   if(!ids.includes('kubernetes')) d.kubernetes = null;
-  if(!ids.includes('snmp')) d.snmp = [];
+  if(!nextIds.some(id => SNMP_PANEL_IDS.includes(id))) d.snmp = [];
   if(!ids.includes('healthchecks')) d.healthchecks = null;
   if(!ids.includes('uptimekuma')) d.uptimekuma = null;
   if(!ids.includes('checks')) d.checks = null;
@@ -1902,7 +1944,7 @@ function applyConfigured(ids, cfg){
       (items||[]).forEach(it => { if(!present.has(keyFn(it))) arr.push({ ...it, online:false, _connecting:true }); });
       return arr;
     };
-    if(ids.includes('snmp'))     d.snmp     = mergeC(d.snmp,     cfg.snmp?.devices,      x=>x.name);
+    if(nextIds.some(id => SNMP_PANEL_IDS.includes(id))) d.snmp = mergeC(d.snmp, cfg.snmp?.devices, x=>x.name);
     if(ids.includes('docker'))   d.docker   = mergeC(d.docker,   cfg.docker?.hosts,      x=>x.name);
     if(ids.includes('database')) d.database = mergeC(d.database, cfg.database?.instances,x=>x.name);
     if(ids.includes('checks') && !d.checks){
@@ -3372,7 +3414,7 @@ function buildKubernetes(k8s){
     title: 'Kubernetes',
     iconKey: 'kubernetes',
     color: 'var(--purple,#9b59b6)',
-    meta: `${s.running??0}/${totalPods}\npods running`,
+    meta: `${s.running??0}/${totalPods} pods`,
     badge: bdg(failed>0?'yellow':'green', failed>0?'degraded':'healthy'),
     sbSummary: sbSummaryHtml,
     summary: summaryHtml,
@@ -3380,9 +3422,27 @@ function buildKubernetes(k8s){
   };
 }
 
-/* ── Synology ── */
-function buildSynology(syn){
+function nasSummaryMetricHtml({ online = 0, total = 0, cpu = null, ram = null, temp = null }, opts = {}) {
+  const prefix = opts.summary ? 'csum' : 'sb-csum';
+  const itemCls = `${prefix}-item`;
+  const valCls = `${prefix}-val`;
+  const lblCls = `${prefix}-lbl`;
+  const metric = (value, label, color, suffix = '%') => `<div class="${itemCls}"><div class="${valCls}" style="color:${color}">${hasNum(value) ? `${value}${suffix}` : '--'}</div><div class="${lblCls}">${label}</div></div>`;
+  return `<div class="${prefix}">
+    <div class="${itemCls}"><div class="${valCls}">${online}/${total}</div><div class="${lblCls}">Devices</div></div>
+    ${metric(cpu, 'CPU Usage', hasNum(cpu) ? bc(cpu) : 'var(--muted)')}
+    ${metric(ram, 'Ram Usage', hasNum(ram) ? bc(ram) : 'var(--muted)')}
+    ${metric(temp, 'CPU Temp', hasNum(temp) ? tempColor(temp) : 'var(--muted)', '°C')}
+  </div>`;
+}
+
+/* ── SNMP-backed devices ── */
+function buildSynology(syn, opts = {}){
   if(!syn?.length) return null;
+  const panelId = opts.id || 'snmp';
+  const panelTitle = opts.title || 'SNMP';
+  const panelIcon = opts.iconKey || panelId;
+  const panelColor = opts.color || PLATFORM_META[panelId]?.color || 'var(--yellow)';
 
   const onlineDevs = syn.filter(d=>d.online);
   const connectingDevs = syn.filter(d=>d._connecting);
@@ -3403,12 +3463,10 @@ function buildSynology(syn){
   const cpuM = metric(cpuVals,'%',bc,90), ramM = metric(ramVals,'%',bc,90), tempM = metric(tempVals,'°C',tempColor,60);
   const cell = (m,lbl,sb) => m ? `<div class="${sb?'sb-csum-item':'csum-item'}"><div class="${sb?'sb-csum-val':'csum-val'}" style="color:${m.color}">${m.val}</div><div class="${sb?'sb-csum-lbl':'csum-lbl'}">${lbl}</div></div>` : '';
 
-  const sbSummaryHtml = `<div class="sb-csum">
-    <div class="sb-csum-item"><div class="sb-csum-val">${onlineDevs.length}/${syn.length}</div><div class="sb-csum-lbl">Devices</div></div>
-    ${cell(cpuM,'CPU usage',true)}
-    ${cell(ramM,'RAM usage',true)}
-    ${cell(tempM,'CPU temp',true)}
-  </div>`;
+  const cpuAvg = avgPct(cpuVals);
+  const ramAvg = avgPct(ramVals);
+  const tempAvg = tempVals.length ? Math.round(tempVals.reduce((a,b)=>a+b,0) / tempVals.length) : null;
+  const sbSummaryHtml = nasSummaryMetricHtml({ online: onlineDevs.length, total: syn.length, cpu: cpuAvg, ram: ramAvg, temp: tempAvg });
 
   const summaryHtml = `<div class="csum">
     <div class="csum-item"><div class="csum-val">${onlineDevs.length}/${syn.length}</div><div class="csum-lbl">Devices</div></div>
@@ -3569,10 +3627,10 @@ function buildSynology(syn){
   }).join('');
 
   return {
-    id: 'snmp',
-    title: 'SNMP',
-    iconKey: 'snmp',
-    color: 'var(--yellow)',
+    id: panelId,
+    title: panelTitle,
+    iconKey: panelIcon,
+    color: panelColor,
     meta: `${onlineDevs.length}/${syn.length} online`,
     badge: bdg(isConnecting ? 'gray' : (allOk ? 'green' : (onlineDevs.length > 0 ? 'yellow' : 'red')), isConnecting ? 'connecting…' : (allOk ? 'healthy' : 'offline')),
     sbSummary: sbSummaryHtml,
@@ -4219,7 +4277,7 @@ function buildDocker(docker){
     title: 'Docker',
     iconKey: 'docker',
     color: '#2496ed',
-    meta: anyConnecting ? (onlineHosts ? `${onlineHosts}/${docker.length} hosts · ${connectingHosts} connecting` : 'connecting...') : (noContainersReported ? `${onlineHosts}/${docker.length} hosts online · no containers` : `${totalRunning}/${totalAll}\ncontainers running`),
+    meta: anyConnecting ? (onlineHosts ? `${onlineHosts}/${docker.length} hosts · ${connectingHosts} connecting` : 'connecting...') : (noContainersReported ? `${onlineHosts}/${docker.length} hosts online · no containers` : `${totalRunning}/${totalAll} containers`),
     badge: anyConnecting
       ? bdg(onlineHosts ? 'yellow' : 'gray', onlineHosts ? `${connectingHosts} connecting` : 'connecting...')
       : bdg(noContainersReported?'gray':allOk&&totalStopped===0?'green':onlineHosts===0?'red':totalStopped>0?'yellow':'red',
@@ -4344,13 +4402,23 @@ function buildFirewall(fw){
   const reboot = Number(sm.rebootRequired || 0);
   const connecting = !!fw._connecting || instances.some(i => i._connecting && !i.online);
   const healthCls = connecting && !up ? 'gray' : up === 0 ? 'red' : (down > 0 || updates > 0 || reboot > 0 ? 'yellow' : 'green');
-  const healthTxt = connecting && !up ? 'connecting...' : up === 0 ? 'offline' : (down > 0 ? `${up}/${total} online` : updates > 0 ? `${updates} updates` : reboot > 0 ? 'reboot required' : 'healthy');
+  const healthTxt = connecting && !up ? 'connecting...' : up === 0 ? 'offline' : (down > 0 ? `${up}/${total} online` : updates > 0 || reboot > 0 ? 'attention' : 'healthy');
+  const firewallWarnText = row => {
+    const s = row?.summary || {};
+    const sys = row?.system || {};
+    const linksDown = Number(s.interfacesDown || 0);
+    const updateCount = Number(s.updates || sys.updateCount || 0);
+    if (linksDown) return `${linksDown} links down`;
+    if (updateCount) return `${updateCount} updates`;
+    if (s.rebootRequired || sys.rebootRequired) return 'reboot required';
+    if (row?.partial) return 'partial';
+    return 'attention';
+  };
 
   const sbSummaryHtml = `<div class="sb-csum">
     <div class="sb-csum-item"><div class="sb-csum-val">${up}/${total}</div><div class="sb-csum-lbl">Gateways</div></div>
     <div class="sb-csum-item"><div class="sb-csum-val" style="color:var(--green)">${sm.interfacesUp || 0}</div><div class="sb-csum-lbl">Links up</div></div>
     ${sm.interfacesDown ? `<div class="sb-csum-item"><div class="sb-csum-val" style="color:var(--yellow)">${sm.interfacesDown}</div><div class="sb-csum-lbl">Links down</div></div>` : ''}
-    ${updates ? `<div class="sb-csum-item"><div class="sb-csum-val" style="color:var(--yellow)">${updates}</div><div class="sb-csum-lbl">Updates</div></div>` : ''}
   </div>`;
 
   const ifaceRows = (inst) => (inst.interfaces || []).slice(0, 12).map(row => {
@@ -4369,7 +4437,7 @@ function buildFirewall(fw){
     const key = inst.url || inst.name || String(idx);
     const isOpen = panelOpenState('firewall:' + key, true);
     const stateClass = inst._connecting ? 'connecting' : !inst.online ? 'offline' : (inst.partial || inst.summary?.updates || inst.summary?.rebootRequired || inst.summary?.interfacesDown) ? 'warn' : 'online';
-    const badge = inst._connecting ? bdg('gray','connecting...') : inst.online ? bdg(stateClass === 'warn' ? 'yellow' : 'green', stateClass === 'warn' ? 'attention' : 'online') : bdg('red','offline');
+    const badge = inst._connecting ? bdg('gray','connecting...') : inst.online ? bdg(stateClass === 'warn' ? 'yellow' : 'green', stateClass === 'warn' ? firewallWarnText(inst) : 'online') : bdg('red','offline');
     const sys = inst.system || {};
     const stats = inst.firewall || {};
     return `<section class="prom-instance">
@@ -4379,7 +4447,7 @@ function buildFirewall(fw){
           <div class="prom-instance-name">${escHtml(inst.name || sys.hostname || inst.url || 'Firewall')}</div>
           <div class="prom-instance-url">${escHtml(inst.url || inst.error || '')}</div>
         </div>
-        <div class="prom-instance-meta">${inst.online ? `${inst.summary?.interfacesUp || 0}/${inst.summary?.interfaces || 0} links${stats.states != null ? ` · ${stats.states} states` : ''}` : inst._connecting ? 'waiting for first check' : 'unreachable'}</div>
+        <div class="prom-instance-meta">${inst.online ? `${inst.summary?.interfacesUp || 0}/${inst.summary?.interfaces || 0} links${inst.summary?.updates ? ` · ${inst.summary.updates} updates` : ''}${inst.summary?.rebootRequired ? ' · reboot required' : ''}${stats.states != null ? ` · ${stats.states} states` : ''}` : inst._connecting ? 'waiting for first check' : 'unreachable'}</div>
         ${badge}
         ${notifyBell('firewall:' + (inst.name || inst.url || 'default'))}
         <span class="chevron ${isOpen?'open':''}" id="firewall-chev-${idx}" style="margin-left:4px">▼</span>
@@ -4500,13 +4568,13 @@ function buildTrueNas(tn){
   const connecting = !!tn._connecting || instances.some(i => i._connecting && !i.online);
   const healthCls = connecting && !up ? 'gray' : up === 0 ? 'red' : (down > 0 || warnCount > 0 || instances.some(i => i.partial) ? 'yellow' : 'green');
   const healthTxt = connecting && !up ? 'connecting...' : up === 0 ? 'offline' : warnCount > 0 ? 'attention' : 'healthy';
-  const pct = hasNum(sm.usedPercent) ? fmtPct(sm.usedPercent) : '--';
-  const sbSummaryHtml = `<div class="sb-csum">
-    <div class="sb-csum-item"><div class="sb-csum-val">${up}/${total}</div><div class="sb-csum-lbl">Systems</div></div>
-    <div class="sb-csum-item"><div class="sb-csum-val" style="color:var(--green)">${sm.poolsHealthy || 0}</div><div class="sb-csum-lbl">Pools OK</div></div>
-    <div class="sb-csum-item"><div class="sb-csum-val" style="color:${warnCount?'var(--yellow)':'var(--text)'}">${sm.poolsWarn || 0}</div><div class="sb-csum-lbl">Pool warn</div></div>
-    <div class="sb-csum-item"><div class="sb-csum-val">${pct}</div><div class="sb-csum-lbl">Used</div></div>
-  </div>`;
+  const onlineInstances = instances.filter(i => i.online);
+  const sysVals = (key) => onlineInstances.map(i => i.system?.[key]).filter(hasNum).map(Number);
+  const cpuAvg = avgPct(sysVals('cpuPercent'));
+  const ramAvg = avgPct(sysVals('memoryPercent'));
+  const tempVals = onlineInstances.map(i => i.system?.cpuTemp ?? i.system?.cpuTemperature ?? i.system?.temperature ?? i.systemTemp).filter(hasNum).map(Number);
+  const tempAvg = tempVals.length ? Math.round(tempVals.reduce((a,b)=>a+b,0) / tempVals.length) : null;
+  const sbSummaryHtml = nasSummaryMetricHtml({ online: up, total, cpu: cpuAvg, ram: ramAvg, temp: tempAvg });
   const poolRows = inst => (inst.pools || []).map(pool => {
     const warn = pool.health !== 'online';
     const sub = [pool.status || pool.health, hasNum(pool.usedPercent) ? `used ${fmtPct(pool.usedPercent)}` : '', pool.totalBytes ? fmtBytes(pool.totalBytes) : '', pool.scan || ''].filter(Boolean).join(' - ');
@@ -4534,6 +4602,7 @@ function buildTrueNas(tn){
     const stateClass = inst._connecting ? 'connecting' : !inst.online ? 'offline' : warn ? 'warn' : 'online';
     const badge = inst._connecting ? bdg('gray','connecting...') : inst.online ? bdg(warn ? 'yellow' : 'green', warn ? 'attention' : 'online') : bdg('red','offline');
     const sys = inst.system || {};
+    const cpuTemp = sys.cpuTemp ?? sys.cpuTemperature ?? sys.temperature ?? inst.systemTemp;
     const disksHtml = diskRows(inst);
     return `<section class="prom-instance">
       <div class="prom-instance-h service-node-hdr ${stateClass}" onclick="toggleTrueNasInstance(${idx},${jsStr(key)})">
@@ -4554,7 +4623,10 @@ function buildTrueNas(tn){
               <div class="node-name">${escHtml(sys.hostname || inst.name || 'TrueNAS')}</div>
               <div class="pve-head-sub">${escHtml([inst.apiMode, sys.version].filter(Boolean).join(' - '))}</div>
             </div>
-            ${hasNum(inst.summary?.usedPercent) ? pveHeadStat('Used', fmtPct(inst.summary.usedPercent), bc(inst.summary.usedPercent), '', 'is-db-primary') : ''}
+            ${hasNum(sys.cpuPercent) ? pveHeadStat('CPU', fmtPct(sys.cpuPercent), bc(sys.cpuPercent), '', 'is-db-primary') : ''}
+            ${hasNum(sys.memoryPercent) ? pveHeadStat('RAM', fmtPct(sys.memoryPercent), bc(sys.memoryPercent), '', 'is-db-primary') : ''}
+            ${hasNum(cpuTemp) ? pveHeadStat('CPU temp', `${cpuTemp}°C`, tempColor(cpuTemp), '', 'is-db-primary') : ''}
+            ${hasNum(inst.summary?.usedPercent) ? pveHeadStat('Storage used', fmtPct(inst.summary.usedPercent), bc(inst.summary.usedPercent), '', 'is-db-primary') : ''}
             ${pveHeadStat('Pools', `${inst.summary?.poolsHealthy || 0}/${inst.summary?.pools || 0}`, inst.summary?.poolsWarn ? 'var(--yellow)' : 'var(--green)', '', 'is-db-primary')}
             ${pveHeadStat('Disks', inst.summary?.disks || 0, inst.summary?.disksWarn ? 'var(--yellow)' : 'var(--text)', '', 'is-db-primary')}
             ${inst.summary?.alertsCritical ? pveHeadStat('Alerts', inst.summary.alertsCritical, 'var(--red)') : ''}
@@ -4589,30 +4661,88 @@ function buildSimpleNasPanel(value, opts){
   const connecting = !!value._connecting || instances.some(i => i._connecting && !i.online);
   const healthCls = connecting && !up ? 'gray' : up === 0 ? 'red' : up < total ? 'yellow' : 'green';
   const healthTxt = connecting && !up ? 'connecting...' : up === 0 ? 'offline' : up < total ? 'partial' : 'online';
-  const sbSummaryHtml = `<div class="sb-mini"><span>${up}/${total}</span><small>online</small></div>`;
+  const onlineInstances = instances.filter(i => i.online);
+  const sysVals = (key) => onlineInstances.map(i => i.system?.[key]).filter(hasNum).map(Number);
+  const cpuAvg = avgPct(sysVals('cpuPercent'));
+  const ramAvg = avgPct(sysVals('memoryPercent'));
+  const tempVals = onlineInstances.map(i => i.system?.cpuTemp ?? i.system?.cpuTemperature ?? i.system?.temperature ?? i.systemTemp).filter(hasNum).map(Number);
+  const tempAvg = tempVals.length ? Math.round(tempVals.reduce((a,b)=>a+b,0) / tempVals.length) : null;
+  const sbSummaryHtml = nasSummaryMetricHtml({ online: up, total, cpu: cpuAvg, ram: ramAvg, temp: tempAvg });
+  const storageRows = inst => [...(inst.volumes || []), ...(inst.pools || [])].map(row => {
+    const used = hasNum(row.usedPercent) ? `used ${fmtPct(row.usedPercent)}` : '';
+    const size = hasNum(row.totalBytes) ? fmtBytes(row.totalBytes) : '';
+    const sub = [row.status, row.health, used, size].filter(Boolean).join(' - ');
+    const warn = /warn|degrad|fail|error|offline/i.test(String(row.status || row.health || ''));
+    return `<div class="mon-row" style="grid-template-columns:18px minmax(150px,1fr) minmax(140px,1fr) 90px">
+      <div class="mon-dot ${warn?'md-yellow':'md-green'}"></div>
+      <div class="mon-name" title="${escAttr(row.name || 'storage')}">${escHtml(row.name || 'storage')}</div>
+      <span style="color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escAttr(sub)}">${escHtml(sub)}</span>
+      <span style="text-align:right">${bdg(warn?'yellow':'green', warn ? 'attention' : 'healthy')}</span>
+    </div>`;
+  }).join('');
+  const diskRows = inst => (inst.disks || []).map(row => {
+    const temp = hasNum(row.temperature) ? `${row.temperature}C` : '';
+    const size = hasNum(row.sizeBytes) ? fmtBytes(row.sizeBytes) : '';
+    const sub = [row.model, row.status, row.health, temp, size].filter(Boolean).join(' - ');
+    const warn = /warn|degrad|fail|error|offline|bad/i.test(String(row.status || row.health || ''));
+    return `<div class="mon-row" style="grid-template-columns:18px minmax(130px,.8fr) minmax(170px,1.2fr) 84px">
+      <div class="mon-dot ${warn?'md-yellow':'md-green'}"></div>
+      <div class="mon-name" title="${escAttr(row.name || row.device || 'disk')}">${escHtml(row.name || row.device || 'disk')}</div>
+      <span style="color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escAttr(sub)}">${escHtml(sub)}</span>
+      <span style="text-align:right">${bdg(warn?'yellow':'green', warn ? 'warn' : 'ok')}</span>
+    </div>`;
+  }).join('');
+  const serviceRows = inst => (inst.services || []).map(row => {
+    const active = row.active !== false && !/stop|down|fail|error/i.test(String(row.status || row.state || ''));
+    const sub = [row.desc, row.status || row.state].filter(Boolean).join(' - ');
+    return `<div class="mon-row" style="grid-template-columns:18px minmax(150px,1fr) minmax(120px,1fr) 86px">
+      <div class="mon-dot ${active?'md-green':'md-yellow'}"></div>
+      <div class="mon-name" title="${escAttr(row.name || 'service')}">${escHtml(row.name || 'service')}</div>
+      <span style="color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escAttr(sub)}">${escHtml(sub)}</span>
+      <span style="text-align:right">${bdg(active?'green':'yellow', active ? 'running' : 'attention')}</span>
+    </div>`;
+  }).join('');
   const body = instances.length ? instances.map((inst, idx) => {
     const key = inst.name || inst.url || String(idx);
     const isOpen = panelOpenState(opts.id + ':' + key, true);
     const stateClass = inst._connecting ? 'connecting' : !inst.online ? 'offline' : 'online';
+    const sys = inst.system || {};
+    const cpuTemp = sys.cpuTemp ?? sys.cpuTemperature ?? sys.temperature ?? inst.systemTemp;
+    const instSm = inst.summary || {};
+    const storageHtml = storageRows(inst);
+    const disksHtml = diskRows(inst);
+    const servicesHtml = serviceRows(inst);
     return `<section class="prom-instance">
       <div class="prom-instance-h service-node-hdr ${stateClass}" onclick="toggleSimpleNasInstance(${jsStr(opts.id)},${idx},${jsStr(key)})">
         <div class="mon-dot ${inst._connecting?'md-gray':inst.online?'md-green':'md-red'}"></div>
         <div class="prom-instance-main">
-          <div class="prom-instance-name">${escHtml(inst.name || inst.system?.hostname || inst.url || opts.title)}</div>
+          <div class="prom-instance-name">${escHtml(inst.name || sys.hostname || inst.url || opts.title)}</div>
           <div class="prom-instance-url">${escHtml(inst.url || inst.error || '')}</div>
         </div>
+        <div class="prom-instance-meta">${inst.online ? `${instSm.disks || 0} disks${hasNum(instSm.usedPercent) ? ` - ${fmtPct(instSm.usedPercent)} used` : ''}` : inst._connecting ? 'waiting for first check' : 'unreachable'}</div>
         ${notifyBell(opts.id + ':' + (inst.name || inst.url || 'default'))}
         <span class="chevron ${isOpen?'open':''}" id="${opts.id}-chev-${idx}" style="margin-left:4px">▼</span>
       </div>
       <div class="prom-instance-body ${isOpen?'open':''}" id="${opts.id}-body-${idx}">
         ${inst.online ? `<div class="node-hdr pve-node-hdr db-node-hdr online" style="cursor:default;margin:10px 0">
           <div class="pve-head-main db-head-main">
-            <div>
-              <div class="node-name">${escHtml(inst.system?.hostname || inst.name || opts.title)}</div>
-              <div class="pve-head-sub">${escHtml([inst.statusCode ? `HTTP ${inst.statusCode}` : '', inst.url].filter(Boolean).join(' - '))}</div>
+            <div class="pve-head-title">
+              <div class="node-name">${escHtml(sys.hostname || inst.name || opts.title)}</div>
+              <div class="pve-head-sub">${escHtml([inst.method, sys.model, sys.version || sys.firmware, inst.statusCode ? `HTTP ${inst.statusCode}` : '', inst.url].filter(Boolean).join(' - '))}</div>
             </div>
+            ${hasNum(sys.cpuPercent) ? pveHeadStat('CPU', fmtPct(sys.cpuPercent), bc(sys.cpuPercent), '', 'is-db-primary') : ''}
+            ${hasNum(sys.memoryPercent) ? pveHeadStat('RAM', fmtPct(sys.memoryPercent), bc(sys.memoryPercent), '', 'is-db-primary') : ''}
+            ${hasNum(cpuTemp) ? pveHeadStat('CPU temp', `${cpuTemp}°C`, tempColor(cpuTemp), '', 'is-db-primary') : ''}
+            ${hasNum(instSm.usedPercent) ? pveHeadStat('Storage used', fmtPct(instSm.usedPercent), bc(instSm.usedPercent), '', 'is-db-primary') : ''}
+            ${pveHeadStat('Storage', (instSm.volumes || instSm.pools || 0), 'var(--text)', '', 'is-db-primary')}
+            ${pveHeadStat('Disks', instSm.disks || 0, instSm.disksWarn ? 'var(--yellow)' : 'var(--green)', '', 'is-db-primary')}
+            ${instSm.services ? pveHeadStat('Services', instSm.services, 'var(--green)', '', 'is-db-primary') : ''}
           </div>
-        </div>` : `<div class="offline-row"><div class="mon-dot ${inst._connecting?'md-gray':'md-red'}"></div><div>${inst._connecting?`Connecting to ${escHtml(opts.title)}...`:`${escHtml(opts.title)} unreachable`}<div class="offline-err">${escHtml(inst._connecting ? (inst.url||'') : (inst.error||inst.url||''))}</div></div></div>`}
+        </div>
+        ${storageHtml ? `<div class="overview-nested-title"><span>Storage</span></div>${storageHtml}` : ''}
+        ${disksHtml ? `<div class="overview-nested-title" style="margin-top:10px"><span>Disks</span></div>${disksHtml}` : ''}
+        ${servicesHtml ? `<div class="overview-nested-title" style="margin-top:10px"><span>Services</span></div>${servicesHtml}` : ''}
+        ${!storageHtml && !disksHtml && !servicesHtml ? '<div class="empty">No detailed NAS metrics available</div>' : ''}` : `<div class="offline-row"><div class="mon-dot ${inst._connecting?'md-gray':'md-red'}"></div><div>${inst._connecting?`Connecting to ${escHtml(opts.title)}...`:`${escHtml(opts.title)} unreachable`}<div class="offline-err">${escHtml(inst._connecting ? (inst.url||'') : (inst.error||inst.url||''))}</div></div></div>`}
       </div>
     </section>`;
   }).join('') : `<div class="offline-row"><div class="mon-dot md-gray"></div><div>Connecting to ${escHtml(opts.title)}...</div></div>`;
@@ -4640,6 +4770,15 @@ function buildPbs(pbs){
   const warnCount = Number(sm.datastoresWarn || 0) + Number(sm.failedTasks || 0);
   const connecting = !!pbs._connecting || instances.some(i => i._connecting && !i.online);
   const healthCls = connecting && !up ? 'gray' : up === 0 ? 'red' : warnCount > 0 || instances.some(i => i.partial) ? 'yellow' : 'green';
+  const pbsWarnText = row => {
+    const s = row?.summary || {};
+    const failedTasks = Number(s.failedTasks || 0);
+    const storeWarn = Number(s.datastoresWarn || 0);
+    if (failedTasks) return `${failedTasks} failed task${failedTasks === 1 ? '' : 's'}`;
+    if (storeWarn) return `${storeWarn} store warn`;
+    if (row?.partial) return 'partial';
+    return 'attention';
+  };
   const healthTxt = connecting && !up ? 'connecting...' : up === 0 ? 'offline' : warnCount > 0 ? 'attention' : 'healthy';
   const sbSummaryHtml = `<div class="sb-csum">
     <div class="sb-csum-item"><div class="sb-csum-val">${up}/${total}</div><div class="sb-csum-lbl">Servers</div></div>
@@ -4657,12 +4796,22 @@ function buildPbs(pbs){
       <span style="text-align:right">${bdg(warn?'yellow':'green', warn ? 'warn' : 'online')}</span>
     </div>`;
   }).join('');
+  const failedTaskRows = inst => (inst.tasks || []).filter(t => t.failed || /fail|error|warn/i.test(String(t.status || ''))).slice(0, 8).map(task => {
+    const name = task.name || [task.type, task.taskId].filter(Boolean).join(' - ') || task.id || 'PBS task';
+    const sub = [task.status, task.type, taskTimeText(task.starttime || task.startTime || ''), taskTimeText(task.endtime || task.endTime || '')].filter(Boolean).join(' - ');
+    return `<div class="mon-row" style="grid-template-columns:18px minmax(190px,1fr) minmax(150px,1fr) 96px">
+      <div class="mon-dot md-yellow"></div>
+      <div class="mon-name" style="width:auto;min-width:0;max-width:none" title="${escAttr(name)}">${escHtml(name)}</div>
+      <span style="color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escAttr(sub)}">${escHtml(sub)}</span>
+      <span style="text-align:right">${bdg('yellow', task.status || 'failed')}</span>
+    </div>`;
+  }).join('');
   const body = instances.length ? instances.map((inst, idx) => {
     const key = inst.url || inst.name || String(idx);
     const isOpen = panelOpenState('pbs:' + key, true);
     const warn = inst.partial || Number(inst.summary?.datastoresWarn || 0) > 0 || Number(inst.summary?.failedTasks || 0) > 0;
     const stateClass = inst._connecting ? 'connecting' : !inst.online ? 'offline' : warn ? 'warn' : 'online';
-    const badge = inst._connecting ? bdg('gray','connecting...') : inst.online ? bdg(warn ? 'yellow' : 'green', warn ? 'attention' : 'online') : bdg('red','offline');
+    const badge = inst._connecting ? bdg('gray','connecting...') : inst.online ? bdg(warn ? 'yellow' : 'green', warn ? pbsWarnText(inst) : 'online') : bdg('red','offline');
     const node = (inst.nodes || [])[0] || {};
     return `<section class="prom-instance">
       <div class="prom-instance-h service-node-hdr ${stateClass}" onclick="togglePbsInstance(${idx},${jsStr(key)})">
@@ -4671,7 +4820,7 @@ function buildPbs(pbs){
           <div class="prom-instance-name">${escHtml(inst.name || inst.url || 'Proxmox Backup')}</div>
           <div class="prom-instance-url">${escHtml(inst.url || inst.error || '')}</div>
         </div>
-        <div class="prom-instance-meta">${inst.online ? `${inst.summary?.datastores || 0} datastores${inst.summary?.failedTasks ? ` - ${inst.summary.failedTasks} failed tasks` : ''}` : inst._connecting ? 'waiting for first check' : 'unreachable'}</div>
+        <div class="prom-instance-meta">${inst.online ? `${inst.summary?.datastores || 0} DST${inst.summary?.failedTasks ? ` - ${inst.summary.failedTasks} failed task${Number(inst.summary.failedTasks) === 1 ? '' : 's'}` : ''}` : inst._connecting ? 'waiting for first check' : 'unreachable'}</div>
         ${badge}
         ${notifyBell('pbs:' + (inst.name || inst.url || 'default'))}
         <span class="chevron ${isOpen?'open':''}" id="pbs-chev-${idx}" style="margin-left:4px">▼</span>
@@ -4691,11 +4840,12 @@ function buildPbs(pbs){
           </div>
         </div>
         ${storeRows(inst) || '<div class="empty">No datastore details available</div>'}
+        ${failedTaskRows(inst) ? `<div class="overview-nested-title" style="margin-top:10px"><span>Failed tasks</span></div>${failedTaskRows(inst)}` : ''}
         ${inst.partial && inst.errors?.length ? `<div class="offline-err" style="margin-top:10px">Partial API data: ${escHtml(inst.errors.join(' - '))}</div>` : ''}` : `<div class="offline-row"><div class="mon-dot ${inst._connecting?'md-gray':'md-red'}"></div><div>${inst._connecting?'Connecting to Proxmox Backup...':'Proxmox Backup unreachable'}<div class="offline-err">${escHtml(inst._connecting ? (inst.url||'') : (inst.error||inst.url||''))}</div></div></div>`}
       </div>
     </section>`;
   }).join('') : `<div class="offline-row"><div class="mon-dot md-gray"></div><div>Connecting to Proxmox Backup...</div></div>`;
-  return { id: 'pbs', title: 'Proxmox Backup', iconKey: 'pbs', color: 'var(--orange,#f59e0b)', meta: connecting && !up ? 'connecting...' : `${up}/${total} servers - ${sm.datastores || 0} datastores`, badge: bdg(healthCls, healthTxt), sbSummary: sbSummaryHtml, summary: '', body };
+  return { id: 'pbs', title: 'Proxmox Backup', iconKey: 'pbs', color: 'var(--orange,#f59e0b)', meta: connecting && !up ? 'connecting...' : `${up}/${total} servers - ${sm.datastores || 0} DST`, badge: bdg(healthCls, healthTxt), sbSummary: sbSummaryHtml, summary: '', body };
 }
 
 function togglePbsInstance(idx, key){
@@ -4723,7 +4873,6 @@ function buildCloudflare(cf){
   const sbSummaryHtml = `<div class="sb-csum">
     <div class="sb-csum-item"><div class="sb-csum-val">${active}/${total}</div><div class="sb-csum-lbl">Zones</div></div>
     <div class="sb-csum-item"><div class="sb-csum-val">${sm.tunnelsHealthy || 0}/${sm.tunnels || 0}</div><div class="sb-csum-lbl">Tunnels</div></div>
-    ${sm.domains ? `<div class="sb-csum-item"><div class="sb-csum-val" style="color:${domainWarn?'var(--yellow)':'var(--text)'}">${domainWarn}/${sm.domains}</div><div class="sb-csum-lbl">Expiring</div></div>` : ''}
   </div>`;
   const zoneRows = zones.map(z => {
     const warn = z.warn || !z.online;
@@ -4773,8 +4922,7 @@ function buildCloudflare(cf){
   ${cf.partial && cf.errors?.length ? `<div class="offline-err" style="margin-top:10px">Partial API data: ${escHtml(cf.errors.join(' - '))}</div>` : ''}` :
   `<div class="offline-row"><div class="mon-dot md-red"></div><div>Cloudflare unreachable<div class="offline-err">${escHtml(cf.error || '')}</div></div></div>`;
   const tunnelMeta = Number(sm.tunnels || 0) ? ` - ${sm.tunnelsHealthy || 0}/${sm.tunnels} tunnels` : '';
-  const domainMeta = Number(sm.domains || 0) ? ` - ${domainWarn}/${sm.domains} domains expiring` : '';
-  return { id: 'cloudflare', title: 'Cloudflare', iconKey: 'cloudflare', color: 'var(--orange,#f59e0b)', meta: connecting && !cf.online ? 'connecting...' : `${active}/${total} zones${tunnelMeta}${domainMeta}`, badge: bdg(healthCls, healthTxt), sbSummary: sbSummaryHtml, summary: '', body };
+  return { id: 'cloudflare', title: 'Cloudflare', iconKey: 'cloudflare', color: 'var(--orange,#f59e0b)', meta: connecting && !cf.online ? 'connecting...' : `${active}/${total} zones${tunnelMeta}`, badge: bdg(healthCls, healthTxt), sbSummary: sbSummaryHtml, summary: '', body };
 }
 
 function buildCiCd(ci){
@@ -4854,10 +5002,12 @@ function buildVeeam(veeam){
   const sessionBadge = s => s.running ? bdg('gray','running') : s.failed ? bdg('yellow','failed') : s.warning ? bdg('yellow','warning') : s.result ? bdg('green', s.result) : bdg('gray', s.state || 'unknown');
   const sessionRows = inst => (inst.sessions || []).slice(0, 10).map(s => {
     const sub = [s.type, s.creationTime || '', s.endTime || '', hasNum(s.progressPercent) ? `${fmtPct(s.progressPercent)} progress` : ''].filter(Boolean).join(' - ');
-    return `<div class="mon-row" style="grid-template-columns:18px minmax(190px,1.1fr) minmax(150px,1fr) 96px">
+    return `<div class="mon-row veeam-session-row">
       <div class="mon-dot ${s.running?'md-gray':s.failed?'md-yellow':s.warning?'md-yellow':'md-green'}"></div>
-      <div class="mon-name" title="${escAttr(s.name || 'session')}">${escHtml(s.name || 'session')}</div>
-      <span style="color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escAttr(sub)}">${escHtml(sub)}</span>
+      <div style="flex:1 1 auto;min-width:0">
+        <div class="veeam-session-name" title="${escAttr(s.name || 'session')}">${escHtml(s.name || 'session')}</div>
+        <div class="veeam-session-sub" title="${escAttr(sub)}">${escHtml(sub)}</div>
+      </div>
       <span style="text-align:right">${sessionBadge(s)}</span>
     </div>`;
   }).join('');
@@ -4883,7 +5033,7 @@ function buildVeeam(veeam){
           <div class="prom-instance-name">${escHtml(inst.name || inst.url || 'Veeam')}</div>
           <div class="prom-instance-url">${escHtml(inst.url || inst.error || '')}</div>
         </div>
-        <div class="prom-instance-meta">${inst.online ? `${inst.summary?.jobs || 0} jobs - ${inst.summary?.failedSessions || 0}/${inst.summary?.sessions || 0} failed sessions` : inst._connecting ? 'waiting for first check' : 'unreachable'}</div>
+        <div class="prom-instance-meta">${inst.online ? `${inst.summary?.jobs || 0} jobs ${inst.summary?.failedSessions || 0}/${inst.summary?.sessions || 0} failed` : inst._connecting ? 'waiting for first check' : 'unreachable'}</div>
         ${badge}
         ${notifyBell('veeam:' + (inst.name || inst.url || idx))}
       </div>
@@ -4905,7 +5055,7 @@ function buildVeeam(veeam){
       </div>
     </section>`;
   }).join('') : `<div class="offline-row"><div class="mon-dot md-gray"></div><div>Connecting to Veeam...</div></div>`;
-  return { id: 'veeam', title: 'Veeam', iconKey: 'veeam', color: 'var(--green)', meta: connecting && !up ? 'connecting...' : `${up}/${total} servers - ${failed}/${sm.sessions || 0} failed sessions`, badge: bdg(healthCls, healthTxt), sbSummary: sbSummaryHtml, summary: '', body };
+  return { id: 'veeam', title: 'Veeam', iconKey: 'veeam', color: 'var(--green)', meta: connecting && !up ? 'connecting...' : `${up}/${total} servers ${failed}/${sm.sessions || 0} failed`, badge: bdg(healthCls, healthTxt), sbSummary: sbSummaryHtml, summary: '', body };
 }
 
 function buildPortainer(pt){
@@ -4966,7 +5116,7 @@ function buildPortainer(pt){
           <div class="prom-instance-name">${escHtml(inst.name || inst.url || 'Portainer')}</div>
           <div class="prom-instance-url">${escHtml(inst.url || inst.error || '')}</div>
         </div>
-        <div class="prom-instance-meta">${inst.online ? `${inst.summary?.environmentsUp || 0}/${inst.summary?.environments || 0} environments - ${inst.summary?.running || 0}/${inst.summary?.containers || 0} containers` : inst._connecting ? 'waiting for first check' : 'unreachable'}</div>
+        <div class="prom-instance-meta">${inst.online ? `${inst.summary?.environmentsUp || 0}/${inst.summary?.environments || 0} env - ${inst.summary?.running || 0}/${inst.summary?.containers || 0} containers` : inst._connecting ? 'waiting for first check' : 'unreachable'}</div>
         ${badge}
         ${notifyBell('portainer:' + (inst.name || inst.url || 'default'))}
         <span class="chevron ${isOpen?'open':''}" id="portainer-chev-${idx}" style="margin-left:4px">▼</span>
@@ -4981,7 +5131,7 @@ function buildPortainer(pt){
       </div>
     </section>`;
   }).join('') : `<div class="offline-row"><div class="mon-dot md-gray"></div><div>Connecting to Portainer...</div></div>`;
-  return { id: 'portainer', title: 'Portainer', iconKey: 'portainer', color: 'var(--blue)', meta: connecting && !up ? 'connecting...' : `${up}/${total} servers - ${sm.environmentsUp || 0}/${sm.environments || 0} environments`, badge: bdg(healthCls, healthTxt), sbSummary: sbSummaryHtml, summary: '', body };
+  return { id: 'portainer', title: 'Portainer', iconKey: 'portainer', color: 'var(--blue)', meta: connecting && !up ? 'connecting...' : `${up}/${total} servers - ${sm.environmentsUp || 0}/${sm.environments || 0} env`, badge: bdg(healthCls, healthTxt), sbSummary: sbSummaryHtml, summary: '', body };
 }
 
 function togglePortainerInstance(idx, key){
@@ -5606,22 +5756,28 @@ function iconFallback(img, iconKey, color){
   span.innerHTML = html;
   img.replaceWith(span);
 }
-const DEFAULT_ICON = { proxmox:'proxmox', kubernetes:'kubernetes', healthchecks:'healthchecks', uptimekuma:'uptime-kuma', checks:'', prometheus:'prometheus', docker:'docker', dockhand:'https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/dockhand.png', firewall:'opnsense', truenas:'truenas', qnap:'qnap', ugreen:'ugreen', pbs:'proxmox', cloudflare:'cloudflare', cicd:'github', veeam:'veeam', portainer:'portainer' };
+const DEFAULT_ICON = { proxmox:'proxmox', kubernetes:'kubernetes', synology:'synology', mikrotik:'mikrotik', unifi:'unifi', healthchecks:'healthchecks', uptimekuma:'uptime-kuma', checks:'', prometheus:'prometheus', docker:'docker', dockhand:'https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/dockhand.png', firewall:'opnsense', truenas:'truenas', qnap:'qnap', ugreen:'ugreen', pbs:'proxmox', cloudflare:'cloudflare', cicd:'github', veeam:'veeam', portainer:'portainer' };
 function useInlineThemedIcon(panel, name){
   const normalized = String(name || '').trim().toLowerCase();
   if (panel?.id === 'cicd') {
     return ['github', 'github.svg', 'github.png', 'github.webp'].includes(normalized)
       || /\/github\.(svg|png|webp)(?:[?#].*)?$/.test(normalized);
   }
-  if (panel?.id === 'portainer') {
-    return ['portainer', 'portainer.svg', 'portainer.png', 'portainer.webp'].includes(normalized)
-      || /\/portainer\.(svg|png|webp)(?:[?#].*)?$/.test(normalized);
-  }
   return false;
+}
+function useMaskedThemedIcon(panel, name){
+  const normalized = String(name || '').trim().toLowerCase();
+  if (panel?.id !== 'mikrotik') return false;
+  return ['mikrotik', 'mikrotik.svg', 'mikrotik.png', 'mikrotik.webp'].includes(normalized)
+    || /\/mikrotik\.(svg|png|webp)(?:[?#].*)?$/.test(normalized);
 }
 function platformIcon(panel){
   const name = (window._lastData?.icons||{})[panel.id] || DEFAULT_ICON[panel.id];
   if(useInlineThemedIcon(panel, name)) return SEC_ICONS[panel.iconKey] ? SEC_ICONS[panel.iconKey]('currentColor') : '';
+  if(useMaskedThemedIcon(panel, name)) {
+    const url = iconUrl(name);
+    return `<span style="display:block;width:100%;height:100%;background:currentColor;-webkit-mask:url('${url}') center/contain no-repeat;mask:url('${url}') center/contain no-repeat"></span>`;
+  }
   const url = iconUrl(name);
   if(url) return `<img src="${url}" alt="" style="width:100%;height:100%;object-fit:contain" onerror="iconFallback(this,'${panel.iconKey}','${panel.color}')">`;
   return SEC_ICONS[panel.iconKey] ? SEC_ICONS[panel.iconKey](panel.color) : '';
@@ -5715,17 +5871,101 @@ function avgPct(vals){
 }
 function platformKpiLabel(id, panels){
   if(id === 'all') return trText('All platforms');
-  if(id === 'snmp') return trText('Network devices');
+  if(id === 'snmp') return trText('SNMP');
   return panels?.[id]?.title || id;
 }
-function overviewKpiOptions(metric, ids, panels){
-  const supported = {
-    cpu: ['proxmox','linux','snmp','docker'],
-    mem: ['proxmox','linux','snmp','docker'],
-    disk: ['proxmox','linux','snmp'],
-    bandwidth: ['proxmox','linux','snmp'],
-  }[metric] || [];
-  return ['all', ...ids.filter(id => supported.includes(id))].map(id => ({ id, label: platformKpiLabel(id, panels) }));
+function overviewKpiData(data){
+  const onlineRows = rows => (rows || []).filter(row => row?.online);
+  const rateSum = obj => metricRateSum(obj, 'readBps', 'writeBps');
+  const metricTotal = obj => metricRateSum(obj, 'rxBps', 'txBps');
+  const linuxOnline = onlineRows(data.linux);
+  const windowsOnline = onlineRows(data.windows);
+  const snmpOnline = onlineRows(data.snmp);
+  const synologyOnline = snmpRowsForPanel(snmpOnline, 'synology');
+  const mikrotikOnline = snmpRowsForPanel(snmpOnline, 'mikrotik');
+  const unifiOnline = snmpRowsForPanel(snmpOnline, 'unifi');
+  const genericSnmpOnline = snmpRowsForPanel(snmpOnline, 'snmp');
+  const pveRows = (data.proxmox?.nodes || []).filter(n => n.node?.online);
+  const pveOnline = pveRows.map(n => n.node || n).filter(n => n.online);
+  const dockerOnline = onlineRows(data.docker);
+  const firewallOnline = onlineRows(data.firewall?.instances);
+  const truenasOnline = onlineRows(data.truenas?.instances);
+  const qnapOnline = onlineRows(data.qnap?.instances);
+  const ugreenOnline = onlineRows(data.ugreen?.instances);
+  const pbsOnline = onlineRows(data.pbs?.instances);
+  const pbsNodes = pbsOnline.flatMap(inst => (inst.nodes || []).map(node => ({ ...node, instanceName: inst.name || inst.url })));
+  return {
+    cpu: {
+      proxmox: pveOnline.map(n => n.cpu),
+      linux: linuxOnline.map(s => s.cpu),
+      windows: windowsOnline.map(s => s.cpu),
+      synology: synologyOnline.map(s => s.cpu),
+      mikrotik: mikrotikOnline.map(s => s.cpu),
+      unifi: unifiOnline.map(s => s.cpu),
+      snmp: genericSnmpOnline.map(s => s.cpu),
+      docker: dockerOnline.map(h => h.summary?.cpu),
+      firewall: firewallOnline.map(inst => inst.system?.cpuPercent),
+      truenas: truenasOnline.map(inst => inst.system?.cpuPercent),
+      qnap: qnapOnline.map(inst => inst.system?.cpuPercent),
+      ugreen: ugreenOnline.map(inst => inst.system?.cpuPercent),
+      pbs: pbsNodes.map(node => node.cpuPercent),
+    },
+    mem: {
+      proxmox: pveOnline.map(n => n.memPct ?? n.ram?.percent),
+      linux: linuxOnline.map(s => s.ram?.percent),
+      windows: windowsOnline.map(s => s.ram?.percent),
+      synology: synologyOnline.map(s => s.ram?.percent),
+      mikrotik: mikrotikOnline.map(s => s.ram?.percent),
+      unifi: unifiOnline.map(s => s.ram?.percent),
+      snmp: genericSnmpOnline.map(s => s.ram?.percent),
+      docker: dockerOnline.map(h => h.summary?.memPercent),
+      firewall: firewallOnline.map(inst => inst.system?.memoryPercent),
+      truenas: truenasOnline.map(inst => inst.system?.memoryPercent),
+      qnap: qnapOnline.map(inst => inst.system?.memoryPercent),
+      ugreen: ugreenOnline.map(inst => inst.system?.memoryPercent),
+      pbs: pbsNodes.map(node => node.memoryPercent ?? node.memPercent),
+    },
+    disk: {
+      proxmox: pveRows.map(n => rateSum(n.metrics?.diskIO)),
+      linux: linuxOnline.map(s => rateSum(s.metrics?.diskIO)),
+      windows: windowsOnline.map(s => rateSum(s.metrics?.diskIO)),
+      synology: synologyOnline.map(s => rateSum(s.metrics?.diskIO)),
+      mikrotik: mikrotikOnline.map(s => rateSum(s.metrics?.diskIO)),
+      unifi: unifiOnline.map(s => rateSum(s.metrics?.diskIO)),
+      snmp: genericSnmpOnline.map(s => rateSum(s.metrics?.diskIO)),
+    },
+    bandwidth: {
+      proxmox: pveRows.map(n => metricTotal(n.metrics?.bandwidth)),
+      linux: linuxOnline.map(s => metricTotal(s.metrics?.bandwidth)),
+      windows: windowsOnline.map(s => metricTotal(s.metrics?.bandwidth)),
+      synology: synologyOnline.map(s => metricTotal(s.metrics?.bandwidth)),
+      mikrotik: mikrotikOnline.map(s => metricTotal(s.metrics?.bandwidth)),
+      unifi: unifiOnline.map(s => metricTotal(s.metrics?.bandwidth)),
+      snmp: genericSnmpOnline.map(s => metricTotal(s.metrics?.bandwidth)),
+    },
+    names: {
+      proxmox: pveOnline.map(n => n.name).filter(Boolean),
+      linux: linuxOnline.map(s => s.name).filter(Boolean),
+      windows: windowsOnline.map(s => s.name).filter(Boolean),
+      synology: synologyOnline.map(s => s.name).filter(Boolean),
+      mikrotik: mikrotikOnline.map(s => s.name).filter(Boolean),
+      unifi: unifiOnline.map(s => s.name).filter(Boolean),
+      snmp: genericSnmpOnline.map(s => s.name).filter(Boolean),
+      docker: dockerOnline.map(h => h.name).filter(Boolean),
+      firewall: firewallOnline.map(inst => inst.name || inst.system?.hostname).filter(Boolean),
+      truenas: truenasOnline.map(inst => inst.name || inst.system?.hostname).filter(Boolean),
+      qnap: qnapOnline.map(inst => inst.name || inst.system?.hostname).filter(Boolean),
+      ugreen: ugreenOnline.map(inst => inst.name || inst.system?.hostname).filter(Boolean),
+      pbs: pbsNodes.map(node => node.name || node.instanceName).filter(Boolean),
+    },
+    rateRows: { proxmox: pveRows, linux: linuxOnline, windows: windowsOnline, synology: synologyOnline, mikrotik: mikrotikOnline, unifi: unifiOnline, snmp: genericSnmpOnline },
+  };
+}
+function overviewKpiOptions(metric, ids, panels, data){
+  const sources = overviewKpiData(data);
+  const metricVals = sources[metric] || {};
+  const hasMetric = id => (metricVals[id] || []).some(hasNum);
+  return ['all', ...ids.filter(id => hasMetric(id))].map(id => ({ id, label: platformKpiLabel(id, panels) }));
 }
 function drawOverviewKpiSelect(metric, current, options){
   if(!options.some(o => o.id === current)) current = 'all';
@@ -5787,9 +6027,7 @@ function overviewBucketHistory(series, mode='sum'){
   }));
 }
 function overviewRateHistory(data, platform, metric){
-  const linuxOnline = (data.linux||[]).filter(s=>s.online);
-  const snmpOnline = (data.snmp||[]).filter(s=>s.online);
-  const pveRows = (data.proxmox?.nodes||[]).filter(n=>n.node?.online);
+  const sources = overviewKpiData(data);
   const rowBandwidthLimit = row => {
     const bw = row?.metrics?.bandwidth;
     if(hasNum(bw?.historyCapacityBps)) return Number(bw.historyCapacityBps);
@@ -5811,47 +6049,12 @@ function overviewRateHistory(data, platform, metric){
     const valid = hasNum(total) && (!limit || (Number(total) >= 0 && Number(total) <= limit * 1.08));
     return { time: h?.time, value: valid ? rateToMBps(total) : null };
   }) : []);
-  const series = {
-    proxmox: mapRate(pveRows),
-    linux: mapRate(linuxOnline),
-    snmp: mapRate(snmpOnline),
-  };
+  const series = Object.fromEntries(Object.entries(sources.rateRows).map(([id, rows]) => [id, mapRate(rows)]));
   return overviewBucketHistory(platform === 'all' ? Object.values(series).flat() : (series[platform] || []), 'sum');
 }
 function overviewKpiMetric(data, metric, platform){
-  const linuxOnline = (data.linux||[]).filter(s=>s.online);
-  const snmpOnline = (data.snmp||[]).filter(s=>s.online);
-  const pveRows = (data.proxmox?.nodes||[]).filter(n=>n.node?.online);
-  const pveOnline = pveRows.map(n=>n.node||n).filter(n=>n.online);
-  const dockerOnline = (data.docker||[]).filter(h=>h.online);
-  const cpu = {
-    proxmox: pveOnline.map(n=>n.cpu),
-    linux: linuxOnline.map(s=>s.cpu),
-    snmp: snmpOnline.map(s=>s.cpu),
-    docker: dockerOnline.map(h=>h.summary?.cpu),
-  };
-  const mem = {
-    proxmox: pveOnline.map(n=>n.memPct ?? n.ram?.percent),
-    linux: linuxOnline.map(s=>s.ram?.percent),
-    snmp: snmpOnline.map(s=>s.ram?.percent),
-    docker: dockerOnline.map(h=>h.summary?.memPercent),
-  };
-  const names = {
-    proxmox: pveOnline.map(n=>n.name).filter(Boolean),
-    linux: linuxOnline.map(s=>s.name).filter(Boolean),
-    snmp: snmpOnline.map(s=>s.name).filter(Boolean),
-    docker: dockerOnline.map(h=>h.name).filter(Boolean),
-  };
-  const disk = {
-    proxmox: pveRows.map(n=>metricRateSum(n.metrics?.diskIO, 'readBps', 'writeBps')),
-    linux: linuxOnline.map(s=>(Number(s.metrics?.diskIO?.readBps)||0)+(Number(s.metrics?.diskIO?.writeBps)||0)),
-    snmp: snmpOnline.map(s=>metricRateSum(s.metrics?.diskIO, 'readBps', 'writeBps')),
-  };
-  const bandwidth = {
-    proxmox: pveRows.map(n=>metricRateSum(n.metrics?.bandwidth, 'rxBps', 'txBps')),
-    linux: linuxOnline.map(s=>(Number(s.metrics?.bandwidth?.rxBps)||0)+(Number(s.metrics?.bandwidth?.txBps)||0)),
-    snmp: snmpOnline.map(s=>metricRateSum(s.metrics?.bandwidth, 'rxBps', 'txBps')),
-  };
+  const sources = overviewKpiData(data);
+  const { cpu, mem, disk, bandwidth, names } = sources;
   const allVals = obj => Object.values(obj).flat();
   const allNames = obj => Object.values(obj).flat();
   if(metric === 'cpu') return { ...kpiPct('reporting source', platform === 'all' ? allVals(cpu) : (cpu[platform] || [])), names: platform === 'all' ? allNames(names) : (names[platform] || []) };
@@ -5907,7 +6110,7 @@ function overviewKpiBody(metric, stat, current, panels){
     <div class="overview-kpi-sub">${stat.sub||''}</div>`;
 }
 function overviewKpi(metric, label, data, ids, panels){
-  const options = overviewKpiOptions(metric, ids, panels);
+  const options = overviewKpiOptions(metric, ids, panels, data);
   const current = options.some(o => o.id === overviewKpiPlatforms[metric]) ? overviewKpiPlatforms[metric] : 'all';
   const stat = overviewKpiMetric(data, metric, current);
   const body = overviewKpiBody(metric, stat, current, panels);
@@ -5931,6 +6134,14 @@ function overviewRow(panelId, name, sub, badgeCls, badgeTxt, dotCls, action, ext
     </div>
     ${bdg(badgeCls||'green', badgeTxt||'ok')}
   </div>`;
+}
+function taskTimeText(value){
+  if(value == null || value === '') return '';
+  if(typeof value === 'number' || /^\d+$/.test(String(value))) {
+    const n = Number(value);
+    if(Number.isFinite(n)) return fmtTime(n > 1e12 ? n : n * 1000);
+  }
+  return String(value);
 }
 function overviewGroup(gid, title, rows, emptyText){
   const open = !!overviewK8sOpen[gid];
@@ -5963,15 +6174,16 @@ function overviewRows(id, data){
     });
     return rows.join('');
   }
-  if(id === 'snmp'){
-    const rows = (data.snmp||[]).slice(0,6).map(dev => {
+  if(SNMP_PANEL_IDS.includes(id)){
+    const panelRows = snmpRowsForPanel(data.snmp, id);
+    const rows = panelRows.slice(0,6).map(dev => {
       const primaryFan = snmpPrimaryFan(dev.fanSpeeds || dev.sensors?.fanSpeeds || []);
       const sub = dev._connecting ? (dev.host||'Connecting') :
         dev.online ? [dev.host, dev.cpu!=null?`CPU ${dev.cpu}%`:'', dev.ram?`RAM ${dev.ram.percent}%`:'', (dev.cpuTemp ?? dev.systemTemp)!=null?`CPU temp ${dev.cpuTemp ?? dev.systemTemp}°C`:'', primaryFan?`${snmpFanLabel(primaryFan)} ${primaryFan.value} RPM`:'' ].filter(Boolean).join(' · ') :
         (dev.error || 'SNMP unreachable');
-      return overviewRow('snmp', dev.name, sub, dev._connecting?'gray':dev.online?'green':'red', dev._connecting?'connecting':dev.online?'online':'offline', dev._connecting?'md-gray':dev.online?'md-green':'md-red');
+      return overviewRow(id, dev.name, sub, dev._connecting?'gray':dev.online?'green':'red', dev._connecting?'connecting':dev.online?'online':'offline', dev._connecting?'md-gray':dev.online?'md-green':'md-red');
     }).join('');
-    return overviewGroup('snmpServers', 'Servers', rows, 'No network devices found');
+    return overviewGroup(`${id}Devices`, 'Devices', rows, `No ${PLATFORM_META[id]?.title || 'SNMP'} devices found`);
   }
   if(id === 'docker'){
     const hosts = data.docker || [];
@@ -6035,12 +6247,13 @@ function overviewRows(id, data){
     const gatewayRows = instances.map(inst => {
       const sm = inst.summary || {};
       const sub = inst._connecting ? (inst.url || 'Connecting') :
-        inst.online ? [`${sm.interfacesUp || 0}/${sm.interfaces || 0} links`, sm.updates ? `${sm.updates} updates` : '', sm.rebootRequired ? 'reboot required' : '', inst.url || ''].filter(Boolean).join(' · ') :
+        inst.online ? [`${sm.interfacesUp || 0}/${sm.interfaces || 0} links`, inst.url || ''].filter(Boolean).join(' · ') :
         (inst.error || inst.url || 'Unreachable');
       const warn = inst.partial || sm.interfacesDown || sm.updates || sm.rebootRequired;
+      const warnTxt = sm.interfacesDown ? `${sm.interfacesDown} links down` : sm.rebootRequired ? 'reboot required' : inst.partial ? 'partial' : 'attention';
       return overviewRow('firewall', inst.name || inst.url || 'Firewall', sub,
         inst._connecting ? 'gray' : !inst.online ? 'red' : warn ? 'yellow' : 'green',
-        inst._connecting ? 'connecting' : !inst.online ? 'offline' : warn ? 'attention' : 'healthy',
+        inst._connecting ? 'connecting' : !inst.online ? 'offline' : warn ? warnTxt : 'healthy',
         inst._connecting ? 'md-gray' : !inst.online ? 'md-red' : warn ? 'md-yellow' : 'md-green');
     }).join('');
     const linkRows = instances.filter(i => i.online).map(inst => {
@@ -6090,12 +6303,13 @@ function overviewRows(id, data){
     const serverRows = instances.map(inst => {
       const sm = inst.summary || {};
       const warn = inst.partial || sm.datastoresWarn || sm.failedTasks;
+      const warnTxt = sm.datastoresWarn ? `${sm.datastoresWarn} store warn` : inst.partial ? 'partial' : 'attention';
       const sub = inst._connecting ? (inst.url || 'Connecting') :
-        inst.online ? [`${sm.datastores || 0} datastores`, sm.snapshots ? `${sm.snapshots} snapshots` : '', hasNum(sm.usedPercent) ? `used ${fmtPct(sm.usedPercent)}` : '', sm.failedTasks ? `${sm.failedTasks} failed tasks` : '', inst.url || ''].filter(Boolean).join(' · ') :
+        inst.online ? [`${sm.datastores || 0} DST`, sm.snapshots ? `${sm.snapshots} snapshots` : '', hasNum(sm.usedPercent) ? `used ${fmtPct(sm.usedPercent)}` : '', inst.url || ''].filter(Boolean).join(' · ') :
         (inst.error || inst.url || 'Unreachable');
       return overviewRow('pbs', inst.name || inst.url || 'Proxmox Backup', sub,
         inst._connecting ? 'gray' : !inst.online ? 'red' : warn ? 'yellow' : 'green',
-        inst._connecting ? 'connecting' : !inst.online ? 'offline' : warn ? 'attention' : 'healthy',
+        inst._connecting ? 'connecting' : !inst.online ? 'offline' : warn ? warnTxt : 'healthy',
         inst._connecting ? 'md-gray' : !inst.online ? 'md-red' : warn ? 'md-yellow' : 'md-green');
     }).join('');
     const storeRows = instances.filter(i => i.online).map(inst => {
@@ -6106,9 +6320,21 @@ function overviewRows(id, data){
       }).join('');
       return `<div class="overview-nested-title"><div class="mon-dot ${inst.online?'md-green':'md-gray'}"></div><span>${escHtml(inst.name || inst.url || 'Proxmox Backup')}</span></div>${rows || '<div class="overview-empty">No datastores reported</div>'}`;
     }).join('');
+    const taskRows = instances.filter(i => i.online).map(inst => {
+      const rows = (inst.tasks || [])
+        .filter(task => task.failed || /fail|error|warn/i.test(String(task.status || '')))
+        .slice(0, 8)
+        .map(task => {
+          const name = task.name || [task.type, task.taskId].filter(Boolean).join(' - ') || task.id || 'PBS task';
+          const sub = [inst.name || inst.url, task.status, taskTimeText(task.starttime || task.startTime || '')].filter(Boolean).join(' · ');
+          return overviewRow('pbs', name, sub, 'yellow', task.status || 'failed', 'md-yellow');
+        }).join('');
+      return rows ? `<div class="overview-nested-title"><div class="mon-dot md-yellow"></div><span>${escHtml(inst.name || inst.url || 'Proxmox Backup')}</span></div>${rows}` : '';
+    }).join('');
     return [
       overviewGroup('pbsServers', 'Servers', serverRows, 'No Proxmox Backup servers configured'),
       overviewGroup('pbsDatastores', 'Datastores', storeRows, 'No datastores reported'),
+      overviewGroup('pbsTasks', 'Failed tasks', taskRows, 'No failed tasks reported'),
     ].join('');
   }
   if(id === 'qnap' || id === 'ugreen'){
@@ -6183,7 +6409,7 @@ function overviewRows(id, data){
       const sm = inst.summary || {};
       const warn = inst.partial || Number(sm.failedSessions || 0) > 0 || Number(sm.warningSessions || 0) > 0 || Number(sm.repositoriesWarn || 0) > 0;
       const sub = inst._connecting ? (inst.url || 'Connecting') :
-        inst.online ? [`${sm.jobs || 0} jobs`, `${sm.failedSessions || 0}/${sm.sessions || 0} failed sessions`, `${sm.repositories || 0} repositories`, inst.url || ''].filter(Boolean).join(' Â· ') :
+        inst.online ? [`${sm.jobs || 0} jobs`, `${sm.failedSessions || 0}/${sm.sessions || 0} failed`, `${sm.repositories || 0} repositories`, inst.url || ''].filter(Boolean).join(' Â· ') :
         (inst.error || inst.url || 'Unreachable');
       return overviewRow('veeam', inst.name || inst.url || 'Veeam', sub,
         inst._connecting ? 'gray' : !inst.online ? 'red' : warn ? 'yellow' : 'green',
@@ -6214,7 +6440,7 @@ function overviewRows(id, data){
       const sm = inst.summary || {};
       const warn = inst.partial || sm.environmentsDown || sm.stacksWarn;
       const sub = inst._connecting ? (inst.url || 'Connecting') :
-        inst.online ? [`${sm.environmentsUp || 0}/${sm.environments || 0} environments`, `${sm.running || 0}/${sm.containers || 0} containers`, sm.stacks ? `${sm.stacks} stacks` : '', inst.url || ''].filter(Boolean).join(' · ') :
+        inst.online ? [`${sm.environmentsUp || 0}/${sm.environments || 0} env`, `${sm.running || 0}/${sm.containers || 0} containers`, sm.stacks ? `${sm.stacks} stacks` : '', inst.url || ''].filter(Boolean).join(' · ') :
         (inst.error || inst.url || 'Unreachable');
       return overviewRow('portainer', inst.name || inst.url || 'Portainer', sub,
         inst._connecting ? 'gray' : !inst.online ? 'red' : warn ? 'yellow' : 'green',
@@ -6557,6 +6783,23 @@ function restoreDashboardPlatforms(){
   clearOverviewCache();
   if(window._lastData && dashboardOpen) render(window._lastData);
 }
+function dashboardSummaryHtml(html){
+  if(!html) return '';
+  const wrap = document.createElement('div');
+  wrap.innerHTML = html;
+  const items = [...wrap.querySelectorAll('.sb-csum-item,.csum-item')];
+  if(!items.length) return html;
+  const zeroMetric = item => {
+    const val = (item.querySelector('.sb-csum-val,.csum-val')?.textContent || '').replace(/\s+/g, ' ').trim();
+    if(!val || /[–—…✕x]/i.test(val)) return false;
+    if(/^0(?:[.,]0+)?%?$/.test(val)) return true;
+    if(/^0(?:[.,]0+)?\s*(?:B|KB|MB|GB|TB|B\/s|KB\/s|MB\/s|GB\/s|TB\/s)$/i.test(val)) return true;
+    if(/^0\s*\/\s*0$/.test(val)) return true;
+    return false;
+  };
+  items.forEach(item => { if(zeroMetric(item)) item.remove(); });
+  return wrap.querySelector('.sb-csum-item,.csum-item') ? wrap.innerHTML : '';
+}
 function renderDashboardOverview(data, ids, panels, opts = {}){
   const showSide = dashboardSidePanelVisible(data);
   const visibleIds = ids.filter(id => !dashboardHiddenPlatforms.has(id));
@@ -6564,7 +6807,7 @@ function renderDashboardOverview(data, ids, panels, opts = {}){
   const cards = visibleIds.map(id => {
     const panel = panels[id];
     const iconSvg = platformIcon(panel);
-    const title = id === 'snmp' ? 'Network devices' : panel.title;
+    const title = id === 'snmp' ? 'SNMP' : panel.title;
     const rows = overviewRows(id, data);
     const listHtml = rows
       ? `<div class="overview-list ${['healthchecks','database','checks','dockhand','portainer'].includes(id)?'is-scroll':''}" data-scroll-key="overview-${id}">${rows}</div>`
@@ -6585,7 +6828,7 @@ function renderDashboardOverview(data, ids, panels, opts = {}){
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
         </button>
       </div>
-      ${panel.sbSummary || ''}
+      ${dashboardSummaryHtml(panel.sbSummary)}
       ${listHtml}
     </section>`;
   }).join('');
@@ -6640,7 +6883,7 @@ function clearOverviewCache(){
 function updateOverviewKpis(data, ids, panels){
   document.querySelectorAll('.overview-kpi[data-kpi]').forEach(el => {
     const metric = el.dataset.kpi;
-    const options = overviewKpiOptions(metric, ids, panels);
+    const options = overviewKpiOptions(metric, ids, panels, data);
     const current = options.some(o => o.id === overviewKpiPlatforms[metric]) ? overviewKpiPlatforms[metric] : 'all';
     const stat = overviewKpiMetric(data, metric, current);
     el.classList.toggle('overview-kpi-gauge', metric === 'cpu' || metric === 'mem');
@@ -6671,7 +6914,10 @@ function buildPanels(data){
     kubernetes:   () => buildKubernetes(data.kubernetes),
     linux:        () => buildLinux(data.linux),
     windows:      () => buildWindows(data.windows),
-    snmp:         () => buildSynology(data.snmp),
+    synology:     () => buildSynology(snmpRowsForPanel(data.snmp, 'synology'), { id:'synology', ...PLATFORM_META.synology }),
+    mikrotik:     () => buildSynology(snmpRowsForPanel(data.snmp, 'mikrotik'), { id:'mikrotik', ...PLATFORM_META.mikrotik }),
+    unifi:        () => buildSynology(snmpRowsForPanel(data.snmp, 'unifi'), { id:'unifi', ...PLATFORM_META.unifi }),
+    snmp:         () => buildSynology(snmpRowsForPanel(data.snmp, 'snmp'), { id:'snmp', ...PLATFORM_META.snmp }),
     healthchecks: () => buildHealthchecks(data.healthchecks),
     uptimekuma:   () => buildUptimeKuma(data.uptimekuma),
     checks:       () => buildChecks(data.checks),
@@ -6936,8 +7182,8 @@ function selectPanel(id, opts = {}){
     });
   }
 
-  if(id === 'snmp'){
-    (data.snmp||[]).forEach((dev,i) => {
+  if(SNMP_PANEL_IDS.includes(id)){
+    snmpRowsForPanel(data.snmp, id).forEach((dev,i) => {
       const k='d'+i;
       const stateKey = 'snmp:' + String(dev.id || dev.name || dev.host || k);
       if(shouldOpen(stateKey, !dev.online)){ snmpOpen[stateKey] = true; openEl(document.getElementById(`snmp-${k}`)); }
@@ -7014,7 +7260,9 @@ function render(data, opts = {}){
   syncDefaultPeriodOverride(data);
   window._lastData = data;
   if(Array.isArray(data.configured)) {
-    setConfiguredIds(data.configured, {
+    const expandedConfigured = expandSnmpConfiguredIds(data.configured, data);
+    data.configured = expandedConfigured;
+    setConfiguredIds(expandedConfigured, {
       keepExistingOnEmpty: embedOpen || !!data.loading || !!data.refreshing || !!data._snapshot,
     });
   }
@@ -7159,7 +7407,7 @@ function render(data, opts = {}){
   setFavicon(anyOff);
   setLogoDot(anyOff);
 
-  const dataHas={ proxmox:!!(data.proxmox?.nodes?.length), linux:!!((data.linux||[]).length), windows:!!((data.windows||[]).length), kubernetes:!!data.kubernetes, snmp:!!((data.snmp||[]).length), healthchecks:!!data.healthchecks, uptimekuma:!!data.uptimekuma, checks:!!data.checks, prometheus:!!data.prometheus, docker:!!((data.docker||[]).length), dockhand:!!data.dockhand, firewall:!!data.firewall, truenas:!!data.truenas, qnap:!!data.qnap, ugreen:!!data.ugreen, pbs:!!data.pbs, cloudflare:!!data.cloudflare, cicd:!!data.cicd, veeam:!!data.veeam, portainer:!!data.portainer, database:!!((data.database||[]).length) };
+  const dataHas={ proxmox:!!(data.proxmox?.nodes?.length), linux:!!((data.linux||[]).length), windows:!!((data.windows||[]).length), kubernetes:!!data.kubernetes, synology:!!snmpRowsForPanel(data.snmp,'synology').length, mikrotik:!!snmpRowsForPanel(data.snmp,'mikrotik').length, unifi:!!snmpRowsForPanel(data.snmp,'unifi').length, snmp:!!snmpRowsForPanel(data.snmp,'snmp').length, healthchecks:!!data.healthchecks, uptimekuma:!!data.uptimekuma, checks:!!data.checks, prometheus:!!data.prometheus, docker:!!((data.docker||[]).length), dockhand:!!data.dockhand, firewall:!!data.firewall, truenas:!!data.truenas, qnap:!!data.qnap, ugreen:!!data.ugreen, pbs:!!data.pbs, cloudflare:!!data.cloudflare, cicd:!!data.cicd, veeam:!!data.veeam, portainer:!!data.portainer, database:!!((data.database||[]).length) };
   const connectingCount=platformConnectingCount + configuredIds.filter(id=>id!=='linux'&&!dataHas[id]).length;
   window._connecting = connectingCount;
 
@@ -7684,7 +7932,8 @@ function commandPaletteItems(){
     items.push(commandItem(host.name || host.host, [host.ip || host.host, host.online ? 'online' : host._connecting ? 'connecting' : 'offline'].filter(Boolean).join(' - '), 'linux', cmdIcon('linux'), () => selectPanel('linux')));
   });
   (data.snmp || []).forEach(dev => {
-    items.push(commandItem(dev.name || dev.host, [dev.host || dev.ip, dev.online ? 'online' : dev._connecting ? 'connecting' : 'offline'].filter(Boolean).join(' - '), 'snmp', cmdIcon('snmp'), () => selectPanel('snmp')));
+    const panelId = normalizeSnmpPanelProfile(dev.profile || dev.preset);
+    items.push(commandItem(dev.name || dev.host, [dev.host || dev.ip, dev.online ? 'online' : dev._connecting ? 'connecting' : 'offline'].filter(Boolean).join(' - '), panelId, cmdIcon(panelId), () => selectPanel(panelId)));
   });
   (data.proxmox?.nodes || []).forEach(n => {
     const node = n.node || n;
@@ -8218,6 +8467,7 @@ function statusCacheKey(){
 }
 const STATUS_INSTANCE_IDS = new Set(['prometheus','dockhand','firewall','truenas','qnap','ugreen','pbs','cloudflare','cicd','veeam','portainer']);
 function statusPlatformPresent(data = {}, id){
+  if(SNMP_PANEL_IDS.includes(id)) return snmpRowsForPanel(data.snmp, id).length > 0;
   const value = data?.[id];
   if(Array.isArray(value)) return value.length > 0;
   if(id === 'proxmox') return Array.isArray(value?.nodes) && value.nodes.length > 0;
@@ -8226,6 +8476,7 @@ function statusPlatformPresent(data = {}, id){
   return !!value;
 }
 function statusPlatformObserved(data = {}, id){
+  if(SNMP_PANEL_IDS.includes(id)) return snmpRowsForPanel(data.snmp, id).some(row => row && !row._connecting);
   const value = data?.[id];
   if(Array.isArray(value)) return value.some(row => row && !row._connecting);
   if(id === 'proxmox') return (value?.nodes || []).some(row => row && !row._connecting);
@@ -8241,12 +8492,12 @@ function statusPlatformObserved(data = {}, id){
   return !!value && !value._connecting;
 }
 function statusPayloadHasUsefulData(data){
-  const ids = cleanUiOrder(Array.isArray(data?.configured) ? data.configured : (configuredIds || ALL_IDS));
+  const ids = expandSnmpConfiguredIds(Array.isArray(data?.configured) ? data.configured : (configuredIds || ALL_IDS), data);
   return ids.some(id => statusPlatformObserved(data, id));
 }
 function statusPayloadLooksTransientShell(data){
   if(!data || data.loading) return false;
-  const ids = cleanUiOrder(Array.isArray(data.configured) ? data.configured : configuredIds).filter(id => id !== 'linux');
+  const ids = expandSnmpConfiguredIds(Array.isArray(data.configured) ? data.configured : configuredIds, data).filter(id => id !== 'linux');
   if(ids.length < 3) return false;
   const present = ids.filter(id => statusPlatformPresent(data, id)).length;
   const observed = ids.filter(id => statusPlatformObserved(data, id)).length;

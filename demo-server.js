@@ -166,7 +166,7 @@ const demoUser = {
   twoFactorEnabled: false,
 };
 const demoSessions = new Map();
-const DEMO_PLATFORM_IDS = ['proxmox', 'kubernetes', 'linux', 'snmp', 'healthchecks', 'uptimekuma', 'checks', 'prometheus', 'docker', 'dockhand', 'database'];
+const DEMO_PLATFORM_IDS = ['proxmox', 'kubernetes', 'linux', 'windows', 'synology', 'mikrotik', 'unifi', 'healthchecks', 'uptimekuma', 'checks', 'prometheus', 'docker', 'dockhand', 'firewall', 'truenas', 'qnap', 'ugreen', 'pbs', 'cloudflare', 'cicd', 'veeam', 'portainer', 'database'];
 const DEMO_OVERVIEW_COLLAPSED = Object.fromEntries(DEMO_PLATFORM_IDS.map(id => [id, true]));
 
 let demoTopology = {
@@ -181,11 +181,12 @@ let demoTopology = {
     { from: 'snmp:core-switch', to: 'proxmox-host:px-demo-02' },
     { from: 'snmp:core-switch', to: 'proxmox-host:px-demo-03' },
     { from: 'snmp:core-switch', to: 'snmp:demo-nas' },
+    { from: 'snmp:core-switch', to: 'snmp:demo-ap' },
     { from: 'snmp:core-switch', to: 'docker:demo-docker' },
     { from: 'snmp:core-switch', to: 'dockhand:dockhand-demo' },
     { from: 'docker:demo-docker', to: 'dockhand:dockhand-demo' },
   ],
-  nodes: ['kubernetes:cluster', 'docker:demo-docker', 'dockhand:dockhand-demo', 'snmp:core-switch', 'snmp:demo-nas'],
+  nodes: ['kubernetes:cluster', 'docker:demo-docker', 'dockhand:dockhand-demo', 'snmp:core-switch', 'snmp:demo-nas', 'snmp:demo-ap'],
   hidden: [],
   spacing: { proxmoxVmGap: 180 },
   positions: {
@@ -201,6 +202,7 @@ let demoTopology = {
     'proxmox-guest:px-demo-03:302': { x: 1215, y: 430 },
     'kubernetes:cluster': { x: 700, y: 615 },
     'snmp:demo-nas': { x: 430, y: -23.33333333333333 },
+    'snmp:demo-ap': { x: 920, y: -55 },
     'docker:demo-docker': { x: 1122.7777777777778, y: -83.33333333333334 },
     'dockhand:dockhand-demo': { x: 1575, y: 90 },
   },
@@ -431,15 +433,29 @@ function demoConfig() {
     performance: { lowIoMode: true },
     security: { passwordResetEnabled: true },
     proxmox: { enabled: true, url: 'https://192.0.2.10:8006', tokenId: '__demo__', tokenSecret: '__demo__', tls: 'verify', sshMetrics: [] },
-    linux: { enabled: true },
-    kubernetes: { enabled: true },
-    snmp: { enabled: true, devices: [{ name: 'core-switch', host: '192.0.2.2' }, { name: 'demo-nas', host: '192.0.2.20' }] },
+    linux: { enabled: true, agentToken: '__demo_agent_token__' },
+    windows: { enabled: true, icon: 'windows' },
+    kubernetes: { enabled: true, kubeconfig: '__demo_kubeconfig__' },
+    snmp: { enabled: true, devices: [
+      { name: 'core-switch', host: '192.0.2.2', profile: 'mikrotik', method: 'snmp', community: 'public' },
+      { name: 'demo-ap', host: '192.0.2.3', profile: 'unifi', method: 'snmp', community: 'public' },
+      { name: 'demo-nas', host: '192.0.2.20', profile: 'synology', method: 'snmp', community: 'public' },
+    ] },
     healthchecks: { enabled: true, url: 'https://healthchecks.example.invalid' },
     uptimekuma: { enabled: true, url: 'https://kuma.example.invalid', historyHours: demoPrefs.uptimekuma.historyHours },
     checks: { enabled: true, historyHours: demoPrefs.checks.historyHours, services: [{ name: 'demo website', type: 'http', target: 'https://example.invalid' }] },
     prometheus: { enabled: true, instances: [{ name: 'prometheus-demo', url: 'https://prometheus.example.invalid' }] },
     docker: { enabled: true, hosts: [{ type: 'ssh', name: 'demo-docker', host: '192.0.2.30', port: 22 }] },
     dockhand: { enabled: true, instances: [{ name: 'dockhand-demo', url: 'https://dockhand.example.invalid' }] },
+    firewall: { enabled: true, instances: [{ name: 'edge-opnsense', type: 'opnsense', url: 'https://firewall.example.invalid', apiKey: '__demo__', apiSecret: '__demo__' }] },
+    truenas: { enabled: true, instances: [{ name: 'truenas-demo', url: 'https://truenas.example.invalid', apiMode: 'auto', method: 'auto', apiKey: '__demo__' }] },
+    qnap: { enabled: true, instances: [{ name: 'qnap-demo', url: 'https://qnap.example.invalid', method: 'qts-api', username: 'monitoring', password: '__demo__' }] },
+    ugreen: { enabled: true, instances: [{ name: 'ugreen-demo', url: 'https://ugreen.example.invalid', method: 'web' }] },
+    pbs: { enabled: true, instances: [{ name: 'pbs-demo', url: 'https://pbs.example.invalid:8007', tokenId: 'root@pam!monitoring', tokenSecret: '__demo__' }] },
+    cloudflare: { enabled: true, apiToken: '__demo__', accountId: 'demo-account', zones: ['example.com', 'internal.example.com'], includeTunnels: true, includeRegistrarDomains: true },
+    cicd: { enabled: true, projects: [{ name: 'OmniSight', provider: 'github', owner: 'caglaryalcin', repo: 'OmniSight', branch: 'main', token: '__demo__' }, { name: 'infra-playbooks', provider: 'gitlab', projectId: 'ops/infra-playbooks', branch: 'main', token: '__demo__' }] },
+    veeam: { enabled: true, instances: [{ name: 'veeam-demo', url: 'https://veeam.example.invalid:9419', username: 'DOMAIN\\monitoring', password: '__demo__', apiVersion: '1.3-rev1' }] },
+    portainer: { enabled: true, instances: [{ name: 'portainer-demo', url: 'https://portainer.example.invalid:9443', apiKey: '__demo__' }] },
     database: { enabled: true, instances: [{ name: 'demo-postgres', type: 'postgresql', host: '192.0.2.40', port: 5432 }] },
     alerts: { enabled: true, channels: { ntfy: { enabled: true, url: 'https://ntfy.sh', topics: ['omnisight-demo'] } } },
     topology: { ...demoTopology },
@@ -471,10 +487,10 @@ function demoStatus() {
     loading: false,
     refreshing: false,
     publicStatus: true,
-    configured: ['proxmox', 'linux', 'kubernetes', 'snmp', 'healthchecks', 'uptimekuma', 'checks', 'prometheus', 'docker', 'dockhand', 'qnap', 'ugreen', 'database'],
-      preferredLanguage: 'en',
-      timeFormat: '24h',
-      defaultTimePeriodHours: 1,
+    configured: ['proxmox', 'linux', 'windows', 'kubernetes', 'synology', 'mikrotik', 'unifi', 'healthchecks', 'uptimekuma', 'checks', 'prometheus', 'docker', 'dockhand', 'firewall', 'truenas', 'qnap', 'ugreen', 'pbs', 'cloudflare', 'cicd', 'veeam', 'portainer', 'database'],
+    preferredLanguage: 'en',
+    timeFormat: '24h',
+    defaultTimePeriodHours: 1,
     historyRetentionDays: 1,
     performance: { lowIoMode: true },
     appearance: { dashboardSidePanel: false },
@@ -631,6 +647,33 @@ function demoStatus() {
     ] },
   ];
 
+  data.windows = [
+    {
+      id: 'windows-demo-01',
+      name: 'demo-win-01',
+      host: '192.0.2.60',
+      ip: '192.0.2.60',
+      online: true,
+      os: 'Windows Server 2022 Datacenter',
+      kernel: '10.0.20348',
+      agentVersion: 'demo',
+      cpu: h4Now.cpu || 31,
+      ram: { percent: h4Now.mem || 61, used: 19.5, usedGB: 19.5, total: 32, totalGB: 32 },
+      disk: { percent: h4Now.disk || 58, used: 348, usedGB: 348, total: 600, totalGB: 600 },
+      uptime: uptimeSeconds(12, 5, 33),
+      metrics: {
+        bandwidth: { rxBps: h4Now.bandwidthRxBps || 1_200_000, txBps: h4Now.bandwidthTxBps || 500_000 },
+        diskIO: { readBps: h4Now.diskReadBps || 420_000, writeBps: h4Now.diskWriteBps || 230_000 },
+      },
+      history: h4,
+      services: [
+        { name: 'WinRM', desc: 'Windows Remote Management', active: true, state: 'running' },
+        { name: 'MSSQLSERVER', desc: 'SQL Server', active: true, state: 'running' },
+        { name: 'VeeamTransportSvc', desc: 'Veeam transport service', active: true, state: 'running' },
+      ],
+    },
+  ];
+
   const k8sPods = [
     ['api-demo-7d9f6c-8m2qf', 'apps', 'Running', '18m', '310 MB', 0],
     ['api-demo-7d9f6c-p91xa', 'apps', 'Running', '17m', '298 MB', 0],
@@ -697,11 +740,14 @@ function demoStatus() {
   };
 
   const hSwitch = history(96, 9, 2, { rxBase: 3_600_000, txBase: 2_100_000, readBase: 20_000, writeBase: 12_000 });
+  const hUnifi = history(96, 13, 4, { rxBase: 2_600_000, txBase: 1_500_000, readBase: 8_000, writeBase: 5_000 });
   const hNas = history(96, 17, 4, { rxBase: 4_400_000, txBase: 2_700_000, readBase: 1_400_000, writeBase: 760_000 });
   const hSwitchNow = hSwitch[hSwitch.length - 1] || {};
+  const hUnifiNow = hUnifi[hUnifi.length - 1] || {};
   const hNasNow = hNas[hNas.length - 1] || {};
   data.snmp = [
     { name: 'core-switch', host: '192.0.2.2', online: true, profile: 'mikrotik', vendor: 'MikroTik', model: 'CRS', cpu: hSwitchNow.cpu || 9, ram: { percent: hSwitchNow.mem || 28, used: 0.3, total: 1 }, systemTemp: hSwitchNow.tempSystem || 42, metrics: { bandwidth: { rxBps: hSwitchNow.bandwidthRxBps || 3_200_000, txBps: hSwitchNow.bandwidthTxBps || 2_000_000 }, diskIO: { readBps: hSwitchNow.diskReadBps || 0, writeBps: hSwitchNow.diskWriteBps || 0 } }, history: hSwitch },
+    { name: 'demo-ap', host: '192.0.2.3', online: true, profile: 'unifi', vendor: 'Ubiquiti', model: 'UniFi U6 Pro', cpu: hUnifiNow.cpu || 13, ram: { percent: hUnifiNow.mem || 41, used: 0.42, total: 1 }, systemTemp: hUnifiNow.tempSystem || 39, fanSpeeds: [], metrics: { bandwidth: { rxBps: hUnifiNow.bandwidthRxBps || 2_400_000, txBps: hUnifiNow.bandwidthTxBps || 1_300_000 }, diskIO: { readBps: hUnifiNow.diskReadBps || 0, writeBps: hUnifiNow.diskWriteBps || 0 } }, history: hUnifi },
     { name: 'demo-nas', host: '192.0.2.20', online: true, profile: 'synology', vendor: 'Synology', model: 'DS Demo', cpu: hNasNow.cpu || 17, ram: { percent: hNasNow.mem || 36, used: 5.8, total: 16 }, systemTemp: hNasNow.tempSystem || 45, metrics: { bandwidth: { rxBps: hNasNow.bandwidthRxBps || 4_200_000, txBps: hNasNow.bandwidthTxBps || 2_600_000 }, diskIO: { readBps: hNasNow.diskReadBps || 1_600_000, writeBps: hNasNow.diskWriteBps || 840_000 } }, history: hNas },
   ];
 
@@ -793,29 +839,220 @@ function demoStatus() {
       imageUpdate: i === 2 ? { status: 'update', checkedAt: nowIso(-240_000) } : { status: 'current', checkedAt: nowIso(-240_000) },
     })),
   };
+  data.firewall = {
+    online: true,
+    summary: { instances: 1, up: 1, down: 0, interfaces: 4, interfacesUp: 4, interfacesDown: 0, updates: 2, rebootRequired: 0 },
+    instances: [{
+      name: 'edge-opnsense',
+      type: 'opnsense',
+      url: 'https://firewall.example.invalid',
+      online: true,
+      system: { hostname: 'edge-fw-01', version: 'OPNsense 24.1', cpuPercent: 14, memoryPercent: 46, updateCount: 2, rebootRequired: false },
+      firewall: { states: 18423, maxStates: 1000000 },
+      summary: { interfaces: 4, interfacesUp: 4, interfacesDown: 0, updates: 2, rebootRequired: 0 },
+      interfaces: [
+        { name: 'wan', description: 'WAN', address: '198.51.100.10/29', status: 'up', inBytes: 28.4 * 1024 ** 3, outBytes: 9.1 * 1024 ** 3 },
+        { name: 'lan', description: 'LAN', address: '192.0.2.1/24', status: 'up', inBytes: 114.2 * 1024 ** 3, outBytes: 86.5 * 1024 ** 3 },
+        { name: 'dmz', description: 'DMZ', address: '192.0.2.129/26', status: 'up', inBytes: 12.8 * 1024 ** 3, outBytes: 7.4 * 1024 ** 3 },
+        { name: 'wg0', description: 'WireGuard', address: '10.6.0.1/24', status: 'up', inBytes: 3.2 * 1024 ** 3, outBytes: 2.1 * 1024 ** 3 },
+      ],
+    }],
+  };
+
+  data.truenas = {
+    online: true,
+    summary: { instances: 1, up: 1, down: 0, pools: 2, poolsHealthy: 2, poolsWarn: 0, disks: 8, disksWarn: 0, alertsCritical: 0, alertsWarning: 1, usedPercent: 57 },
+    instances: [{
+      name: 'truenas-demo',
+      url: 'https://truenas.example.invalid',
+      apiMode: 'websocket',
+      method: 'websocket',
+      online: true,
+      system: { hostname: 'truenas-demo', model: 'TrueNAS SCALE', version: '24.04.2', cpuPercent: 22, memoryPercent: 64, cpuTemp: 46 },
+      summary: { pools: 2, poolsHealthy: 2, poolsWarn: 0, disks: 8, disksWarn: 0, alertsCritical: 0, alertsWarning: 1, usedPercent: 57 },
+      pools: [
+        { name: 'tank', health: 'ONLINE', status: 'ONLINE', usedPercent: 62, totalBytes: 42 * 1024 ** 4, scan: { state: 'FINISHED', errors: 0, endTime: nowIso(-18 * 60 * 60 * 1000) } },
+        { name: 'backup', health: 'ONLINE', status: 'ONLINE', usedPercent: 41, totalBytes: 20 * 1024 ** 4, scan: { state: 'FINISHED', errors: 0, endTime: nowIso(-42 * 60 * 60 * 1000) } },
+      ],
+      disks: Array.from({ length: 8 }, (_, i) => ({ name: `sd${String.fromCharCode(97 + i)}`, health: 'ONLINE', status: 'ONLINE', model: i < 6 ? 'WD Red Plus 12TB' : 'Samsung 870 EVO 2TB', pool: i < 6 ? 'tank' : 'backup', temperature: 34 + (i % 4), sizeBytes: i < 6 ? 12 * 1024 ** 4 : 2 * 1024 ** 4 })),
+      alerts: [{ level: 'WARNING', severity: 'WARNING', title: 'Scrub due soon', message: 'Pool tank scheduled scrub will run tonight.', source: 'storage', datetime: nowIso(-2 * 60 * 60 * 1000) }],
+    }],
+  };
+
   data.qnap = {
     online: true,
-    summary: { instances: 1, up: 1, down: 0 },
+    summary: { instances: 1, up: 1, down: 0, volumes: 2, volumesHealthy: 2, disks: 4, disksWarn: 0, services: 5, usedPercent: 63 },
     instances: [{
       name: 'qnap-demo',
       url: 'https://qnap.example.invalid',
+      method: 'qts-api',
+      statusCode: 200,
       online: true,
-      system: { hostname: 'qnap-demo' },
-      summary: { instances: 1, up: 1, down: 0 },
+      system: { hostname: 'qnap-demo', model: 'TS-464', version: 'QTS 5.1.8', firmware: '5.1.8.2823', cpuPercent: 18, memoryPercent: 52, cpuTemp: 44, uptimeSeconds: uptimeSeconds(31, 4, 12) },
+      summary: { instances: 1, up: 1, down: 0, volumes: 2, volumesHealthy: 2, disks: 4, disksWarn: 0, services: 5, usedPercent: 63 },
+      volumes: [
+        { name: 'DataVol1', status: 'ready', health: 'online', usedPercent: 66, totalBytes: 18 * 1024 ** 4 },
+        { name: 'Snapshots', status: 'ready', health: 'online', usedPercent: 38, totalBytes: 4 * 1024 ** 4 },
+      ],
+      disks: [
+        { name: 'Disk 1', model: 'WD Red Plus 8TB', health: 'good', status: 'online', temperature: 36, sizeBytes: 8 * 1024 ** 4 },
+        { name: 'Disk 2', model: 'WD Red Plus 8TB', health: 'good', status: 'online', temperature: 37, sizeBytes: 8 * 1024 ** 4 },
+        { name: 'Disk 3', model: 'WD Red Plus 8TB', health: 'good', status: 'online', temperature: 35, sizeBytes: 8 * 1024 ** 4 },
+        { name: 'Disk 4', model: 'WD Red Plus 8TB', health: 'good', status: 'online', temperature: 38, sizeBytes: 8 * 1024 ** 4 },
+      ],
+      services: [
+        { name: 'SMB', status: 'running', active: true },
+        { name: 'NFS', status: 'running', active: true },
+        { name: 'File Station', status: 'running', active: true },
+        { name: 'Hybrid Backup Sync', status: 'running', active: true },
+        { name: 'Container Station', status: 'running', active: true },
+      ],
     }],
   };
+
   data.ugreen = {
     online: true,
-    summary: { instances: 1, up: 1, down: 0 },
+    summary: { instances: 1, up: 1, down: 0, pools: 1, volumes: 2, disks: 4, disksWarn: 0, services: 4, usedPercent: 54 },
     instances: [{
       name: 'ugreen-demo',
       url: 'https://ugreen.example.invalid',
+      method: 'web',
       statusCode: 200,
       online: true,
-      system: { hostname: 'ugreen-demo' },
-      summary: { instances: 1, up: 1, down: 0 },
+      system: { hostname: 'ugreen-demo', model: 'DXP4800 Plus', version: 'UGOS Pro 1.2.0', cpuPercent: 23, memoryPercent: 48, cpuTemp: 41, uptimeSeconds: uptimeSeconds(16, 8, 5) },
+      summary: { instances: 1, up: 1, down: 0, pools: 1, volumes: 2, disks: 4, disksWarn: 0, services: 4, usedPercent: 54 },
+      pools: [{ name: 'Storage Pool 1', status: 'healthy', health: 'online', usedPercent: 54, totalBytes: 16 * 1024 ** 4 }],
+      volumes: [
+        { name: 'Media', status: 'mounted', health: 'online', usedPercent: 61, totalBytes: 10 * 1024 ** 4 },
+        { name: 'Backups', status: 'mounted', health: 'online', usedPercent: 43, totalBytes: 6 * 1024 ** 4 },
+      ],
+      disks: [
+        { name: 'Bay 1', model: 'Seagate IronWolf 6TB', health: 'good', status: 'online', temperature: 34, sizeBytes: 6 * 1024 ** 4 },
+        { name: 'Bay 2', model: 'Seagate IronWolf 6TB', health: 'good', status: 'online', temperature: 35, sizeBytes: 6 * 1024 ** 4 },
+        { name: 'Bay 3', model: 'Seagate IronWolf 6TB', health: 'good', status: 'online', temperature: 33, sizeBytes: 6 * 1024 ** 4 },
+        { name: 'Bay 4', model: 'Seagate IronWolf 6TB', health: 'good', status: 'online', temperature: 36, sizeBytes: 6 * 1024 ** 4 },
+      ],
+      services: [
+        { name: 'SMB', status: 'running', active: true },
+        { name: 'Docker', status: 'running', active: true },
+        { name: 'Photos', status: 'running', active: true },
+        { name: 'Sync & Backup', status: 'running', active: true },
+      ],
     }],
   };
+
+  data.pbs = {
+    online: true,
+    summary: { instances: 1, up: 1, down: 0, datastores: 2, datastoresWarn: 0, snapshots: 148, groups: 31, failedTasks: 1, usedPercent: 58 },
+    instances: [{
+      name: 'pbs-demo',
+      url: 'https://pbs.example.invalid:8007',
+      online: true,
+      version: { version: '3.2.7', release: 'demo' },
+      nodes: [{ name: 'pbs-demo', cpuPercent: 16, memoryPercent: 42 }],
+      summary: { datastores: 2, datastoresWarn: 0, snapshots: 148, groups: 31, failedTasks: 1, usedPercent: 58 },
+      datastores: [
+        { name: 'vm-backups', health: 'online', usedPercent: 61, totalBytes: 18 * 1024 ** 4, snapshots: 112, groups: 22, gcStatus: 'last GC OK' },
+        { name: 'nas-backups', health: 'online', usedPercent: 47, totalBytes: 10 * 1024 ** 4, snapshots: 36, groups: 9, gcStatus: 'last GC OK' },
+      ],
+      tasks: [
+        { id: 'UPID:demo:backup:101', name: 'backup - vm/101/2026-07-05T18:00:00Z', taskId: 'vm/101', type: 'backup', status: 'OK', failed: false, running: false, startTime: nowIso(-3 * 60 * 60 * 1000), endTime: nowIso(-2.7 * 60 * 60 * 1000) },
+        { id: 'UPID:demo:verify:weekly', name: 'verify - vm/104/2026-07-05T12:00:00Z', taskId: 'vm/104', type: 'verify', status: 'WARNINGS', failed: true, running: false, startTime: nowIso(-7 * 60 * 60 * 1000), endTime: nowIso(-6.5 * 60 * 60 * 1000) },
+      ],
+    }],
+  };
+
+  data.cloudflare = {
+    online: true,
+    summary: { zones: 2, zonesActive: 2, zonesWarn: 0, tunnels: 2, tunnelsHealthy: 2, tunnelsDown: 0, domains: 3, domainsExpiring: 1, domainsExpired: 0, domainsAutoRenew: 3 },
+    zones: [
+      { name: 'example.com', status: 'active', paused: false, plan: 'Pro', accountName: 'Demo Ops', online: true },
+      { name: 'internal.example.com', status: 'active', paused: false, plan: 'Free', accountName: 'Demo Ops', online: true },
+    ],
+    tunnels: [
+      { name: 'home-lab-ingress', status: 'healthy', online: true, activeConnections: 4, pendingReconnect: 0, id: 'tun_demo_01' },
+      { name: 'admin-access', status: 'healthy', online: true, activeConnections: 2, pendingReconnect: 0, id: 'tun_demo_02' },
+    ],
+    domains: [
+      { name: 'example.com', daysToExpire: 241, expired: false, expiring: false, expiresAt: nowIso(241 * 24 * 60 * 60 * 1000), autoRenew: true, currentRegistrar: 'Cloudflare Registrar' },
+      { name: 'omnisight.dev', daysToExpire: 18, expired: false, expiring: true, expiresAt: nowIso(18 * 24 * 60 * 60 * 1000), autoRenew: true, currentRegistrar: 'Cloudflare Registrar' },
+      { name: 'ops-demo.net', daysToExpire: 93, expired: false, expiring: false, expiresAt: nowIso(93 * 24 * 60 * 60 * 1000), autoRenew: true, currentRegistrar: 'Cloudflare Registrar' },
+    ],
+  };
+
+  data.cicd = {
+    online: true,
+    summary: { projects: 2, up: 2, down: 0, partial: 0, pipelines: 5, success: 3, failed: 1, running: 1, canceled: 0, jobs: 18, jobsFailed: 1, jobsRunning: 2 },
+    projects: [
+      {
+        name: 'OmniSight',
+        provider: 'github',
+        branch: 'main',
+        online: true,
+        pipelines: [
+          { name: 'build', workflowName: 'build', status: 'success', success: true, ref: 'main', actor: 'demo_admin', title: 'v2 demo refresh', updatedAt: nowIso(-18 * 60 * 1000) },
+          { name: 'docker-publish', workflowName: 'docker-publish', status: 'running', running: true, ref: 'main', actor: 'demo_admin', title: 'publish demo image', updatedAt: nowIso(-4 * 60 * 1000) },
+          { name: 'lint', workflowName: 'lint', status: 'success', success: true, ref: 'main', actor: 'demo_admin', title: 'lint dashboard', updatedAt: nowIso(-31 * 60 * 1000) },
+        ],
+        jobs: [{ name: 'unit tests', success: true }, { name: 'browser smoke', running: true }],
+      },
+      {
+        name: 'infra-playbooks',
+        provider: 'gitlab',
+        branch: 'main',
+        online: true,
+        pipelines: [
+          { name: 'syntax-check', status: 'success', success: true, ref: 'main', actor: 'ops-bot', title: 'ansible syntax', updatedAt: nowIso(-42 * 60 * 1000) },
+          { name: 'staging-apply', status: 'failed', failed: true, ref: 'main', actor: 'ops-bot', title: 'demo failure for alert view', updatedAt: nowIso(-9 * 60 * 1000) },
+        ],
+        jobs: [{ name: 'staging-apply', failed: true }],
+      },
+    ],
+  };
+
+  data.veeam = {
+    online: true,
+    summary: { instances: 1, up: 1, down: 0, partial: 0, jobs: 5, jobsDisabled: 1, sessions: 6, failedSessions: 1, warningSessions: 1, runningSessions: 1, repositories: 2, repositoriesWarn: 0 },
+    instances: [{
+      name: 'veeam-demo',
+      url: 'https://veeam.example.invalid:9419',
+      online: true,
+      summary: { jobs: 5, jobsDisabled: 1, sessions: 6, failedSessions: 1, warningSessions: 1, runningSessions: 1, repositories: 2, repositoriesWarn: 0 },
+      sessions: [
+        { name: 'VM Backup - Production', type: 'Backup', result: 'Success', success: true, creationTime: nowIso(-6 * 60 * 60 * 1000), endTime: nowIso(-5.4 * 60 * 60 * 1000) },
+        { name: 'NAS Backup - Shares', type: 'Backup', state: 'Running', running: true, progressPercent: 72, creationTime: nowIso(-48 * 60 * 1000) },
+        { name: 'Offsite Copy', type: 'Backup Copy', result: 'Warning', warning: true, creationTime: nowIso(-10 * 60 * 60 * 1000), endTime: nowIso(-9.2 * 60 * 60 * 1000) },
+        { name: 'SQL Transaction Logs', type: 'Log Backup', result: 'Failed', failed: true, creationTime: nowIso(-90 * 60 * 1000), endTime: nowIso(-84 * 60 * 1000) },
+      ],
+      repositories: [
+        { name: 'Primary Repository', path: '\\\\repo01\\veeam', usedPercent: 58, status: 'online' },
+        { name: 'Object Archive', path: 's3://demo-veeam-archive', usedPercent: 34, status: 'online' },
+      ],
+    }],
+  };
+
+  data.portainer = {
+    online: true,
+    summary: { instances: 1, up: 1, down: 0, environments: 2, environmentsUp: 2, environmentsDown: 0, stacks: 4, stacksWarn: 1, containers: containers.length, running: containers.length, stopped: 0 },
+    instances: [{
+      name: 'portainer-demo',
+      url: 'https://portainer.example.invalid:9443',
+      online: true,
+      summary: { environments: 2, environmentsUp: 2, environmentsDown: 0, stacks: 4, stacksWarn: 1, containers: containers.length, running: containers.length, stopped: 0 },
+      environments: [
+        { id: 1, name: 'docker-prod', type: 'Docker', url: 'tcp://192.0.2.30:2376', online: true, status: 'up' },
+        { id: 2, name: 'edge-agent', type: 'Agent', url: 'tcp://192.0.2.31:9001', online: true, status: 'up' },
+      ],
+      stacks: [
+        { name: 'monitoring', status: 'running', warning: false },
+        { name: 'public-web', status: 'running', warning: false },
+        { name: 'backup-tools', status: 'warning', warning: true },
+        { name: 'databases', status: 'running', warning: false },
+      ],
+      containers: containers.map((c, i) => ({ ...c, endpointId: i < 4 ? 1 : 2, endpointName: i < 4 ? 'docker-prod' : 'edge-agent', sourceName: 'portainer-demo' })),
+    }],
+  };
+
   data.database = [{
     name: 'demo-postgres',
     type: 'postgresql',
@@ -841,24 +1078,40 @@ function demoStatus() {
 function publicSummary(data = demoStatus()) {
   return data.configured.map(id => {
     const names = {
-      proxmox: 'Proxmox', linux: 'Linux Server', kubernetes: 'Kubernetes', snmp: 'SNMP',
+      proxmox: 'Proxmox', linux: 'Linux Server', windows: 'Windows Server', kubernetes: 'Kubernetes', synology: 'Synology', mikrotik: 'MikroTik', unifi: 'UniFi', snmp: 'SNMP',
       healthchecks: 'Healthchecks', uptimekuma: 'Uptime Kuma', checks: 'Service checks',
-      prometheus: 'Prometheus', docker: 'Docker', dockhand: 'Dockhand', qnap: 'QNAP',
-      ugreen: 'Ugreen', database: 'Databases',
+      prometheus: 'Prometheus', docker: 'Docker', dockhand: 'Dockhand', firewall: 'Firewalls',
+      truenas: 'TrueNAS', qnap: 'QNAP', ugreen: 'Ugreen', pbs: 'Proxmox Backup',
+      cloudflare: 'Cloudflare', cicd: 'GitHub/GitLab CI', veeam: 'Veeam', portainer: 'Portainer',
+      database: 'Databases',
     };
     const detail = (() => {
       if (id === 'proxmox') return `${data.proxmox.nodes.filter(n => n.online).length}/${data.proxmox.nodes.length} nodes up`;
       if (id === 'linux') return `${data.linux.filter(n => n.online).length}/${data.linux.length} servers\n${data.linux.reduce((n, h) => n + (h.services || []).filter(s => s.active).length, 0)}/${data.linux.reduce((n, h) => n + (h.services || []).length, 0)} services`;
-      if (id === 'kubernetes') return `${data.kubernetes.summary.running}/${data.kubernetes.summary.pods}\npods running`;
-      if (id === 'snmp') return `${data.snmp.filter(d => d.online).length}/${data.snmp.length} up`;
+      if (id === 'windows') return `${data.windows.filter(n => n.online).length}/${data.windows.length} servers\n${data.windows.reduce((n, h) => n + (h.services || []).filter(s => s.active).length, 0)}/${data.windows.reduce((n, h) => n + (h.services || []).length, 0)} services`;
+      if (id === 'kubernetes') return `${data.kubernetes.summary.running}/${data.kubernetes.summary.pods} pods`;
+      if (['synology', 'mikrotik', 'unifi', 'snmp'].includes(id)) {
+        const rows = data.snmp.filter(d => {
+          const profile = ['synology', 'mikrotik', 'unifi'].includes(String(d.profile || '').toLowerCase()) ? String(d.profile).toLowerCase() : 'snmp';
+          return profile === id;
+        });
+        return `${rows.filter(d => d.online).length}/${rows.length} up`;
+      }
       if (id === 'healthchecks') return `${data.healthchecks.summary.up}/${data.healthchecks.summary.total} up`;
       if (id === 'uptimekuma') return `${data.uptimekuma.summary.up}/${data.uptimekuma.summary.total} up`;
       if (id === 'checks') return `${data.checks.summary.up}/${data.checks.summary.total} up`;
       if (id === 'prometheus') return `${data.prometheus.summary.up}/${data.prometheus.summary.total} up`;
-      if (id === 'docker') return `${data.docker.reduce((n, h) => n + (h.summary?.running || 0), 0)}/${data.docker.reduce((n, h) => n + (h.summary?.total || 0), 0)}\ncontainers running`;
+      if (id === 'docker') return `${data.docker.reduce((n, h) => n + (h.summary?.running || 0), 0)}/${data.docker.reduce((n, h) => n + (h.summary?.total || 0), 0)} containers`;
       if (id === 'dockhand') return `${data.dockhand.summary.running}/${data.dockhand.summary.total} running`;
-      if (id === 'qnap') return `${data.qnap.summary.up}/${data.qnap.summary.instances} systems up`;
-      if (id === 'ugreen') return `${data.ugreen.summary.up}/${data.ugreen.summary.instances} systems up`;
+      if (id === 'firewall') return `${data.firewall.summary.interfacesUp}/${data.firewall.summary.interfaces} interfaces up`;
+      if (id === 'truenas') return `${data.truenas.summary.poolsHealthy}/${data.truenas.summary.pools} pools healthy`;
+      if (id === 'qnap') return `${data.qnap.summary.up}/${data.qnap.summary.instances} systems up\n${data.qnap.summary.disks || 0} disks`;
+      if (id === 'ugreen') return `${data.ugreen.summary.up}/${data.ugreen.summary.instances} systems up\n${data.ugreen.summary.disks || 0} disks`;
+      if (id === 'pbs') return `${data.pbs.summary.datastores} DST\n${data.pbs.summary.snapshots} snapshots`;
+      if (id === 'cloudflare') return `${data.cloudflare.summary.zonesActive}/${data.cloudflare.summary.zones} zones\n${data.cloudflare.summary.tunnelsHealthy}/${data.cloudflare.summary.tunnels} tunnels`;
+      if (id === 'cicd') return `${data.cicd.summary.success}/${data.cicd.summary.pipelines} pipelines green`;
+      if (id === 'veeam') return `${data.veeam.summary.jobs} jobs\n${data.veeam.summary.failedSessions}/${data.veeam.summary.sessions} failed`;
+      if (id === 'portainer') return `${data.portainer.summary.environmentsUp}/${data.portainer.summary.environments} env\n${data.portainer.summary.running}/${data.portainer.summary.containers} containers`;
       if (id === 'database') return `${data.database.filter(d => d.online).length}/${data.database.length} up`;
       return 'demo data online';
     })();
@@ -930,11 +1183,20 @@ function topologyData() {
         vms: n.vms.map(v => ({ id: v.id, name: v.name, status: v.status, type: v.type, os: v.os })),
       })),
     },
+    linux: d.linux.map(s => ({ name: s.name, host: s.host, online: s.online, services: s.services })),
+    windows: d.windows.map(s => ({ name: s.name, host: s.host, online: s.online, services: s.services })),
     kubernetes: { online: true, summary: d.kubernetes.summary, pods: d.kubernetes.pods.map(p => ({ name: p.name, namespace: p.namespace, status: p.status, containers: p.containers })) },
     docker: d.docker.map(h => ({ name: h.name, host: h.host, online: true, summary: h.summary, containers: h.containers })),
     dockhand: d.dockhand,
+    firewall: d.firewall,
+    truenas: d.truenas,
     qnap: d.qnap,
     ugreen: d.ugreen,
+    pbs: d.pbs,
+    cloudflare: d.cloudflare,
+    cicd: d.cicd,
+    veeam: d.veeam,
+    portainer: d.portainer,
     snmp: d.snmp.map(s => ({ name: s.name, host: s.host, online: true, profile: s.profile, vendor: s.vendor, model: s.model })),
   };
 }
@@ -1040,7 +1302,10 @@ app.get('/api/sessions', (req, res) => res.json({
   }],
 }));
 app.delete('/api/sessions/:token', (req, res) => res.json({ ok: true, demo: true }));
-app.get('/api/certificates', (req, res) => res.json([]));
+app.get('/api/certificates', (req, res) => res.json([
+  { name: 'demo-root-ca.pem', size: 1842, trusted: true, commonName: 'OmniSight Demo Root CA' },
+  { name: 'homelab-wildcard.pem', size: 2264, trusted: false, commonName: '*.example.invalid' },
+]));
 app.delete('/api/certificates/:name', (req, res) => res.json({ ok: true, demo: true }));
 
 app.get('/api/status', (req, res) => res.json(demoStatus()));
