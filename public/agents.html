@@ -59,6 +59,26 @@ h1{font-size:18px;font-weight:750;flex:1}
 .notice-text{color:var(--muted)}
 .notice .btn{height:28px;flex:0 0 auto}
 .action-hint{width:100%;color:var(--muted);font-size:11px;line-height:1.25}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:300;padding:20px}
+.modal.open{display:flex}
+.modal-box{width:min(760px,96vw);max-height:92vh;overflow:auto;background:var(--panel);border:1px solid var(--border);border-radius:10px;box-shadow:0 24px 70px rgba(0,0,0,.35)}
+.modal-hdr{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;border-bottom:1px solid var(--border)}
+.modal-title{font-weight:850;font-size:15px}
+.modal-x{width:30px;height:30px;border:1px solid var(--border);background:var(--row);color:var(--text);border-radius:7px;cursor:pointer}
+.modal-body{padding:16px}
+.kind-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:12px 0}
+.kind-btn{border:1px solid var(--border);background:var(--row);color:var(--text);border-radius:8px;padding:10px;cursor:pointer;font-weight:800;text-align:left}
+.kind-btn.active{border-color:var(--blue);box-shadow:0 0 0 1px rgba(96,165,250,.25) inset}
+.tab-row{display:flex;gap:8px;margin:12px 0;flex-wrap:wrap}
+.tab-btn{height:30px;border-radius:7px;border:1px solid var(--border);background:var(--row);color:var(--text);font-size:12px;font-weight:750;cursor:pointer;padding:0 10px}
+.tab-btn.active{border-color:var(--blue);color:var(--blue)}
+.modal-desc{color:var(--muted);font-size:13px;line-height:1.45}
+.check-line{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px;margin:8px 0}
+.cmd-wrap{position:relative;margin-top:10px}
+.cmd-wrap .cmd{margin-top:0}
+.await{display:flex;align-items:center;gap:8px;margin-top:12px;color:var(--muted);font-size:13px}
+.await-dot{width:9px;height:9px;border-radius:50%;background:var(--yellow)}
+@media(max-width:720px){.kind-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 html.embed header{display:none}
 @media(max-width:900px){.row{grid-template-columns:10px minmax(150px,1fr) 90px 100px}.row .hide-sm,.hdr .hide-sm{display:none}}
 </style>
@@ -73,7 +93,8 @@ html.embed header{display:none}
       <div class="sub">Connected push agents and their installed versions.</div>
     </div>
     <div class="pill" id="latest">Latest -</div>
-    <button class="btn" onclick="loadAgents()">Refresh</button>
+    <button class="btn primary" onclick="openAddAgentModal()">Add</button>
+    <button class="btn" id="agents-refresh" onclick="manualRefreshAgents(this)">Refresh</button>
   </div>
   <div class="notice" id="agent-notice"></div>
   <div class="card" id="agents-card">
@@ -84,6 +105,42 @@ html.embed header{display:none}
   </div>
   <div class="msg" id="msg"></div>
 </main>
+
+<div class="modal" id="add-agent-modal" onclick="if(event.target===this)closeAddAgentModal()">
+  <div class="modal-box">
+    <div class="modal-hdr">
+      <span class="modal-title" id="add-agent-title">Add Agent</span>
+      <button class="modal-x" type="button" onclick="closeAddAgentModal()">x</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-desc" id="add-agent-desc"></div>
+      <div class="kind-grid">
+        <button class="kind-btn" type="button" data-kind="linux" onclick="setAgentKind('linux')">Linux</button>
+        <button class="kind-btn" type="button" data-kind="windows" onclick="setAgentKind('windows')">Windows</button>
+        <button class="kind-btn" type="button" data-kind="proxmox" onclick="setAgentKind('proxmox')">Proxmox</button>
+        <button class="kind-btn" type="button" data-kind="docker" onclick="setAgentKind('docker')">Docker</button>
+      </div>
+      <label class="check-line"><input type="checkbox" id="aa-insecure" onchange="refreshAddAgentCommands()"> Allow self-signed OmniSight certificate</label>
+      <label class="check-line" id="aa-synology-row" style="display:none"><input type="checkbox" id="aa-synology" onchange="refreshAddAgentCommands()"> Synology Docker path</label>
+      <div class="tab-row">
+        <button class="tab-btn active" id="aa-tab-binary" type="button" onclick="setAgentInstallTab('binary')">Binary</button>
+        <button class="tab-btn" id="aa-tab-docker" type="button" onclick="setAgentInstallTab('docker')">Docker</button>
+        <button class="tab-btn" id="aa-tab-stack" type="button" onclick="setAgentInstallTab('stack')">Stack</button>
+      </div>
+      <div id="aa-panel-binary">
+        <div class="cmd-wrap"><div class="cmd"><pre class="cmd-body" id="aa-cmd-binary"></pre><button class="btn" onclick="copyText(document.getElementById('aa-cmd-binary').textContent,this)">Copy</button></div></div>
+        <div class="cmd-wrap"><div class="cmd has-title"><div class="cmd-title">Uninstall</div><pre class="cmd-body" id="aa-cmd-uninstall"></pre><button class="btn" onclick="copyText(document.getElementById('aa-cmd-uninstall').textContent,this)">Copy</button></div></div>
+      </div>
+      <div id="aa-panel-docker" style="display:none">
+        <div class="cmd-wrap"><div class="cmd"><pre class="cmd-body" id="aa-cmd-docker"></pre><button class="btn" onclick="copyText(document.getElementById('aa-cmd-docker').textContent,this)">Copy</button></div></div>
+      </div>
+      <div id="aa-panel-stack" style="display:none">
+        <div class="cmd-wrap"><div class="cmd"><pre class="cmd-body" id="aa-cmd-stack"></pre><button class="btn" onclick="copyText(document.getElementById('aa-cmd-stack').textContent,this)">Copy</button></div></div>
+      </div>
+      <div class="await"><span class="await-dot"></span><span id="aa-wait">Waiting for the agent to connect...</span></div>
+    </div>
+  </div>
+</div>
 <script src="/i18n.js"></script>
 <script>
 function currentLang(){ return OmniI18n.currentLang('en'); }
@@ -206,6 +263,183 @@ function demoAgentRepairCommands(id){
     },
   ];
 }
+
+const ADD_AGENT_META = {
+  linux: { title: 'Add Linux Agent', desc: 'Run this on a Linux server. The agent pushes host metrics and service state to OmniSight.' },
+  windows: { title: 'Add Windows Agent', desc: 'Run this in an elevated PowerShell window. The agent reports Windows host metrics and services.' },
+  proxmox: { title: 'Add Proxmox Agent', desc: 'Run this on a Proxmox VE node. The agent uses local pvesh data for nodes, guests, storage and backups.' },
+  docker: { title: 'Add Docker Agent', desc: 'Run this on a Docker host. The agent reports containers and can run logs/prune actions locally.' },
+};
+let addAgentKind = 'linux';
+let addAgentTab = 'binary';
+let addAgentToken = '';
+let addAgentPollTimer = null;
+let addAgentOpenedAt = 0;
+let addAgentKnownIds = new Set();
+
+function isMaskedSecretValue(value){
+  return value === '__set__' || value === '__encrypted__';
+}
+
+async function getAgentToken(){
+  if(addAgentToken && !isMaskedSecretValue(addAgentToken)) return addAgentToken;
+  try{
+    const current = await fetchJson('/api/agent/token', { headers:authHeaders(), cache:'no-store' }, 6000);
+    addAgentToken = current?.token || '';
+  }catch{}
+  if(addAgentToken && !isMaskedSecretValue(addAgentToken)) return addAgentToken;
+  try{
+    const cfg = await fetchJson('/api/config', { headers:authHeaders() }, 6000);
+    addAgentToken = cfg?.linux?.agentToken || '';
+  }catch{}
+  if(addAgentToken && !isMaskedSecretValue(addAgentToken)) return addAgentToken;
+  const r = await fetch('/api/agent/token', { method:'POST', headers:authHeaders() });
+  handleUnauth(r);
+  const b = await readJson(r);
+  if(!r.ok) throw new Error(b.error || r.statusText);
+  addAgentToken = b.token || '';
+  if(!addAgentToken) throw new Error('Agent token could not be created');
+  return addAgentToken;
+}
+
+function addAgentCommands(){
+  const token = addAgentToken && !isMaskedSecretValue(addAgentToken) ? addAgentToken : '<token>';
+  const base = window.location.origin;
+  const role = addAgentKind === 'docker' ? 'docker' : addAgentKind === 'proxmox' ? 'proxmox' : addAgentKind === 'windows' ? 'windows' : 'linux';
+  const insecure = !!document.getElementById('aa-insecure')?.checked;
+  const curlTLS = insecure ? ' --insecure' : '';
+  const envTLS = insecure ? ' OMNISIGHT_INSECURE_TLS=1' : '';
+  const sudoTLS = insecure ? ' OMNISIGHT_INSECURE_TLS=1' : '';
+  const dockerEnvTLS = insecure ? '  -e OMNISIGHT_INSECURE_TLS=1 \\\n' : '';
+  const stackEnvTLS = insecure ? '      OMNISIGHT_INSECURE_TLS: "1"\n' : '';
+  const synology = addAgentKind === 'docker' && !!document.getElementById('aa-synology')?.checked;
+  const dockerBin = synology ? 'sudo /usr/local/bin/docker' : 'docker';
+  const psTLS = insecure ? '; $env:OMNISIGHT_INSECURE_TLS="1"' : '';
+  return {
+    binary: addAgentKind === 'windows'
+      ? `$env:OMNISIGHT_URL="${base}"; $env:OMNISIGHT_TOKEN="${token}"; $env:OMNISIGHT_AGENT_ROLE="windows"${psTLS}; iwr -UseBasicParsing "${base}/agent/install-windows.ps1" | iex`
+      : `curl -fsSL${curlTLS} ${base}/agent/install.sh | sudo OMNISIGHT_URL=${base} OMNISIGHT_TOKEN=${token} OMNISIGHT_AGENT_ROLE=${role}${envTLS} bash`,
+    uninstall: addAgentKind === 'windows'
+      ? `iwr -UseBasicParsing "${base}/agent/install-windows.ps1" | iex; Uninstall-OmniSightAgent`
+      : `curl -fsSL${curlTLS} ${base}/agent/install.sh | sudo${sudoTLS} bash -s uninstall`,
+    docker: `${dockerBin} run -d --name omnisight-agent --restart unless-stopped \\
+  --network host --pid host \\
+  -e OMNISIGHT_URL=${base} \\
+  -e OMNISIGHT_TOKEN=${token} \\
+  -e OMNISIGHT_AGENT_ROLE=docker \\
+${dockerEnvTLS}  -e OMNISIGHT_HOST_ROOT=/host \\
+  -v /:/host:ro \\
+  -v /var/run/docker.sock:/var/run/docker.sock:ro \\
+  docker:cli sh -c "apk add --no-cache bash curl coreutils >/dev/null && curl -fsSL${curlTLS} ${base}/agent/omnisight-agent.sh -o /usr/local/bin/omnisight-agent && exec bash /usr/local/bin/omnisight-agent"`,
+    stack: `${dockerBin} stack deploy -c - omnisight-agent <<'EOF'
+version: "3.8"
+services:
+  agent:
+    image: docker:cli
+    command: sh -c "apk add --no-cache bash curl coreutils >/dev/null && curl -fsSL${curlTLS} ${base}/agent/omnisight-agent.sh -o /usr/local/bin/omnisight-agent && exec bash /usr/local/bin/omnisight-agent"
+    environment:
+      OMNISIGHT_URL: ${base}
+      OMNISIGHT_TOKEN: ${token}
+      OMNISIGHT_AGENT_ROLE: docker
+${stackEnvTLS}      OMNISIGHT_HOST_ROOT: /host
+    volumes:
+      - /:/host:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    deploy:
+      mode: global
+      restart_policy:
+        condition: any
+EOF`,
+  };
+}
+
+function refreshAddAgentCommands(){
+  const cmds = addAgentCommands();
+  document.getElementById('aa-cmd-binary').textContent = cmds.binary;
+  document.getElementById('aa-cmd-uninstall').textContent = cmds.uninstall;
+  document.getElementById('aa-cmd-docker').textContent = cmds.docker;
+  document.getElementById('aa-cmd-stack').textContent = cmds.stack;
+}
+
+function setAgentInstallTab(tab){
+  if(addAgentKind === 'windows') tab = 'binary';
+  addAgentTab = tab;
+  ['binary','docker','stack'].forEach(name => {
+    document.getElementById('aa-tab-' + name)?.classList.toggle('active', name === tab);
+    const panel = document.getElementById('aa-panel-' + name);
+    if(panel) panel.style.display = name === tab ? '' : 'none';
+  });
+  const binary = document.getElementById('aa-tab-binary');
+  if(binary) binary.textContent = addAgentKind === 'windows' ? 'PowerShell' : 'Binary';
+  const showDockerTabs = addAgentKind !== 'windows';
+  document.getElementById('aa-tab-docker').style.display = showDockerTabs ? '' : 'none';
+  document.getElementById('aa-tab-stack').style.display = showDockerTabs ? '' : 'none';
+  document.getElementById('aa-synology-row').style.display = addAgentKind === 'docker' && (tab === 'docker' || tab === 'stack') ? 'flex' : 'none';
+}
+
+function setAgentKind(kind){
+  addAgentKind = ADD_AGENT_META[kind] ? kind : 'linux';
+  const meta = ADD_AGENT_META[addAgentKind];
+  document.getElementById('add-agent-title').textContent = meta.title;
+  document.getElementById('add-agent-desc').textContent = meta.desc;
+  document.querySelectorAll('.kind-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.kind === addAgentKind));
+  refreshAddAgentCommands();
+  setAgentInstallTab(addAgentKind === 'docker' ? 'docker' : 'binary');
+}
+
+async function registerPendingAgent(kind){
+  try{
+    const r = await fetch('/api/agent/pending', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', ...authHeaders() },
+      body:JSON.stringify({ kind }),
+    });
+    handleUnauth(r);
+    const b = await readJson(r);
+    if(!r.ok) throw new Error(b.error || r.statusText);
+  }catch(e){
+    const msg = document.getElementById('aa-wait');
+    if(msg) msg.textContent = e.message || 'Could not create pending agent';
+  }
+}
+
+async function openAddAgentModal(kind = 'linux'){
+  try{
+    await getAgentToken();
+    addAgentOpenedAt = Date.now();
+    addAgentKnownIds = new Set((readAgentsCache()?.agents || []).map(a => a.id || a.name).filter(Boolean));
+    document.getElementById('add-agent-modal').classList.add('open');
+    setAgentKind(kind);
+    document.getElementById('aa-wait').textContent = 'Waiting for the agent to connect...';
+    document.querySelector('#add-agent-modal .await-dot').style.background = 'var(--yellow)';
+    await registerPendingAgent(addAgentKind);
+    clearInterval(addAgentPollTimer);
+    addAgentPollTimer = setInterval(async () => {
+      agentsLastLoadedAt = 0;
+      await loadAgents();
+      const current = readAgentsCache()?.agents || [];
+      const fresh = current.find(a => {
+        const id = a.id || a.name;
+        return id && !addAgentKnownIds.has(id) && (a.online || Number(a.lastSeen || 0) >= addAgentOpenedAt - 3000);
+      });
+      if(fresh){
+        document.getElementById('aa-wait').textContent = `${fresh.name || fresh.id} connected.`;
+        document.querySelector('#add-agent-modal .await-dot').style.background = 'var(--green)';
+      }
+    }, 4000);
+  }catch(e){
+    const msg = document.getElementById('msg');
+    msg.className = 'msg err';
+    msg.textContent = e.message;
+  }
+}
+
+function closeAddAgentModal(){
+  document.getElementById('add-agent-modal').classList.remove('open');
+  clearInterval(addAgentPollTimer);
+  addAgentPollTimer = null;
+}
+
 const AGENTS_CACHE_KEY = 'os_agents_cache_v2';
 function agentsCacheKey(){
   const token = sessionStorage.getItem('os_token') || localStorage.getItem('os_token') || 'anon';
@@ -379,22 +613,50 @@ function scheduleAgentsPoll(delay = 15000){
     scheduleAgentsPoll(embedPaused ? 5000 : 15000);
   }, delay);
 }
-async function loadAgents(){
-  if(agentsLoading || embedPaused) return;
-  if(agentsLastLoadedAt && Date.now() - agentsLastLoadedAt < 5000) return;
+async function manualRefreshAgents(btn){
+  await loadAgents({ force: true, manual: true, button: btn });
+}
+async function loadAgents(options = {}){
+  const force = options.force === true;
+  const manual = options.manual === true;
+  const btn = options.button || null;
+  if(agentsLoading || embedPaused) {
+    if(manual){
+      const msg = document.getElementById('msg');
+      msg.textContent = agentsLoading ? t('Refresh already in progress.') : t('Refresh paused while page is hidden.');
+      msg.className = 'msg';
+    }
+    return;
+  }
+  if(!force && agentsLastLoadedAt && Date.now() - agentsLastLoadedAt < 5000) return;
   if(AGENTS_DEMO_MODE){
     renderAgents(demoAgentsData());
     agentsLastLoadedAt = Date.now();
-    clearMsg(true);
+    if(manual){
+      const msg = document.getElementById('msg');
+      msg.textContent = t('Agents refreshed.');
+      msg.className = 'msg ok';
+    } else {
+      clearMsg(true);
+    }
     return;
   }
   agentsLoading = true;
-  clearMsg();
+  const oldText = btn ? btn.textContent : '';
+  if(btn){ btn.disabled = true; btn.textContent = t('Refreshing...'); }
+  if(manual) clearMsg(true);
+  else clearMsg();
   try{
-    const d = await fetchJson('/api/agents', { headers:authHeaders() }, 8000);
+    const d = await fetchJson('/api/agents', { headers:authHeaders(), cache: manual ? 'no-store' : 'no-cache' }, 8000);
     writeAgentsCache(d);
     renderAgents(d);
     agentsLastLoadedAt = Date.now();
+    if(manual){
+      const msg = document.getElementById('msg');
+      const time = new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+      msg.textContent = `${t('Agents refreshed.')} ${time}`;
+      msg.className = 'msg ok';
+    }
   }catch(e){
     if(e.message === 'Agents request cancelled') return;
     const cachedBox = readAgentsCacheBox(30 * 60 * 1000);
@@ -416,6 +678,7 @@ async function loadAgents(){
     msg.className = 'msg err';
   }finally{
     agentsLoading = false;
+    if(btn){ btn.disabled = false; btn.textContent = oldText || t('Refresh'); }
   }
 }
 async function updateAgent(id, btn){

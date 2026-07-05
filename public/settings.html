@@ -46,18 +46,28 @@ header{
 .btn-save:disabled{opacity:.5;cursor:not-allowed}
 
 main{padding:20px;max-width:1380px;margin:0 auto}
-.settings-workspace{display:grid;grid-template-columns:400px minmax(0,1fr);gap:18px;align-items:stretch}
-.settings-nav{position:sticky;top:68px;height:calc(100vh - 72px);max-height:calc(100vh - 72px);overflow:auto;background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:12px;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.settings-workspace{display:grid;grid-template-columns:340px minmax(0,1fr);gap:18px;align-items:stretch;contain:layout style}
+.settings-nav{position:sticky;top:68px;height:calc(100vh - 72px);max-height:calc(100vh - 72px);overflow-y:auto;overflow-x:hidden;background:linear-gradient(180deg,rgba(24,26,27,.98),rgba(18,20,22,.98));border:1px solid rgba(96,165,250,.18);border-radius:14px;padding:14px;box-shadow:0 18px 44px rgba(0,0,0,.22),inset 0 1px 0 rgba(255,255,255,.035);scrollbar-width:thin;scrollbar-color:rgba(125,138,163,.45) transparent;contain:layout paint style}
 html.embed .settings-nav{top:20px;height:calc(100vh - 40px);max-height:calc(100vh - 40px)}
-.settings-search{width:100%;background:var(--row);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:9px 11px;font-size:13px;margin-bottom:12px}
-.settings-search:focus{outline:none;border-color:var(--blue)}
-.settings-nav-group{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;font-weight:800;margin:12px 8px 6px}
-.settings-nav-group:first-of-type{margin-top:2px}
-.settings-nav-btn{width:100%;height:34px;border:1px solid transparent;background:transparent;color:var(--muted);border-radius:8px;padding:0 10px;display:flex;align-items:center;gap:9px;cursor:pointer;font-size:13px;font-weight:700;text-align:left}
-.settings-nav-btn:hover{color:var(--text);background:rgba(255,255,255,.04);border-color:rgba(125,138,163,.18)}
-.settings-nav-btn.active{color:var(--text);background:rgba(96,165,250,.12);border-color:rgba(96,165,250,.28)}
-.settings-nav-dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex-shrink:0}
-.settings-content{display:flex;flex-direction:column;gap:14px;min-width:0}
+html.embed .settings-nav{background:var(--panel);box-shadow:none;overscroll-behavior:contain;scrollbar-gutter:stable;will-change:scroll-position}
+.settings-nav-group{width:100%;min-height:24px;color:#8FA0BA;text-transform:uppercase;letter-spacing:.72px;font-size:10px;font-weight:850;margin:16px 0 6px;padding:0 8px 7px;border-bottom:1px solid rgba(125,138,163,.14);display:flex;align-items:center}
+.settings-nav-group:first-of-type{margin-top:0}
+.settings-nav-btn{position:relative;width:100%;min-height:38px;border:1px solid transparent;background:transparent;color:#9AA8BF;border-radius:10px;padding:0 11px 0 12px;margin:2px 0;display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;font-weight:750;text-align:left;overflow:hidden;transition:background .08s,border-color .08s,color .08s,transform .08s,box-shadow .08s}
+.settings-nav-btn::before{content:'';position:absolute;left:0;top:8px;bottom:8px;width:3px;border-radius:0 999px 999px 0;background:transparent;transition:background .08s,box-shadow .08s}
+.settings-nav-btn span{position:relative;z-index:1}
+.settings-nav-btn[hidden],.settings-nav-group[hidden]{display:none!important}
+.settings-nav-btn:hover{color:var(--text);background:rgba(255,255,255,.055);border-color:rgba(125,138,163,.22);transform:translateX(2px)}
+.settings-nav-btn.active{color:#dbeafe;background:linear-gradient(135deg,rgba(96,165,250,.18),rgba(125,138,163,.12));border-color:rgba(96,165,250,.30);box-shadow:0 8px 22px rgba(15,23,42,.14)}
+.settings-nav-btn.active::before{background:rgba(96,165,250,.92);box-shadow:0 0 12px rgba(96,165,250,.48)}
+.settings-nav-btn:disabled{cursor:not-allowed;opacity:.46}
+.settings-nav-btn:disabled:hover{color:var(--muted);background:transparent;border-color:transparent;transform:none}
+.settings-nav-dot{width:10px;height:10px;border-radius:50%;background:var(--muted);flex-shrink:0;box-shadow:0 0 0 3px rgba(125,138,163,.12)}
+.settings-nav-btn.active .settings-nav-dot{box-shadow:0 0 0 4px rgba(96,165,250,.15),0 0 14px rgba(96,165,250,.36)}
+html.embed .settings-nav-btn,html.embed .settings-nav-btn::before{transition:none!important}
+html.embed .settings-nav-btn:hover{transform:none}
+html.embed .settings-nav-btn.active,html.embed .settings-nav-btn.active::before,html.embed .settings-nav-dot,html.embed .settings-nav-btn.active .settings-nav-dot{box-shadow:none!important}
+html.embed .settings-nav-btn.active{background:rgba(96,165,250,.15)}
+.settings-content{display:flex;flex-direction:column;gap:14px;min-width:0;contain:layout style}
 .settings-content>.card[data-settings-section]:not(.settings-section-hidden){min-height:calc(100vh - 72px)}
 .settings-content>.card[data-settings-section]>.card-body.hidden{display:block}
 .settings-js-pending .settings-content>.card[data-settings-section]:not(:first-of-type){display:none!important}
@@ -67,10 +77,11 @@ html.embed .settings-nav{top:20px;height:calc(100vh - 40px);max-height:calc(100v
 @media (max-width:920px){
   main{padding:14px}
   .settings-workspace{grid-template-columns:1fr}
-  .settings-nav{position:static;height:auto;max-height:none}
+  .settings-nav{position:static;height:auto;max-height:min(62vh,560px)}
 }
 
 .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;overflow:hidden;transition:opacity .15s,border-color .15s,box-shadow .15s;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.card[data-settings-section]{contain:layout paint style}
 .card:hover{border-color:#2E3850}
 .card.card-off{opacity:.5}
 .card-hdr{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;cursor:default;user-select:none}
@@ -146,8 +157,8 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 .tag-add input{flex:1;background:var(--row);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:6px 10px;font-size:13px}
 .tag-add input:focus{outline:none;border-color:var(--blue)}
 
-.btn-sm{background:var(--row);border:1px solid var(--border);color:var(--text);padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;white-space:nowrap}
-.btn-sm:hover{border-color:var(--blue)}
+.btn-sm{background:rgba(125,138,163,.10);border:1px solid rgba(125,138,163,.28);color:var(--text);padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;white-space:nowrap;transition:border-color .15s,background .15s,color .15s,box-shadow .15s}
+.btn-sm:hover{border-color:rgba(96,165,250,.42);background:rgba(96,165,250,.10);color:var(--text);box-shadow:0 6px 16px rgba(15,23,42,.10)}
 .btn-danger{background:rgba(239,68,68,.16);border:1px solid rgba(239,68,68,.42);color:#fecaca;padding:7px 16px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;white-space:nowrap}
 .btn-danger:hover{background:rgba(239,68,68,.24);border-color:rgba(239,68,68,.68);color:#fff}
 
@@ -204,9 +215,27 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 .user-access-panel,.users-list-panel{margin-top:14px}
 .user-access-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px}
 .form-group.required-missing label{color:var(--red)}
-.form-group.required-missing input{border-color:rgba(248,113,113,.78)!important;box-shadow:0 0 0 1px rgba(248,113,113,.18)}
+.form-group.required-missing input,.form-group.required-missing select{border-color:rgba(248,113,113,.78)!important;box-shadow:0 0 0 1px rgba(248,113,113,.18)}
 .field-error{display:none;font-size:11px;color:var(--red);line-height:1.25}
 .form-group.required-missing .field-error{display:block}
+.req{color:var(--red);font-weight:900;margin-left:3px}
+.ci-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ci-card{border-radius:12px;background:linear-gradient(180deg,rgba(96,165,250,.045),rgba(0,0,0,.055));box-shadow:inset 0 1px 0 rgba(255,255,255,.025)}
+.ci-card.github{border-color:rgba(125,138,163,.26)}
+.ci-card.gitlab{border-color:rgba(251,146,60,.28)}
+.ci-card .arr-hdr{min-height:48px;padding:11px 13px;background:rgba(20,22,23,.76);gap:10px}
+.ci-provider-badge{height:24px;display:inline-flex;align-items:center;justify-content:center;border-radius:999px;padding:0 9px;border:1px solid rgba(125,138,163,.26);background:rgba(125,138,163,.11);font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.055em;white-space:nowrap;color:var(--muted)}
+.ci-provider-badge.github{color:#dbeafe;border-color:rgba(96,165,250,.28);background:rgba(96,165,250,.11)}
+.ci-provider-badge.gitlab{color:#fed7aa;border-color:rgba(251,146,60,.34);background:rgba(251,146,60,.12)}
+.ci-card .arr-hdr-name{font-size:14px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ci-body{padding:15px;background:rgba(255,255,255,.012)}
+.ci-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.ci-grid .form-group{margin-bottom:0}
+.ci-provider-field{display:none}
+.ci-card.github .ci-github-field,.ci-card.gitlab .ci-gitlab-field{display:flex}
+.ci-token-field{grid-column:1/-1}
+.ci-help{font-size:12px;color:var(--muted);line-height:1.4;margin-bottom:12px}
+@media (max-width:760px){.ci-grid{grid-template-columns:1fr}.ci-actions{width:100%}.ci-actions .btn-add{flex:1}}
 .session-row{align-items:flex-start;justify-content:space-between;gap:12px}
 .session-main{min-width:0;flex:1}
 .session-title{font-weight:750;color:var(--text);line-height:1.25}
@@ -222,8 +251,8 @@ body.settings-readonly .btn-save{display:none}
 .sec-head h3{margin:0;font-size:15px;line-height:1.2}
 .sec-head .btn-add{margin-left:auto;flex-shrink:0}
 .sys-empty{font-size:13px;color:var(--muted);padding:14px;border:1px dashed var(--border);border-radius:10px;text-align:center}
-.btn-add{background:linear-gradient(135deg,var(--accent),#4f8ef7);border:none;color:#fff;padding:7px 16px;border-radius:9px;cursor:pointer;font-size:13px;font-weight:600;box-shadow:0 2px 10px rgba(99,102,241,.35);transition:filter .15s,transform .1s}
-.btn-add:hover{filter:brightness(1.1)}
+.btn-add{background:linear-gradient(135deg,rgba(96,165,250,.18),rgba(125,138,163,.12));border:1px solid rgba(96,165,250,.30);color:#dbeafe;padding:7px 16px;border-radius:9px;cursor:pointer;font-size:13px;font-weight:700;box-shadow:0 8px 22px rgba(15,23,42,.14);transition:border-color .15s,background .15s,color .15s,box-shadow .15s,transform .1s}
+.btn-add:hover{background:linear-gradient(135deg,rgba(96,165,250,.24),rgba(125,138,163,.16));border-color:rgba(96,165,250,.46);color:#eff6ff;box-shadow:0 10px 26px rgba(15,23,42,.18)}
 .btn-add:active{transform:scale(.97)}
 .amodal{display:none;position:fixed;inset:0;background:rgba(4,6,10,.66);backdrop-filter:blur(4px);z-index:1000;align-items:center;justify-content:center}
 .amodal.open{display:flex}
@@ -248,6 +277,54 @@ body.settings-readonly .btn-save{display:none}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#ccd7e6;--text:#1c2433;--muted:#64748b;--green:#0e9f6e;--red:#dc2f2f;--yellow:#b7791f;--blue:#3b82f6;--save-bg:#2f856b;--save-bg2:#3d766b;--save-hover:#347f69;}
+html[data-theme="light"] .settings-nav{background:linear-gradient(180deg,rgba(255,255,255,.98),rgba(246,248,252,.98));border-color:rgba(59,130,246,.22);box-shadow:0 18px 42px rgba(30,41,59,.10),inset 0 1px 0 rgba(255,255,255,.75)}
+html[data-theme="light"] .settings-nav-group{color:#64748b;border-color:rgba(100,116,139,.18)}
+html[data-theme="light"] .settings-nav-btn{color:#53657c}
+html[data-theme="light"] .settings-nav-btn:hover{background:rgba(15,23,42,.045);border-color:rgba(100,116,139,.18)}
+html[data-theme="light"] .settings-nav-btn.active{color:#1e3a8a;background:linear-gradient(135deg,rgba(59,130,246,.14),rgba(100,116,139,.08));border-color:rgba(59,130,246,.28);box-shadow:0 8px 22px rgba(30,41,59,.10)}
+html[data-theme="light"] .ci-card{background:linear-gradient(180deg,#ffffff,#f8fbff);box-shadow:0 1px 2px rgba(30,41,59,.05),inset 0 1px 0 rgba(255,255,255,.9)}
+html[data-theme="light"] .ci-card.github{border-color:#c7d8ee}
+html[data-theme="light"] .ci-card.gitlab{border-color:#f2c7a5}
+html[data-theme="light"] .ci-card .arr-hdr{background:linear-gradient(180deg,#f7faff,#eef4fb);border-bottom-color:#d6e1ef}
+html[data-theme="light"] .ci-body{background:#ffffff}
+html[data-theme="light"] .ci-provider-badge{background:#eef2f7;border-color:#cbd6e6;color:#53657c}
+html[data-theme="light"] .ci-provider-badge.github{background:#eaf3ff;border-color:#b8d4f5;color:#24528f}
+html[data-theme="light"] .ci-provider-badge.gitlab{background:#fff4e8;border-color:#f3c89f;color:#9a4a12}
+html[data-theme="light"] .ci-help{color:#53657c}
+@-moz-document url-prefix(){
+  body::before{display:none}
+  .settings-nav{background:rgba(24,26,27,.98);box-shadow:none}
+  html[data-theme="light"] .settings-nav{background:#fff;box-shadow:none}
+  .settings-nav-btn,
+  .settings-nav-btn::before,
+  .card,
+  .btn-save,
+  .btn-sm,
+  .btn-add,
+  .toggle-t,
+  .toggle-t::after,
+  .ci-card,
+  .atab,
+  .amodal-box{transition:none!important}
+  .settings-nav-btn:hover{transform:none}
+  .settings-nav-btn.active{background:rgba(96,165,250,.16);box-shadow:none}
+  html[data-theme="light"] .settings-nav-btn.active{background:#edf4ff;box-shadow:none}
+  .settings-nav-btn.active::before,
+  .settings-nav-dot,
+  .settings-nav-btn.active .settings-nav-dot,
+  .card,
+  .btn-save,
+  .btn-save:hover,
+  .btn-sm:hover,
+  .btn-add,
+  .btn-add:hover,
+  .ci-card,
+  html[data-theme="light"] .ci-card,
+  .menu-drop,
+  .amodal-box,
+  .atab.active{box-shadow:none!important}
+  .amodal{backdrop-filter:none}
+}
 </style>
 <style>html.embed header{display:none}</style>
 <script>if(window.self!==window.top)document.documentElement.classList.add('embed');</script>
@@ -275,27 +352,40 @@ html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#cc
 <div class="readonly-note" id="readonly-note">This account can view settings, but only admins can change configuration.</div>
 <div class="settings-workspace">
   <aside class="settings-nav" aria-label="Settings sections">
-    <input class="settings-search" id="settings-search" type="search" placeholder="Search settings..." oninput="filterSettingsNav(this.value)">
-    <div class="settings-nav-group">General</div>
-    <button class="settings-nav-btn active" type="button" data-target="appearance" onclick="showSettingsSection('appearance')"><span class="settings-nav-dot" style="background:var(--blue)"></span><span>System</span></button>
-    <button class="settings-nav-btn" type="button" data-target="statuspage" onclick="showSettingsSection('statuspage')"><span class="settings-nav-dot" data-nav-dot="statuspage"></span><span>Status Page</span></button>
-    <button class="settings-nav-btn" type="button" data-target="certificates" onclick="showSettingsSection('certificates')"><span class="settings-nav-dot" data-nav-dot="certificates"></span><span>Certificates</span></button>
-    <button class="settings-nav-btn" type="button" data-target="alerts" onclick="showSettingsSection('alerts')"><span class="settings-nav-dot" data-nav-dot="alerts"></span><span>Alerts</span></button>
-    <div class="settings-nav-group">Security</div>
-    <button class="settings-nav-btn" type="button" data-target="users" data-admin-section="1" onclick="showSettingsSection('users')"><span class="settings-nav-dot" data-nav-dot="users"></span><span>Users & roles</span></button>
-    <button class="settings-nav-btn" type="button" data-target="sessions" data-admin-section="1" onclick="showSettingsSection('sessions')"><span class="settings-nav-dot" data-nav-dot="sessions"></span><span>Sessions & access</span></button>
-    <div class="settings-nav-group">Platforms</div>
-    <button class="settings-nav-btn" type="button" data-target="proxmox" onclick="showSettingsSection('proxmox')"><span class="settings-nav-dot" data-nav-dot="proxmox"></span><span>Proxmox</span></button>
-    <button class="settings-nav-btn" type="button" data-target="linux" onclick="showSettingsSection('linux')"><span class="settings-nav-dot" data-nav-dot="linux"></span><span>Linux Servers</span></button>
-    <button class="settings-nav-btn" type="button" data-target="kubernetes" onclick="showSettingsSection('kubernetes')"><span class="settings-nav-dot" data-nav-dot="kubernetes"></span><span>Kubernetes</span></button>
-    <button class="settings-nav-btn" type="button" data-target="synology" onclick="showSettingsSection('synology')"><span class="settings-nav-dot" data-nav-dot="synology"></span><span>SNMP</span></button>
-    <button class="settings-nav-btn" type="button" data-target="healthchecks" onclick="showSettingsSection('healthchecks')"><span class="settings-nav-dot" data-nav-dot="healthchecks"></span><span>Healthchecks</span></button>
-    <button class="settings-nav-btn" type="button" data-target="uptimekuma" onclick="showSettingsSection('uptimekuma')"><span class="settings-nav-dot" data-nav-dot="uptimekuma"></span><span>Uptime Kuma</span></button>
-    <button class="settings-nav-btn" type="button" data-target="checks" onclick="showSettingsSection('checks')"><span class="settings-nav-dot" data-nav-dot="checks"></span><span>Service checks</span></button>
-    <button class="settings-nav-btn" type="button" data-target="prometheus" onclick="showSettingsSection('prometheus')"><span class="settings-nav-dot" data-nav-dot="prometheus"></span><span>Prometheus</span></button>
-    <button class="settings-nav-btn" type="button" data-target="docker" onclick="showSettingsSection('docker')"><span class="settings-nav-dot" data-nav-dot="docker"></span><span>Docker</span></button>
-    <button class="settings-nav-btn" type="button" data-target="dockhand" onclick="showSettingsSection('dockhand')"><span class="settings-nav-dot" data-nav-dot="dockhand"></span><span>Dockhand</span></button>
-    <button class="settings-nav-btn" type="button" data-target="database" onclick="showSettingsSection('database')"><span class="settings-nav-dot" data-nav-dot="database"></span><span>Databases</span></button>
+    <div class="settings-nav-group" data-nav-group="general"><span>General</span></div>
+    <button class="settings-nav-btn active" type="button" data-nav-parent="general" data-target="appearance" onclick="showSettingsSection('appearance')"><span class="settings-nav-dot" style="background:var(--blue)"></span><span>System</span></button>
+    <button class="settings-nav-btn" type="button" data-nav-parent="general" data-target="statuspage" onclick="showSettingsSection('statuspage')"><span class="settings-nav-dot" data-nav-dot="statuspage"></span><span>Status Page</span></button>
+    <button class="settings-nav-btn" type="button" data-nav-parent="general" data-target="certificates" onclick="showSettingsSection('certificates')"><span class="settings-nav-dot" data-nav-dot="certificates"></span><span>Certificates</span></button>
+    <button class="settings-nav-btn" type="button" data-nav-parent="general" data-target="alerts" onclick="showSettingsSection('alerts')"><span class="settings-nav-dot" data-nav-dot="alerts"></span><span>Alerts</span></button>
+    <div class="settings-nav-group" data-nav-group="security"><span>Security</span></div>
+    <button class="settings-nav-btn" type="button" data-nav-parent="security" data-target="users" data-admin-section="1" onclick="showSettingsSection('users')"><span class="settings-nav-dot" data-nav-dot="users"></span><span>Users & roles</span></button>
+    <button class="settings-nav-btn" type="button" data-nav-parent="security" data-target="sessions" data-admin-section="1" onclick="showSettingsSection('sessions')"><span class="settings-nav-dot" data-nav-dot="sessions"></span><span>Sessions & access</span></button>
+    <div class="settings-nav-group" data-nav-group="docker"><span>Docker</span></div>
+    <button class="settings-nav-btn" type="button" data-nav-parent="docker" data-target="docker" onclick="showSettingsSection('docker')"><span class="settings-nav-dot" data-nav-dot="docker"></span><span>Host</span></button>
+    <button class="settings-nav-btn" type="button" data-nav-parent="docker" data-target="dockhand" onclick="showSettingsSection('dockhand')"><span class="settings-nav-dot" data-nav-dot="dockhand"></span><span>Dockhand</span></button>
+    <button class="settings-nav-btn" type="button" data-nav-parent="docker" data-target="portainer" onclick="showSettingsSection('portainer')"><span class="settings-nav-dot" data-nav-dot="portainer"></span><span>Portainer</span></button>
+    <div class="settings-nav-group" data-nav-group="backup"><span>Backup Platform</span></div>
+    <button class="settings-nav-btn" type="button" data-nav-parent="backup" data-target="pbs" onclick="showSettingsSection('pbs')"><span class="settings-nav-dot" data-nav-dot="pbs"></span><span>Proxmox Backup</span></button>
+    <button class="settings-nav-btn" type="button" data-nav-parent="backup" data-target="veeam" onclick="showSettingsSection('veeam')"><span class="settings-nav-dot" data-nav-dot="veeam"></span><span>Veeam</span></button>
+    <div class="settings-nav-group" data-nav-group="nas"><span>NAS</span></div>
+    <button class="settings-nav-btn" type="button" data-nav-parent="nas" data-target="truenas" onclick="showSettingsSection('truenas')"><span class="settings-nav-dot" data-nav-dot="truenas"></span><span>TrueNAS</span></button>
+    <button class="settings-nav-btn" type="button" data-nav-parent="nas" data-target="synology" onclick="showSettingsSection('synology')"><span class="settings-nav-dot" data-nav-dot="synology"></span><span>Synology</span></button>
+    <button class="settings-nav-btn" type="button" data-nav-parent="nas" data-target="ugreen" onclick="showSettingsSection('ugreen')"><span class="settings-nav-dot" data-nav-dot="ugreen"></span><span>Ugreen</span></button>
+    <button class="settings-nav-btn" type="button" data-nav-parent="nas" data-target="qnap" onclick="showSettingsSection('qnap')"><span class="settings-nav-dot" data-nav-dot="qnap"></span><span>QNAP</span></button>
+    <div class="settings-nav-group" data-nav-group="os"><span>OS Servers</span></div>
+    <button class="settings-nav-btn" type="button" data-nav-parent="os" data-target="linux" onclick="showSettingsSection('linux')"><span class="settings-nav-dot" data-nav-dot="linux"></span><span>Linux Server</span></button>
+    <button class="settings-nav-btn" type="button" data-nav-parent="os" data-target="windows" onclick="showSettingsSection('windows')"><span class="settings-nav-dot" data-nav-dot="windows"></span><span>Windows Server</span></button>
+    <div class="settings-nav-group" data-nav-group="infra"><span>Infrastructure</span></div>
+    <button class="settings-nav-btn" type="button" data-nav-parent="infra" data-target="proxmox" onclick="showSettingsSection('proxmox')"><span class="settings-nav-dot" data-nav-dot="proxmox"></span><span>Proxmox</span></button>
+    <button class="settings-nav-btn" type="button" data-nav-parent="infra" data-target="kubernetes" onclick="showSettingsSection('kubernetes')"><span class="settings-nav-dot" data-nav-dot="kubernetes"></span><span>Kubernetes</span></button>
+    <button class="settings-nav-btn" type="button" data-nav-parent="infra" data-target="healthchecks" onclick="showSettingsSection('healthchecks')"><span class="settings-nav-dot" data-nav-dot="healthchecks"></span><span>Healthchecks</span></button>
+    <button class="settings-nav-btn" type="button" data-nav-parent="infra" data-target="uptimekuma" onclick="showSettingsSection('uptimekuma')"><span class="settings-nav-dot" data-nav-dot="uptimekuma"></span><span>Uptime Kuma</span></button>
+    <button class="settings-nav-btn" type="button" data-nav-parent="infra" data-target="checks" onclick="showSettingsSection('checks')"><span class="settings-nav-dot" data-nav-dot="checks"></span><span>Service checks</span></button>
+    <button class="settings-nav-btn" type="button" data-nav-parent="infra" data-target="prometheus" onclick="showSettingsSection('prometheus')"><span class="settings-nav-dot" data-nav-dot="prometheus"></span><span>Prometheus</span></button>
+    <button class="settings-nav-btn" type="button" data-nav-parent="infra" data-target="firewall" onclick="showSettingsSection('firewall')"><span class="settings-nav-dot" data-nav-dot="firewall"></span><span>Firewalls</span></button>
+    <button class="settings-nav-btn" type="button" data-nav-parent="infra" data-target="cloudflare" onclick="showSettingsSection('cloudflare')"><span class="settings-nav-dot" data-nav-dot="cloudflare"></span><span>Cloudflare</span></button>
+    <button class="settings-nav-btn" type="button" data-nav-parent="infra" data-target="cicd" onclick="showSettingsSection('cicd')"><span class="settings-nav-dot" data-nav-dot="cicd"></span><span>GitHub/GitLab CI</span></button>
+    <button class="settings-nav-btn" type="button" data-nav-parent="infra" data-target="database" onclick="showSettingsSection('database')"><span class="settings-nav-dot" data-nav-dot="database"></span><span>Databases</span></button>
   </aside>
   <div class="settings-content" id="settings-content">
 
@@ -516,7 +606,8 @@ html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#cc
       <label>Visible platforms</label>
       <div class="check-grid" id="public-platforms">
         <label class="check-chip"><input type="checkbox" value="proxmox" checked> Proxmox</label>
-        <label class="check-chip"><input type="checkbox" value="linux" checked> Linux Servers</label>
+        <label class="check-chip"><input type="checkbox" value="linux" checked> Linux Server</label>
+        <label class="check-chip"><input type="checkbox" value="windows" checked> Windows Server</label>
         <label class="check-chip"><input type="checkbox" value="kubernetes" checked> Kubernetes</label>
         <label class="check-chip"><input type="checkbox" value="snmp" checked> SNMP</label>
         <label class="check-chip"><input type="checkbox" value="healthchecks" checked> Healthchecks</label>
@@ -525,6 +616,15 @@ html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#cc
         <label class="check-chip"><input type="checkbox" value="prometheus" checked> Prometheus</label>
         <label class="check-chip"><input type="checkbox" value="docker" checked> Docker</label>
         <label class="check-chip"><input type="checkbox" value="dockhand" checked> Dockhand</label>
+        <label class="check-chip"><input type="checkbox" value="firewall" checked> Firewalls</label>
+        <label class="check-chip"><input type="checkbox" value="truenas" checked> TrueNAS</label>
+        <label class="check-chip"><input type="checkbox" value="qnap" checked> QNAP</label>
+        <label class="check-chip"><input type="checkbox" value="ugreen" checked> Ugreen</label>
+        <label class="check-chip"><input type="checkbox" value="pbs" checked> Proxmox Backup</label>
+        <label class="check-chip"><input type="checkbox" value="cloudflare" checked> Cloudflare</label>
+        <label class="check-chip"><input type="checkbox" value="cicd" checked> GitHub/GitLab CI</label>
+        <label class="check-chip"><input type="checkbox" value="veeam" checked> Veeam</label>
+        <label class="check-chip"><input type="checkbox" value="portainer" checked> Portainer</label>
         <label class="check-chip"><input type="checkbox" value="database" checked> Databases</label>
       </div>
     </div>
@@ -572,12 +672,12 @@ html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#cc
   </div>
 </div>
 
-<!-- Linux Servers -->
+<!-- Linux Server -->
 <div class="card" data-settings-section="linux">
   <div class="card-hdr">
     <div class="card-left">
       <div class="card-icon" id="dot-linux" style="background:var(--muted)"></div>
-      <span class="card-title">Linux Servers</span>
+      <span class="card-title">Linux Server</span>
     </div>
     <label class="toggle"><input type="checkbox" id="en-linux" onchange="toggleCard('linux')"><span class="toggle-t"></span></label>
   </div>
@@ -594,7 +694,7 @@ html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#cc
       <div class="path-row">
         <input type="text" id="lx-token" readonly placeholder="Auto-generated when you add your first system">
         <button type="button" class="btn-sm" onclick="genAgentToken(this)">Regenerate</button>
-        <button type="button" class="btn-sm" onclick="copyToClip(document.getElementById('lx-token').value,this)">Copy</button>
+        <button type="button" class="btn-sm" onclick="copyAgentToken(this)">Copy</button>
       </div>
       <div style="font-size:12px;color:var(--muted)">One shared token for all agents (Linux, Proxmox, Docker). Regenerating invalidates installed agents.</div>
     </div>
@@ -604,6 +704,37 @@ html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#cc
         <button class="btn-add" type="button" onclick="openAddModal('linux')">+ Add System</button>
       </div>
       <div class="sys-list" id="lx-agents"><div class="sys-empty">No systems yet — click “+ Add System”, run the command on a server and it appears here automatically.</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Windows Server -->
+<div class="card" data-settings-section="windows">
+  <div class="card-hdr">
+    <div class="card-left">
+      <div class="card-icon" id="dot-windows" style="background:var(--muted)"></div>
+      <span class="card-title">Windows Server</span>
+    </div>
+    <label class="toggle"><input type="checkbox" id="en-windows" onchange="toggleCard('windows')"><span class="toggle-t"></span></label>
+  </div>
+  <div class="card-body hidden" id="cb-windows">
+    <div class="form-group"><label>Icon (optional)</label>
+      <div class="path-row">
+        <input type="text" id="icon-windows" placeholder="e.g. windows or windows.png - from dashboard-icons">
+        <button type="button" class="btn-sm" onclick="document.getElementById('icon-windows-f').click()">Browse...</button>
+        <input type="file" id="icon-windows-f" accept="image/*,.svg" style="display:none" onchange="uploadIcon(this,'icon-windows')">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Agent Token</label>
+      <div style="font-size:12px;color:var(--muted)">Windows uses the same shared token as Linux, Proxmox and Docker agents. Regenerate it from Linux Server if needed.</div>
+    </div>
+    <div class="form-group" style="margin-bottom:0">
+      <div class="sys-hdr">
+        <label style="margin:0">Hosts</label>
+        <button class="btn-add" type="button" onclick="openAddModal('windows')">+ Add Windows Host</button>
+      </div>
+      <div class="sys-list" id="win-agents"><div class="sys-empty">No hosts yet - click "+ Add Windows Host", run the PowerShell command and it appears here automatically.</div></div>
     </div>
   </div>
 </div>
@@ -649,7 +780,7 @@ html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#cc
   <div class="card-hdr">
     <div class="card-left">
       <div class="card-icon" id="dot-synology" style="background:var(--muted)"></div>
-      <span class="card-title">SNMP</span>
+      <span class="card-title">Synology</span>
     </div>
     <label class="toggle"><input type="checkbox" id="en-synology" onchange="toggleCard('synology')"><span class="toggle-t"></span></label>
   </div>
@@ -862,6 +993,263 @@ html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#cc
         <button class="btn-add" type="button" onclick="addDockhandInstance()">+ Add Dockhand</button>
       </div>
       <div id="dockhand-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Firewalls -->
+<div class="card" data-settings-section="firewall">
+  <div class="card-hdr">
+    <div class="card-left">
+      <div class="card-icon" id="dot-firewall" style="background:var(--muted)"></div>
+      <span class="card-title">Firewalls</span>
+    </div>
+    <label class="toggle"><input type="checkbox" id="en-firewall" onchange="toggleCard('firewall')"><span class="toggle-t"></span></label>
+  </div>
+  <div class="card-body hidden" id="cb-firewall">
+    <div class="form-group"><label>Icon (optional)</label>
+      <div class="path-row">
+        <input type="text" id="icon-firewall" placeholder="e.g. opnsense or pfsense — from dashboard-icons">
+        <button type="button" class="btn-sm" onclick="document.getElementById('icon-firewall-f').click()">Browse…</button>
+        <input type="file" id="icon-firewall-f" accept="image/*,.svg" style="display:none" onchange="uploadIcon(this,'icon-firewall')">
+      </div>
+    </div>
+    <div class="section mini-section">
+      <div class="sec-head">
+        <h3>Gateways</h3>
+        <button class="btn-add" type="button" onclick="addFirewallInstance()">+ Add Firewall</button>
+      </div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.35;margin-bottom:10px">OPNsense uses API key/secret with System > Access > Users. pfSense requires a compatible REST API endpoint.</div>
+      <div id="firewall-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- TrueNAS -->
+<div class="card" data-settings-section="truenas">
+  <div class="card-hdr">
+    <div class="card-left">
+      <div class="card-icon" id="dot-truenas" style="background:var(--muted)"></div>
+      <span class="card-title">TrueNAS</span>
+    </div>
+    <label class="toggle"><input type="checkbox" id="en-truenas" onchange="toggleCard('truenas')"><span class="toggle-t"></span></label>
+  </div>
+  <div class="card-body hidden" id="cb-truenas">
+    <div class="form-group"><label>Icon (optional)</label>
+      <div class="path-row">
+        <input type="text" id="icon-truenas" placeholder="e.g. truenas - from dashboard-icons">
+        <button type="button" class="btn-sm" onclick="document.getElementById('icon-truenas-f').click()">Browse...</button>
+        <input type="file" id="icon-truenas-f" accept="image/*,.svg" style="display:none" onchange="uploadIcon(this,'icon-truenas')">
+      </div>
+    </div>
+    <div class="section mini-section">
+      <div class="sec-head">
+        <h3>Storage systems</h3>
+        <button class="btn-add" type="button" onclick="addTrueNasInstance()">+ Add TrueNAS</button>
+      </div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.35;margin-bottom:10px">Auto mode uses the current TrueNAS WebSocket API first, then falls back to the older REST API when needed.</div>
+      <div id="truenas-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- QNAP -->
+<div class="card" data-settings-section="qnap">
+  <div class="card-hdr">
+    <div class="card-left">
+      <div class="card-icon" id="dot-qnap" style="background:var(--muted)"></div>
+      <span class="card-title">QNAP</span>
+    </div>
+    <label class="toggle"><input type="checkbox" id="en-qnap" onchange="toggleCard('qnap')"><span class="toggle-t"></span></label>
+  </div>
+  <div class="card-body hidden" id="cb-qnap">
+    <div class="form-group"><label>Icon (optional)</label>
+      <div class="path-row">
+        <input type="text" id="icon-qnap" placeholder="e.g. qnap - from dashboard-icons">
+        <button type="button" class="btn-sm" onclick="document.getElementById('icon-qnap-f').click()">Browse...</button>
+        <input type="file" id="icon-qnap-f" accept="image/*,.svg" style="display:none" onchange="uploadIcon(this,'icon-qnap')">
+      </div>
+    </div>
+    <div class="section mini-section">
+      <div class="sec-head">
+        <h3>Storage systems</h3>
+        <button class="btn-add" type="button" onclick="addQnapInstance()">+ Add QNAP</button>
+      </div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.35;margin-bottom:10px">Uses QNAP QTS authLogin.cgi and File Station SID check from the official HTTP API documentation.</div>
+      <div id="qnap-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Ugreen -->
+<div class="card" data-settings-section="ugreen">
+  <div class="card-hdr">
+    <div class="card-left">
+      <div class="card-icon" id="dot-ugreen" style="background:var(--muted)"></div>
+      <span class="card-title">Ugreen</span>
+    </div>
+    <label class="toggle"><input type="checkbox" id="en-ugreen" onchange="toggleCard('ugreen')"><span class="toggle-t"></span></label>
+  </div>
+  <div class="card-body hidden" id="cb-ugreen">
+    <div class="form-group"><label>Icon (optional)</label>
+      <div class="path-row">
+        <input type="text" id="icon-ugreen" placeholder="e.g. ugreen - from dashboard-icons">
+        <button type="button" class="btn-sm" onclick="document.getElementById('icon-ugreen-f').click()">Browse...</button>
+        <input type="file" id="icon-ugreen-f" accept="image/*,.svg" style="display:none" onchange="uploadIcon(this,'icon-ugreen')">
+      </div>
+    </div>
+    <div class="section mini-section">
+      <div class="sec-head">
+        <h3>Storage systems</h3>
+        <button class="btn-add" type="button" onclick="addUgreenInstance()">+ Add Ugreen</button>
+      </div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.35;margin-bottom:10px">UGREEN publishes product documentation but no stable public API; OmniSight checks UGOS Pro web reachability.</div>
+      <div id="ugreen-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Proxmox Backup -->
+<div class="card" data-settings-section="pbs">
+  <div class="card-hdr">
+    <div class="card-left">
+      <div class="card-icon" id="dot-pbs" style="background:var(--muted)"></div>
+      <span class="card-title">Proxmox Backup</span>
+    </div>
+    <label class="toggle"><input type="checkbox" id="en-pbs" onchange="toggleCard('pbs')"><span class="toggle-t"></span></label>
+  </div>
+  <div class="card-body hidden" id="cb-pbs">
+    <div class="form-group"><label>Icon (optional)</label>
+      <div class="path-row">
+        <input type="text" id="icon-pbs" placeholder="e.g. proxmox or proxmox-backup - from dashboard-icons">
+        <button type="button" class="btn-sm" onclick="document.getElementById('icon-pbs-f').click()">Browse...</button>
+        <input type="file" id="icon-pbs-f" accept="image/*,.svg" style="display:none" onchange="uploadIcon(this,'icon-pbs')">
+      </div>
+    </div>
+    <div class="section mini-section">
+      <div class="sec-head">
+        <h3>Backup servers</h3>
+        <button class="btn-add" type="button" onclick="addPbsInstance()">+ Add PBS</button>
+      </div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.35;margin-bottom:10px">Use a PBS API token with audit access to the datastores you want to monitor.</div>
+      <div id="pbs-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Cloudflare -->
+<div class="card" data-settings-section="cloudflare">
+  <div class="card-hdr">
+    <div class="card-left">
+      <div class="card-icon" id="dot-cloudflare" style="background:var(--muted)"></div>
+      <span class="card-title">Cloudflare</span>
+    </div>
+    <label class="toggle"><input type="checkbox" id="en-cloudflare" onchange="toggleCard('cloudflare')"><span class="toggle-t"></span></label>
+  </div>
+  <div class="card-body hidden" id="cb-cloudflare">
+    <div class="form-group"><label>Icon (optional)</label>
+      <div class="path-row">
+        <input type="text" id="icon-cloudflare" placeholder="e.g. cloudflare - from dashboard-icons">
+        <button type="button" class="btn-sm" onclick="document.getElementById('icon-cloudflare-f').click()">Browse...</button>
+        <input type="file" id="icon-cloudflare-f" accept="image/*,.svg" style="display:none" onchange="uploadIcon(this,'icon-cloudflare')">
+      </div>
+    </div>
+    <div class="grid two">
+      <div class="form-group"><label>API token</label><input type="password" id="cf-token" placeholder="cfut_*****"></div>
+      <div class="form-group"><label>Account ID (optional)</label><input type="text" id="cf-account-id" placeholder="required for tunnel health"></div>
+    </div>
+    <div class="form-group"><label>Zone filter (optional)</label><textarea id="cf-zones" rows="4" placeholder="example.com&#10;another-zone-id"></textarea></div>
+    <div class="grid two">
+      <label class="check-chip"><input type="checkbox" id="cf-include-tunnels" checked> Include tunnels</label>
+      <label class="check-chip"><input type="checkbox" id="cf-include-domains" checked> Include domain expiration</label>
+    </div>
+    <div style="font-size:12px;color:var(--muted);line-height:1.35;margin-top:10px">Use a scoped Cloudflare API token with Zone Read and, if tunnels are enabled, Cloudflare Tunnel read access for the account. Domain expiration needs Cloudflare Registrar read access and only reports domains registered with Cloudflare Registrar.</div>
+  </div>
+</div>
+
+<!-- GitHub/GitLab CI -->
+<div class="card" data-settings-section="cicd">
+  <div class="card-hdr">
+    <div class="card-left">
+      <div class="card-icon" id="dot-cicd" style="background:var(--muted)"></div>
+      <span class="card-title">GitHub/GitLab CI</span>
+    </div>
+    <label class="toggle"><input type="checkbox" id="en-cicd" onchange="toggleCard('cicd')"><span class="toggle-t"></span></label>
+  </div>
+  <div class="card-body hidden" id="cb-cicd">
+    <div class="form-group"><label>Icon (optional)</label>
+      <div class="path-row">
+        <input type="text" id="icon-cicd" placeholder="e.g. github or gitlab - from dashboard-icons">
+        <button type="button" class="btn-sm" onclick="document.getElementById('icon-cicd-f').click()">Browse...</button>
+        <input type="file" id="icon-cicd-f" accept="image/*,.svg" style="display:none" onchange="uploadIcon(this,'icon-cicd')">
+      </div>
+    </div>
+    <div class="section mini-section">
+      <div class="sec-head">
+        <h3>Projects</h3>
+        <div class="ci-actions">
+          <button class="btn-add" type="button" onclick="addCiProject({ provider: 'github' })">+ Add GitHub</button>
+          <button class="btn-add" type="button" onclick="addCiProject({ provider: 'gitlab' })">+ Add GitLab</button>
+        </div>
+      </div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.35;margin-bottom:10px">GitHub uses Actions workflow runs. GitLab uses project pipelines and, when enabled, jobs for recent pipelines.</div>
+      <div id="cicd-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Veeam -->
+<div class="card" data-settings-section="veeam">
+  <div class="card-hdr">
+    <div class="card-left">
+      <div class="card-icon" id="dot-veeam" style="background:var(--muted)"></div>
+      <span class="card-title">Veeam</span>
+    </div>
+    <label class="toggle"><input type="checkbox" id="en-veeam" onchange="toggleCard('veeam')"><span class="toggle-t"></span></label>
+  </div>
+  <div class="card-body hidden" id="cb-veeam">
+    <div class="form-group"><label>Icon (optional)</label>
+      <div class="path-row">
+        <input type="text" id="icon-veeam" placeholder="e.g. veeam - from dashboard-icons">
+        <button type="button" class="btn-sm" onclick="document.getElementById('icon-veeam-f').click()">Browse...</button>
+        <input type="file" id="icon-veeam-f" accept="image/*,.svg" style="display:none" onchange="uploadIcon(this,'icon-veeam')">
+      </div>
+    </div>
+    <div class="section mini-section">
+      <div class="sec-head">
+        <h3>Instances</h3>
+        <button class="btn-add" type="button" onclick="addVeeamInstance()">+ Add Veeam</button>
+      </div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.35;margin-bottom:10px">Veeam Backup &amp; Replication REST API is read with the configured API revision. Default VBR REST port is 9419.</div>
+      <div id="veeam-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Portainer -->
+<div class="card" data-settings-section="portainer">
+  <div class="card-hdr">
+    <div class="card-left">
+      <div class="card-icon" id="dot-portainer" style="background:var(--muted)"></div>
+      <span class="card-title">Portainer</span>
+    </div>
+    <label class="toggle"><input type="checkbox" id="en-portainer" onchange="toggleCard('portainer')"><span class="toggle-t"></span></label>
+  </div>
+  <div class="card-body hidden" id="cb-portainer">
+    <div class="form-group"><label>Icon (optional)</label>
+      <div class="path-row">
+        <input type="text" id="icon-portainer" placeholder="e.g. portainer - from dashboard-icons">
+        <button type="button" class="btn-sm" onclick="document.getElementById('icon-portainer-f').click()">Browse...</button>
+        <input type="file" id="icon-portainer-f" accept="image/*,.svg" style="display:none" onchange="uploadIcon(this,'icon-portainer')">
+      </div>
+    </div>
+    <div class="section mini-section">
+      <div class="sec-head">
+        <h3>Instances</h3>
+        <button class="btn-add" type="button" onclick="addPortainerInstance()">+ Add Portainer</button>
+      </div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.35;margin-bottom:10px">Use a Portainer access token from My account. OmniSight reads environments, stacks and lightweight container summaries.</div>
+      <div id="portainer-list"></div>
     </div>
   </div>
 </div>
@@ -1204,7 +1592,7 @@ html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#cc
 
 <script src="/i18n.js"></script>
 <script>
-let lCount = 0, sCount = 0, dCount = 0, dbCount = 0, dkApiCount = 0, dkSshCount = 0, pveSshCount = 0, promCount = 0, dockhandCount = 0, checkCount = 0;
+let lCount = 0, sCount = 0, dCount = 0, dbCount = 0, dkApiCount = 0, dkSshCount = 0, pveSshCount = 0, promCount = 0, dockhandCount = 0, firewallCount = 0, trueNasCount = 0, qnapCount = 0, ugreenCount = 0, pbsCount = 0, cicdCount = 0, veeamCount = 0, portainerCount = 0, checkCount = 0;
 const SETTINGS_CARD_OPEN_KEY = 'os_settings_card_open';
 const SETTINGS_ACTIVE_SECTION_KEY = 'os_settings_active_section';
 const DEFAULT_SETTINGS_SECTION = 'appearance';
@@ -1225,6 +1613,9 @@ let settingsAgentsLast = 0;
 let settingsAgentsRequest = null;
 let settingsCertsRequest = null;
 let lastSessionRows = [];
+let settingsShellResizing = false;
+let settingsShellResizeTimer = null;
+let pendingDotsRefresh = null;
 const activeSettingsFetchControllers = new Set();
 function abortSettingsFetches(){
   activeSettingsFetchControllers.forEach(ctrl => {
@@ -1245,11 +1636,41 @@ function ensureActiveSettingsSection() {
     .find(card => card.style.display !== 'none');
   activeSettingsSection = first?.dataset.settingsSection || DEFAULT_SETTINGS_SECTION;
 }
+function settingsNavStatusRank(btn) {
+  const state = btn.querySelector('[data-nav-dot]')?.dataset.navState || '';
+  if (state === 'ok') return 0;
+  if (state === 'warn') return 1;
+  if (state === 'bad') return 2;
+  if (state === 'gray') return 3;
+  return 4;
+}
+function sortSettingsNavByStatus() {
+  document.querySelectorAll('.settings-nav-btn').forEach((btn, idx) => {
+    if (!btn.dataset.navOrder) btn.dataset.navOrder = String(idx);
+  });
+  document.querySelectorAll('.settings-nav-group').forEach(group => {
+    if (['general', 'security'].includes(group.dataset.navGroup || '')) return;
+    const rows = [];
+    let node = group.nextElementSibling;
+    while (node && !node.classList.contains('settings-nav-group')) {
+      if (node.classList.contains('settings-nav-btn')) rows.push(node);
+      node = node.nextElementSibling;
+    }
+    rows
+      .slice()
+      .sort((a, b) => settingsNavStatusRank(a) - settingsNavStatusRank(b) || Number(a.dataset.navOrder || 0) - Number(b.dataset.navOrder || 0))
+      .forEach(row => group.parentNode.insertBefore(row, node));
+  });
+}
 function syncSettingsNavDots() {
   document.querySelectorAll('[data-nav-dot]').forEach(dot => {
     const src = document.getElementById(`dot-${dot.dataset.navDot}`);
-    if (src) dot.style.background = getComputedStyle(src).backgroundColor;
+    if (src) {
+      dot.dataset.navState = src.dataset.dotState || '';
+      dot.style.background = getComputedStyle(src).backgroundColor;
+    }
   });
+  sortSettingsNavByStatus();
 }
 function refreshSettingsSectionVisibility() {
   ensureActiveSettingsSection();
@@ -1262,18 +1683,25 @@ function refreshSettingsSectionVisibility() {
   document.documentElement.classList.add('settings-js-ready');
   document.querySelectorAll('.settings-nav-btn').forEach(btn => {
     const target = btn.dataset.target;
-    const hidden = !settingsSectionExists(target);
+    const hidden = target ? !settingsSectionExists(target) : false;
     btn.hidden = hidden;
-    btn.classList.toggle('active', target === activeSettingsSection && !hidden);
+    if (btn.hidden) btn.style.display = 'none';
+    else btn.style.display = '';
+    btn.classList.toggle('active', target === activeSettingsSection && !btn.hidden);
   });
   document.querySelectorAll('.settings-nav-group').forEach(group => {
     let node = group.nextElementSibling;
     let any = false;
     while (node && !node.classList.contains('settings-nav-group')) {
-      if (node.classList.contains('settings-nav-btn') && !node.hidden && node.style.display !== 'none') any = true;
+      if (node.classList.contains('settings-nav-btn') && node.dataset.target && !settingsSectionExists(node.dataset.target)) {
+        node = node.nextElementSibling;
+        continue;
+      }
+      if (node.classList.contains('settings-nav-btn')) any = true;
       node = node.nextElementSibling;
     }
     group.hidden = !any;
+    group.style.display = group.hidden ? 'none' : '';
   });
   const card = [...document.querySelectorAll('.card[data-settings-section]')].find(el => el.dataset.settingsSection === activeSettingsSection);
   if (card) setSettingsCardOpen(card, true, false);
@@ -1283,6 +1711,21 @@ function afterFirstSettingsPaint(fn, delay = 0) {
   const run = () => setTimeout(fn, delay);
   requestAnimationFrame(() => requestAnimationFrame(run));
 }
+function settingsRefreshHeld() {
+  return settingsShellResizing && window.self !== window.top;
+}
+function runAfterSettingsResize() {
+  if (settingsShellResizeTimer) clearTimeout(settingsShellResizeTimer);
+  settingsShellResizeTimer = setTimeout(() => {
+    if (settingsRefreshHeld()) return runAfterSettingsResize();
+    const pending = pendingDotsRefresh;
+    pendingDotsRefresh = null;
+    if (pending) refreshDots(pending.cfg, pending.newData);
+    else scheduleSettingsDotsPoll(350);
+    if (settingsSessionsRefreshAllowed()) scheduleSettingsSessionsPoll(900);
+    if (settingsAgentsRefreshAllowed()) scheduleSettingsAgentsPoll(1000);
+  }, 220);
+}
 function idleSettingsTask(fn, timeout = 2500) {
   const run = () => { try { fn(); } catch (e) { console.warn(e); } };
   if (window.requestIdleCallback) requestIdleCallback(run, { timeout });
@@ -1290,44 +1733,46 @@ function idleSettingsTask(fn, timeout = 2500) {
 }
 function loadSettingsSectionData(id) {
   if (embedPaused) return;
-  if (id === 'certificates') idleSettingsTask(loadCertificates, 1200);
-  if (id === 'users') idleSettingsTask(loadUsers, 1200);
-  if (id === 'sessions') idleSettingsTask(loadSessions, 1200);
-  if (['linux', 'proxmox', 'docker'].includes(id)) idleSettingsTask(loadAgents, 1200);
+  if (id === 'appearance') idleSettingsTask(loadHostClock, 900);
+  else clearHostClockTimer();
+  if (id === 'certificates') idleSettingsTask(() => loadCertificates({ visibleOnly: true }), 1200);
+  if (id === 'users') idleSettingsTask(() => loadUsers({ visibleOnly: true }), 1200);
+  if (id === 'sessions') {
+    idleSettingsTask(loadSessions, 1200);
+    scheduleSettingsSessionsPoll(15000);
+  } else {
+    clearTimeout(settingsSessionsTimer);
+  }
+  if (['linux', 'windows', 'proxmox', 'docker'].includes(id)) idleSettingsTask(loadAgents, 1200);
+  else clearTimeout(settingsAgentsTimer);
 }
 function showSettingsSection(id, opts = {}) {
   activeSettingsSection = id || DEFAULT_SETTINGS_SECTION;
   try { localStorage.setItem(SETTINGS_ACTIVE_SECTION_KEY, activeSettingsSection); } catch {}
-  const search = document.getElementById('settings-search');
-  if (search && !opts.keepSearch) {
-    search.value = '';
-    filterSettingsNav('');
-  }
   refreshSettingsSectionVisibility();
   loadSettingsSectionData(activeSettingsSection);
   if (!opts.noScroll) {
     document.getElementById('settings-content')?.scrollIntoView({ block: 'start' });
   }
 }
-function filterSettingsNav(query) {
-  const q = String(query || '').trim().toLowerCase();
-  document.querySelectorAll('.settings-nav-btn').forEach(btn => {
-    const label = btn.textContent.toLowerCase();
-    btn.style.display = !q || label.includes(q) ? '' : 'none';
-  });
-  refreshSettingsSectionVisibility();
-}
 
 window.addEventListener('message', event => {
   if(event.origin !== window.location.origin) return;
+  if(event.data?.type === 'omnisight-shell-resize') {
+    settingsShellResizing = !!event.data.active;
+    clearTimeout(settingsDotsTimer);
+    clearTimeout(settingsSessionsTimer);
+    clearTimeout(settingsAgentsTimer);
+    if(!settingsShellResizing) runAfterSettingsResize();
+    return;
+  }
   if(event.data?.type !== 'omnisight-embed-visibility') return;
   embedPaused = event.data.visible === false;
   if(embedPaused) {
     clearTimeout(settingsDotsTimer);
     clearTimeout(settingsSessionsTimer);
     clearTimeout(settingsAgentsTimer);
-    clearInterval(hostClockTimer);
-    hostClockTimer = null;
+    clearHostClockTimer();
     abortSettingsFetches();
     return;
   }
@@ -1338,22 +1783,43 @@ window.addEventListener('message', event => {
 });
 function scheduleSettingsDotsPoll(delay = 7000) {
   clearTimeout(settingsDotsTimer);
+  if(settingsRefreshHeld()) return runAfterSettingsResize();
   settingsDotsTimer = setTimeout(async () => {
+    if(settingsRefreshHeld()) return runAfterSettingsResize();
     if(!embedPaused) await refreshDots(window._settingsConfig);
     scheduleSettingsDotsPoll(embedPaused ? 5000 : 7000);
   }, delay);
 }
+function settingsSessionsRefreshAllowed() {
+  if (embedPaused) return false;
+  if (window.self === window.top) return true;
+  return activeSettingsSection === 'sessions';
+}
 function scheduleSettingsSessionsPoll(delay = 15000) {
   clearTimeout(settingsSessionsTimer);
+  if(settingsRefreshHeld()) return runAfterSettingsResize();
+  if(!settingsSessionsRefreshAllowed()) return;
   settingsSessionsTimer = setTimeout(async () => {
-    if(!embedPaused && Date.now() - settingsSessionsLast > 5000) await loadSessions();
+    if(settingsRefreshHeld()) return runAfterSettingsResize();
+    if(!settingsSessionsRefreshAllowed()) return;
+    if(Date.now() - settingsSessionsLast > 5000) await loadSessions();
     scheduleSettingsSessionsPoll(embedPaused ? 5000 : 15000);
   }, delay);
 }
+function settingsAgentsRefreshAllowed() {
+  if (embedPaused) return false;
+  if (window.self === window.top) return true;
+  if (document.getElementById('agent-modal')?.classList.contains('open')) return true;
+  return ['linux', 'windows', 'proxmox', 'docker'].includes(activeSettingsSection);
+}
 function scheduleSettingsAgentsPoll(delay = 10000) {
   clearTimeout(settingsAgentsTimer);
+  if(settingsRefreshHeld()) return runAfterSettingsResize();
+  if(!settingsAgentsRefreshAllowed()) return;
   settingsAgentsTimer = setTimeout(async () => {
-    if(!embedPaused) await loadAgents();
+    if(settingsRefreshHeld()) return runAfterSettingsResize();
+    if(!settingsAgentsRefreshAllowed()) return;
+    await loadAgents();
     scheduleSettingsAgentsPoll(embedPaused ? 5000 : 10000);
   }, delay);
 }
@@ -1549,6 +2015,7 @@ function previewConfiguredIds(cfg = {}) {
   if (en(cfg.proxmox) && (cfg.proxmox?.url || cfg.proxmox?.tokenId || cfg.proxmox?.tokenSecret || (cfg.proxmox?.nodes || []).length)) ids.push('proxmox');
   if (en(cfg.kubernetes) && cfg.kubernetes?.kubeconfig) ids.push('kubernetes');
   if (en(cfg.linux) && cfg.linux?.agentToken) ids.push('linux');
+  if (en(cfg.windows) && cfg.linux?.agentToken) ids.push('windows');
   if (en(cfg.snmp) && (cfg.snmp?.devices || []).length) ids.push('snmp');
   if (en(cfg.healthchecks) && cfg.healthchecks?.url) ids.push('healthchecks');
   if (en(cfg.uptimekuma) && cfg.uptimekuma?.url) ids.push('uptimekuma');
@@ -1556,6 +2023,15 @@ function previewConfiguredIds(cfg = {}) {
   if (en(cfg.prometheus) && hasInstances(cfg.prometheus)) ids.push('prometheus');
   if (en(cfg.docker) && (cfg.docker?.hosts || []).length) ids.push('docker');
   if (en(cfg.dockhand) && hasInstances(cfg.dockhand)) ids.push('dockhand');
+  if (en(cfg.firewall) && hasInstances(cfg.firewall)) ids.push('firewall');
+  if (en(cfg.truenas) && hasInstances(cfg.truenas)) ids.push('truenas');
+  if (en(cfg.qnap) && hasInstances(cfg.qnap)) ids.push('qnap');
+  if (en(cfg.ugreen) && hasInstances(cfg.ugreen)) ids.push('ugreen');
+  if (en(cfg.pbs) && hasInstances(cfg.pbs)) ids.push('pbs');
+  if (en(cfg.cloudflare) && (cfg.cloudflare.apiToken || cfg.cloudflare.token || cfg.cloudflare.bearerToken)) ids.push('cloudflare');
+  if (en(cfg.cicd) && ((cfg.cicd?.projects || []).length || (cfg.cicd?.instances || []).length)) ids.push('cicd');
+  if (en(cfg.veeam) && hasInstances(cfg.veeam)) ids.push('veeam');
+  if (en(cfg.portainer) && hasInstances(cfg.portainer)) ids.push('portainer');
   if (en(cfg.database) && (cfg.database?.instances || []).length) ids.push('database');
   return ids;
 }
@@ -1578,6 +2054,33 @@ function previewConnectingPlatform(data, id, cfg = {}) {
   } else if (id === 'dockhand') {
     const instances = Array.isArray(cfg.dockhand?.instances) ? cfg.dockhand.instances : (cfg.dockhand?.url ? [cfg.dockhand] : []);
     data.dockhand = { _connecting: true, online: false, summary: { servers: instances.length, serverUp: 0, serverDown: 0, total: 0, running: 0, stopped: 0, pending: 0 }, instances: instances.map((inst, idx) => ({ name: inst.name || inst.url || `Dockhand ${idx + 1}`, url: inst.url || '', online: false, _connecting: true, summary: { total: 0, running: 0, stopped: 0, pending: 0 }, containers: [] })), containers: [] };
+  } else if (id === 'firewall') {
+    const instances = Array.isArray(cfg.firewall?.instances) ? cfg.firewall.instances : (cfg.firewall?.url ? [cfg.firewall] : []);
+    data.firewall = { _connecting: true, online: false, summary: { instances: instances.length, up: 0, down: 0, interfaces: 0, interfacesUp: 0, interfacesDown: 0, updates: 0, rebootRequired: 0 }, instances: instances.map((inst, idx) => ({ name: inst.name || inst.url || `Firewall ${idx + 1}`, type: inst.type || 'opnsense', url: inst.url || '', online: false, _connecting: true, summary: { interfaces: 0, interfacesUp: 0, interfacesDown: 0 } })) };
+  } else if (id === 'truenas') {
+    const instances = Array.isArray(cfg.truenas?.instances) ? cfg.truenas.instances : (cfg.truenas?.url ? [cfg.truenas] : []);
+    data.truenas = { _connecting: true, online: false, summary: { instances: instances.length, up: 0, down: 0, pools: 0, poolsHealthy: 0, poolsWarn: 0, disks: 0, disksWarn: 0, alertsCritical: 0, alertsWarning: 0 }, instances: instances.map((inst, idx) => ({ name: inst.name || inst.url || `TrueNAS ${idx + 1}`, url: inst.url || '', apiMode: inst.apiMode || 'auto', online: false, _connecting: true, summary: { pools: 0, poolsHealthy: 0, poolsWarn: 0, disks: 0, disksWarn: 0 } })) };
+  } else if (id === 'qnap') {
+    const instances = Array.isArray(cfg.qnap?.instances) ? cfg.qnap.instances : (cfg.qnap?.url ? [cfg.qnap] : []);
+    data.qnap = { _connecting: true, online: false, summary: { instances: instances.length, up: 0, down: 0 }, instances: instances.map((inst, idx) => ({ name: inst.name || inst.url || `QNAP ${idx + 1}`, url: inst.url || '', online: false, _connecting: true, summary: { instances: 1, up: 0, down: 0 } })) };
+  } else if (id === 'ugreen') {
+    const instances = Array.isArray(cfg.ugreen?.instances) ? cfg.ugreen.instances : (cfg.ugreen?.url ? [cfg.ugreen] : []);
+    data.ugreen = { _connecting: true, online: false, summary: { instances: instances.length, up: 0, down: 0 }, instances: instances.map((inst, idx) => ({ name: inst.name || inst.url || `Ugreen ${idx + 1}`, url: inst.url || '', online: false, _connecting: true, summary: { instances: 1, up: 0, down: 0 } })) };
+  } else if (id === 'pbs') {
+    const instances = Array.isArray(cfg.pbs?.instances) ? cfg.pbs.instances : (cfg.pbs?.url ? [cfg.pbs] : []);
+    data.pbs = { _connecting: true, online: false, summary: { instances: instances.length, up: 0, down: 0, datastores: 0, datastoresWarn: 0, snapshots: 0, groups: 0, failedTasks: 0 }, instances: instances.map((inst, idx) => ({ name: inst.name || inst.url || `PBS ${idx + 1}`, url: inst.url || '', online: false, _connecting: true, summary: { datastores: 0, datastoresWarn: 0, snapshots: 0, groups: 0, failedTasks: 0 } })) };
+  } else if (id === 'cloudflare') {
+    const zones = Array.isArray(cfg.cloudflare?.zones) ? cfg.cloudflare.zones.filter(Boolean) : [];
+    data.cloudflare = { _connecting: true, online: false, summary: { zones: zones.length, zonesActive: 0, zonesWarn: 0, tunnels: 0, tunnelsHealthy: 0, tunnelsDown: 0, domains: 0, domainsExpiring: 0, domainsExpired: 0, domainsAutoRenew: 0 }, zones: zones.map(name => ({ name, status: 'connecting', online: false, _connecting: true })), tunnels: [], domains: [] };
+  } else if (id === 'cicd') {
+    const projects = Array.isArray(cfg.cicd?.projects) ? cfg.cicd.projects : (Array.isArray(cfg.cicd?.instances) ? cfg.cicd.instances : []);
+    data.cicd = { _connecting: true, online: false, summary: { projects: projects.length, up: 0, down: 0, partial: 0, pipelines: 0, success: 0, failed: 0, running: 0, canceled: 0, jobs: 0, jobsFailed: 0, jobsRunning: 0 }, projects: projects.map((row, idx) => ({ name: row.name || row.repo || row.projectId || `CI Project ${idx + 1}`, provider: row.provider || 'github', branch: row.branch || row.ref || '', online: false, _connecting: true, pipelines: [], jobs: [] })) };
+  } else if (id === 'veeam') {
+    const instances = Array.isArray(cfg.veeam?.instances) ? cfg.veeam.instances : (cfg.veeam?.url ? [cfg.veeam] : []);
+    data.veeam = { _connecting: true, online: false, summary: { instances: instances.length, up: 0, down: 0, partial: 0, jobs: 0, jobsDisabled: 0, sessions: 0, failedSessions: 0, warningSessions: 0, runningSessions: 0, repositories: 0, repositoriesWarn: 0 }, instances: instances.map((inst, idx) => ({ name: inst.name || inst.url || `Veeam ${idx + 1}`, url: inst.url || '', online: false, _connecting: true, jobs: [], sessions: [], repositories: [], summary: { jobs: 0, sessions: 0, repositories: 0, failedSessions: 0, warningSessions: 0, runningSessions: 0, repositoriesWarn: 0 } })) };
+  } else if (id === 'portainer') {
+    const instances = Array.isArray(cfg.portainer?.instances) ? cfg.portainer.instances : (cfg.portainer?.url ? [cfg.portainer] : []);
+    data.portainer = { _connecting: true, online: false, summary: { instances: instances.length, up: 0, down: 0, environments: 0, environmentsUp: 0, environmentsDown: 0, stacks: 0, stacksWarn: 0, containers: 0, running: 0, stopped: 0 }, instances: instances.map((inst, idx) => ({ name: inst.name || inst.url || `Portainer ${idx + 1}`, url: inst.url || '', online: false, _connecting: true, summary: { environments: 0, environmentsUp: 0, environmentsDown: 0, stacks: 0, stacksWarn: 0, containers: 0, running: 0, stopped: 0 } })) };
   }
 }
 function applySettingsPreview(cfgPayload = null) {
@@ -1601,6 +2104,7 @@ function applySettingsPreview(cfgPayload = null) {
       data.configured = configured;
       if (!configuredSet.has('proxmox')) data.proxmox = { clusterSummary: null, nodes: [] };
       if (!configuredSet.has('linux')) data.linux = [];
+      if (!configuredSet.has('windows')) data.windows = [];
       if (!configuredSet.has('kubernetes')) data.kubernetes = null;
       if (!configuredSet.has('snmp')) data.snmp = [];
       if (!configuredSet.has('healthchecks')) data.healthchecks = null;
@@ -1609,8 +2113,17 @@ function applySettingsPreview(cfgPayload = null) {
       if (!configuredSet.has('prometheus')) data.prometheus = null;
       if (!configuredSet.has('docker')) data.docker = [];
       if (!configuredSet.has('dockhand')) data.dockhand = null;
+      if (!configuredSet.has('firewall')) data.firewall = null;
+      if (!configuredSet.has('truenas')) data.truenas = null;
+      if (!configuredSet.has('qnap')) data.qnap = null;
+      if (!configuredSet.has('ugreen')) data.ugreen = null;
+      if (!configuredSet.has('pbs')) data.pbs = null;
+      if (!configuredSet.has('cloudflare')) data.cloudflare = null;
+      if (!configuredSet.has('cicd')) data.cicd = null;
+      if (!configuredSet.has('veeam')) data.veeam = null;
+      if (!configuredSet.has('portainer')) data.portainer = null;
       if (!configuredSet.has('database')) data.database = [];
-      ['kubernetes','healthchecks','uptimekuma','checks','prometheus','dockhand'].forEach(id => {
+      ['kubernetes','healthchecks','uptimekuma','checks','prometheus','dockhand','firewall','truenas','qnap','ugreen','pbs','cloudflare','cicd','veeam','portainer'].forEach(id => {
         if (configuredSet.has(id) && (!data[id] || settingsSectionChanged(window._settingsConfig || {}, payload, id))) previewConnectingPlatform(data, id, payload);
       });
       const dhInstances = Array.isArray(payload.dockhand?.instances) ? payload.dockhand.instances : (payload.dockhand?.url ? [payload.dockhand] : []);
@@ -1728,7 +2241,7 @@ function configBool(value, fallback = false) {
   if (['0', 'false', 'no', 'off'].includes(text)) return false;
   return fallback;
 }
-const PLATFORM_CONFIG_KEYS = ['proxmox','linux','kubernetes','snmp','healthchecks','uptimekuma','checks','prometheus','docker','dockhand','database'];
+const PLATFORM_CONFIG_KEYS = ['proxmox','linux','windows','kubernetes','snmp','healthchecks','uptimekuma','checks','prometheus','docker','dockhand','firewall','truenas','qnap','ugreen','pbs','cloudflare','cicd','veeam','portainer','database'];
 function hasPlatformConfig(cfg) {
   return !!(cfg && PLATFORM_CONFIG_KEYS.some(key => Object.prototype.hasOwnProperty.call(cfg, key)));
 }
@@ -1777,10 +2290,23 @@ function ruleDurationValue(rules, key, fallback = 60) {
 
 let hostClockTimer = null;
 let hostClockInfo = null;
+function settingsEmbedded() {
+  return window.self !== window.top;
+}
+function clearHostClockTimer() {
+  clearInterval(hostClockTimer);
+  hostClockTimer = null;
+}
+function hostClockRenderAllowed() {
+  return !settingsEmbedded() || activeSettingsSection === 'appearance';
+}
 function renderHostClock(info = hostClockInfo) {
   const el = document.getElementById('host-clock');
-  if (!el || !info?.serverTime) return;
   hostClockInfo = info;
+  if (!el || !info?.serverTime || !hostClockRenderAllowed()) {
+    clearHostClockTimer();
+    return;
+  }
   const tz = document.getElementById('cfg-timezone')?.value || info.timezone || 'UTC';
   const base = new Date(info.serverTime).getTime();
   const started = Date.now();
@@ -1792,12 +2318,13 @@ function renderHostClock(info = hostClockInfo) {
       el.textContent = 'Host time: ' + now.toLocaleString([], { hour12: false });
     }
   };
-  clearInterval(hostClockTimer);
+  clearHostClockTimer();
   tick();
-  hostClockTimer = setInterval(tick, 1000);
+  if (!settingsEmbedded()) hostClockTimer = setInterval(tick, 1000);
 }
 
 async function loadHostClock() {
+  if (!hostClockRenderAllowed()) return;
   try {
     const r = await fetch('/api/about', { headers: authHeaders(), cache: 'no-store' });
     if (r.ok) renderHostClock(await r.json());
@@ -1936,6 +2463,237 @@ function addDockhandInstance(data = {}) {
     </div>`;
   document.getElementById('dockhand-list').appendChild(item);
   if (data.token || data.apiToken || data.bearerToken) secVal(data.token || data.apiToken || data.bearerToken, item.querySelector('.dh-token'));
+}
+
+function addFirewallInstance(data = {}) {
+  const idx = firewallCount++;
+  const id = `firewall-${idx}`;
+  const item = document.createElement('div');
+  item.className = 'arr-item';
+  item.innerHTML = `
+    <div class="arr-hdr" onclick="toggleArr('${id}')">
+      <span class="arr-hdr-name">${escHtml(data.name || data.url || 'Firewall')}</span>
+      <button class="btn-rm" type="button" onclick="event.stopPropagation();this.closest('.arr-item').remove()">✕</button>
+    </div>
+    <div class="arr-body" id="ab-${id}">
+      <div class="form-grid">
+        <div class="form-group"><label>Name</label><input type="text" class="fw-name" value="${escHtml(data.name||'')}" placeholder="opnsense01" oninput="this.closest('.arr-item').querySelector('.arr-hdr-name').textContent=this.value||'Firewall'"></div>
+        <div class="form-group"><label>Type</label><select class="fw-type"><option value="opnsense" ${String(data.type||'opnsense').toLowerCase()!=='pfsense'?'selected':''}>OPNsense</option><option value="pfsense" ${String(data.type||'').toLowerCase()==='pfsense'?'selected':''}>pfSense compatible API</option></select></div>
+        <div class="form-group"><label>URL</label><input type="text" class="fw-url" value="${escHtml(data.url||'')}" placeholder="https://firewall.yourdomain.com"></div>
+        <div class="form-group"><label>API key / username</label><input type="text" class="fw-key" value="${escHtml(data.apiKey||data.username||'')}" placeholder="OPNsense API key"></div>
+        <div class="form-group"><label>API secret / password</label><input type="password" class="fw-secret" placeholder="leave blank to keep current secret"></div>
+        <div class="form-group"><label>TLS</label><select class="fw-insecure"><option value="false" ${!data.insecureTLS?'selected':''}>Verify certificate</option><option value="true" ${data.insecureTLS?'selected':''}>Allow self-signed</option></select></div>
+      </div>
+    </div>`;
+  document.getElementById('firewall-list').appendChild(item);
+  if (data.apiSecret || data.password) secVal(data.apiSecret || data.password, item.querySelector('.fw-secret'));
+}
+
+function addTrueNasInstance(data = {}) {
+  const idx = trueNasCount++;
+  const id = `truenas-${idx}`;
+  const mode = String(data.apiMode || data.mode || 'auto').toLowerCase();
+  const item = document.createElement('div');
+  item.className = 'arr-item';
+  item.innerHTML = `
+    <div class="arr-hdr" onclick="toggleArr('${id}')">
+      <span class="arr-hdr-name">${escHtml(data.name || data.url || 'TrueNAS')}</span>
+      <button class="btn-rm" type="button" onclick="event.stopPropagation();this.closest('.arr-item').remove()">x</button>
+    </div>
+    <div class="arr-body" id="ab-${id}">
+      <div class="form-grid">
+        <div class="form-group"><label>Name</label><input type="text" class="tn-name" value="${escHtml(data.name||'')}" placeholder="truenas01" oninput="this.closest('.arr-item').querySelector('.arr-hdr-name').textContent=this.value||'TrueNAS'"></div>
+        <div class="form-group"><label>API mode</label><select class="tn-mode">
+          <option value="auto" ${mode==='auto'?'selected':''}>Auto</option>
+          <option value="websocket" ${['websocket','ws','jsonrpc'].includes(mode)?'selected':''}>WebSocket JSON-RPC</option>
+          <option value="rest" ${mode==='rest'?'selected':''}>REST v2.0</option>
+        </select></div>
+        <div class="form-group"><label>URL</label><input type="text" class="tn-url" value="${escHtml(data.url||'')}" placeholder="https://truenas.yourdomain.com"></div>
+        <div class="form-group"><label>Username</label><input type="text" class="tn-user" value="${escHtml(data.username||data.user||'')}" placeholder="root or service account"></div>
+        <div class="form-group"><label>API key</label><input type="password" class="tn-key" placeholder="leave blank to keep current API key"></div>
+        <div class="form-group"><label>Password (optional)</label><input type="password" class="tn-password" placeholder="optional fallback"></div>
+        <div class="form-group"><label>TLS</label><select class="tn-insecure"><option value="false" ${!data.insecureTLS?'selected':''}>Verify certificate</option><option value="true" ${data.insecureTLS?'selected':''}>Allow self-signed</option></select></div>
+      </div>
+    </div>`;
+  document.getElementById('truenas-list').appendChild(item);
+  if (data.apiKey || data.apiToken || data.token || data.bearerToken) secVal(data.apiKey || data.apiToken || data.token || data.bearerToken, item.querySelector('.tn-key'));
+  if (data.password) secVal(data.password, item.querySelector('.tn-password'));
+}
+
+function addQnapInstance(data = {}) {
+  const idx = qnapCount++;
+  const id = `qnap-${idx}`;
+  const item = document.createElement('div');
+  item.className = 'arr-item';
+  item.innerHTML = `
+    <div class="arr-hdr" onclick="toggleArr('${id}')">
+      <span class="arr-hdr-name">${escHtml(data.name || data.url || 'QNAP')}</span>
+      <button class="btn-rm" type="button" onclick="event.stopPropagation();this.closest('.arr-item').remove()">x</button>
+    </div>
+    <div class="arr-body" id="ab-${id}">
+      <div class="form-grid">
+        <div class="form-group"><label>Name</label><input type="text" class="qnap-name" value="${escHtml(data.name||'')}" placeholder="qnap01" oninput="this.closest('.arr-item').querySelector('.arr-hdr-name').textContent=this.value||'QNAP'"></div>
+        <div class="form-group"><label>URL</label><input type="text" class="qnap-url" value="${escHtml(data.url||'')}" placeholder="https://qnap.yourdomain.com:8080"></div>
+        <div class="form-group"><label>Username</label><input type="text" class="qnap-user" value="${escHtml(data.username||data.user||'')}" placeholder="monitoring user"></div>
+        <div class="form-group"><label>Password</label><input type="password" class="qnap-password" placeholder="leave blank to keep current password"></div>
+        <div class="form-group"><label>SID / token (optional)</label><input type="password" class="qnap-sid" placeholder="optional existing SID"></div>
+        <div class="form-group"><label>TLS</label><select class="qnap-insecure"><option value="false" ${!data.insecureTLS?'selected':''}>Verify certificate</option><option value="true" ${data.insecureTLS?'selected':''}>Allow self-signed</option></select></div>
+      </div>
+    </div>`;
+  document.getElementById('qnap-list').appendChild(item);
+  if (data.password) secVal(data.password, item.querySelector('.qnap-password'));
+  if (data.sid || data.qsid || data.token) secVal(data.sid || data.qsid || data.token, item.querySelector('.qnap-sid'));
+}
+
+function addUgreenInstance(data = {}) {
+  const idx = ugreenCount++;
+  const id = `ugreen-${idx}`;
+  const item = document.createElement('div');
+  item.className = 'arr-item';
+  item.innerHTML = `
+    <div class="arr-hdr" onclick="toggleArr('${id}')">
+      <span class="arr-hdr-name">${escHtml(data.name || data.url || 'Ugreen')}</span>
+      <button class="btn-rm" type="button" onclick="event.stopPropagation();this.closest('.arr-item').remove()">x</button>
+    </div>
+    <div class="arr-body" id="ab-${id}">
+      <div class="form-grid">
+        <div class="form-group"><label>Name</label><input type="text" class="ugreen-name" value="${escHtml(data.name||'')}" placeholder="ugreen01" oninput="this.closest('.arr-item').querySelector('.arr-hdr-name').textContent=this.value||'Ugreen'"></div>
+        <div class="form-group"><label>URL</label><input type="text" class="ugreen-url" value="${escHtml(data.url||'')}" placeholder="https://ugreen.yourdomain.com"></div>
+        <div class="form-group"><label>TLS</label><select class="ugreen-insecure"><option value="false" ${!data.insecureTLS?'selected':''}>Verify certificate</option><option value="true" ${data.insecureTLS?'selected':''}>Allow self-signed</option></select></div>
+      </div>
+    </div>`;
+  document.getElementById('ugreen-list').appendChild(item);
+}
+
+function addPbsInstance(data = {}) {
+  const idx = pbsCount++;
+  const id = `pbs-${idx}`;
+  const item = document.createElement('div');
+  item.className = 'arr-item';
+  item.innerHTML = `
+    <div class="arr-hdr" onclick="toggleArr('${id}')">
+      <span class="arr-hdr-name">${escHtml(data.name || data.url || 'Proxmox Backup')}</span>
+      <button class="btn-rm" type="button" onclick="event.stopPropagation();this.closest('.arr-item').remove()">x</button>
+    </div>
+    <div class="arr-body" id="ab-${id}">
+      <div class="form-grid">
+        <div class="form-group"><label>Name</label><input type="text" class="pbs-name" value="${escHtml(data.name||'')}" placeholder="pbs01" oninput="this.closest('.arr-item').querySelector('.arr-hdr-name').textContent=this.value||'Proxmox Backup'"></div>
+        <div class="form-group"><label>URL</label><input type="text" class="pbs-url" value="${escHtml(data.url||'')}" placeholder="https://pbs.yourdomain.com:8007"></div>
+        <div class="form-group"><label>Token ID</label><input type="text" class="pbs-token-id" value="${escHtml(data.tokenId||data.apiKey||'')}" placeholder="root@pam!monitoring"></div>
+        <div class="form-group"><label>Token secret</label><input type="password" class="pbs-token-secret" placeholder="leave blank to keep current secret"></div>
+        <div class="form-group"><label>TLS</label><select class="pbs-insecure"><option value="false" ${!data.insecureTLS?'selected':''}>Verify certificate</option><option value="true" ${data.insecureTLS?'selected':''}>Allow self-signed</option></select></div>
+      </div>
+    </div>`;
+  document.getElementById('pbs-list').appendChild(item);
+  if (data.tokenSecret || data.apiSecret || data.secret) secVal(data.tokenSecret || data.apiSecret || data.secret, item.querySelector('.pbs-token-secret'));
+}
+
+function addCiProject(data = {}) {
+  const idx = cicdCount++;
+  const id = `cicd-${idx}`;
+  const provider = (data.provider || data.type || 'github').toLowerCase();
+  const item = document.createElement('div');
+  item.className = `arr-item ci-card ${provider === 'gitlab' ? 'gitlab' : 'github'}`;
+  item.innerHTML = `
+    <div class="arr-hdr">
+      <span class="ci-provider-badge ${provider === 'gitlab' ? 'gitlab' : 'github'}">${provider === 'gitlab' ? 'GitLab' : 'GitHub'}</span>
+      <span class="arr-hdr-name">${escHtml(data.name||data.repo||data.projectId||data.project||data.projectPath||(provider === 'gitlab' ? 'GitLab Project' : 'GitHub Repo'))}</span>
+      <button class="btn-rm" type="button" onclick="this.closest('.arr-item').remove()">x</button>
+    </div>
+    <div class="arr-body ci-body">
+      <input type="hidden" class="ci-provider" value="${provider === 'gitlab' ? 'gitlab' : 'github'}">
+      <div class="ci-help">${provider === 'gitlab' ? 'GitLab pipelines are read from a project path or numeric project ID.' : 'GitHub Actions runs are read from a repository in owner/repo format.'}</div>
+      <div class="ci-grid">
+        <div class="form-group"><label>Name</label><input type="text" class="ci-name" value="${escHtml(data.name||'')}" placeholder="${provider === 'gitlab' ? 'gitlab-app' : 'github-app'}" oninput="updateCiHeader(this)"></div>
+        <div class="form-group ci-provider-field ci-github-field"><label>GitHub repo <span class="req">*</span></label><input type="text" class="ci-repo" value="${escHtml(data.repo||data.repository||'')}" placeholder="owner/repo" required oninput="clearCiValidation(this);updateCiHeader(this)"><div class="field-error">GitHub repo is required</div></div>
+        <div class="form-group ci-provider-field ci-gitlab-field"><label>GitLab project <span class="req">*</span></label><input type="text" class="ci-project" value="${escHtml(data.projectId||data.project||data.projectPath||'')}" placeholder="group/project or numeric id" required oninput="clearCiValidation(this);updateCiHeader(this)"><div class="field-error">GitLab project is required</div></div>
+        <div class="form-group"><label>Branch/ref</label><input type="text" class="ci-branch" value="${escHtml(data.branch||data.ref||'')}" placeholder="main"></div>
+        <div class="form-group ci-provider-field ci-gitlab-field"><label>GitLab base URL</label><input type="text" class="ci-base-url" value="${escHtml(data.baseUrl||'')}" placeholder="https://gitlab.com"></div>
+        <div class="form-group ci-provider-field ci-gitlab-field"><label>Jobs</label><select class="ci-jobs"><option value="true" ${data.includeJobs!==false?'selected':''}>Include jobs</option><option value="false" ${data.includeJobs===false?'selected':''}>Pipelines only</option></select></div>
+        <div class="form-group ci-token-field"><label>Token</label><input type="password" class="ci-token" placeholder="leave blank to keep current token"></div>
+      </div>
+    </div>`;
+  document.getElementById('cicd-list').appendChild(item);
+  if (data.token || data.apiToken || data.accessToken || data.bearerToken) secVal(data.token || data.apiToken || data.accessToken || data.bearerToken, item.querySelector('.ci-token'));
+}
+
+function updateCiHeader(el) {
+  const item = el?.closest?.('.arr-item');
+  if (!item) return;
+  const provider = item.querySelector('.ci-provider')?.value || 'github';
+  const name = item.querySelector('.ci-name')?.value.trim();
+  const repo = item.querySelector('.ci-repo')?.value.trim();
+  const project = item.querySelector('.ci-project')?.value.trim();
+  const title = name || (provider === 'gitlab' ? project : repo) || (provider === 'gitlab' ? 'GitLab Project' : 'GitHub Repo');
+  item.querySelector('.arr-hdr-name').textContent = title;
+}
+
+function clearCiValidation(el) {
+  el?.closest?.('.form-group')?.classList.remove('required-missing');
+}
+
+function validateCiProjects({ focus = true } = {}) {
+  let firstMissing = null;
+  document.querySelectorAll('#cicd-list .arr-item').forEach(item => {
+    const provider = item.querySelector('.ci-provider')?.value || 'github';
+    const requiredInput = provider === 'gitlab' ? item.querySelector('.ci-project') : item.querySelector('.ci-repo');
+    const missing = !String(requiredInput?.value || '').trim();
+    requiredInput?.closest('.form-group')?.classList.toggle('required-missing', missing);
+    if (missing && !firstMissing) firstMissing = requiredInput;
+  });
+  if (focus && firstMissing) {
+    showSettingsSection('cicd');
+    setTimeout(() => firstMissing.focus(), 0);
+  }
+  return !firstMissing;
+}
+
+function addVeeamInstance(data = {}) {
+  const idx = veeamCount++;
+  const id = `veeam-${idx}`;
+  const item = document.createElement('div');
+  item.className = 'arr-item';
+  item.innerHTML = `
+    <div class="arr-hdr" onclick="toggleArr('${id}')">
+      <span class="arr-hdr-name">${escHtml(data.name || data.url || 'Veeam')}</span>
+      <button class="btn-rm" type="button" onclick="event.stopPropagation();this.closest('.arr-item').remove()">x</button>
+    </div>
+    <div class="arr-body" id="ab-${id}">
+      <div class="form-grid">
+        <div class="form-group"><label>Name</label><input type="text" class="veeam-name" value="${escHtml(data.name||'')}" placeholder="vbr01" oninput="this.closest('.arr-item').querySelector('.arr-hdr-name').textContent=this.value||'Veeam'"></div>
+        <div class="form-group"><label>URL</label><input type="text" class="veeam-url" value="${escHtml(data.url||'')}" placeholder="https://veeam.yourdomain.com:9419"></div>
+        <div class="form-group"><label>Username</label><input type="text" class="veeam-user" value="${escHtml(data.username||data.user||'')}" placeholder="DOMAIN\\user"></div>
+        <div class="form-group"><label>Password</label><input type="password" class="veeam-password" placeholder="leave blank to keep current password"></div>
+        <div class="form-group"><label>Access token (optional)</label><input type="password" class="veeam-token" placeholder="optional bearer token"></div>
+        <div class="form-group"><label>API revision</label><input type="text" class="veeam-api-version" value="${escHtml(data.apiVersion||'1.3-rev1')}" placeholder="1.3-rev1"></div>
+        <div class="form-group"><label>TLS</label><select class="veeam-insecure"><option value="false" ${!data.insecureTLS?'selected':''}>Verify certificate</option><option value="true" ${data.insecureTLS?'selected':''}>Allow self-signed</option></select></div>
+      </div>
+    </div>`;
+  document.getElementById('veeam-list').appendChild(item);
+  if (data.password) secVal(data.password, item.querySelector('.veeam-password'));
+  if (data.accessToken || data.token || data.bearerToken) secVal(data.accessToken || data.token || data.bearerToken, item.querySelector('.veeam-token'));
+}
+
+function addPortainerInstance(data = {}) {
+  const idx = portainerCount++;
+  const id = `portainer-${idx}`;
+  const item = document.createElement('div');
+  item.className = 'arr-item';
+  item.innerHTML = `
+    <div class="arr-hdr" onclick="toggleArr('${id}')">
+      <span class="arr-hdr-name">${escHtml(data.name || data.url || 'Portainer')}</span>
+      <button class="btn-rm" type="button" onclick="event.stopPropagation();this.closest('.arr-item').remove()">x</button>
+    </div>
+    <div class="arr-body" id="ab-${id}">
+      <div class="form-grid">
+        <div class="form-group"><label>Name</label><input type="text" class="pt-name" value="${escHtml(data.name||'')}" placeholder="portainer01" oninput="this.closest('.arr-item').querySelector('.arr-hdr-name').textContent=this.value||'Portainer'"></div>
+        <div class="form-group"><label>URL</label><input type="text" class="pt-url" value="${escHtml(data.url||'')}" placeholder="https://portainer.yourdomain.com:9443"></div>
+        <div class="form-group"><label>Access token</label><input type="password" class="pt-token" placeholder="leave blank to keep current token"></div>
+        <div class="form-group"><label>TLS</label><select class="pt-insecure"><option value="false" ${!data.insecureTLS?'selected':''}>Verify certificate</option><option value="true" ${data.insecureTLS?'selected':''}>Allow self-signed</option></select></div>
+      </div>
+    </div>`;
+  document.getElementById('portainer-list').appendChild(item);
+  if (data.apiKey || data.accessToken || data.token) secVal(data.apiKey || data.accessToken || data.token, item.querySelector('.pt-token'));
 }
 
 function addServiceCheck(data = {}) {
@@ -2295,8 +3053,38 @@ async function genAgentToken(btn, silent) {
   finally { if (btn) btn.disabled = false; }
 }
 
+function isMaskedSecretValue(value) {
+  return value === '__set__' || value === '__encrypted__';
+}
+
+async function getAgentInstallToken() {
+  const input = document.getElementById('lx-token');
+  const current = input.value.trim();
+  if (current && !isMaskedSecretValue(current)) return current;
+  try {
+    const r = await fetch('/api/agent/token', { headers: authHeaders(), cache: 'no-store' });
+    const b = await r.json().catch(() => ({}));
+    if (r.ok && b.token) {
+      input.value = b.token;
+      document.getElementById('en-linux').checked = true;
+      return b.token;
+    }
+    if (r.status !== 404) throw new Error(b.error || r.statusText);
+  } catch (e) {
+    toast(e.message || 'Could not read agent token', 'err');
+    return null;
+  }
+  return genAgentToken(null, true);
+}
+
+async function copyAgentToken(btn) {
+  const token = await getAgentInstallToken();
+  if (token) copyToClip(token, btn);
+}
+
 const AM_META = {
   linux:   { title: 'Add System',  desc: 'Works on any systemd Linux: bare-metal/VM servers, NAS and other Linux devices. The agent pushes metrics + services; no inbound access to the server is needed.' },
+  windows: { title: 'Add Windows Host', desc: 'Run the PowerShell command in an elevated PowerShell window. The agent pushes CPU, RAM, disk, network and Windows service status with no inbound access to the server.' },
   proxmox: { title: 'Add Proxmox Node', desc: 'Run the command on a Proxmox VE node (as root). The agent uses pvesh locally to report VMs/LXC, storage, backups and Ceph — no API token needed. Repeat on every node of the cluster.' },
   docker:  { title: 'Add Docker Host', desc: 'The agent reports containers, unused images and host metrics, and runs logs/prune commands locally. Pick Binary for a normal install or Docker to run the agent itself in a container.' },
 };
@@ -2308,9 +3096,10 @@ let amKnownIds = new Map();
 let amOpenedAt = 0;
 
 function agentCmds() {
-  const token = document.getElementById('lx-token').value.trim() || '<token>';
+  const rawToken = document.getElementById('lx-token').value.trim();
+  const token = rawToken && !isMaskedSecretValue(rawToken) ? rawToken : '<token>';
   const base = window.location.origin;
-  const role = amKind === 'docker' ? 'docker' : amKind === 'proxmox' ? 'proxmox' : 'linux';
+  const role = amKind === 'docker' ? 'docker' : amKind === 'proxmox' ? 'proxmox' : amKind === 'windows' ? 'windows' : 'linux';
   const insecure = !!document.getElementById('am-insecure')?.checked;
   const curlTLS = insecure ? ' --insecure' : '';
   const envTLS = insecure ? ' OMNISIGHT_INSECURE_TLS=1' : '';
@@ -2319,9 +3108,14 @@ function agentCmds() {
   const stackEnvTLS = insecure ? '      OMNISIGHT_INSECURE_TLS: "1"\n' : '';
   const synology = amKind === 'docker' && !!document.getElementById('am-synology')?.checked;
   const dockerBin = synology ? 'sudo /usr/local/bin/docker' : 'docker';
+  const psTLS = insecure ? '; $env:OMNISIGHT_INSECURE_TLS="1"' : '';
   return {
-    binary: `curl -fsSL${curlTLS} ${base}/agent/install.sh | sudo OMNISIGHT_URL=${base} OMNISIGHT_TOKEN=${token} OMNISIGHT_AGENT_ROLE=${role}${envTLS} bash`,
-    uninstall: `curl -fsSL${curlTLS} ${base}/agent/install.sh | sudo${sudoTLS} bash -s uninstall`,
+    binary: amKind === 'windows'
+      ? `$env:OMNISIGHT_URL="${base}"; $env:OMNISIGHT_TOKEN="${token}"; $env:OMNISIGHT_AGENT_ROLE="windows"${psTLS}; iwr -UseBasicParsing "${base}/agent/install-windows.ps1" | iex`
+      : `curl -fsSL${curlTLS} ${base}/agent/install.sh | sudo OMNISIGHT_URL=${base} OMNISIGHT_TOKEN=${token} OMNISIGHT_AGENT_ROLE=${role}${envTLS} bash`,
+    uninstall: amKind === 'windows'
+      ? `iwr -UseBasicParsing "${base}/agent/install-windows.ps1" | iex; Uninstall-OmniSightAgent`
+      : `curl -fsSL${curlTLS} ${base}/agent/install.sh | sudo${sudoTLS} bash -s uninstall`,
     docker: `${dockerBin} run -d --name omnisight-agent --restart unless-stopped \\
   --network host --pid host \\
   -e OMNISIGHT_URL=${base} \\
@@ -2377,10 +3171,8 @@ async function registerPendingAgent(kind) {
 }
 
 async function openAddModal(kind) {
-  if (!document.getElementById('lx-token').value.trim()) {
-    const t = await genAgentToken(null, true);
-    if (!t) return;
-  }
+  const t = await getAgentInstallToken();
+  if (!t) return;
   const m = AM_META[kind] || AM_META.linux;
   amKind = kind;
   const synRow = document.getElementById('am-synology-row');
@@ -2390,7 +3182,7 @@ async function openAddModal(kind) {
   refreshAgentCmds();
   document.querySelectorAll('.am-base').forEach(el => el.textContent = window.location.origin);
   setAddTab(kind === 'docker' ? 'docker' : 'binary');
-  document.getElementById('en-' + (kind === 'proxmox' ? 'proxmox' : kind === 'docker' ? 'docker' : 'linux')).checked = true;
+  document.getElementById('en-' + (kind === 'proxmox' ? 'proxmox' : kind === 'docker' ? 'docker' : kind === 'windows' ? 'windows' : 'linux')).checked = true;
   document.getElementById('agent-modal').classList.add('open');
   await registerPendingAgent(kind);
   amOpenedAt = Date.now();
@@ -2422,10 +3214,14 @@ function closeAddModal() {
 }
 
 function setAddTab(t) {
+  if (amKind === 'windows') t = 'binary';
   amTab = t;
   document.getElementById('atab-binary').classList.toggle('active', t === 'binary');
   document.getElementById('atab-docker').classList.toggle('active', t === 'docker');
   document.getElementById('atab-stack').classList.toggle('active', t === 'stack');
+  document.getElementById('atab-binary').textContent = amKind === 'windows' ? 'PowerShell' : 'Binary (systemd)';
+  document.getElementById('atab-docker').style.display = amKind === 'windows' ? 'none' : '';
+  document.getElementById('atab-stack').style.display = amKind === 'windows' ? 'none' : '';
   document.getElementById('am-binary').style.display = t === 'binary' ? '' : 'none';
   document.getElementById('am-docker').style.display = t === 'docker' ? '' : 'none';
   document.getElementById('am-stack').style.display = t === 'stack' ? '' : 'none';
@@ -2491,7 +3287,7 @@ function configuredDockerKeys() {
 }
 
 async function loadAgents() {
-  if (embedPaused) return;
+  if (!settingsAgentsRefreshAllowed()) return;
   if (settingsAgentsRequest) return settingsAgentsRequest;
   if (Date.now() - settingsAgentsLast < 5000 && window._agentData?.length) return;
   settingsAgentsRequest = (async () => {
@@ -2520,14 +3316,24 @@ function applySettingsAgents(all) {
     });
   window._agentData = visible;
   renderAgentList('lx-agents', visible.filter(a => a.kind === 'linux'), 'No systems yet — click “+ Add System”, run the command on a server and it appears here automatically.');
+  renderAgentList('win-agents', visible.filter(a => a.kind === 'windows'), 'No hosts yet - click "+ Add Windows Host", run the PowerShell command and it appears here automatically.');
   renderAgentList('px-agents', visible.filter(a => a.kind === 'proxmox'), 'No nodes yet — click “+ Add Node”, run the command on a Proxmox node and it appears here automatically.');
   renderAgentList('dk-agents', visible.filter(a => a.kind === 'docker'), 'No hosts yet — click “+ Add Host”, run the command on a Docker host and it appears here automatically.');
+}
+
+function refreshWindowsDotFromAgents() {
+  refreshWindowsDot(window._settingsConfig || {}, readSessionCache(SETTINGS_STATUS_CACHE_KEY, 5 * 60 * 1000) || {});
+  syncSettingsNavDots();
 }
 
 function renderAgentList(elId, list, emptyMsg) {
   const el = document.getElementById(elId);
   if (!el) return;
-  if (!list.length) { setStableHtml(el, `empty:${emptyMsg}`, `<div class="sys-empty">${emptyMsg}</div>`); return; }
+  if (!list.length) {
+    setStableHtml(el, `empty:${emptyMsg}`, `<div class="sys-empty">${emptyMsg}</div>`);
+    refreshWindowsDotFromAgents();
+    return;
+  }
   const signature = JSON.stringify(list.map(a => [a.id, a.name, a.ip, a.os, a.meta, a.platform, a.connecting, a.online]));
   const html = list.map(a => `
     <div class="agent-row">
@@ -2539,6 +3345,7 @@ function renderAgentList(elId, list, emptyMsg) {
       <button class="btn-rm" type="button" title="Remove" onclick="removeAgent('${escHtml(a.id || '')}',this)">✕</button>
     </div>`).join('');
   setStableHtml(el, signature, html);
+  refreshWindowsDotFromAgents();
 }
 
 async function removeAgent(id, btn) {
@@ -2561,7 +3368,8 @@ function addSynDevice(data = {}) {
   const idx = sCount++;
   const id = `syn-${idx}`;
   const ver = data.snmpVersion === 3 ? '3' : '2c';
-  const profile = data.profile || data.preset || 'generic';
+  const rawProfile = data.profile || data.preset || 'generic';
+  const profile = rawProfile === 'linux' ? 'generic' : rawProfile;
   const el = document.createElement('div');
   el.className = 'arr-item';
   el.id = id;
@@ -2592,7 +3400,6 @@ function addSynDevice(data = {}) {
           <option value="synology" ${profile==='synology'?'selected':''}>Synology</option>
           <option value="mikrotik" ${profile==='mikrotik'?'selected':''}>MikroTik</option>
           <option value="unifi" ${profile==='unifi'?'selected':''}>UniFi</option>
-          <option value="linux" ${profile==='linux'?'selected':''}>Linux SNMP</option>
         </select>
       </div>
       <div class="form-group">
@@ -2647,7 +3454,7 @@ function addSynDevice(data = {}) {
 }
 
 function profileLabel(profile) {
-  const labels = { generic: 'Generic', synology: 'Synology', mikrotik: 'MikroTik', unifi: 'UniFi', linux: 'Linux' };
+  const labels = { generic: 'Generic', synology: 'Synology', mikrotik: 'MikroTik', unifi: 'UniFi' };
   return labels[profile] || labels.generic;
 }
 
@@ -2798,6 +3605,14 @@ const DYNAMIC_CONFIG_LIST_IDS = [
   'docker-api-list',
   'docker-ssh-list',
   'dockhand-list',
+  'firewall-list',
+  'truenas-list',
+  'qnap-list',
+  'ugreen-list',
+  'pbs-list',
+  'cicd-list',
+  'veeam-list',
+  'portainer-list',
   'db-list',
 ];
 
@@ -2832,6 +3647,14 @@ function resetDynamicConfigLists() {
   pveSshCount = 0;
   promCount = 0;
   dockhandCount = 0;
+  firewallCount = 0;
+  trueNasCount = 0;
+  qnapCount = 0;
+  ugreenCount = 0;
+  pbsCount = 0;
+  cicdCount = 0;
+  veeamCount = 0;
+  portainerCount = 0;
   checkCount = 0;
 }
 
@@ -2905,6 +3728,11 @@ function populate(cfg) {
     document.getElementById('cb-linux').classList.remove('hidden');
     document.getElementById('icon-linux').value = cfg.linux.icon || '';
     if (cfg.linux.agentToken) document.getElementById('lx-token').value = cfg.linux.agentToken;
+  }
+  if (cfg.windows) {
+    document.getElementById('en-windows').checked = cfg.windows.enabled !== false;
+    document.getElementById('cb-windows').classList.remove('hidden');
+    document.getElementById('icon-windows').value = cfg.windows.icon || '';
   }
   if (cfg.kubernetes) {
     document.getElementById('en-kubernetes').checked = cfg.kubernetes.enabled !== false;
@@ -2983,6 +3811,130 @@ function populate(cfg) {
           insecureTLS: cfg.dockhand.insecureTLS,
         }] : []);
     uniqueConfigItems(instances, ['name', 'url']).forEach(addDockhandInstance);
+  }
+  if (cfg.firewall) {
+    document.getElementById('en-firewall').checked = cfg.firewall.enabled !== false;
+    document.getElementById('cb-firewall').classList.remove('hidden');
+    document.getElementById('icon-firewall').value = cfg.firewall.icon || '';
+    const instances = Array.isArray(cfg.firewall.instances) && cfg.firewall.instances.length
+      ? cfg.firewall.instances
+      : (cfg.firewall.url ? [{
+          name: cfg.firewall.name || 'Firewall',
+          type: cfg.firewall.type || 'opnsense',
+          url: cfg.firewall.url,
+          apiKey: cfg.firewall.apiKey || cfg.firewall.username,
+          apiSecret: cfg.firewall.apiSecret || cfg.firewall.password,
+          insecureTLS: cfg.firewall.insecureTLS,
+        }] : []);
+    uniqueConfigItems(instances, ['name', 'url']).forEach(addFirewallInstance);
+  }
+  if (cfg.truenas) {
+    document.getElementById('en-truenas').checked = cfg.truenas.enabled !== false;
+    document.getElementById('cb-truenas').classList.remove('hidden');
+    document.getElementById('icon-truenas').value = cfg.truenas.icon || '';
+    const instances = Array.isArray(cfg.truenas.instances) && cfg.truenas.instances.length
+      ? cfg.truenas.instances
+      : (cfg.truenas.url ? [{
+          name: cfg.truenas.name || 'TrueNAS',
+          url: cfg.truenas.url,
+          apiMode: cfg.truenas.apiMode || cfg.truenas.mode || 'auto',
+          username: cfg.truenas.username || cfg.truenas.user,
+          apiKey: cfg.truenas.apiKey || cfg.truenas.apiToken || cfg.truenas.token || cfg.truenas.bearerToken,
+          password: cfg.truenas.password,
+          insecureTLS: cfg.truenas.insecureTLS,
+        }] : []);
+    uniqueConfigItems(instances, ['name', 'url']).forEach(addTrueNasInstance);
+  }
+  if (cfg.qnap) {
+    document.getElementById('en-qnap').checked = cfg.qnap.enabled !== false;
+    document.getElementById('cb-qnap').classList.remove('hidden');
+    document.getElementById('icon-qnap').value = cfg.qnap.icon || '';
+    const instances = Array.isArray(cfg.qnap.instances) && cfg.qnap.instances.length
+      ? cfg.qnap.instances
+      : (cfg.qnap.url ? [{
+          name: cfg.qnap.name || 'QNAP',
+          url: cfg.qnap.url,
+          username: cfg.qnap.username || cfg.qnap.user,
+          password: cfg.qnap.password,
+          sid: cfg.qnap.sid || cfg.qnap.qsid || cfg.qnap.token,
+          insecureTLS: cfg.qnap.insecureTLS,
+        }] : []);
+    uniqueConfigItems(instances, ['name', 'url']).forEach(addQnapInstance);
+  }
+  if (cfg.ugreen) {
+    document.getElementById('en-ugreen').checked = cfg.ugreen.enabled !== false;
+    document.getElementById('cb-ugreen').classList.remove('hidden');
+    document.getElementById('icon-ugreen').value = cfg.ugreen.icon || '';
+    const instances = Array.isArray(cfg.ugreen.instances) && cfg.ugreen.instances.length
+      ? cfg.ugreen.instances
+      : (cfg.ugreen.url ? [{
+          name: cfg.ugreen.name || 'Ugreen',
+          url: cfg.ugreen.url,
+          insecureTLS: cfg.ugreen.insecureTLS,
+        }] : []);
+    uniqueConfigItems(instances, ['name', 'url']).forEach(addUgreenInstance);
+  }
+  if (cfg.pbs) {
+    document.getElementById('en-pbs').checked = cfg.pbs.enabled !== false;
+    document.getElementById('cb-pbs').classList.remove('hidden');
+    document.getElementById('icon-pbs').value = cfg.pbs.icon || '';
+    const instances = Array.isArray(cfg.pbs.instances) && cfg.pbs.instances.length
+      ? cfg.pbs.instances
+      : (cfg.pbs.url ? [{
+          name: cfg.pbs.name || 'Proxmox Backup',
+          url: cfg.pbs.url,
+          tokenId: cfg.pbs.tokenId || cfg.pbs.apiKey,
+          tokenSecret: cfg.pbs.tokenSecret || cfg.pbs.apiSecret || cfg.pbs.secret,
+          insecureTLS: cfg.pbs.insecureTLS,
+        }] : []);
+    uniqueConfigItems(instances, ['name', 'url']).forEach(addPbsInstance);
+  }
+  if (cfg.cloudflare) {
+    document.getElementById('en-cloudflare').checked = cfg.cloudflare.enabled !== false;
+    document.getElementById('cb-cloudflare').classList.remove('hidden');
+    document.getElementById('icon-cloudflare').value = cfg.cloudflare.icon || '';
+    secVal(cfg.cloudflare.apiToken || cfg.cloudflare.token || cfg.cloudflare.bearerToken, document.getElementById('cf-token'));
+    document.getElementById('cf-account-id').value = cfg.cloudflare.accountId || '';
+    document.getElementById('cf-zones').value = Array.isArray(cfg.cloudflare.zones) ? cfg.cloudflare.zones.join('\n') : (cfg.cloudflare.zone || '');
+    document.getElementById('cf-include-tunnels').checked = cfg.cloudflare.includeTunnels !== false;
+    document.getElementById('cf-include-domains').checked = cfg.cloudflare.includeRegistrarDomains !== false;
+  }
+  if (cfg.cicd) {
+    document.getElementById('en-cicd').checked = cfg.cicd.enabled !== false;
+    document.getElementById('cb-cicd').classList.remove('hidden');
+    document.getElementById('icon-cicd').value = cfg.cicd.icon || '';
+    uniqueConfigItems(cfg.cicd.projects || cfg.cicd.instances || [], ['provider', 'name', 'repo', 'projectId', 'project']).forEach(addCiProject);
+  }
+  if (cfg.veeam) {
+    document.getElementById('en-veeam').checked = cfg.veeam.enabled !== false;
+    document.getElementById('cb-veeam').classList.remove('hidden');
+    document.getElementById('icon-veeam').value = cfg.veeam.icon || '';
+    const instances = Array.isArray(cfg.veeam.instances) && cfg.veeam.instances.length
+      ? cfg.veeam.instances
+      : (cfg.veeam.url ? [{
+          name: cfg.veeam.name || 'Veeam',
+          url: cfg.veeam.url,
+          username: cfg.veeam.username || cfg.veeam.user,
+          password: cfg.veeam.password,
+          accessToken: cfg.veeam.accessToken || cfg.veeam.token || cfg.veeam.bearerToken,
+          apiVersion: cfg.veeam.apiVersion,
+          insecureTLS: cfg.veeam.insecureTLS,
+        }] : []);
+    uniqueConfigItems(instances, ['name', 'url']).forEach(addVeeamInstance);
+  }
+  if (cfg.portainer) {
+    document.getElementById('en-portainer').checked = cfg.portainer.enabled !== false;
+    document.getElementById('cb-portainer').classList.remove('hidden');
+    document.getElementById('icon-portainer').value = cfg.portainer.icon || '';
+    const instances = Array.isArray(cfg.portainer.instances) && cfg.portainer.instances.length
+      ? cfg.portainer.instances
+      : (cfg.portainer.url ? [{
+          name: cfg.portainer.name || 'Portainer',
+          url: cfg.portainer.url,
+          apiKey: cfg.portainer.apiKey || cfg.portainer.accessToken || cfg.portainer.token,
+          insecureTLS: cfg.portainer.insecureTLS,
+        }] : []);
+    uniqueConfigItems(instances, ['name', 'url']).forEach(addPortainerInstance);
   }
   if (cfg.database) {
     document.getElementById('en-database').checked = cfg.database.enabled !== false;
@@ -3127,6 +4079,12 @@ function collect() {
     const on = document.getElementById('en-linux').checked;
     const agentToken = document.getElementById('lx-token').value.trim();
     if (on || agentToken) cfg.linux = { enabled: on, agentToken: agentToken || undefined, icon: document.getElementById('icon-linux').value.trim() || undefined };
+  }
+
+  {
+    const on = document.getElementById('en-windows').checked;
+    const icon = document.getElementById('icon-windows').value.trim();
+    if (on || icon) cfg.windows = { enabled: on, icon: icon || undefined };
   }
 
   {
@@ -3304,6 +4262,224 @@ function collect() {
       enabled: on,
       instances: uniqueInstances,
       icon: document.getElementById('icon-dockhand').value.trim() || undefined,
+    };
+  }
+
+  {
+    const on = document.getElementById('en-firewall').checked;
+    const instances = [];
+    document.querySelectorAll('#firewall-list .arr-item').forEach(item => {
+      const url = item.querySelector('.fw-url').value.trim();
+      const name = item.querySelector('.fw-name').value.trim();
+      const apiKey = item.querySelector('.fw-key').value.trim();
+      const apiSecret = maskedVal(item.querySelector('.fw-secret'));
+      const type = item.querySelector('.fw-type').value || 'opnsense';
+      if (url || name) instances.push({
+        name: name || undefined,
+        type,
+        url: url || undefined,
+        apiKey: apiKey || undefined,
+        apiSecret: apiSecret || undefined,
+        insecureTLS: item.querySelector('.fw-insecure').value === 'true' || undefined,
+      });
+    });
+    const uniqueInstances = uniqueConfigItems(instances, ['name', 'url']);
+    if (on || uniqueInstances.length) cfg.firewall = {
+      enabled: on,
+      instances: uniqueInstances,
+      icon: document.getElementById('icon-firewall').value.trim() || undefined,
+    };
+  }
+
+  {
+    const on = document.getElementById('en-truenas').checked;
+    const instances = [];
+    document.querySelectorAll('#truenas-list .arr-item').forEach(item => {
+      const url = item.querySelector('.tn-url').value.trim();
+      const name = item.querySelector('.tn-name').value.trim();
+      const apiKey = maskedVal(item.querySelector('.tn-key'));
+      const password = maskedVal(item.querySelector('.tn-password'));
+      if (url || name) instances.push({
+        name: name || undefined,
+        url: url || undefined,
+        apiMode: item.querySelector('.tn-mode').value || 'auto',
+        username: item.querySelector('.tn-user').value.trim() || undefined,
+        apiKey: apiKey || undefined,
+        password: password || undefined,
+        insecureTLS: item.querySelector('.tn-insecure').value === 'true' || undefined,
+      });
+    });
+    const uniqueInstances = uniqueConfigItems(instances, ['name', 'url']);
+    if (on || uniqueInstances.length) cfg.truenas = {
+      enabled: on,
+      instances: uniqueInstances,
+      icon: document.getElementById('icon-truenas').value.trim() || undefined,
+    };
+  }
+
+  {
+    const on = document.getElementById('en-qnap').checked;
+    const instances = [];
+    document.querySelectorAll('#qnap-list .arr-item').forEach(item => {
+      const url = item.querySelector('.qnap-url').value.trim();
+      const name = item.querySelector('.qnap-name').value.trim();
+      const password = maskedVal(item.querySelector('.qnap-password'));
+      const sid = maskedVal(item.querySelector('.qnap-sid'));
+      if (url || name) instances.push({
+        name: name || undefined,
+        url: url || undefined,
+        username: item.querySelector('.qnap-user').value.trim() || undefined,
+        password: password || undefined,
+        sid: sid || undefined,
+        insecureTLS: item.querySelector('.qnap-insecure').value === 'true' || undefined,
+      });
+    });
+    const uniqueInstances = uniqueConfigItems(instances, ['name', 'url']);
+    if (on || uniqueInstances.length) cfg.qnap = {
+      enabled: on,
+      instances: uniqueInstances,
+      icon: document.getElementById('icon-qnap').value.trim() || undefined,
+    };
+  }
+
+  {
+    const on = document.getElementById('en-ugreen').checked;
+    const instances = [];
+    document.querySelectorAll('#ugreen-list .arr-item').forEach(item => {
+      const url = item.querySelector('.ugreen-url').value.trim();
+      const name = item.querySelector('.ugreen-name').value.trim();
+      if (url || name) instances.push({
+        name: name || undefined,
+        url: url || undefined,
+        insecureTLS: item.querySelector('.ugreen-insecure').value === 'true' || undefined,
+      });
+    });
+    const uniqueInstances = uniqueConfigItems(instances, ['name', 'url']);
+    if (on || uniqueInstances.length) cfg.ugreen = {
+      enabled: on,
+      instances: uniqueInstances,
+      icon: document.getElementById('icon-ugreen').value.trim() || undefined,
+    };
+  }
+
+  {
+    const on = document.getElementById('en-pbs').checked;
+    const instances = [];
+    document.querySelectorAll('#pbs-list .arr-item').forEach(item => {
+      const url = item.querySelector('.pbs-url').value.trim();
+      const name = item.querySelector('.pbs-name').value.trim();
+      const tokenId = item.querySelector('.pbs-token-id').value.trim();
+      const tokenSecret = maskedVal(item.querySelector('.pbs-token-secret'));
+      if (url || name) instances.push({
+        name: name || undefined,
+        url: url || undefined,
+        tokenId: tokenId || undefined,
+        tokenSecret: tokenSecret || undefined,
+        insecureTLS: item.querySelector('.pbs-insecure').value === 'true' || undefined,
+      });
+    });
+    const uniqueInstances = uniqueConfigItems(instances, ['name', 'url']);
+    if (on || uniqueInstances.length) cfg.pbs = {
+      enabled: on,
+      instances: uniqueInstances,
+      icon: document.getElementById('icon-pbs').value.trim() || undefined,
+    };
+  }
+
+  {
+    const on = document.getElementById('en-cloudflare').checked;
+    const apiToken = maskedVal(document.getElementById('cf-token'));
+    const accountId = document.getElementById('cf-account-id').value.trim();
+    const zones = document.getElementById('cf-zones').value
+      .split(/\r?\n|,/)
+      .map(v => v.trim())
+      .filter(Boolean);
+    const icon = document.getElementById('icon-cloudflare').value.trim();
+    if (on || apiToken || accountId || zones.length || icon) cfg.cloudflare = {
+      enabled: on,
+      apiToken: apiToken || undefined,
+      accountId: accountId || undefined,
+      zones: zones.length ? zones : undefined,
+      includeTunnels: document.getElementById('cf-include-tunnels').checked !== false,
+      includeRegistrarDomains: document.getElementById('cf-include-domains').checked !== false,
+      icon: icon || undefined,
+    };
+  }
+
+  {
+    const on = document.getElementById('en-cicd').checked;
+    const projects = [];
+    document.querySelectorAll('#cicd-list .arr-item').forEach(item => {
+      const provider = item.querySelector('.ci-provider').value || 'github';
+      const name = item.querySelector('.ci-name').value.trim();
+      const repo = item.querySelector('.ci-repo').value.trim();
+      const projectId = item.querySelector('.ci-project').value.trim();
+      const token = maskedVal(item.querySelector('.ci-token'));
+      const row = {
+        name: name || undefined,
+        provider,
+        repo: provider === 'github' ? (repo || undefined) : undefined,
+        projectId: provider === 'gitlab' ? (projectId || undefined) : undefined,
+        branch: item.querySelector('.ci-branch').value.trim() || undefined,
+        baseUrl: provider === 'gitlab' ? (item.querySelector('.ci-base-url').value.trim() || undefined) : undefined,
+        token: token || undefined,
+        includeJobs: item.querySelector('.ci-jobs').value !== 'false',
+      };
+      if (row.name || row.repo || row.projectId) projects.push(row);
+    });
+    const uniqueProjects = uniqueConfigItems(projects, ['provider', 'name', 'repo', 'projectId']);
+    if (on || uniqueProjects.length) cfg.cicd = {
+      enabled: on,
+      projects: uniqueProjects,
+      icon: document.getElementById('icon-cicd').value.trim() || undefined,
+    };
+  }
+
+  {
+    const on = document.getElementById('en-veeam').checked;
+    const instances = [];
+    document.querySelectorAll('#veeam-list .arr-item').forEach(item => {
+      const url = item.querySelector('.veeam-url').value.trim();
+      const name = item.querySelector('.veeam-name').value.trim();
+      const password = maskedVal(item.querySelector('.veeam-password'));
+      const accessToken = maskedVal(item.querySelector('.veeam-token'));
+      if (url || name) instances.push({
+        name: name || undefined,
+        url: url || undefined,
+        username: item.querySelector('.veeam-user').value.trim() || undefined,
+        password: password || undefined,
+        accessToken: accessToken || undefined,
+        apiVersion: item.querySelector('.veeam-api-version').value.trim() || undefined,
+        insecureTLS: item.querySelector('.veeam-insecure').value === 'true' || undefined,
+      });
+    });
+    const uniqueInstances = uniqueConfigItems(instances, ['name', 'url']);
+    if (on || uniqueInstances.length) cfg.veeam = {
+      enabled: on,
+      instances: uniqueInstances,
+      icon: document.getElementById('icon-veeam').value.trim() || undefined,
+    };
+  }
+
+  {
+    const on = document.getElementById('en-portainer').checked;
+    const instances = [];
+    document.querySelectorAll('#portainer-list .arr-item').forEach(item => {
+      const url = item.querySelector('.pt-url').value.trim();
+      const name = item.querySelector('.pt-name').value.trim();
+      const apiKey = maskedVal(item.querySelector('.pt-token'));
+      if (url || name) instances.push({
+        name: name || undefined,
+        url: url || undefined,
+        apiKey: apiKey || undefined,
+        insecureTLS: item.querySelector('.pt-insecure').value === 'true' || undefined,
+      });
+    });
+    const uniqueInstances = uniqueConfigItems(instances, ['name', 'url']);
+    if (on || uniqueInstances.length) cfg.portainer = {
+      enabled: on,
+      instances: uniqueInstances,
+      icon: document.getElementById('icon-portainer').value.trim() || undefined,
     };
   }
 
@@ -3555,6 +4731,7 @@ function previewUploadedIcon(targetId, path) {
   const map = {
     'icon-proxmox': 'proxmox',
     'icon-linux': 'linux',
+    'icon-windows': 'windows',
     'icon-kubernetes': 'kubernetes',
     'icon-synology': 'snmp',
     'icon-healthchecks': 'healthchecks',
@@ -3563,6 +4740,15 @@ function previewUploadedIcon(targetId, path) {
     'icon-prometheus': 'prometheus',
     'icon-docker': 'docker',
     'icon-dockhand': 'dockhand',
+    'icon-firewall': 'firewall',
+    'icon-truenas': 'truenas',
+    'icon-qnap': 'qnap',
+    'icon-ugreen': 'ugreen',
+    'icon-pbs': 'pbs',
+    'icon-cloudflare': 'cloudflare',
+    'icon-cicd': 'cicd',
+    'icon-veeam': 'veeam',
+    'icon-portainer': 'portainer',
     'icon-database': 'database',
   };
   const id = map[targetId];
@@ -3652,7 +4838,8 @@ function initNewUserValidation() {
   });
 }
 
-async function loadUsers() {
+async function loadUsers(opts = {}) {
+  if (settingsEmbedded() && opts.visibleOnly && activeSettingsSection !== 'users') return;
   const card = document.getElementById('card-users');
   const list = document.getElementById('users-list');
   if (!card || !list) return;
@@ -3858,6 +5045,7 @@ function fmtSessionTime(ms) {
 
 async function loadSessions() {
   if (embedPaused) return;
+  if (!settingsSessionsRefreshAllowed()) return;
   const card = document.getElementById('card-sessions');
   const list = document.getElementById('sessions-list');
   if (!card || !list) return;
@@ -3959,6 +5147,7 @@ function currentCertificateRowsVisible() {
   return document.querySelectorAll('#cert-list .agent-row').length > 0;
 }
 async function loadCertificates(opts = {}) {
+  if (settingsEmbedded() && opts.visibleOnly && activeSettingsSection !== 'certificates') return;
   const el = document.getElementById('cert-list');
   if (!el) return;
   const force = !!opts.force;
@@ -4068,6 +5257,10 @@ async function saveConfig(opts = {}) {
     return;
   }
   const silent = !!opts.silent;
+  if (!validateCiProjects({ focus: !silent })) {
+    if (!silent) toast('Fill required GitHub/GitLab fields', 'err');
+    return;
+  }
   const btns = document.querySelectorAll('.btn-save');
   flushPendingTags();
   btns.forEach(b => b.disabled = true);
@@ -4108,7 +5301,11 @@ async function saveConfig(opts = {}) {
       if(p && p !== window && typeof p.render === 'function') {
         if (typeof p.clearOverviewCache === 'function') p.clearOverviewCache();
         if (body.fullData !== false) p.render(body.data);
-        else if (Array.isArray(body.data?.configured) && typeof p.applyConfigured === 'function') p.applyConfigured(body.data.configured, cfgPayload);
+        else {
+          if (Array.isArray(body.data?.configured) && typeof p.setConfiguredIds === 'function') p.setConfiguredIds(body.data.configured, { keepExistingOnEmpty: true });
+          if (typeof p.doRefresh === 'function') p.doRefresh();
+          else if (Array.isArray(body.data?.configured) && typeof p.applyConfigured === 'function') p.applyConfigured(body.data.configured, cfgPayload);
+        }
       }
     } catch(e){}
   } catch (e) {
@@ -4208,8 +5405,24 @@ function platformDot(configured, total, online, connecting) {
   if (total > 0 && online === 0) return 'bad';
   return online > 0 ? 'ok' : 'gray';
 }
+function refreshWindowsDot(cfg = {}, d = {}) {
+  const en=c=>!!(c && c.enabled!==false);
+  const windowsRows = d.windows || [];
+  const windowsAgents = (window._agentData || []).filter(a => a.kind === 'windows');
+  const winTotal = Math.max(windowsRows.length, windowsAgents.length);
+  const winOnline = Math.max(
+    windowsRows.filter(w => w.online).length,
+    windowsAgents.filter(a => a.online).length
+  );
+  const winConnecting = windowsRows.some(w => w._connecting) || windowsAgents.some(a => a.connecting);
+  setDot('dot-windows', platformDot(en(cfg.windows), winTotal, winOnline, winConnecting));
+}
 async function refreshDots(cfg, newData){
   if (embedPaused && !newData) return;
+  if (settingsRefreshHeld()) {
+    pendingDotsRefresh = { cfg, newData };
+    return;
+  }
   if (!newData && Date.now() - settingsDotsLast < 5000) return;
   if (!newData) settingsDotsLast = Date.now();
   try { if(!cfg){ cfg = window._settingsConfig || {}; if(!Object.keys(cfg).length) cfg = await fetchJson('/api/config', { headers: authHeaders() }, 3500); } } catch { cfg={}; }
@@ -4220,12 +5433,16 @@ async function refreshDots(cfg, newData){
   if(!newData){
     try { d = await fetchJson('/api/settings/status', { headers: authHeaders() }, 3500); } catch {}
   }
+  if (settingsRefreshHeld()) {
+    pendingDotsRefresh = { cfg, newData: d };
+    return;
+  }
   d = d || {};
   if (d && Object.keys(d).length) writeSessionCache(SETTINGS_STATUS_CACHE_KEY, d);
   const en=c=>!!(c && c.enabled!==false);
   const pxNodes = d.proxmox?.nodes || [];
   setDot('dot-proxmox', platformDot(en(cfg.proxmox), pxNodes.length, pxNodes.filter(n=>n.node?.online).length, !!d.proxmox?._connecting || pxNodes.some(n=>n._connecting)));
-  document.querySelectorAll('#px-ssh-list .arr-item').forEach(item => {
+  if (activeSettingsSection === 'proxmox') document.querySelectorAll('#px-ssh-list .arr-item').forEach(item => {
     const dot = item.querySelector('.pvessh-dot');
     if (!dot) return;
     const norm = v => String(v || '').trim().toLowerCase().replace(/^[a-z]+:\/\//, '').split('/')[0].replace(/:\d+$/, '');
@@ -4244,6 +5461,7 @@ async function refreshDots(cfg, newData){
   });
   const linuxRows = d.linux || [];
   setDot('dot-linux', platformDot(en(cfg.linux), linuxRows.length, linuxRows.filter(l=>l.online).length, linuxRows.some(l=>l._connecting)));
+  refreshWindowsDot(cfg, d);
   const kOnline = !!(d.kubernetes && d.kubernetes.online);
   setDot('dot-kubernetes', platformDot(en(cfg.kubernetes), d.kubernetes ? 1 : 0, kOnline ? 1 : 0, !!d.kubernetes?._connecting));
   const snmpRows = d.snmp || [];
@@ -4282,6 +5500,66 @@ async function refreshDots(cfg, newData){
     || (en(cfg.dockhand) && dhTotal > 0 && dhInstances.length < dhTotal)
     || (en(cfg.dockhand) && dhTotal > 0 && dhOnline === 0 && (d.loading || d.refreshing));
   setDot('dot-dockhand', platformDot(en(cfg.dockhand), dhTotal, dhOnline, dhConnecting));
+  const fwInstances = d.firewall?.instances || [];
+  const fwTotal = Math.max(fwInstances.length, cfg.firewall?.instances?.length || (cfg.firewall?.url ? 1 : 0));
+  const fwOnline = fwInstances.filter(i=>i.online).length;
+  const fwConnecting = !!d.firewall?._connecting || fwInstances.some(i=>i._connecting)
+    || (en(cfg.firewall) && fwTotal > 0 && fwInstances.length < fwTotal)
+    || (en(cfg.firewall) && fwTotal > 0 && fwOnline === 0 && (d.loading || d.refreshing));
+  setDot('dot-firewall', platformDot(en(cfg.firewall), fwTotal, fwOnline, fwConnecting));
+  const tnInstances = d.truenas?.instances || [];
+  const tnTotal = Math.max(tnInstances.length, cfg.truenas?.instances?.length || (cfg.truenas?.url ? 1 : 0));
+  const tnOnline = tnInstances.filter(i=>i.online).length;
+  const tnConnecting = !!d.truenas?._connecting || tnInstances.some(i=>i._connecting)
+    || (en(cfg.truenas) && tnTotal > 0 && tnInstances.length < tnTotal)
+    || (en(cfg.truenas) && tnTotal > 0 && tnOnline === 0 && (d.loading || d.refreshing));
+  setDot('dot-truenas', platformDot(en(cfg.truenas), tnTotal, tnOnline || (d.truenas?.online ? 1 : 0), tnConnecting));
+  const qnapInstances = d.qnap?.instances || [];
+  const qnapTotal = Math.max(qnapInstances.length, cfg.qnap?.instances?.length || (cfg.qnap?.url ? 1 : 0));
+  const qnapOnline = qnapInstances.filter(i=>i.online).length;
+  const qnapConnecting = !!d.qnap?._connecting || qnapInstances.some(i=>i._connecting)
+    || (en(cfg.qnap) && qnapTotal > 0 && qnapInstances.length < qnapTotal)
+    || (en(cfg.qnap) && qnapTotal > 0 && qnapOnline === 0 && (d.loading || d.refreshing));
+  setDot('dot-qnap', platformDot(en(cfg.qnap), qnapTotal, qnapOnline || (d.qnap?.online ? 1 : 0), qnapConnecting));
+  const ugreenInstances = d.ugreen?.instances || [];
+  const ugreenTotal = Math.max(ugreenInstances.length, cfg.ugreen?.instances?.length || (cfg.ugreen?.url ? 1 : 0));
+  const ugreenOnline = ugreenInstances.filter(i=>i.online).length;
+  const ugreenConnecting = !!d.ugreen?._connecting || ugreenInstances.some(i=>i._connecting)
+    || (en(cfg.ugreen) && ugreenTotal > 0 && ugreenInstances.length < ugreenTotal)
+    || (en(cfg.ugreen) && ugreenTotal > 0 && ugreenOnline === 0 && (d.loading || d.refreshing));
+  setDot('dot-ugreen', platformDot(en(cfg.ugreen), ugreenTotal, ugreenOnline || (d.ugreen?.online ? 1 : 0), ugreenConnecting));
+  const pbsInstances = d.pbs?.instances || [];
+  const pbsTotal = Math.max(pbsInstances.length, cfg.pbs?.instances?.length || (cfg.pbs?.url ? 1 : 0));
+  const pbsOnline = pbsInstances.filter(i=>i.online).length;
+  const pbsConnecting = !!d.pbs?._connecting || pbsInstances.some(i=>i._connecting)
+    || (en(cfg.pbs) && pbsTotal > 0 && pbsInstances.length < pbsTotal)
+    || (en(cfg.pbs) && pbsTotal > 0 && pbsOnline === 0 && (d.loading || d.refreshing));
+  setDot('dot-pbs', platformDot(en(cfg.pbs), pbsTotal, pbsOnline || (d.pbs?.online ? 1 : 0), pbsConnecting));
+  const cfConfigured = !!(cfg.cloudflare?.apiToken || cfg.cloudflare?.token || cfg.cloudflare?.bearerToken);
+  const cfOnline = d.cloudflare?.online ? 1 : 0;
+  const cfConnecting = !!d.cloudflare?._connecting || (en(cfg.cloudflare) && cfConfigured && !d.cloudflare && (d.loading || d.refreshing));
+  setDot('dot-cloudflare', platformDot(en(cfg.cloudflare), cfConfigured ? 1 : 0, cfOnline, cfConnecting));
+  const ciProjects = d.cicd?.projects || [];
+  const ciConfigured = (cfg.cicd?.projects || cfg.cicd?.instances || []).length || 0;
+  const ciOnline = ciProjects.filter(i=>i.online).length;
+  const ciConnecting = !!d.cicd?._connecting || ciProjects.some(i=>i._connecting)
+    || (en(cfg.cicd) && ciConfigured > 0 && ciProjects.length < ciConfigured)
+    || (en(cfg.cicd) && ciConfigured > 0 && ciOnline === 0 && (d.loading || d.refreshing));
+  setDot('dot-cicd', platformDot(en(cfg.cicd), Math.max(ciProjects.length, ciConfigured), ciOnline || (d.cicd?.online ? 1 : 0), ciConnecting));
+  const veeamInstances = d.veeam?.instances || [];
+  const veeamTotal = Math.max(veeamInstances.length, cfg.veeam?.instances?.length || (cfg.veeam?.url ? 1 : 0));
+  const veeamOnline = veeamInstances.filter(i=>i.online).length;
+  const veeamConnecting = !!d.veeam?._connecting || veeamInstances.some(i=>i._connecting)
+    || (en(cfg.veeam) && veeamTotal > 0 && veeamInstances.length < veeamTotal)
+    || (en(cfg.veeam) && veeamTotal > 0 && veeamOnline === 0 && (d.loading || d.refreshing));
+  setDot('dot-veeam', platformDot(en(cfg.veeam), veeamTotal, veeamOnline || (d.veeam?.online ? 1 : 0), veeamConnecting));
+  const ptInstances = d.portainer?.instances || [];
+  const ptTotal = Math.max(ptInstances.length, cfg.portainer?.instances?.length || (cfg.portainer?.url ? 1 : 0));
+  const ptOnline = ptInstances.filter(i=>i.online).length;
+  const ptConnecting = !!d.portainer?._connecting || ptInstances.some(i=>i._connecting)
+    || (en(cfg.portainer) && ptTotal > 0 && ptInstances.length < ptTotal)
+    || (en(cfg.portainer) && ptTotal > 0 && ptOnline === 0 && (d.loading || d.refreshing));
+  setDot('dot-portainer', platformDot(en(cfg.portainer), ptTotal, ptOnline || (d.portainer?.online ? 1 : 0), ptConnecting));
   const dbRows = d.database || [];
   const dbTotal = Math.max(dbRows.length, cfg.database?.instances?.length || 0);
   setDot('dot-database', platformDot(en(cfg.database), dbTotal, dbRows.filter(x=>x.online).length, dbRows.some(x=>x._connecting)));
@@ -4349,15 +5627,6 @@ refreshSettingsSectionVisibility();
       refreshDots(cfg);
       scheduleSettingsDotsPoll(7000);
       idleSettingsTask(loadHostClock, 1500);
-      idleSettingsTask(loadCertificates, 1800);
-      idleSettingsTask(loadAgents, 2200);
-      idleSettingsTask(loadUsers, 2600);
-      idleSettingsTask(() => {
-        loadSessions();
-        settingsSessionsLast = Date.now();
-        scheduleSettingsSessionsPoll(15000);
-      }, 3000);
-      scheduleSettingsAgentsPoll(10000);
     });
     document.getElementById('security-password-reset')?.addEventListener('change', () => saveConfig({ silent: true, skipUsers: true, reason: 'password-reset-toggle' }));
     document.getElementById('security-self-registration')?.addEventListener('change', () => saveConfig({ silent: true, skipUsers: true, reason: 'self-registration-toggle' }));

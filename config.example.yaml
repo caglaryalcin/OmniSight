@@ -25,17 +25,22 @@ security:
   redactIpAddresses: false
   allowedPublicIps: []
 
-# Linux servers, Proxmox nodes and Docker hosts are all monitored by the
-# OmniSight agent (push). Use Settings -> "+ Add System / Node / Host" to get
-# a copy-paste install command (Binary/systemd or Docker) with the token
+# Linux servers, Windows hosts, Proxmox nodes and Docker hosts are all monitored by the
+# OmniSight agent (push). Use Settings -> "+ Add System / Windows Host / Node / Host" to get
+# a copy-paste install command (Binary/systemd, PowerShell or Docker) with the token
 # pre-filled. Agents self-register; no per-server config is needed here.
 #   Binary:  curl -fsSL http://<host>:3000/agent/install.sh | \
 #              sudo OMNISIGHT_URL=http://<host>:3000 OMNISIGHT_TOKEN=<token> bash
+#   Windows: $env:OMNISIGHT_URL="http://<host>:3000"; $env:OMNISIGHT_TOKEN="<token>";
+#              iwr -UseBasicParsing "http://<host>:3000/agent/install-windows.ps1" | iex
 #   Self-signed HTTPS: add curl --insecure and OMNISIGHT_INSECURE_TLS=1.
 # The same shared token is used by every agent (linux.agentToken).
 linux:
   enabled: true
   agentToken: "generate-from-settings-ui"
+
+windows:
+  enabled: true
 
 # Proxmox data (VM/LXC, storage, backups, Ceph) is collected by the agent via
 # pvesh on each node - no API token needed. Just install the agent on the node.
@@ -52,7 +57,7 @@ snmp:
   devices:
     - name: "NAS-01"
       host: "192.168.1.5"
-      profile: "synology" # generic, synology, mikrotik, unifi, linux
+      profile: "synology" # generic, synology, mikrotik, unifi
       community: "CHANGE_ME"
 
 healthchecks:
@@ -100,6 +105,109 @@ dockhand:
   #     token: "dh_..."
   #     insecureTLS: false
 
+firewall:
+  enabled: false
+  # OPNsense uses API key/secret. pfSense requires a compatible REST API endpoint.
+  # instances:
+  #   - name: Gateway
+  #     type: opnsense
+  #     url: "https://opnsense.example.com"
+  #     apiKey: "${OPNSENSE_API_KEY:-}"
+  #     apiSecret: "${OPNSENSE_API_SECRET:-}"
+  #     insecureTLS: false
+
+truenas:
+  enabled: false
+  # TrueNAS 25.04+ uses WebSocket JSON-RPC; older CORE/SCALE REST v2.0 can be used
+  # by setting apiMode: rest, or leave apiMode: auto to try both safely.
+  # instances:
+  #   - name: Storage
+  #     url: "https://truenas.example.com"
+  #     apiMode: auto # auto, websocket, rest
+  #     username: "root"
+  #     apiKey: "${TRUENAS_API_KEY:-}"
+  #     insecureTLS: false
+
+qnap:
+  enabled: false
+  # QNAP QTS HTTP API authLogin.cgi + File Station SID check.
+  # instances:
+  #   - name: QNAP
+  #     url: "https://qnap.example.com:8080"
+  #     username: "monitoring"
+  #     password: "${QNAP_PASSWORD:-}"
+  #     # sid: "${QNAP_SID:-}" # optional existing SID instead of username/password
+  #     insecureTLS: false
+
+ugreen:
+  enabled: false
+  # UGREEN UGOS Pro does not publish a stable public monitoring API; OmniSight
+  # checks the configured web endpoint reachability.
+  # instances:
+  #   - name: Ugreen
+  #     url: "https://ugreen.example.com"
+  #     insecureTLS: false
+
+pbs:
+  enabled: false
+  # Proxmox Backup Server management API. Default PBS HTTPS port is 8007.
+  # instances:
+  #   - name: PBS
+  #     url: "https://pbs.example.com:8007"
+  #     tokenId: "root@pam!monitoring"
+  #     tokenSecret: "${PBS_TOKEN_SECRET:-}"
+  #     insecureTLS: false
+
+cloudflare:
+  enabled: false
+  # API token scoped to Zone Read. Add accountId to monitor Cloudflare Tunnels
+  # and Cloudflare Registrar domain expiration.
+  apiToken: "${CLOUDFLARE_API_TOKEN:-}"
+  accountId: ""
+  includeTunnels: true
+  includeRegistrarDomains: true
+  domainExpiryWarningDays: 30
+  # Optional zone names or IDs to limit collection.
+  # zones:
+  #   - example.com
+
+cicd:
+  enabled: false
+  # GitHub Actions and GitLab CI read-only monitoring.
+  # projects:
+  #   - name: OmniSight GitHub
+  #     provider: github
+  #     repo: "owner/repo"
+  #     branch: main
+  #     token: "${GITHUB_TOKEN:-}"
+  #   - name: OmniSight GitLab
+  #     provider: gitlab
+  #     baseUrl: "https://gitlab.com"
+  #     projectId: "group/project"
+  #     branch: main
+  #     token: "${GITLAB_TOKEN:-}"
+  #     includeJobs: true
+
+veeam:
+  enabled: false
+  # Veeam Backup & Replication REST API. Default VBR REST HTTPS port is 9419.
+  # instances:
+  #   - name: VBR
+  #     url: "https://veeam.example.com:9419"
+  #     username: "DOMAIN\\monitoring"
+  #     password: "${VEEAM_PASSWORD:-}"
+  #     apiVersion: "1.3-rev1"
+  #     insecureTLS: false
+
+portainer:
+  enabled: false
+  # Create an access token in Portainer: My account -> Access tokens.
+  # instances:
+  #   - name: Portainer
+  #     url: "https://portainer.example.com:9443"
+  #     apiKey: "${PORTAINER_API_KEY:-}"
+  #     insecureTLS: false
+
 publicStatus: false
 publicTitle: "OmniSight Status"
 publicDescription: ""
@@ -116,6 +224,15 @@ publicPlatforms:
   - prometheus
   - docker
   - dockhand
+  - firewall
+  - truenas
+  - qnap
+  - ugreen
+  - pbs
+  - cloudflare
+  - cicd
+  - veeam
+  - portainer
   - database
 
 alerts:

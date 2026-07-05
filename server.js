@@ -18,6 +18,15 @@ const { getPrometheusData } = require('./src/prometheus');
 const { getAllChecks } = require('./src/checks');
 const { getAllDockhand, dockhandLogs, configInstances: dockhandConfigInstances } = require('./src/dockhand');
 const { getAllDatabaseData } = require('./src/database');
+const { getAllFirewallData } = require('./src/firewall');
+const { getAllTrueNasData, configuredInstances: trueNasConfigInstances } = require('./src/truenas');
+const { getAllQnapData, configuredInstances: qnapConfigInstances } = require('./src/qnap');
+const { getAllUgreenData, configuredInstances: ugreenConfigInstances } = require('./src/ugreen');
+const { getAllPbsData, configuredInstances: pbsConfigInstances } = require('./src/pbs');
+const { getAllPortainerData, configuredInstances: portainerConfigInstances, portainerLogs } = require('./src/portainer');
+const { getCloudflareData } = require('./src/cloudflare');
+const { getAllCiData, configuredProjects: ciConfigProjects } = require('./src/cicd');
+const { getAllVeeamData, configuredInstances: veeamConfigInstances } = require('./src/veeam');
 const { getProxmoxApiData } = require('./src/proxmox');
 const { getDockerApiData, dockerLogs: dockerApiLogs, dockerPrune: dockerApiPrune } = require('./src/docker');
 const { dispatchAlert } = require('./src/alerts');
@@ -1998,8 +2007,8 @@ function stripDeprecatedConfig(obj) {
   return obj;
 }
 
-const UI_PLATFORM_IDS = new Set(['proxmox','kubernetes','linux','snmp','healthchecks','uptimekuma','checks','prometheus','docker','dockhand','database']);
-const UI_GROUP_KEYS = new Set(['pods','deps','svcs','snmpServers','dockerHosts','dockerContainers','checksServices','prometheusServers','prometheusTargets','databaseServers']);
+const UI_PLATFORM_IDS = new Set(['proxmox','kubernetes','linux','windows','snmp','healthchecks','uptimekuma','checks','prometheus','docker','dockhand','database','firewall','truenas','qnap','ugreen','pbs','cloudflare','cicd','veeam','portainer']);
+const UI_GROUP_KEYS = new Set(['pods','deps','svcs','snmpServers','dockerHosts','dockerContainers','checksServices','prometheusServers','prometheusTargets','firewallGateways','firewallLinks','truenasSystems','truenasPools','qnapSystems','ugreenSystems','pbsServers','pbsDatastores','cloudflareZones','cloudflareTunnels','cloudflareDomains','cicdProjects','cicdPipelines','veeamServers','veeamSessions','veeamRepositories','portainerServers','portainerEnvironments','portainerContainers','databaseServers']);
 const UI_SORT_KEYS = new Set(['state','name','cpu','memory','disk','network','status','restarts']);
 const UI_KPI_KEYS = new Set(['cpu','memory','disk','bandwidth']);
 
@@ -2454,7 +2463,7 @@ function eventsViewSignature(limit) {
   ].join('|');
 }
 
-const PLATFORM_REFRESH_KEYS = ['proxmox','linux','kubernetes','snmp','healthchecks','uptimekuma','checks','prometheus','docker','dockhand','database'];
+const PLATFORM_REFRESH_KEYS = ['proxmox','linux','windows','kubernetes','snmp','healthchecks','uptimekuma','checks','prometheus','docker','dockhand','database','firewall','truenas','qnap','ugreen','pbs','cloudflare','cicd','veeam','portainer'];
 const platformRefreshState = Object.fromEntries(PLATFORM_REFRESH_KEYS.map(k => [k, { inFlight: false, nextDue: 0, failures: 0, lastStarted: 0, lastFinished: 0 }]));
 const forceConnectingPlatforms = new Set();
 const CONFIG_CHANGE_CONNECTING_MS = Math.max(30000, Number(process.env.OMNISIGHT_CONFIG_CHANGE_CONNECTING_MS || 120000));
@@ -2512,6 +2521,15 @@ function platformResultLooksFailed(key, value, enabled) {
   if (key === 'docker') return Array.isArray(value) && value.length > 0 && value.every(d => d.online === false || d.error || d._connecting);
   if (key === 'dockhand') return value?.instances?.length && value.instances.every(i => i.online === false || i.error || i._connecting);
   if (key === 'prometheus') return value?.instances?.length && value.instances.every(i => i.online === false || i.error || i._connecting);
+  if (key === 'firewall') return value?.instances?.length && value.instances.every(i => i.online === false || i.error || i._connecting);
+  if (key === 'truenas') return value?.instances?.length && value.instances.every(i => i.online === false || i.error || i._connecting);
+  if (key === 'qnap') return value?.instances?.length && value.instances.every(i => i.online === false || i.error || i._connecting);
+  if (key === 'ugreen') return value?.instances?.length && value.instances.every(i => i.online === false || i.error || i._connecting);
+  if (key === 'pbs') return value?.instances?.length && value.instances.every(i => i.online === false || i.error || i._connecting);
+  if (key === 'cloudflare') return value && value.online === false && (value.error || value._connecting);
+  if (key === 'cicd') return value?.projects?.length && value.projects.every(i => i.online === false || i.error || i._connecting);
+  if (key === 'veeam') return value?.instances?.length && value.instances.every(i => i.online === false || i.error || i._connecting);
+  if (key === 'portainer') return value?.instances?.length && value.instances.every(i => i.online === false || i.error || i._connecting);
   if (key === 'kubernetes') return value && ((value.online === false && (value.error || value._connecting)) || value._empty || value.resourceError);
   if (key === 'uptimekuma' || key === 'healthchecks' || key === 'checks') return value && value.online === false && (value.error || value._connecting);
   if (key === 'proxmox') return value?._stale === true || (Array.isArray(value?.nodes) && value.nodes.length > 0 && value.nodes.every(n => n.node?.online === false || n.error));
@@ -2797,6 +2815,10 @@ function getLinuxData(proxmoxData = cache.data?.proxmox) {
   );
 }
 
+function getWindowsData() {
+  return agents.getWindowsData({ ...config.windows, excludedServices: config.excludedServices });
+}
+
 async function getDockerData() {
   const apiData = hasDockerApi() ? await getDockerApiData(config.docker) : [];
   const agentData = agents.getDockerData();
@@ -2870,8 +2892,17 @@ function assignStatic(base) {
   };
   base.ui = cleanUiPreferences(config.ui || {});
   base.icons = {
-    proxmox: publicIconValue(config.proxmox?.icon), linux: publicIconValue(config.linux?.icon), kubernetes: publicIconValue(config.kubernetes?.icon),
+    proxmox: publicIconValue(config.proxmox?.icon), linux: publicIconValue(config.linux?.icon), windows: publicIconValue(config.windows?.icon), kubernetes: publicIconValue(config.kubernetes?.icon),
     snmp: publicIconValue(config.snmp?.icon), healthchecks: publicIconValue(config.healthchecks?.icon), uptimekuma: publicIconValue(config.uptimekuma?.icon), checks: publicIconValue(config.checks?.icon), prometheus: publicIconValue(config.prometheus?.icon), docker: publicIconValue(config.docker?.icon), dockhand: publicIconValue(config.dockhand?.icon),
+    firewall: publicIconValue(config.firewall?.icon),
+    truenas: publicIconValue(config.truenas?.icon),
+    qnap: publicIconValue(config.qnap?.icon),
+    ugreen: publicIconValue(config.ugreen?.icon),
+    pbs: publicIconValue(config.pbs?.icon),
+    cloudflare: publicIconValue(config.cloudflare?.icon),
+    cicd: publicIconValue(config.cicd?.icon),
+    veeam: publicIconValue(config.veeam?.icon),
+    portainer: publicIconValue(config.portainer?.icon),
     database: publicIconValue(config.database?.icon),
   };
 }
@@ -2923,6 +2954,11 @@ function settingsStatusData(data = cache.data || EMPTY) {
     _connecting: !!l._connecting,
     services: slimServices(l.services),
   }));
+  const windowsRows = (data.windows || []).map(w => ({
+    online: !!w.online,
+    _connecting: !!w._connecting,
+    services: slimServices(w.services),
+  }));
   const dockerRows = (data.docker || []).map(h => ({
     name: h.name,
     host: h.host,
@@ -2950,6 +2986,7 @@ function settingsStatusData(data = cache.data || EMPTY) {
     publicStatus: !!config.publicStatus,
     proxmox: { _connecting: !!data.proxmox?._connecting, nodes: pxNodes },
     linux: linuxRows,
+    windows: windowsRows,
     kubernetes: data.kubernetes ? {
       online: !!data.kubernetes.online,
       _connecting: !!data.kubernetes._connecting,
@@ -2987,6 +3024,103 @@ function settingsStatusData(data = cache.data || EMPTY) {
       _connecting: !!data.dockhand._connecting,
       summary: data.dockhand.summary || {},
       instances: (data.dockhand.instances || []).map(i => ({ online: !!i.online, _connecting: !!i._connecting })),
+    } : null,
+    firewall: data.firewall ? {
+      online: !!data.firewall.online,
+      _connecting: !!data.firewall._connecting,
+      summary: data.firewall.summary || {},
+      instances: (data.firewall.instances || []).map(i => ({
+        online: !!i.online,
+        _connecting: !!i._connecting,
+        partial: !!i.partial,
+        summary: i.summary || {},
+      })),
+    } : null,
+    truenas: data.truenas ? {
+      online: !!data.truenas.online,
+      _connecting: !!data.truenas._connecting,
+      summary: data.truenas.summary || {},
+      instances: (data.truenas.instances || []).map(i => ({
+        online: !!i.online,
+        _connecting: !!i._connecting,
+        partial: !!i.partial,
+        summary: i.summary || {},
+      })),
+    } : null,
+    qnap: data.qnap ? {
+      online: !!data.qnap.online,
+      _connecting: !!data.qnap._connecting,
+      summary: data.qnap.summary || {},
+      instances: (data.qnap.instances || []).map(i => ({
+        online: !!i.online,
+        _connecting: !!i._connecting,
+        partial: !!i.partial,
+        summary: i.summary || {},
+      })),
+    } : null,
+    ugreen: data.ugreen ? {
+      online: !!data.ugreen.online,
+      _connecting: !!data.ugreen._connecting,
+      summary: data.ugreen.summary || {},
+      instances: (data.ugreen.instances || []).map(i => ({
+        online: !!i.online,
+        _connecting: !!i._connecting,
+        partial: !!i.partial,
+        summary: i.summary || {},
+      })),
+    } : null,
+    pbs: data.pbs ? {
+      online: !!data.pbs.online,
+      _connecting: !!data.pbs._connecting,
+      summary: data.pbs.summary || {},
+      instances: (data.pbs.instances || []).map(i => ({
+        online: !!i.online,
+        _connecting: !!i._connecting,
+        partial: !!i.partial,
+        summary: i.summary || {},
+      })),
+    } : null,
+    cloudflare: data.cloudflare ? {
+      online: !!data.cloudflare.online,
+      _connecting: !!data.cloudflare._connecting,
+      partial: !!data.cloudflare.partial,
+      summary: data.cloudflare.summary || {},
+      zones: Array.isArray(data.cloudflare.zones) ? data.cloudflare.zones.length : 0,
+      tunnels: Array.isArray(data.cloudflare.tunnels) ? data.cloudflare.tunnels.length : 0,
+      domains: Array.isArray(data.cloudflare.domains) ? data.cloudflare.domains.length : 0,
+    } : null,
+    cicd: data.cicd ? {
+      online: !!data.cicd.online,
+      _connecting: !!data.cicd._connecting,
+      summary: data.cicd.summary || {},
+      projects: (data.cicd.projects || []).map(i => ({
+        online: !!i.online,
+        _connecting: !!i._connecting,
+        partial: !!i.partial,
+        provider: i.provider || '',
+      })),
+    } : null,
+    veeam: data.veeam ? {
+      online: !!data.veeam.online,
+      _connecting: !!data.veeam._connecting,
+      summary: data.veeam.summary || {},
+      instances: (data.veeam.instances || []).map(i => ({
+        online: !!i.online,
+        _connecting: !!i._connecting,
+        partial: !!i.partial,
+        summary: i.summary || {},
+      })),
+    } : null,
+    portainer: data.portainer ? {
+      online: !!data.portainer.online,
+      _connecting: !!data.portainer._connecting,
+      summary: data.portainer.summary || {},
+      instances: (data.portainer.instances || []).map(i => ({
+        online: !!i.online,
+        _connecting: !!i._connecting,
+        partial: !!i.partial,
+        summary: i.summary || {},
+      })),
     } : null,
     database: dbRows,
   };
@@ -3046,6 +3180,68 @@ function topologyStatusData(data = cache.data || EMPTY) {
     dockhand: data.dockhand ? {
       instances: (data.dockhand.instances || []).map(i => ({ name: i.name, url: i.url, online: !!i.online, _connecting: !!i._connecting })),
       containers: (data.dockhand.containers || []).map(c => ({ name: c.name, state: c.state, sourceName: c.sourceName, sourceUrl: c.sourceUrl })),
+    } : null,
+    firewall: data.firewall ? {
+      instances: (data.firewall.instances || []).map(i => ({
+        name: i.name,
+        url: i.url,
+        online: !!i.online,
+        _connecting: !!i._connecting,
+        partial: !!i.partial,
+        summary: i.summary || {},
+      })),
+    } : null,
+    truenas: data.truenas ? {
+      instances: (data.truenas.instances || []).map(i => ({
+        name: i.name,
+        url: i.url,
+        online: !!i.online,
+        _connecting: !!i._connecting,
+        partial: !!i.partial,
+        pools: Array.isArray(i.pools) ? i.pools.map(p => ({ name: p.name, health: p.health, status: p.status })) : [],
+        disks: Array.isArray(i.disks) ? i.disks.map(d => ({ name: d.name, health: d.health, status: d.status })) : [],
+      })),
+    } : null,
+    qnap: data.qnap ? {
+      instances: (data.qnap.instances || []).map(i => ({
+        name: i.name,
+        url: i.url,
+        online: !!i.online,
+        _connecting: !!i._connecting,
+        partial: !!i.partial,
+        system: i.system || {},
+      })),
+    } : null,
+    ugreen: data.ugreen ? {
+      instances: (data.ugreen.instances || []).map(i => ({
+        name: i.name,
+        url: i.url,
+        online: !!i.online,
+        _connecting: !!i._connecting,
+        partial: !!i.partial,
+        statusCode: i.statusCode,
+        system: i.system || {},
+      })),
+    } : null,
+    pbs: data.pbs ? {
+      instances: (data.pbs.instances || []).map(i => ({
+        name: i.name,
+        url: i.url,
+        online: !!i.online,
+        _connecting: !!i._connecting,
+        partial: !!i.partial,
+        datastores: Array.isArray(i.datastores) ? i.datastores.map(d => ({ name: d.name, health: d.health, usedPercent: d.usedPercent })) : [],
+      })),
+    } : null,
+    portainer: data.portainer ? {
+      instances: (data.portainer.instances || []).map(i => ({
+        name: i.name,
+        url: i.url,
+        online: !!i.online,
+        _connecting: !!i._connecting,
+        partial: !!i.partial,
+        environments: Array.isArray(i.environments) ? i.environments.map(e => ({ name: e.name, type: e.type, online: e.online })) : [],
+      })),
     } : null,
     snmp: (data.snmp || []).map(s => ({
       name: s.name,
@@ -3113,6 +3309,8 @@ function settingsAgentRows() {
   const rows = agents.listAgents().map(a => {
     const kind = a.pveNode || a.platform === 'proxmox' || a.role === 'proxmox'
       ? 'proxmox'
+      : a.platform === 'windows' || a.role === 'windows'
+      ? 'windows'
       : a.role === 'docker' || a.hasDocker
       ? 'docker'
       : 'linux';
@@ -3127,7 +3325,7 @@ function settingsAgentRows() {
       online: !!a.online,
       connecting: !!a.connecting,
       lastSeen: a.lastSeen || 0,
-      meta: kind === 'docker' ? 'Docker agent' : '',
+      meta: kind === 'docker' ? 'Docker agent' : kind === 'windows' ? 'Windows agent' : '',
     };
   });
   for (const p of pending) {
@@ -3229,6 +3427,15 @@ function configuredList() {
   const en = c => c && c.enabled !== false;
   const hasPrometheus = c => !!(c && (c.url || (Array.isArray(c.instances) && c.instances.length)));
   const hasDockhand = c => !!(c && (c.url || (Array.isArray(c.instances) && c.instances.length)));
+  const hasFirewall = c => !!(c && (c.url || (Array.isArray(c.instances) && c.instances.length)));
+  const hasTrueNas = c => !!(c && (c.url || (Array.isArray(c.instances) && c.instances.length)));
+  const hasQnap = c => !!(c && (c.url || (Array.isArray(c.instances) && c.instances.length)));
+  const hasUgreen = c => !!(c && (c.url || (Array.isArray(c.instances) && c.instances.length)));
+  const hasPbs = c => !!(c && (c.url || (Array.isArray(c.instances) && c.instances.length)));
+  const hasCloudflare = c => !!(c && (c.apiToken || c.token || c.bearerToken));
+  const hasCiCd = c => !!(c && ((Array.isArray(c.projects) && c.projects.length) || (Array.isArray(c.instances) && c.instances.length)));
+  const hasVeeam = c => !!(c && (c.url || (Array.isArray(c.instances) && c.instances.length)));
+  const hasPortainer = c => !!(c && (c.url || (Array.isArray(c.instances) && c.instances.length)));
   const hasCachedRows = key => {
     const value = cache.data?.[key];
     if (Array.isArray(value)) return value.length > 0;
@@ -3240,6 +3447,7 @@ function configuredList() {
   if (en(config.proxmox)      && (agents.hasPve() || hasCachedRows('proxmox') || (config.proxmox.url && config.proxmox.tokenId && config.proxmox.tokenSecret))) ids.push('proxmox');
   if (en(config.kubernetes)   && config.kubernetes.kubeconfig)          ids.push('kubernetes');
   if (en(config.linux)        && config.linux.agentToken && (agents.hasLinux?.() || hasCachedRows('linux'))) ids.push('linux');
+  if (en(config.windows)      && config.linux?.agentToken && (agents.hasWindows?.() || hasCachedRows('windows'))) ids.push('windows');
   if (en(config.snmp)         && (config.snmp.devices || []).length)    ids.push('snmp');
   if (en(config.healthchecks) && config.healthchecks.url)               ids.push('healthchecks');
   if (en(config.uptimekuma)   && config.uptimekuma.url)                 ids.push('uptimekuma');
@@ -3248,7 +3456,174 @@ function configuredList() {
   if (en(config.docker)       && (agents.hasDocker() || hasCachedRows('docker') || (config.docker.hosts || []).length)) ids.push('docker');
   if (en(config.dockhand)     && hasDockhand(config.dockhand))           ids.push('dockhand');
   if (en(config.database)     && (config.database.instances || []).length) ids.push('database');
+  if (en(config.firewall)     && hasFirewall(config.firewall))           ids.push('firewall');
+  if (en(config.truenas)      && hasTrueNas(config.truenas))             ids.push('truenas');
+  if (en(config.qnap)         && hasQnap(config.qnap))                   ids.push('qnap');
+  if (en(config.ugreen)       && hasUgreen(config.ugreen))               ids.push('ugreen');
+  if (en(config.pbs)          && hasPbs(config.pbs))                     ids.push('pbs');
+  if (en(config.cloudflare)   && hasCloudflare(config.cloudflare))        ids.push('cloudflare');
+  if (en(config.cicd)         && hasCiCd(config.cicd))                   ids.push('cicd');
+  if (en(config.veeam)        && hasVeeam(config.veeam))                  ids.push('veeam');
+  if (en(config.portainer)    && hasPortainer(config.portainer))         ids.push('portainer');
   return ids;
+}
+
+function trueNasConnectingData(conf = config.truenas) {
+  const instances = trueNasConfigInstances(conf || {});
+  const rows = instances.map((inst, idx) => ({
+    name: inst.name || inst.url || `TrueNAS ${idx + 1}`,
+    url: inst.url || '',
+    apiMode: inst.apiMode || 'auto',
+    online: false,
+    _connecting: true,
+    system: {},
+    pools: [],
+    disks: [],
+    alerts: [],
+    summary: { instances: 1, up: 0, down: 0, pools: 0, poolsHealthy: 0, poolsWarn: 0, disks: 0, disksWarn: 0, alertsCritical: 0, alertsWarning: 0 },
+  }));
+  return {
+    online: false,
+    _connecting: true,
+    summary: {
+      instances: rows.length,
+      up: 0,
+      down: 0,
+      pools: 0,
+      poolsHealthy: 0,
+      poolsWarn: 0,
+      disks: 0,
+      disksWarn: 0,
+      alertsCritical: 0,
+      alertsWarning: 0,
+    },
+    instances: rows,
+  };
+}
+
+function pbsConnectingData(conf = config.pbs) {
+  const instances = pbsConfigInstances(conf || {});
+  const rows = instances.map((inst, idx) => ({
+    name: inst.name || inst.url || `PBS ${idx + 1}`,
+    url: inst.url || '',
+    online: false,
+    _connecting: true,
+    version: {},
+    nodes: [],
+    datastores: [],
+    tasks: [],
+    summary: { instances: 1, up: 0, down: 0, datastores: 0, datastoresWarn: 0, snapshots: 0, groups: 0, failedTasks: 0 },
+  }));
+  return {
+    online: false,
+    _connecting: true,
+    summary: { instances: rows.length, up: 0, down: 0, datastores: 0, datastoresWarn: 0, snapshots: 0, groups: 0, failedTasks: 0 },
+    instances: rows,
+  };
+}
+
+function simpleNasConnectingData(conf, configuredInstancesFn, fallbackName) {
+  const instances = configuredInstancesFn(conf || {});
+  const rows = instances.map((inst, idx) => ({
+    name: inst.name || inst.url || `${fallbackName} ${idx + 1}`,
+    url: inst.url || '',
+    online: false,
+    _connecting: true,
+    system: {},
+    summary: { instances: 1, up: 0, down: 0 },
+  }));
+  return {
+    online: false,
+    _connecting: true,
+    summary: { instances: rows.length, up: 0, down: 0 },
+    instances: rows,
+  };
+}
+
+function qnapConnectingData(conf = config.qnap) {
+  return simpleNasConnectingData(conf, qnapConfigInstances, 'QNAP');
+}
+
+function ugreenConnectingData(conf = config.ugreen) {
+  return simpleNasConnectingData(conf, ugreenConfigInstances, 'Ugreen');
+}
+
+function portainerConnectingData(conf = config.portainer) {
+  const instances = portainerConfigInstances(conf || {});
+  const rows = instances.map((inst, idx) => ({
+    name: inst.name || inst.url || `Portainer ${idx + 1}`,
+    url: inst.url || '',
+    online: false,
+    _connecting: true,
+    version: '',
+    environments: [],
+    stacks: [],
+    containers: [],
+    summary: { instances: 1, up: 0, down: 0, environments: 0, environmentsUp: 0, environmentsDown: 0, stacks: 0, stacksWarn: 0, containers: 0, running: 0, stopped: 0 },
+  }));
+  return {
+    online: false,
+    _connecting: true,
+    summary: { instances: rows.length, up: 0, down: 0, environments: 0, environmentsUp: 0, environmentsDown: 0, stacks: 0, stacksWarn: 0, containers: 0, running: 0, stopped: 0 },
+    instances: rows,
+  };
+}
+
+function cloudflareConnectingData(conf = config.cloudflare) {
+  const zones = Array.isArray(conf?.zones) ? conf.zones.filter(Boolean).map(z => ({
+    id: '',
+    name: String(z),
+    status: 'connecting',
+    online: false,
+    _connecting: true,
+  })) : [];
+  return {
+    online: false,
+    _connecting: true,
+    summary: { zones: zones.length, zonesActive: 0, zonesWarn: 0, tunnels: 0, tunnelsHealthy: 0, tunnelsDown: 0, domains: 0, domainsExpiring: 0, domainsExpired: 0, domainsAutoRenew: 0, errors: 0 },
+    zones,
+    tunnels: [],
+    domains: [],
+  };
+}
+
+function cicdConnectingData(conf = config.cicd) {
+  const projects = ciConfigProjects(conf || {});
+  const rows = projects.map((row, idx) => ({
+    name: row.name || row.repo || row.projectId || `CI Project ${idx + 1}`,
+    provider: row.provider || 'github',
+    branch: row.branch || row.ref || '',
+    online: false,
+    _connecting: true,
+    pipelines: [],
+    jobs: [],
+  }));
+  return {
+    online: false,
+    _connecting: true,
+    summary: { projects: rows.length, up: 0, down: 0, partial: 0, pipelines: 0, success: 0, failed: 0, running: 0, canceled: 0, jobs: 0, jobsFailed: 0, jobsRunning: 0 },
+    projects: rows,
+  };
+}
+
+function veeamConnectingData(conf = config.veeam) {
+  const instances = veeamConfigInstances(conf || {});
+  const rows = instances.map((inst, idx) => ({
+    name: inst.name || inst.url || `Veeam ${idx + 1}`,
+    url: inst.url || '',
+    online: false,
+    _connecting: true,
+    jobs: [],
+    sessions: [],
+    repositories: [],
+    summary: { instances: 1, up: 0, down: 0, partial: 0, jobs: 0, jobsDisabled: 0, sessions: 0, failedSessions: 0, warningSessions: 0, runningSessions: 0, repositories: 0, repositoriesWarn: 0 },
+  }));
+  return {
+    online: false,
+    _connecting: true,
+    summary: { instances: rows.length, up: 0, down: 0, partial: 0, jobs: 0, jobsDisabled: 0, sessions: 0, failedSessions: 0, warningSessions: 0, runningSessions: 0, repositories: 0, repositoriesWarn: 0 },
+    instances: rows,
+  };
 }
 
 function prometheusConfigInstances(c = {}) {
@@ -3356,6 +3731,46 @@ function mergePrometheusConfigured(current, cfg) {
 function extractChecks(data) {
   const m = new Map();
   const add = (key, ok, label, detail, extra = {}) => m.set(key, { ok, label, detail, ...extra });
+  const durationText = (seconds) => {
+    const n = Number(seconds);
+    if (!Number.isFinite(n) || n < 0) return '';
+    if (n === 0) return '0 seconds';
+    const units = [
+      ['day', 86400],
+      ['hour', 3600],
+      ['minute', 60],
+      ['second', 1],
+    ];
+    const parts = [];
+    let rest = Math.round(n);
+    for (const [name, size] of units) {
+      const value = Math.floor(rest / size);
+      if (!value) continue;
+      parts.push(`${value} ${name}${value === 1 ? '' : 's'}`);
+      rest -= value * size;
+      if (parts.length === 2) break;
+    }
+    return parts.join(' ');
+  };
+  const healthcheckInfoLines = (c = {}) => [
+    c.project ? `Project: ${c.project}` : '',
+    c.tags ? `Tags: ${c.tags}` : '',
+    durationText(c.periodSec) ? `Period: ${durationText(c.periodSec)}` : '',
+    durationText(c.graceSec) ? `Grace: ${durationText(c.graceSec)}` : '',
+    Number.isFinite(Number(c.totalPings)) ? `Total Pings: ${Number(c.totalPings)}` : '',
+  ].filter(Boolean);
+  const healthcheckDeadlineMs = (c = {}) => {
+    const lastPingMs = c.lastPing ? new Date(c.lastPing).getTime() : NaN;
+    const periodSec = Number(c.periodSec);
+    const graceSec = Number(c.graceSec);
+    if (!Number.isFinite(lastPingMs) || !Number.isFinite(periodSec)) return null;
+    return lastPingMs + Math.max(0, periodSec + (Number.isFinite(graceSec) ? graceSec : 0)) * 1000;
+  };
+  const healthcheckAlertOk = (c = {}, nowMs = Date.now()) => {
+    if (String(c.status || '').toLowerCase() !== 'down') return true;
+    const deadline = healthcheckDeadlineMs(c);
+    return deadline != null && nowMs < deadline;
+  };
   const dockerContainerLabels = (c = {}) => {
     if (c.labels && typeof c.labels === 'object' && !Array.isArray(c.labels)) return c.labels;
     if (c.Labels && typeof c.Labels === 'object' && !Array.isArray(c.Labels)) return c.Labels;
@@ -3446,6 +3861,20 @@ function extractChecks(data) {
       });
     }
   });
+  (data.windows || []).forEach(w => {
+    if (w._connecting) return;
+    add('win:' + w.name, !!w.online, 'Windows host ' + w.name, 'unreachable');
+    if (w.online) {
+      addPct('win:' + w.name + ':cpu', 'Windows host ' + w.name, 'CPU usage', w.cpu, thresholds.cpu);
+      addPct('win:' + w.name + ':ram', 'Windows host ' + w.name, 'RAM usage', w.ram?.percent, thresholds.ram);
+      addPct('win:' + w.name + ':disk', 'Windows host ' + w.name, 'disk usage', w.disk?.percent, thresholds.disk);
+      addAnomaly('win:' + w.name + ':cpu:anomaly', 'Windows host ' + w.name, 'CPU usage', w.cpu, w.history, 'cpu');
+      addAnomaly('win:' + w.name + ':ram:anomaly', 'Windows host ' + w.name, 'RAM usage', w.ram?.percent, w.history, 'ram');
+      (w.services || []).forEach(s => {
+        if (!s.excluded) add('win:' + w.name + ':' + s.name, !!s.active, w.name + ' / ' + s.name, 'inactive');
+      });
+    }
+  });
   const k = data.kubernetes;
   if (k && k.online !== undefined) {
     add('k8s', !!k.online, 'Kubernetes', 'unreachable');
@@ -3486,7 +3915,11 @@ function extractChecks(data) {
   const hc = data.healthchecks;
   if (hc && Array.isArray(hc.checks)) hc.checks.forEach(c => {
     const nm = c.name || c.slug;
-    add('hc:' + nm, c.status !== 'down', 'Healthcheck ' + nm, c.status);
+    add('hc:' + nm, healthcheckAlertOk(c), 'Healthcheck ' + nm, c.status, {
+      kind: 'healthchecks',
+      durationSeconds: 0,
+      infoLines: healthcheckInfoLines(c),
+    });
   });
   const uk = data.uptimekuma;
   if (uk && Array.isArray(uk.monitors)) uk.monitors.forEach(m => {
@@ -3508,6 +3941,82 @@ function extractChecks(data) {
     const nm = t.name || t.scrapeUrl || 'target';
     const key = [t.sourceName || t.sourceUrl || 'default', nm].join(':');
     add('prom:' + key, t.health === 'up', 'Prometheus target ' + nm, t.lastError || t.health);
+  });
+  const fw = data.firewall;
+  if (fw && Array.isArray(fw.instances)) fw.instances.forEach(i => {
+    if (i._connecting) return;
+    const nm = i.name || i.url || 'Firewall';
+    add('firewall:' + nm, !!i.online && !i.partial, 'Firewall ' + nm, i.error || (i.partial ? 'partial API data' : 'unreachable'));
+    if (i.online && Number(i.summary?.interfacesDown || 0) > 0) add('firewall-link:' + nm, false, 'Firewall link ' + nm, `${i.summary.interfacesDown} link(s) down`);
+    if (i.online && Number(i.summary?.updates || 0) > 0) add('firewall-update:' + nm, false, 'Firewall updates ' + nm, `${i.summary.updates} update(s) available`);
+    if (i.online && i.summary?.rebootRequired) add('firewall-reboot:' + nm, false, 'Firewall reboot ' + nm, 'reboot required');
+  });
+  const tn = data.truenas;
+  if (tn && Array.isArray(tn.instances)) tn.instances.forEach(i => {
+    if (i._connecting) return;
+    const nm = i.name || i.url || 'TrueNAS';
+    add('truenas:' + nm, !!i.online && !i.partial, 'TrueNAS ' + nm, i.error || (i.partial ? 'partial API data' : 'unreachable'));
+    if (i.online && Number(i.summary?.poolsWarn || 0) > 0) add('truenas-pool:' + nm, false, 'TrueNAS pool ' + nm, `${i.summary.poolsWarn} pool(s) need attention`);
+    if (i.online && Number(i.summary?.disksWarn || 0) > 0) add('truenas-disk:' + nm, false, 'TrueNAS disk ' + nm, `${i.summary.disksWarn} disk(s) need attention`);
+    if (i.online && Number(i.summary?.alertsCritical || 0) > 0) add('truenas-alert:' + nm, false, 'TrueNAS alert ' + nm, `${i.summary.alertsCritical} critical alert(s)`);
+  });
+  const qnap = data.qnap;
+  if (qnap && Array.isArray(qnap.instances)) qnap.instances.forEach(i => {
+    if (i._connecting) return;
+    const nm = i.name || i.url || 'QNAP';
+    add('qnap:' + nm, !!i.online && !i.partial, 'QNAP ' + nm, i.error || (i.partial ? 'partial API data' : 'unreachable'));
+  });
+  const ugreen = data.ugreen;
+  if (ugreen && Array.isArray(ugreen.instances)) ugreen.instances.forEach(i => {
+    if (i._connecting) return;
+    const nm = i.name || i.url || 'Ugreen';
+    add('ugreen:' + nm, !!i.online && !i.partial, 'Ugreen ' + nm, i.error || (i.partial ? 'partial API data' : 'unreachable'));
+  });
+  const pbs = data.pbs;
+  if (pbs && Array.isArray(pbs.instances)) pbs.instances.forEach(i => {
+    if (i._connecting) return;
+    const nm = i.name || i.url || 'PBS';
+    add('pbs:' + nm, !!i.online && !i.partial, 'Proxmox Backup ' + nm, i.error || (i.partial ? 'partial API data' : 'unreachable'));
+    if (i.online && Number(i.summary?.datastoresWarn || 0) > 0) add('pbs-datastore:' + nm, false, 'PBS datastore ' + nm, `${i.summary.datastoresWarn} datastore(s) need attention`);
+    if (i.online && Number(i.summary?.failedTasks || 0) > 0) add('pbs-task:' + nm, false, 'PBS task ' + nm, `${i.summary.failedTasks} failed task(s)`);
+  });
+  const cf = data.cloudflare;
+  if (cf && cf.online !== undefined) {
+    const sm = cf.summary || {};
+    if (!cf._connecting) {
+      add('cloudflare', !!cf.online && !cf.partial, 'Cloudflare', cf.error || (cf.partial ? 'partial API data' : 'unreachable'));
+      if (cf.online && Number(sm.zonesWarn || 0) > 0) add('cloudflare-zones', false, 'Cloudflare zones', `${sm.zonesWarn} zone(s) need attention`);
+      if (cf.online && Number(sm.tunnelsDown || 0) > 0) add('cloudflare-tunnels', false, 'Cloudflare tunnels', `${sm.tunnelsDown} tunnel(s) down`);
+      if (cf.online && Number(sm.domainsExpired || 0) > 0) add('cloudflare-domains-expired', false, 'Cloudflare domains', `${sm.domainsExpired} domain(s) expired`);
+      if (cf.online && Number(sm.domainsExpiring || 0) > 0) add('cloudflare-domains-expiring', false, 'Cloudflare domains', `${sm.domainsExpiring} domain(s) expiring soon`);
+    }
+  }
+  const ci = data.cicd;
+  if (ci && Array.isArray(ci.projects)) ci.projects.forEach(i => {
+    if (i._connecting) return;
+    const nm = i.name || i.repo || i.projectId || 'CI/CD';
+    const sm = i.summary || {};
+    add('cicd:' + nm, !!i.online && !i.partial, 'CI/CD ' + nm, i.error || (i.partial ? 'partial API data' : 'unreachable'));
+    const failed = (i.pipelines || []).filter(p => p.failed).length || Number(sm.failed || 0);
+    if (i.online && failed > 0) add('cicd-failed:' + nm, false, 'CI/CD failed ' + nm, `${failed} failed run(s)`);
+  });
+  const veeam = data.veeam;
+  if (veeam && Array.isArray(veeam.instances)) veeam.instances.forEach(i => {
+    if (i._connecting) return;
+    const nm = i.name || i.url || 'Veeam';
+    const sm = i.summary || {};
+    add('veeam:' + nm, !!i.online && !i.partial, 'Veeam ' + nm, i.error || (i.partial ? 'partial API data' : 'unreachable'));
+    if (i.online && Number(sm.failedSessions || 0) > 0) add('veeam-session:' + nm, false, 'Veeam session ' + nm, `${sm.failedSessions} failed session(s)`);
+    if (i.online && Number(sm.warningSessions || 0) > 0) add('veeam-warning:' + nm, false, 'Veeam warning ' + nm, `${sm.warningSessions} warning session(s)`);
+    if (i.online && Number(sm.repositoriesWarn || 0) > 0) add('veeam-repo:' + nm, false, 'Veeam repository ' + nm, `${sm.repositoriesWarn} repository(s) need attention`);
+  });
+  const portainer = data.portainer;
+  if (portainer && Array.isArray(portainer.instances)) portainer.instances.forEach(i => {
+    if (i._connecting) return;
+    const nm = i.name || i.url || 'Portainer';
+    add('portainer:' + nm, !!i.online && !i.partial, 'Portainer ' + nm, i.error || (i.partial ? 'partial API data' : 'unreachable'));
+    if (i.online && Number(i.summary?.environmentsDown || 0) > 0) add('portainer-env:' + nm, false, 'Portainer environment ' + nm, `${i.summary.environmentsDown} environment(s) down`);
+    if (i.online && Number(i.summary?.stacksWarn || 0) > 0) add('portainer-stack:' + nm, false, 'Portainer stack ' + nm, `${i.summary.stacksWarn} stack(s) need attention`);
   });
   (data.database || []).forEach(d => add('db:' + d.name, !!d.online, 'Database ' + d.name, 'unreachable'));
   return m;
@@ -3638,17 +4147,20 @@ function dayMatches(rule, date) {
   return (Array.isArray(days) ? days : String(days).split(',')).map(d => String(d).trim().slice(0,3).toLowerCase()).includes(cur);
 }
 function inMaintenanceWindow(now = Date.now()) {
+  return !!currentMaintenanceWindow(now);
+}
+function currentMaintenanceWindow(now = Date.now()) {
   const windows = config.alerts?.maintenanceWindows || config.alerts?.maintenance || [];
-  if (!Array.isArray(windows) || !windows.length) return false;
+  if (!Array.isArray(windows) || !windows.length) return null;
   const d = new Date(now);
   const mins = d.getHours() * 60 + d.getMinutes();
-  return windows.some(w => {
+  return windows.find(w => {
     if (!w || w.enabled === false || !dayMatches(w, d)) return false;
     const start = parseClockMinutes(w.start || w.from);
     const end = parseClockMinutes(w.end || w.to);
     if (start == null || end == null) return false;
     return start <= end ? mins >= start && mins <= end : (mins >= start || mins <= end);
-  });
+  }) || null;
 }
 function isAlertMuted(key, now = Date.now()) {
   const rec = alertMutes.get(key);
@@ -3696,6 +4208,9 @@ function dispatchTrackedAlert(alertConfig, alert, meta = {}, only) {
       saveAlertHistory();
     });
 }
+function alertInfoText(check = {}) {
+  return Array.isArray(check.infoLines) && check.infoLines.length ? `\n${check.infoLines.join('\n')}` : '';
+}
 function runAlertChecks(data) {
   if (!config.alerts || config.alerts.enabled === false) return;
   const cur = extractChecks(data);
@@ -3724,7 +4239,7 @@ function runAlertChecks(data) {
         ? `${c.label} is outside normal range: ${c.detail}\n${new Date().toLocaleString()}`
         : threshold
         ? `${c.label} is ${c.severity}: ${c.detail}\n${new Date().toLocaleString()}`
-        : `${c.label} is ${c.detail || 'down'}\n${new Date().toLocaleString()}`,
+        : `${c.label} is ${c.detail || 'down'}${alertInfoText(c)}\n${new Date().toLocaleString()}`,
       priority: critical ? 'high' : 'default', tags: critical ? 'rotating_light' : 'warning',
     }, {
       type: 'problem',
@@ -3746,7 +4261,7 @@ function runAlertChecks(data) {
         ? `${c.label} is back in its normal range\n${new Date().toLocaleString()}`
         : threshold
         ? `${c.label} is back below threshold\n${new Date().toLocaleString()}`
-        : `${c.label} recovered\n${new Date().toLocaleString()}`,
+        : `${c.label} recovered${alertInfoText(c)}\n${new Date().toLocaleString()}`,
       priority: 'default', tags: 'white_check_mark',
     }, {
       type: 'recovery',
@@ -3984,6 +4499,69 @@ function preserveUptimeKumaOnTransient(next, err) {
   };
 }
 
+const OBJECT_INSTANCE_PLATFORMS = new Set(['prometheus', 'dockhand', 'firewall', 'truenas', 'qnap', 'ugreen', 'pbs', 'cloudflare', 'cicd', 'veeam', 'portainer']);
+function objectPlatformHasUsableData(value) {
+  if (!value || typeof value !== 'object') return false;
+  const instances = Array.isArray(value.instances) ? value.instances : [];
+  if (instances.some(inst => inst && !inst._connecting && inst.online !== false)) return true;
+  if (Array.isArray(value.targets) && value.targets.length) return true;
+  if (Array.isArray(value.containers) && value.containers.length) return true;
+  return value.online === true && !value._connecting;
+}
+
+function objectPlatformLooksTransient(next, err) {
+  if (!next || err) return true;
+  if (next._connecting) return true;
+  const instances = Array.isArray(next.instances) ? next.instances : [];
+  if (instances.length && instances.every(inst => inst?._connecting || inst?.error || inst?.online === false)) return true;
+  return next.online === false && !!next.error;
+}
+
+function preserveObjectPlatformOnTransient(key, next, err) {
+  const prev = cache.data?.[key];
+  if (!objectPlatformHasUsableData(prev)) return next;
+  if (!objectPlatformLooksTransient(next, err)) return { ...next, _stale: false, _staleSince: null, error: undefined };
+  const now = Date.now();
+  const staleSince = prev._staleSince || now;
+  if (now - staleSince > STALE_KEEP_MS) return next;
+  return {
+    ...prev,
+    _stale: true,
+    _staleSince: staleSince,
+    error: next?.error || err?.message || `temporary ${key} refresh failure`,
+  };
+}
+
+function arrayPlatformHasUsableData(rows) {
+  return Array.isArray(rows) && rows.some(row => row && !row._connecting && row.online !== false);
+}
+
+function preserveArrayPlatformOnTransient(key, nextRows, err) {
+  const prevRows = Array.isArray(cache.data?.[key]) ? cache.data[key] : [];
+  if (!arrayPlatformHasUsableData(prevRows)) return nextRows;
+  const rows = Array.isArray(nextRows) ? nextRows : [];
+  const failed = !!err || !rows.length || rows.every(row => row?._connecting || row?.error || row?.online === false);
+  if (!failed) return rows.map(row => row ? { ...row, _stale: false, _staleSince: null } : row);
+  const now = Date.now();
+  return prevRows.map(row => {
+    if (!row || row.online === false) return row;
+    const staleSince = row._staleSince || now;
+    if (now - staleSince > STALE_KEEP_MS) return row;
+    return {
+      ...row,
+      _stale: true,
+      _staleSince: staleSince,
+      error: err?.message || `temporary ${key} refresh failure`,
+    };
+  });
+}
+
+function preservePlatformOnTransient(key, next, err) {
+  if (OBJECT_INSTANCE_PLATFORMS.has(key)) return preserveObjectPlatformOnTransient(key, next, err);
+  if (key === 'database') return preserveArrayPlatformOnTransient(key, next, err);
+  return next;
+}
+
 function backgroundRefresh(opts = {}) {
   const force = opts === true || opts.force === true;
   if (refreshActiveCount >= maxRefreshActiveTasks()) {
@@ -4006,6 +4584,7 @@ function backgroundRefresh(opts = {}) {
   const taskDefs = [
     ['proxmox',      enabled(config.proxmox),      () => getProxmoxData(),                      { clusterSummary: null, nodes: [] }],
     ['linux',        enabled(config.linux),        () => Promise.resolve(getLinuxData()),        []],
+    ['windows',      enabled(config.windows),      () => Promise.resolve(getWindowsData()),      []],
     ['kubernetes',   enabled(config.kubernetes),   () => getAllKubernetesData(config.kubernetes), null],
     ['snmp',         enabled(config.snmp),         () => getAllSynologyData(config.snmp),         []],
     ['healthchecks', enabled(config.healthchecks), () => getAllHealthchecks(config.healthchecks), null],
@@ -4015,6 +4594,15 @@ function backgroundRefresh(opts = {}) {
     ['docker',       enabled(config.docker),       () => getDockerData(),                        []],
     ['dockhand',     enabled(config.dockhand),     () => getAllDockhand(config.dockhand),         null],
     ['database',     enabled(config.database),     () => getAllDatabaseData(config.database),     []],
+    ['firewall',     enabled(config.firewall),     () => getAllFirewallData(config.firewall),     null],
+    ['truenas',      enabled(config.truenas),      () => getAllTrueNasData(config.truenas),       null],
+    ['qnap',         enabled(config.qnap),         () => getAllQnapData(config.qnap),             null],
+    ['ugreen',       enabled(config.ugreen),       () => getAllUgreenData(config.ugreen),         null],
+    ['pbs',          enabled(config.pbs),          () => getAllPbsData(config.pbs),               null],
+    ['cloudflare',   enabled(config.cloudflare),   () => getCloudflareData(config.cloudflare),    null],
+    ['cicd',         enabled(config.cicd),         () => getAllCiData(config.cicd),               null],
+    ['veeam',        enabled(config.veeam),        () => getAllVeeamData(config.veeam),           null],
+    ['portainer',    enabled(config.portainer),    () => getAllPortainerData(config.portainer),   null],
   ];
 
   const taskFns = [];
@@ -4040,6 +4628,7 @@ function backgroundRefresh(opts = {}) {
           : key === 'uptimekuma' ? preserveUptimeKumaOnTransient(mergeUptimeKumaHistory(next))
           : key === 'snmp' ? preserveSnmpOnTransient(next)
           : key === 'checks' && next ? { ...next, historyHours: checksConfig().historyHours }
+          : OBJECT_INSTANCE_PLATFORMS.has(key) || key === 'database' ? preservePlatformOnTransient(key, next)
           : next;
         ok = !platformResultLooksFailed(key, base[key], isEnabled);
         base.timestamp = new Date().toISOString();
@@ -4063,6 +4652,10 @@ function backgroundRefresh(opts = {}) {
           if ((base[key] || []).some(row => row._stale)) console.warn(`SNMP refresh failed; keeping last data: ${err.message}`);
         } else if (key === 'kubernetes') {
           base[key] = keepKubernetesConnectingAfterConfigChange(fb, err);
+        } else if (OBJECT_INSTANCE_PLATFORMS.has(key) || key === 'database') {
+          base[key] = preservePlatformOnTransient(key, fb, err);
+          const kept = Array.isArray(base[key]) ? base[key].some(row => row?._stale) : base[key]?._stale;
+          if (kept) console.warn(`${key} refresh failed; keeping last data: ${err.message}`);
         } else {
           base[key] = fb;
         }
@@ -4118,6 +4711,7 @@ const EMPTY = {
   loading: false,
   proxmox: { clusterSummary: null, nodes: [] },
   linux: [],
+  windows: [],
   kubernetes: null,
   snmp: [],
   healthchecks: null,
@@ -4127,6 +4721,15 @@ const EMPTY = {
   docker: [],
   dockhand: null,
   database: [],
+  firewall: null,
+  truenas: null,
+  qnap: null,
+  ugreen: null,
+  pbs: null,
+  cloudflare: null,
+  cicd: null,
+  veeam: null,
+  portainer: null,
   publicStatus: false,
 };
 
@@ -4134,6 +4737,7 @@ function runtimeEmptyFor(id) {
   return {
     proxmox: { clusterSummary: null, nodes: [] },
     linux: [],
+    windows: [],
     kubernetes: null,
     snmp: [],
     healthchecks: null,
@@ -4143,6 +4747,15 @@ function runtimeEmptyFor(id) {
     docker: [],
     dockhand: null,
     database: [],
+    firewall: null,
+    truenas: null,
+    qnap: null,
+    ugreen: null,
+    pbs: null,
+    cloudflare: null,
+    cicd: null,
+    veeam: null,
+    portainer: null,
   }[id];
 }
 
@@ -4169,6 +4782,9 @@ function ensureRuntimeShell(data = cache.data) {
 
   if (en(config.linux)) out.linux = filterLinuxProxmoxRows(Array.isArray(out.linux) ? out.linux : getLinuxData(out.proxmox), out.proxmox);
   else out.linux = [];
+
+  if (en(config.windows)) out.windows = Array.isArray(out.windows) ? out.windows : getWindowsData();
+  else out.windows = [];
 
   if (en(config.kubernetes)) {
     if (!out.kubernetes) out.kubernetes = kubernetesConnectingData();
@@ -4228,6 +4844,33 @@ function ensureRuntimeShell(data = cache.data) {
   out.prometheus = en(config.prometheus) ? mergePrometheusConfigured(out.prometheus, config.prometheus) : null;
   out.docker = en(config.docker) ? mergeDockerHistory(mergeDockerConfiguredRows(Array.isArray(out.docker) ? out.docker : [], agents.getDockerData())) : [];
   out.dockhand = en(config.dockhand) ? mergeDockhandConfigured(out.dockhand, config.dockhand) : null;
+  out.firewall = en(config.firewall)
+    ? (out.firewall || { _connecting: true, online: false, summary: { instances: 0, up: 0, down: 0, interfaces: 0, interfacesUp: 0, interfacesDown: 0, updates: 0, rebootRequired: 0 }, instances: [] })
+    : null;
+  out.truenas = en(config.truenas)
+    ? (out.truenas || trueNasConnectingData(config.truenas))
+    : null;
+  out.qnap = en(config.qnap)
+    ? (out.qnap || qnapConnectingData(config.qnap))
+    : null;
+  out.ugreen = en(config.ugreen)
+    ? (out.ugreen || ugreenConnectingData(config.ugreen))
+    : null;
+  out.pbs = en(config.pbs)
+    ? (out.pbs || pbsConnectingData(config.pbs))
+    : null;
+  out.cloudflare = en(config.cloudflare)
+    ? (out.cloudflare || cloudflareConnectingData(config.cloudflare))
+    : null;
+  out.cicd = en(config.cicd)
+    ? (out.cicd || cicdConnectingData(config.cicd))
+    : null;
+  out.veeam = en(config.veeam)
+    ? (out.veeam || veeamConnectingData(config.veeam))
+    : null;
+  out.portainer = en(config.portainer)
+    ? (out.portainer || portainerConnectingData(config.portainer))
+    : null;
 
   if (en(config.database)) {
     const current = Array.isArray(out.database) ? out.database : [];
@@ -4247,7 +4890,7 @@ function ensureRuntimeShell(data = cache.data) {
 function pruneRuntimeSnapshot(data = {}) {
   const out = { ...EMPTY, ...(data || {}) };
   const configured = new Set(configuredList());
-  for (const id of ['proxmox','linux','kubernetes','snmp','healthchecks','uptimekuma','checks','prometheus','docker','dockhand','database']) {
+  for (const id of ['proxmox','linux','windows','kubernetes','snmp','healthchecks','uptimekuma','checks','prometheus','docker','dockhand','database','firewall','truenas','qnap','ugreen','pbs','cloudflare','cicd','veeam','portainer']) {
     if (!configured.has(id)) out[id] = runtimeEmptyFor(id);
   }
   out.loading = false;
@@ -4291,11 +4934,48 @@ function runtimeSnapshotSignature(data = {}) {
   }
 }
 
+function runtimePlatformPresent(data = {}, id) {
+  const value = data[id];
+  if (Array.isArray(value)) return value.length > 0;
+  if (id === 'proxmox') return Array.isArray(value?.nodes) && value.nodes.length > 0;
+  if (id === 'kubernetes') return !!value;
+  if (id === 'healthchecks') return !!value;
+  if (id === 'uptimekuma') return !!value;
+  if (id === 'checks') return !!value;
+  if (OBJECT_INSTANCE_PLATFORMS.has(id)) return !!value && (Array.isArray(value.instances) ? value.instances.length > 0 : true);
+  return !!value;
+}
+
+function runtimePlatformObserved(data = {}, id) {
+  const value = data[id];
+  if (Array.isArray(value)) return value.some(row => row && !row._connecting);
+  if (id === 'proxmox') return (value?.nodes || []).some(row => row && !row._connecting);
+  if (id === 'kubernetes') return !!value && !value._connecting && (value.online !== undefined || value.error || value.resourceError || value.summary);
+  if (id === 'healthchecks') return !!value && !value._connecting && (value.online !== undefined || value.error || (value.checks || []).length);
+  if (id === 'uptimekuma') return !!value && !value._connecting && (value.online !== undefined || value.error || (value.monitors || []).length);
+  if (id === 'checks') return !!value && !value._connecting && (value.online !== undefined || value.error || (value.checks || []).some(c => !c?._connecting && c?.status !== 'connecting'));
+  if (OBJECT_INSTANCE_PLATFORMS.has(id)) {
+    if (!value || value._connecting) return false;
+    const instances = Array.isArray(value.instances) ? value.instances : [];
+    return value.online !== undefined || value.error || instances.some(inst => inst && !inst._connecting);
+  }
+  return !!value && !value._connecting;
+}
+
+function runtimeSnapshotLooksLikeConnectingShell(data = {}) {
+  const ids = configuredList().filter(id => id !== 'linux');
+  if (ids.length < 3) return false;
+  const present = ids.filter(id => runtimePlatformPresent(data, id)).length;
+  const observed = ids.filter(id => runtimePlatformObserved(data, id)).length;
+  return present >= Math.max(2, Math.floor(ids.length * 0.5)) && observed === 0;
+}
+
 function writeRuntimeSnapshotNow(data = runtimeSnapshotPending || cache.data) {
   if (!data || data.loading) return;
   try {
     const snapshot = clonePlain(data);
     if (!snapshot || typeof snapshot !== 'object') return;
+    if (runtimeSnapshotLooksLikeConnectingShell(snapshot)) return;
     delete snapshot._snapshot;
     delete snapshot._snapshotLoadedAt;
     const payload = JSON.stringify({
@@ -4502,6 +5182,9 @@ if (startupSnapshot) {
   }
   if (enabled(config.linux)) {
     cache.data.linux = filterLinuxProxmoxRows(getLinuxData(cache.data.proxmox), cache.data.proxmox);
+  }
+  if (enabled(config.windows)) {
+    cache.data.windows = getWindowsData();
   }
   if (enabled(config.docker)) {
     cache.data.docker = mergeDockerHistory(mergeDockerConfiguredRows(cache.data.docker, agents.getDockerData()));
@@ -6222,7 +6905,8 @@ const CONFIG_AUDIT_LABELS = {
   performance: 'performance',
   security: 'security',
   proxmox: 'Proxmox',
-  linux: 'Linux servers',
+  linux: 'Linux Server',
+  windows: 'Windows Server',
   kubernetes: 'Kubernetes',
   snmp: 'SNMP',
   healthchecks: 'Healthchecks',
@@ -6231,6 +6915,15 @@ const CONFIG_AUDIT_LABELS = {
   prometheus: 'Prometheus',
   docker: 'Docker',
   dockhand: 'Dockhand',
+  firewall: 'Firewalls',
+  truenas: 'TrueNAS',
+  qnap: 'QNAP',
+  ugreen: 'Ugreen',
+  pbs: 'Proxmox Backup',
+  cloudflare: 'Cloudflare',
+  cicd: 'GitHub/GitLab CI',
+  veeam: 'Veeam',
+  portainer: 'Portainer',
   database: 'Databases',
   alerts: 'alerts',
   publicStatus: 'public status',
@@ -6361,6 +7054,10 @@ app.post('/api/config', async (req, res) => {
         cache.data.linux = getLinuxData(cache.data.proxmox);
       } else { cache.data.linux = []; }
 
+      if (en(config.windows)) {
+        cache.data.windows = getWindowsData();
+      } else { cache.data.windows = []; }
+
       if (en(config.kubernetes)) {
         if (connectingPlatforms.has('kubernetes') || !cache.data.kubernetes) {
           cache.data.kubernetes = kubernetesConnectingData();
@@ -6433,6 +7130,64 @@ app.post('/api/config', async (req, res) => {
         cache.data.dockhand = mergeDockhandConfigured(connectingPlatforms.has('dockhand') ? null : cache.data.dockhand, config.dockhand);
       } else { cache.data.dockhand = null; }
 
+      if (en(config.firewall)) {
+        const instances = Array.isArray(config.firewall?.instances) && config.firewall.instances.length ? config.firewall.instances : (config.firewall?.url ? [config.firewall] : []);
+        const current = !connectingPlatforms.has('firewall') && cache.data.firewall?.instances ? cache.data.firewall.instances : [];
+        const rows = instances.map((i, idx) => {
+          const existing = current.find(r => r.name === i.name || r.url === i.url);
+          return existing || { name: i.name || i.url || `Firewall ${idx + 1}`, type: i.type || 'opnsense', url: i.url || '', online: false, _connecting: true, summary: { interfaces: 0, interfacesUp: 0, interfacesDown: 0 } };
+        });
+        cache.data.firewall = { online: rows.some(r => r.online), _connecting: rows.some(r => r._connecting), instances: rows, summary: { instances: rows.length, up: rows.filter(r => r.online).length, down: rows.filter(r => !r.online && !r._connecting).length, interfaces: rows.reduce((a, r) => a + Number(r.summary?.interfaces || 0), 0), interfacesUp: rows.reduce((a, r) => a + Number(r.summary?.interfacesUp || 0), 0), interfacesDown: rows.reduce((a, r) => a + Number(r.summary?.interfacesDown || 0), 0), updates: rows.reduce((a, r) => a + Number(r.summary?.updates || 0), 0), rebootRequired: rows.filter(r => r.summary?.rebootRequired).length } };
+      } else { cache.data.firewall = null; }
+
+      if (en(config.truenas)) {
+        if (connectingPlatforms.has('truenas') || !cache.data.truenas) {
+          cache.data.truenas = trueNasConnectingData(config.truenas);
+        }
+      } else { cache.data.truenas = null; }
+
+      if (en(config.qnap)) {
+        if (connectingPlatforms.has('qnap') || !cache.data.qnap) {
+          cache.data.qnap = qnapConnectingData(config.qnap);
+        }
+      } else { cache.data.qnap = null; }
+
+      if (en(config.ugreen)) {
+        if (connectingPlatforms.has('ugreen') || !cache.data.ugreen) {
+          cache.data.ugreen = ugreenConnectingData(config.ugreen);
+        }
+      } else { cache.data.ugreen = null; }
+
+      if (en(config.pbs)) {
+        if (connectingPlatforms.has('pbs') || !cache.data.pbs) {
+          cache.data.pbs = pbsConnectingData(config.pbs);
+        }
+      } else { cache.data.pbs = null; }
+
+      if (en(config.cloudflare)) {
+        if (connectingPlatforms.has('cloudflare') || !cache.data.cloudflare) {
+          cache.data.cloudflare = cloudflareConnectingData(config.cloudflare);
+        }
+      } else { cache.data.cloudflare = null; }
+
+      if (en(config.cicd)) {
+        if (connectingPlatforms.has('cicd') || !cache.data.cicd) {
+          cache.data.cicd = cicdConnectingData(config.cicd);
+        }
+      } else { cache.data.cicd = null; }
+
+      if (en(config.veeam)) {
+        if (connectingPlatforms.has('veeam') || !cache.data.veeam) {
+          cache.data.veeam = veeamConnectingData(config.veeam);
+        }
+      } else { cache.data.veeam = null; }
+
+      if (en(config.portainer)) {
+        if (connectingPlatforms.has('portainer') || !cache.data.portainer) {
+          cache.data.portainer = portainerConnectingData(config.portainer);
+        }
+      } else { cache.data.portainer = null; }
+
       if (en(config.database)) {
         const instances = config.database.instances || [];
         cache.data.database = (cache.data.database || []).filter(d => instances.some(i => i.name === d.name));
@@ -6457,12 +7212,21 @@ app.post('/api/config', async (req, res) => {
       }
     }
 
-    backgroundRefresh({ force: true });
+    const refreshForResponse = backgroundRefresh({ force: true });
+    let responseData = cache.data || EMPTY;
+    try {
+      await Promise.race([
+        refreshForResponse.then(() => { responseData = cache.data || EMPTY; }),
+        new Promise(resolve => setTimeout(resolve, Number(req.query.wait || 7000))),
+      ]);
+    } catch {
+      responseData = cache.data || EMPTY;
+    }
 
     if (req.query.slim === '1') {
-      res.json({ ok: true, fullData: false, data: settingsStatusData(cache.data || EMPTY) });
+      res.json({ ok: true, fullData: false, data: { ...settingsStatusData(responseData), ui: uiPreferencesForRequest(req) } });
     } else {
-      res.json({ ok: true, fullData: true, data: cache.data });
+      res.json({ ok: true, fullData: true, data: { ...responseData, ui: uiPreferencesForRequest(req) } });
     }
   } catch (err) {
     sendServerError(res, err);
@@ -6629,6 +7393,12 @@ function patchCacheExclude(platform, host, service, isExcluded) {
   if (!cache.data) return;
   if (platform === 'linux' && cache.data.linux) {
     const srv = cache.data.linux.find(s => s.host === host || s.name === host);
+    if (srv && srv.services) {
+      const svc = srv.services.find(s => s.name === service);
+      if (svc) svc.excluded = isExcluded;
+    }
+  } else if (platform === 'windows' && cache.data.windows) {
+    const srv = cache.data.windows.find(s => s.host === host || s.name === host);
     if (srv && srv.services) {
       const svc = srv.services.find(s => s.name === service);
       if (svc) svc.excluded = isExcluded;
@@ -6982,6 +7752,14 @@ app.get('/agent/omnisight-agent.sh', (req, res) => {
   res.type('text/x-shellscript').sendFile(path.join(__dirname, 'agent', 'omnisight-agent.sh'));
 });
 
+app.get('/agent/install-windows.ps1', (req, res) => {
+  res.type('text/plain; charset=utf-8').sendFile(path.join(__dirname, 'agent', 'install-windows.ps1'));
+});
+
+app.get('/agent/omnisight-agent.ps1', (req, res) => {
+  res.type('text/plain; charset=utf-8').sendFile(path.join(__dirname, 'agent', 'omnisight-agent.ps1'));
+});
+
 app.post('/api/agent/ping', (req, res) => {
   if (!agentAuth(req, res)) return;
   res.json({ ok: true, id: String(req.body?.id || '').replace(/[^\w.-]/g, '').slice(0, 128), serverTime: new Date().toISOString() });
@@ -6994,12 +7772,14 @@ function refreshAgentDerivedCache() {
   if (!cache.data) return;
   const en = c => c && c.enabled !== false;
   cache.data.linux = en(config.linux) ? getLinuxData(cache.data.proxmox) : [];
+  cache.data.windows = en(config.windows) ? getWindowsData() : [];
   if (en(config.proxmox) && !hasProxmoxApi()) {
     cache.data.proxmox = preserveProxmoxOnTransient(agents.getProxmoxData({ excludedServices: config.excludedServices }));
   } else if (!en(config.proxmox)) {
     cache.data.proxmox = { clusterSummary: null, nodes: [] };
   }
   cache.data.linux = en(config.linux) ? getLinuxData(cache.data.proxmox) : [];
+  cache.data.windows = en(config.windows) ? getWindowsData() : [];
   cache.data.docker = en(config.docker) ? mergeDockerHistory(mergeDockerConfiguredRows(cache.data.docker, agents.getDockerData())) : [];
   assignStatic(cache.data);
   cache.data.timestamp = new Date().toISOString();
@@ -7198,6 +7978,7 @@ function shQuote(value) {
 
 function agentInstallRole(agent) {
   if (agent?.pveNode || agent?.platform === 'proxmox' || agent?.role === 'proxmox') return 'proxmox';
+  if (agent?.platform === 'windows' || agent?.role === 'windows') return 'windows';
   if (agent?.role === 'docker' || agent?.hasDocker) return 'docker';
   return agent?.platform === 'synology' ? 'synology' : 'linux';
 }
@@ -7207,6 +7988,23 @@ function agentRepairCommands(req, agent) {
   const token = String(config.linux?.agentToken || '');
   const role = agentInstallRole(agent);
   const id = String(agent.id || '');
+  if (role === 'windows') {
+    const install = token
+      ? `$env:OMNISIGHT_URL="${base}"; $env:OMNISIGHT_TOKEN="${token}"; $env:OMNISIGHT_AGENT_ROLE="windows"; iwr -UseBasicParsing "${base}/agent/install-windows.ps1" | iex`
+      : 'Generate an agent token in Settings before reinstalling agents.';
+    return [
+      {
+        title: 'Query Windows agent',
+        description: 'Run in an elevated PowerShell window on the Windows host.',
+        command: 'Get-ScheduledTask -TaskName OmniSightAgent -ErrorAction SilentlyContinue | Format-List *; Get-Content "$env:ProgramData\\OmniSight\\agent.id" -ErrorAction SilentlyContinue',
+      },
+      {
+        title: 'Repair Windows agent',
+        description: 'Reinstalls the scheduled task and keeps the same agent identity when ProgramData still exists.',
+        command: install,
+      },
+    ];
+  }
   const queryScript = [
     'echo "== omnisight-agent service =="',
     'systemctl status omnisight-agent --no-pager -l || true',
@@ -7286,7 +8084,7 @@ function agentRepairCommands(req, agent) {
     commands.push({
       title: 'Repair unavailable',
       description: 'No Linux agent token is configured. Generate a token in Settings before reinstalling agents.',
-      command: 'Open Settings -> Linux Servers and generate an agent token.',
+      command: 'Open Settings -> Linux Server and generate an agent token.',
     });
   }
   return commands;
@@ -7325,6 +8123,17 @@ app.post('/api/agent/update', async (req, res) => {
     if (!id) return res.status(400).json({ error: 'id required' });
     const agent = agents.findAgent(id);
     if (!agent) return res.status(404).json({ error: 'agent not found' });
+    const role = agentInstallRole(agent);
+    if (role === 'windows' && versionCompare(agent.agentVersion, '1.2.4') < 0) {
+      const base = browserRequestOrigin(req);
+      const token = String(config.linux?.agentToken || '');
+      return res.status(409).json({
+        error: 'This Windows agent needs a one-time reinstall before remote updates are available.',
+        manualCommand: token
+          ? `$env:OMNISIGHT_URL="${base}"; $env:OMNISIGHT_TOKEN="${token}"; $env:OMNISIGHT_AGENT_ROLE="windows"; $env:OMNISIGHT_AGENT_ID="${id}"; iwr -UseBasicParsing "${base}/agent/install-windows.ps1" | iex`
+          : 'Generate an agent token in Settings before reinstalling the Windows agent.',
+      });
+    }
     if (versionCompare(agent.agentVersion, '1.2.1') < 0) {
       return res.status(409).json({
         error: 'This agent needs a one-time manual update before remote updates are available.',
@@ -7356,13 +8165,25 @@ app.post('/api/agent/token', (req, res) => {
   } catch (err) { sendServerError(res, err); }
 });
 
+app.get('/api/agent/token', (req, res) => {
+  try {
+    if (sessionRole(req) !== 'admin') return res.status(403).json({ error: 'Forbidden' });
+    const token = String(config.linux?.agentToken || '');
+    if (!token) return res.status(404).json({ error: 'agent token is not configured' });
+    res.json({ ok: true, token });
+  } catch (err) { sendServerError(res, err); }
+});
+
 app.post('/api/agent/pending', (req, res) => {
   try {
-    const kind = ['linux', 'proxmox', 'docker'].includes(req.body?.kind) ? req.body.kind : 'linux';
+    const kind = ['linux', 'windows', 'proxmox', 'docker'].includes(req.body?.kind) ? req.body.kind : 'linux';
     const pending = agents.addPendingInstall(kind);
     if (cache.data) {
       if (kind === 'linux') {
         cache.data.linux = getLinuxData(cache.data.proxmox);
+      }
+      if (kind === 'windows') {
+        cache.data.windows = getWindowsData();
       }
       if (kind === 'proxmox') {
         cache.data.proxmox = preserveProxmoxOnTransient(agents.getProxmoxData({ excludedServices: config.excludedServices }));
@@ -7387,6 +8208,7 @@ app.post('/api/agent/remove', (req, res) => {
         ? cache.data.proxmox
         : preserveProxmoxOnTransient(agents.getProxmoxData({ excludedServices: config.excludedServices }));
       cache.data.linux = getLinuxData(cache.data.proxmox);
+      cache.data.windows = getWindowsData();
       cache.data.docker = mergeDockerHistory(mergeDockerConfiguredRows(cache.data.docker, agents.getDockerData()));
       assignStatic(cache.data);
     }
@@ -7651,7 +8473,17 @@ function buildPublicSummary(data) {
     const svcUp = linuxRows.reduce((a, l) => a + (l.services || []).filter(x => x.active && !x.excluded).length, 0);
     const failedSvcs = svcTotal - svcUp;
     const status = !linuxRows.length && connecting ? 'connecting' : up === 0 ? 'down' : (up < linuxRows.length || connecting || failedSvcs > 0 ? 'warn' : 'ok');
-    out.push({ id: 'linux', title: 'Linux Servers', status, meta: linuxRows.length ? `${up}/${linuxRows.length} servers\n${svcUp}/${svcTotal} services` : 'connecting...' });
+    out.push({ id: 'linux', title: 'Linux Server', status, meta: linuxRows.length ? `${up}/${linuxRows.length} servers\n${svcUp}/${svcTotal} services` : 'connecting...' });
+  }
+  if ((data.windows || []).length) {
+    const rows = data.windows.filter(w => !w._connecting);
+    const connecting = data.windows.length - rows.length;
+    const up = rows.filter(w => w.online).length;
+    const svcTotal = rows.reduce((a, w) => a + (w.services || []).filter(s => !s.excluded).length, 0);
+    const svcUp = rows.reduce((a, w) => a + (w.services || []).filter(x => x.active && !x.excluded).length, 0);
+    const failedSvcs = rows.reduce((a, w) => a + (w.services || []).filter(x => !x.active && !x.excluded && x.state !== 'unknown').length, 0);
+    const status = !rows.length && connecting ? 'connecting' : up === 0 ? 'down' : (up < rows.length || connecting || failedSvcs > 0 ? 'warn' : 'ok');
+    out.push({ id: 'windows', title: 'Windows Server', status, meta: rows.length ? `${up}/${rows.length} servers\n${svcUp}/${svcTotal} services` : 'connecting...' });
   }
   const k = data.kubernetes;
   if (k && k.online !== undefined && (k.online || k.summary)) {
@@ -7742,6 +8574,105 @@ function buildPublicSummary(data) {
     const up = rows.filter(d => d.online).length;
     out.push({ id: 'database', title: 'Databases', status: !rows.length && connecting ? 'connecting' : up === rows.length && !connecting ? 'ok' : up > 0 ? 'warn' : 'down', meta: !rows.length && connecting ? 'connecting...' : `${up}/${rows.length} up${connecting ? ` · ${connecting} connecting` : ''}` });
   }
+  const fw = data.firewall;
+  if (fw && fw.online !== undefined) {
+    const sm = fw.summary || {};
+    const up = Number(sm.up || 0);
+    const down = Number(sm.down || 0);
+    const updates = Number(sm.updates || 0);
+    const reboot = Number(sm.rebootRequired || 0);
+    const status = fw._connecting && !fw.online ? 'connecting' : !fw.online || up === 0 ? 'down' : (down > 0 || updates > 0 || reboot > 0 ? 'warn' : 'ok');
+    const meta = fw._connecting && !fw.online ? 'connecting...' : fw.online ? `${up}/${sm.instances || 0} gateways · ${sm.interfacesUp || 0}/${sm.interfaces || 0} links` : 'unreachable';
+    out.push({ id: 'firewall', title: 'Firewalls', status, meta });
+  }
+  const tn = data.truenas;
+  if (tn && tn.online !== undefined) {
+    const sm = tn.summary || {};
+    const up = Number(sm.up || 0);
+    const down = Number(sm.down || 0);
+    const warn = Number(sm.poolsWarn || 0) + Number(sm.disksWarn || 0) + Number(sm.alertsCritical || 0) + Number(sm.alertsWarning || 0);
+    const status = tn._connecting && !tn.online ? 'connecting' : !tn.online || up === 0 ? 'down' : (down > 0 || warn > 0 ? 'warn' : 'ok');
+    const meta = tn._connecting && !tn.online ? 'connecting...' : tn.online ? `${up}/${sm.instances || 0} systems · ${sm.poolsHealthy || 0}/${sm.pools || 0} pools` : 'unreachable';
+    out.push({ id: 'truenas', title: 'TrueNAS', status, meta });
+  }
+  const qnap = data.qnap;
+  if (qnap && qnap.online !== undefined) {
+    const sm = qnap.summary || {};
+    const up = Number(sm.up || 0);
+    const total = Number(sm.instances || (qnap.instances || []).length || 0);
+    const status = qnap._connecting && !qnap.online ? 'connecting' : !qnap.online || up === 0 ? 'down' : (up < total ? 'warn' : 'ok');
+    const meta = qnap._connecting && !qnap.online ? 'connecting...' : qnap.online ? `${up}/${total} systems` : 'unreachable';
+    out.push({ id: 'qnap', title: 'QNAP', status, meta });
+  }
+  const ugreen = data.ugreen;
+  if (ugreen && ugreen.online !== undefined) {
+    const sm = ugreen.summary || {};
+    const up = Number(sm.up || 0);
+    const total = Number(sm.instances || (ugreen.instances || []).length || 0);
+    const status = ugreen._connecting && !ugreen.online ? 'connecting' : !ugreen.online || up === 0 ? 'down' : (up < total ? 'warn' : 'ok');
+    const meta = ugreen._connecting && !ugreen.online ? 'connecting...' : ugreen.online ? `${up}/${total} systems` : 'unreachable';
+    out.push({ id: 'ugreen', title: 'Ugreen', status, meta });
+  }
+  const pbs = data.pbs;
+  if (pbs && pbs.online !== undefined) {
+    const sm = pbs.summary || {};
+    const up = Number(sm.up || 0);
+    const down = Number(sm.down || 0);
+    const warn = Number(sm.datastoresWarn || 0) + Number(sm.failedTasks || 0);
+    const status = pbs._connecting && !pbs.online ? 'connecting' : !pbs.online || up === 0 ? 'down' : (down > 0 || warn > 0 ? 'warn' : 'ok');
+    const meta = pbs._connecting && !pbs.online ? 'connecting...' : pbs.online ? `${up}/${sm.instances || 0} servers · ${sm.datastores || 0} datastores` : 'unreachable';
+    out.push({ id: 'pbs', title: 'Proxmox Backup', status, meta });
+  }
+  const cfPublic = data.cloudflare;
+  if (cfPublic && cfPublic.online !== undefined) {
+    const sm = cfPublic.summary || {};
+    const zones = Number(sm.zones || 0);
+    const active = Number(sm.zonesActive || 0);
+    const zoneWarn = Number(sm.zonesWarn || 0);
+    const tunnelsDown = Number(sm.tunnelsDown || 0);
+    const domainWarn = Number(sm.domainsExpired || 0) + Number(sm.domainsExpiring || 0);
+    const partial = !!cfPublic.partial || Number(sm.errors || 0) > 0;
+    const status = cfPublic._connecting && !cfPublic.online ? 'connecting' : !cfPublic.online ? 'down' : (zoneWarn > 0 || tunnelsDown > 0 || domainWarn > 0 || partial ? 'warn' : 'ok');
+    const tunnelMeta = Number(sm.tunnels || 0) ? ` - ${sm.tunnelsHealthy || 0}/${sm.tunnels} tunnels` : '';
+    const domainMeta = Number(sm.domains || 0) ? ` - ${domainWarn}/${sm.domains} domains expiring` : '';
+    const meta = cfPublic._connecting && !cfPublic.online ? 'connecting...' : cfPublic.online ? `${active}/${zones} zones${tunnelMeta}${domainMeta}` : 'unreachable';
+    out.push({ id: 'cloudflare', title: 'Cloudflare', status, meta });
+  }
+  const ciPublic = data.cicd;
+  if (ciPublic && ciPublic.online !== undefined) {
+    const sm = ciPublic.summary || {};
+    const up = Number(sm.up || 0);
+    const total = Number(sm.projects || (ciPublic.projects || []).length || 0);
+    const failed = Number(sm.failed || 0) + Number(sm.jobsFailed || 0);
+    const running = Number(sm.running || 0) + Number(sm.jobsRunning || 0);
+    const partial = Number(sm.partial || 0) > 0 || (ciPublic.projects || []).some(p => p.partial);
+    const status = ciPublic._connecting && !ciPublic.online ? 'connecting' : !ciPublic.online || up === 0 ? 'down' : (failed > 0 || partial ? 'warn' : 'ok');
+    const runMeta = running ? ` - ${running} running` : '';
+    const meta = ciPublic._connecting && !ciPublic.online ? 'connecting...' : ciPublic.online ? `${up}/${total} projects - ${sm.success || 0}/${sm.pipelines || 0} green${runMeta}` : 'unreachable';
+    out.push({ id: 'cicd', title: 'GitHub/GitLab CI', status, meta });
+  }
+  const veeam = data.veeam;
+  if (veeam && veeam.online !== undefined) {
+    const sm = veeam.summary || {};
+    const up = Number(sm.up || 0);
+    const down = Number(sm.down || 0);
+    const warn = Number(sm.failedSessions || 0) + Number(sm.warningSessions || 0) + Number(sm.repositoriesWarn || 0) + Number(sm.partial || 0);
+    const running = Number(sm.runningSessions || 0);
+    const status = veeam._connecting && !veeam.online ? 'connecting' : !veeam.online || up === 0 ? 'down' : (down > 0 || warn > 0 ? 'warn' : 'ok');
+    const runMeta = running ? ` - ${running} running` : '';
+    const meta = veeam._connecting && !veeam.online ? 'connecting...' : veeam.online ? `${up}/${sm.instances || 0} servers - ${sm.failedSessions || 0}/${sm.sessions || 0} failed sessions${runMeta}` : 'unreachable';
+    out.push({ id: 'veeam', title: 'Veeam', status, meta });
+  }
+  const portainer = data.portainer;
+  if (portainer && portainer.online !== undefined) {
+    const sm = portainer.summary || {};
+    const up = Number(sm.up || 0);
+    const down = Number(sm.down || 0);
+    const warn = Number(sm.environmentsDown || 0) + Number(sm.stacksWarn || 0);
+    const status = portainer._connecting && !portainer.online ? 'connecting' : !portainer.online || up === 0 ? 'down' : (down > 0 || warn > 0 ? 'warn' : 'ok');
+    const meta = portainer._connecting && !portainer.online ? 'connecting...' : portainer.online ? `${up}/${sm.instances || 0} servers · ${sm.environmentsUp || 0}/${sm.environments || 0} environments` : 'unreachable';
+    out.push({ id: 'portainer', title: 'Portainer', status, meta });
+  }
   return out;
 }
 
@@ -7750,12 +8681,13 @@ app.get('/api/public/status', (req, res) => {
   const data = cache.data || EMPTY;
   const showDetails = configFlag(config.publicStatusShowDetails, false);
   const showHistory = configFlag(config.publicStatusShowHistory, false);
+  const maintenanceWindow = currentMaintenanceWindow();
   const visible = Array.isArray(config.publicPlatforms) && config.publicPlatforms.length
     ? new Set(config.publicPlatforms.map(String))
     : null;
   const services = buildPublicSummary(data).filter(s => !visible || visible.has(s.id));
   const present = new Set(services.map(s => s.id));
-  const titles = { proxmox: 'Proxmox', linux: 'Linux Servers', kubernetes: 'Kubernetes', snmp: 'SNMP', healthchecks: 'Healthchecks', uptimekuma: 'Uptime Kuma', checks: 'Service checks', prometheus: 'Prometheus', docker: 'Docker', dockhand: 'Dockhand', database: 'Databases' };
+  const titles = { proxmox: 'Proxmox', linux: 'Linux Server', windows: 'Windows Server', kubernetes: 'Kubernetes', snmp: 'SNMP', healthchecks: 'Healthchecks', uptimekuma: 'Uptime Kuma', checks: 'Service checks', prometheus: 'Prometheus', docker: 'Docker', dockhand: 'Dockhand', database: 'Databases', firewall: 'Firewalls', truenas: 'TrueNAS', qnap: 'QNAP', ugreen: 'Ugreen', pbs: 'Proxmox Backup', cloudflare: 'Cloudflare', cicd: 'GitHub/GitLab CI', veeam: 'Veeam', portainer: 'Portainer' };
   configuredList().forEach(id => {
     if (visible && !visible.has(id)) return;
     if (!present.has(id)) services.push({ id, title: titles[id] || id, status: 'connecting', meta: 'connecting…' });
@@ -7774,6 +8706,12 @@ app.get('/api/public/status', (req, res) => {
     refreshing: refreshBusy(),
     version: appVersion(),
     historyEnabled: showHistory,
+    maintenance: maintenanceWindow ? {
+      active: true,
+      start: maintenanceWindow.start || maintenanceWindow.from || '',
+      end: maintenanceWindow.end || maintenanceWindow.to || '',
+      days: maintenanceWindow.days || maintenanceWindow.day || maintenanceWindow.weekdays || '',
+    } : { active: false },
     services,
   });
 });
@@ -7891,6 +8829,28 @@ app.post('/api/linux/service', async (req, res) => {
   } catch (err) { sendServerError(res, err); }
 });
 
+app.post('/api/windows/service', async (req, res) => {
+  try {
+    const { host, service, action } = req.query;
+    if (!['status', 'start', 'stop', 'restart'].includes(action)) return res.status(400).json({ error: 'invalid action' });
+    if (!SVC_NAME.test(String(host || '')) || !SVC_NAME.test(String(service || ''))) return res.status(400).json({ error: 'invalid host or service' });
+    if (!agents.findAgent(host)) return res.status(404).json({ error: 'agent not found' });
+    const output = await agents.queueCommand(host, action, service);
+    if (action !== 'status') {
+      if (cache.data?.windows) {
+        const s = cache.data.windows.find(x => x.host === host || x.name === host);
+        if (s && s.services) {
+          const svc = s.services.find(x => x.name === service);
+          if (svc) svc.active = action !== 'stop';
+        }
+      }
+      refreshPromise = null;
+      backgroundRefresh();
+    }
+    res.json({ ok: true, output });
+  } catch (err) { sendServerError(res, err); }
+});
+
 app.post('/api/docker/prune', async (req, res) => {
   try {
     const host = String(req.query.host || '');
@@ -7942,6 +8902,15 @@ app.get('/api/kubernetes/logs', async (req, res) => {
   } catch (err) {
     res.status(502).json({ error: err?.message || 'Kubernetes logs unavailable' });
   }
+});
+
+app.get(['/api/portainer/logs', '/api/portainer/container/logs'], async (req, res) => {
+  try {
+    const { instance, endpoint, id } = req.query;
+    if (!instance || !endpoint || !id) return res.status(400).json({ error: 'instance, endpoint and id required' });
+    const logs = await portainerLogs(config.portainer, instance, endpoint, id);
+    res.type('text/plain; charset=utf-8').send(logs || '');
+  } catch (err) { sendServerError(res, err); }
 });
 
 app.use('/api', (req, res) => {

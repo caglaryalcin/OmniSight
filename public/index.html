@@ -95,6 +95,7 @@ header{
 
 /* Layout */
 .layout{display:flex;height:calc(100vh - 88px)}
+body.os-resizing{cursor:col-resize;user-select:none}
 .appfoot{height:28px;display:flex;align-items:center;gap:14px;padding:0 16px;border-top:1px solid var(--border);font-size:12px;color:var(--muted);background:rgba(24,26,27,.82);backdrop-filter:blur(14px)}
 .appfoot a{color:var(--muted);text-decoration:none;display:inline-flex;align-items:center;gap:5px;transition:color .15s}
 .appfoot a:hover{color:var(--text)}
@@ -105,6 +106,7 @@ header{
 #detail .embed-frame{position:absolute;inset:0;width:100%;height:100%;border:0;display:none;background:var(--bg);transition:opacity .12s ease;z-index:2}
 #detail .embed-frame.active{display:block}
 #detail .embed-frame.loading{opacity:1}
+body.os-resizing #detail .embed-frame{pointer-events:none}
 #embed-cache-bin{position:fixed;left:-10000px;top:-10000px;width:1px;height:1px;overflow:hidden;visibility:hidden;pointer-events:none}
 
 /* Sidebar cards */
@@ -339,10 +341,11 @@ html[data-theme="light"] #os-hover-dot{box-shadow:0 0 0 3px rgba(255,255,255,.9)
 .k8s-colhdr.k8s-pod-row > :nth-child(2) .docker-sort-btn{font-size:inherit;font-weight:inherit;letter-spacing:inherit}
 .k8s-pod-row > :nth-child(7){width:96px;overflow:visible}
 .k8s-pod-row .docker-sort-btn{justify-content:center}
-.k8s-colhdr.k8s-deploy-row,.mon-row.k8s-deploy-row{display:grid;grid-template-columns:10px minmax(360px,2.2fr) minmax(170px,.9fr) minmax(120px,.55fr);align-items:center;gap:22px}
-.k8s-colhdr.k8s-service-row,.mon-row.k8s-service-row{display:grid;grid-template-columns:10px minmax(360px,2.2fr) minmax(170px,.9fr) minmax(150px,.7fr) minmax(110px,.55fr);align-items:center;gap:22px}
+.k8s-colhdr.k8s-deploy-row,.mon-row.k8s-deploy-row{display:grid;grid-template-columns:10px minmax(520px,3fr) minmax(150px,.7fr) minmax(96px,.45fr);align-items:center;gap:18px}
+.k8s-colhdr.k8s-service-row,.mon-row.k8s-service-row{display:grid;grid-template-columns:10px minmax(520px,3fr) minmax(150px,.7fr) minmax(140px,.55fr) minmax(92px,.4fr);align-items:center;gap:18px}
 .k8s-grp-body .mon-row.k8s-deploy-row,.k8s-grp-body .mon-row.k8s-service-row{padding-left:34px;padding-right:16px}
 .k8s-detail-cell{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+.k8s-deploy-row .mon-name.k8s-detail-cell,.k8s-service-row .mon-name.k8s-detail-cell{width:auto;max-width:none;white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;line-height:1.28}
 .k8s-detail-cell.muted{color:var(--muted);font-size:12.5px}
 .k8s-deploy-row > :nth-child(n+4),.k8s-service-row > :nth-child(n+4){text-align:center;justify-self:center}
 .k8s-service-row > :nth-child(5){width:86px}
@@ -368,6 +371,21 @@ html[data-theme="light"] #os-hover-dot{box-shadow:0 0 0 3px rgba(255,255,255,.9)
   background:rgba(248,113,113,.06);border-bottom:1px solid var(--border);
 }
 .offline-err{font-size:12px;color:var(--muted);margin-top:2px;word-break:break-all}
+.tn-alerts{margin:12px 0 0;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:rgba(0,0,0,.08)}
+.tn-alerts-h{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;border-bottom:1px solid var(--border);background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.01))}
+.tn-alerts-title{font-size:11px;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.07em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tn-alert-row{display:grid;grid-template-columns:12px minmax(0,1fr) auto;align-items:start;gap:11px;padding:11px 12px;border-top:1px solid rgba(255,255,255,.035)}
+.tn-alerts-h + .tn-alert-row{border-top:0}
+.tn-alert-row.red{background:rgba(248,113,113,.045)}
+.tn-alert-row.yellow{background:rgba(251,191,36,.045)}
+.tn-alert-row.gray{background:rgba(148,163,184,.035)}
+.tn-alert-row .mon-dot{margin-top:5px}
+.tn-alert-main{min-width:0}
+.tn-alert-title{font-size:13px;font-weight:700;color:var(--text);line-height:1.34;overflow-wrap:anywhere}
+.tn-alert-meta{font-size:11px;color:var(--muted);margin-top:4px;text-transform:uppercase;letter-spacing:.055em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tn-alert-more{padding:0 12px 10px 35px;font-size:12px;color:var(--muted)}
+html[data-theme="light"] .tn-alerts{background:rgba(16,24,40,.025)}
+html[data-theme="light"] .tn-alert-row{border-top-color:rgba(16,24,40,.055)}
 
 .empty{color:var(--muted);font-size:13px;text-align:center;padding:18px}
 .chevron{color:var(--muted);font-size:11px;transition:transform .2s;flex-shrink:0}
@@ -667,10 +685,11 @@ html.nav-collapsed .nav-wrap .nav{max-height:0;opacity:0;padding-top:0;pointer-e
 .topbar #pbtn,.topbar #rbtn{width:36px;height:36px;border-radius:8px;background:var(--panel);padding:0;display:inline-flex;align-items:center;justify-content:center;gap:0}
 .topbar #thbtn{width:36px;height:36px;border-radius:8px;background:var(--panel);display:grid;place-items:center;flex-shrink:0}
 .topbar .menu-btn{width:36px;height:36px;border-radius:8px;background:var(--panel);display:grid;place-items:center;padding:0}
-.shell #sidebar{width:auto;min-width:0;min-height:0;max-width:none;border-right:0;background:transparent;backdrop-filter:none;position:relative;padding:0 12px 16px;overflow-y:hidden;flex:1 1 auto;display:flex;flex-direction:column;gap:8px;container-type:inline-size;container-name:sidebar}
+.shell #sidebar{width:auto;min-width:0;min-height:0;max-width:none;border-right:0;background:transparent;backdrop-filter:none;position:relative;padding:0 12px 16px;overflow-y:hidden;flex:1 1 auto;display:flex;flex-direction:column;gap:8px}
 .shell #sidebar.can-scroll{overflow-y:auto}
 .shell #detail{overflow-y:auto;padding:0;background:transparent;min-width:0;min-height:0;flex:none}
 .shell .sb-card{margin:0;border:1px solid var(--border);background:rgba(24,26,27,.78);border-radius:8px;padding:10px 11px;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:9px;box-shadow:none;overflow:visible}
+body.os-resizing .shell .sb-card{transition:none!important}
 .shell .sb-card:hover{border-color:var(--border2);transform:none;box-shadow:none;background:rgba(29,32,33,.72)}
 .shell .sb-card.active{border-color:var(--border);background:rgba(24,26,27,.78);box-shadow:none}
 .shell .sb-card.dragging{border:1px dashed var(--blue);background:rgba(96,165,250,.08)}
@@ -679,14 +698,12 @@ html.nav-collapsed .nav-wrap .nav{max-height:0;opacity:0;padding-top:0;pointer-e
 .shell .sb-title{font-size:13px;font-weight:650;letter-spacing:0}
 .shell .sb-meta{max-height:28px}
 .shell .sb-summary{display:none}
-@container sidebar (max-width: 230px){
-  .shell .sb-card{grid-template-columns:auto minmax(0,1fr);align-items:start}
-  .shell .sb-icon{grid-column:1;grid-row:1 / span 2}
-  .shell .sb-main{grid-column:2;grid-row:1;min-width:0}
-  .shell .sb-badge-wrap{grid-column:2;grid-row:2;justify-self:start;margin-left:0!important;margin-top:3px;max-width:100%;min-width:0}
-  .shell .sb-meta{max-height:none;flex-direction:column;align-items:flex-start;gap:1px;line-height:1.2}
-  .shell .sb-meta-part{max-width:100%}
-}
+.shell.rail-narrow .sb-card{grid-template-columns:auto minmax(0,1fr);align-items:start}
+.shell.rail-narrow .sb-icon{grid-column:1;grid-row:1 / span 2}
+.shell.rail-narrow .sb-main{grid-column:2;grid-row:1;min-width:0}
+.shell.rail-narrow .sb-badge-wrap{grid-column:2;grid-row:2;justify-self:start;margin-left:0!important;margin-top:3px;max-width:100%;min-width:0}
+.shell.rail-narrow .sb-meta{max-height:none;flex-direction:column;align-items:flex-start;gap:1px;line-height:1.2}
+.shell.rail-narrow .sb-meta-part{display:block;width:100%;max-width:100%}
 .shell .menu-btn{width:36px;height:36px;border-radius:8px}
 .shell .sb-csum{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;padding:8px}
 .shell .sb-csum-item{min-width:0;padding:7px 3px;border-radius:8px}
@@ -903,8 +920,8 @@ html[data-theme="light"] .overview-card .sb-csum-item{background:transparent!imp
   .det-platform-summary{min-width:100%}
   .k8s-grp,.prom-instance,.node-card{overflow-x:auto}
   .k8s-colhdr.k8s-pod-row,.mon-row.k8s-pod-row{min-width:900px}
-  .k8s-colhdr.k8s-deploy-row,.mon-row.k8s-deploy-row{min-width:620px}
-  .k8s-colhdr.k8s-service-row,.mon-row.k8s-service-row{min-width:720px}
+  .k8s-colhdr.k8s-deploy-row,.mon-row.k8s-deploy-row{min-width:820px}
+  .k8s-colhdr.k8s-service-row,.mon-row.k8s-service-row{min-width:940px}
   .docker-row,.docker-head-row{min-width:980px}
   .pve-node-hdr,.snmp-node-hdr,.docker-host-hdr,.db-row{min-width:760px}
 }
@@ -1089,10 +1106,11 @@ window.addEventListener('unhandledrejection', event => {
 let timer = null;
 const nodeOpen = {};
 const linuxOpen = {};
+const windowsOpen = {};
 const hcOpen = {};
 const snmpOpen = {};
 const k8sGrpOpen = {};
-const defaultOverviewGroupOpen = { pods:true, deps:false, svcs:false, snmpServers:true, dockerHosts:true, dockerContainers:true, checksServices:true, prometheusServers:true, prometheusTargets:true, databaseServers:true };
+const defaultOverviewGroupOpen = { pods:true, deps:false, svcs:false, snmpServers:true, dockerHosts:true, dockerContainers:true, checksServices:true, prometheusServers:true, prometheusTargets:true, firewallGateways:true, firewallLinks:true, truenasSystems:true, truenasPools:true, qnapSystems:true, ugreenSystems:true, pbsServers:true, pbsDatastores:true, cloudflareZones:true, cloudflareTunnels:true, cloudflareDomains:true, cicdProjects:true, cicdPipelines:true, veeamServers:true, veeamSessions:true, veeamRepositories:true, portainerServers:true, portainerEnvironments:true, portainerContainers:true, databaseServers:true };
 let overviewK8sOpen = { ...defaultOverviewGroupOpen };
 try { overviewK8sOpen = { ...overviewK8sOpen, ...JSON.parse(localStorage.getItem('os_overview_group_open') || '{}') }; } catch {}
 function saveOverviewGroupOpen(){
@@ -1568,10 +1586,14 @@ function persistLocalUserOverride(){
   try{ localStorage.setItem(UO_KEY, JSON.stringify(userOverride || {})); }catch{}
 }
 let userOverride = readLocalUserOverride();
+function invalidatePanelStateCache(){
+  window._panels = null;
+}
 function setOverride(key, val) {
   if(!key) return;
   userOverride[key] = !!val;
   persistLocalUserOverride();
+  invalidatePanelStateCache();
   scheduleUiPreferencesSave();
 }
 function panelOpenState(key, fallback = false) {
@@ -1702,7 +1724,11 @@ function applyServerUiPreferences(data = {}){
     setLocalUiShellPref('os_nav_collapsed', navCollapsedPref);
     if(Number.isFinite(Number(ui.railWidth))) railWidthPref = Number(ui.railWidth) || railWidthPref;
     const shell = document.querySelector('.shell');
-    if(shell && railWidthPref) shell.style.setProperty('--rail-w', Math.max(238, Math.min(440, Math.round(railWidthPref))) + 'px');
+    if(shell && railWidthPref) {
+      const w = Math.max(238, Math.min(440, Math.round(railWidthPref)));
+      shell.style.setProperty('--rail-w', w + 'px');
+      shell.classList.toggle('rail-narrow', w <= 254);
+    }
     applyRailCollapsed(railCollapsedPref);
     applyMainNavCollapsed(navCollapsedPref);
   } finally {
@@ -1715,12 +1741,16 @@ function applyServerUiPreferences(data = {}){
 
 let activePanel = null;
 
-const ALL_IDS = ['proxmox','kubernetes','linux','snmp','healthchecks','uptimekuma','checks','prometheus','docker','dockhand','database'];
+const ALL_IDS = ['proxmox','kubernetes','linux','windows','snmp','healthchecks','uptimekuma','checks','prometheus','docker','dockhand','firewall','truenas','qnap','ugreen','pbs','cloudflare','cicd','veeam','portainer','database'];
 const CONFIGURED_CACHE_KEY = 'os_configured_ids_v1';
+function platformTitle(id, title){
+  return String(title || id || '');
+}
 
 const SEC_ICONS = {
   proxmox:     () => `<span class="sec-glyph" style="font-size:15px">🖧</span>`,
   linux:       (c) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>`,
+  windows:     (c) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M3 5.5 10 4.5v7H3v-6Z" fill="${c}"/><path d="M11 4.35 21 3v8.5H11V4.35Z" fill="${c}" opacity=".82"/><path d="M3 12.5h7v7L3 18.5v-6Z" fill="${c}" opacity=".82"/><path d="M11 12.5h10V21l-10-1.35V12.5Z" fill="${c}"/></svg>`,
   kubernetes:  () => `<span class="sec-glyph" style="font-size:15px">⎈</span>`,
   snmp:        (c) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4.03 3 9 3s9-1.34 9-3"/></svg>`,
   healthchecks:(c) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>`,
@@ -1729,6 +1759,15 @@ const SEC_ICONS = {
   prometheus:  (c) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v5"/><path d="M8 5h8"/><path d="M7 10a5 5 0 0 1 10 0c0 2.5-2 4-5 6-3-2-5-3.5-5-6Z"/><path d="M9 21h6"/><path d="M10 17h4"/></svg>`,
   docker:      () => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2496ed" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="9" width="4" height="4" rx="1"/><rect x="7" y="9" width="4" height="4" rx="1"/><rect x="12" y="9" width="4" height="4" rx="1"/><rect x="7" y="4" width="4" height="4" rx="1"/><rect x="12" y="4" width="4" height="4" rx="1"/><path d="M22 11c-.5-3-3-4-6-4"/><path d="M2 13c1 4 5 5 9 5h3c4 0 6-2 6-5"/></svg>`,
   dockhand:    (c) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="14" rx="3"/><path d="M8 9h8"/><path d="M8 13h5"/><path d="M16 13l2 2-2 2"/><path d="M6 19h12"/></svg>`,
+  firewall:    (c) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 6v6c0 5 3.4 8 8 9 4.6-1 8-4 8-9V6l-8-3Z"/><path d="M9 12h6"/><path d="M12 9v6"/></svg>`,
+  truenas:     (c) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg>`,
+  qnap:        (c) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M8 9h8"/><path d="M8 13h5"/><circle cx="17" cy="16" r="1"/></svg>`,
+  ugreen:      (c) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5h14v10a7 7 0 0 1-14 0V5Z"/><path d="M9 9v6a3 3 0 0 0 6 0V9"/></svg>`,
+  pbs:         (c) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16v12H4z"/><path d="M8 10h8"/><path d="M8 14h5"/><path d="M6 20h12"/><path d="M9 4h6"/></svg>`,
+  cloudflare:  (c) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 18H8a5 5 0 1 1 1.1-9.9A6.5 6.5 0 0 1 21 12.5 3.5 3.5 0 0 1 17.5 18Z"/><path d="M7 14h10"/></svg>`,
+  cicd:        (c) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="${c}" aria-hidden="true"><path d="M12 .5C5.37.5 0 5.87 0 12.5c0 5.3 3.44 9.8 8.2 11.39.6.11.82-.26.82-.58v-2.04c-3.34.73-4.04-1.42-4.04-1.42-.55-1.39-1.34-1.76-1.34-1.76-1.09-.75.08-.73.08-.73 1.2.08 1.84 1.24 1.84 1.24 1.07 1.83 2.8 1.3 3.49.99.11-.78.42-1.3.76-1.6-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.13-.3-.54-1.52.11-3.18 0 0 1.01-.32 3.3 1.23a11.45 11.45 0 0 1 6 0c2.29-1.55 3.3-1.23 3.3-1.23.65 1.66.24 2.88.12 3.18.77.84 1.23 1.91 1.23 3.22 0 4.61-2.81 5.62-5.49 5.92.43.37.82 1.1.82 2.22v3.29c0 .32.22.69.83.57A12 12 0 0 0 12 .5z"/></svg>`,
+  veeam:       (c) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7Z"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="m9 14 2 2 4-5"/></svg>`,
+  portainer:   (c) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="5" height="5" rx="1"/><rect x="9.5" y="7" width="5" height="5" rx="1"/><rect x="16" y="7" width="5" height="5" rx="1"/><rect x="6" y="14" width="5" height="5" rx="1"/><rect x="13" y="14" width="5" height="5" rx="1"/></svg>`,
   database:    (c) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>`,
 };
 
@@ -1781,7 +1820,8 @@ function sortSvcs(svcs) {
 const PLATFORM_META = {
   proxmox:     { title:'Proxmox',       iconKey:'proxmox',     color:'var(--blue)' },
   kubernetes:  { title:'Kubernetes',    iconKey:'kubernetes',  color:'var(--purple,#9b59b6)' },
-  linux:       { title:'Linux Servers', iconKey:'linux',       color:'var(--green)' },
+  linux:       { title:'Linux Server', iconKey:'linux',       color:'var(--green)' },
+  windows:     { title:'Windows Server', iconKey:'windows',   color:'var(--blue)' },
   snmp:        { title:'SNMP',          iconKey:'snmp',        color:'var(--yellow)' },
   healthchecks:{ title:'Healthchecks',  iconKey:'healthchecks',color:'var(--green)' },
   uptimekuma:  { title:'Uptime Kuma',   iconKey:'uptimekuma',  color:'var(--green)' },
@@ -1789,6 +1829,15 @@ const PLATFORM_META = {
   prometheus:  { title:'Prometheus',    iconKey:'prometheus',  color:'var(--red)' },
   docker:      { title:'Docker',        iconKey:'docker',      color:'var(--blue)' },
   dockhand:    { title:'Dockhand',      iconKey:'dockhand',    color:'var(--green)' },
+  firewall:    { title: platformTitle('firewall', 'Firewalls'),     iconKey:'firewall',    color:'var(--yellow)' },
+  truenas:     { title: platformTitle('truenas', 'TrueNAS'),       iconKey:'truenas',     color:'var(--blue)' },
+  qnap:        { title: platformTitle('qnap', 'QNAP'),          iconKey:'qnap',        color:'var(--blue)' },
+  ugreen:      { title: platformTitle('ugreen', 'Ugreen'),        iconKey:'ugreen',      color:'var(--green)' },
+  pbs:         { title: platformTitle('pbs', 'Proxmox Backup'), iconKey:'pbs',        color:'var(--orange,#f59e0b)' },
+  cloudflare:  { title: platformTitle('cloudflare', 'Cloudflare'),    iconKey:'cloudflare',  color:'var(--orange,#f59e0b)' },
+  cicd:        { title: platformTitle('cicd', 'GitHub/GitLab CI'), iconKey:'cicd',     color:'var(--green)' },
+  veeam:       { title: platformTitle('veeam', 'Veeam'),         iconKey:'veeam',       color:'var(--green)' },
+  portainer:   { title: platformTitle('portainer', 'Portainer'),     iconKey:'portainer',   color:'var(--blue)' },
   database:    { title:'Databases',     iconKey:'database',     color:'var(--blue)' },
 };
 let configuredIds = [];
@@ -1814,7 +1863,7 @@ function placeholderPanel(id){
     const waitBody = `<div style="display:flex;flex-direction:column;align-items:center;gap:10px;padding:60px;color:var(--muted);font-size:14px;text-align:center">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
       Waiting for agents to report…
-      <span style="font-size:12px">Install the agent from <a href="#" onclick="openEmbed('/settings');return false" style="color:var(--blue)">Settings → Linux Servers</a></span>
+      <span style="font-size:12px">Install the agent from <a href="#" onclick="openEmbed('/settings');return false" style="color:var(--blue)">Settings → Linux Server</a></span>
     </div>`;
     return { id, loading:true, title:m.title, iconKey:m.iconKey, color:m.color, meta:'', badge:bdg('gray','no agents'), sbSummary:'', summary:'', body:waitBody };
   }
@@ -1823,10 +1872,11 @@ function placeholderPanel(id){
 }
 function applyConfigured(ids, cfg){
   setConfiguredIds(ids);
-  const d = window._lastData || { timestamp:new Date().toISOString(), proxmox:{nodes:[]}, linux:[], kubernetes:null, snmp:[], healthchecks:null, uptimekuma:null, checks:null, prometheus:null, docker:[], dockhand:null, database:[] };
+  const d = window._lastData || { timestamp:new Date().toISOString(), proxmox:{nodes:[]}, linux:[], windows:[], kubernetes:null, snmp:[], healthchecks:null, uptimekuma:null, checks:null, prometheus:null, docker:[], dockhand:null, firewall:null, truenas:null, qnap:null, ugreen:null, pbs:null, cloudflare:null, cicd:null, veeam:null, portainer:null, database:[] };
   d.configured = ids;
   if(!ids.includes('proxmox')) d.proxmox = { clusterSummary:null, nodes:[] };
   if(!ids.includes('linux')) d.linux = [];
+  if(!ids.includes('windows')) d.windows = [];
   if(!ids.includes('kubernetes')) d.kubernetes = null;
   if(!ids.includes('snmp')) d.snmp = [];
   if(!ids.includes('healthchecks')) d.healthchecks = null;
@@ -1835,6 +1885,15 @@ function applyConfigured(ids, cfg){
   if(!ids.includes('prometheus')) d.prometheus = null;
   if(!ids.includes('docker')) d.docker = [];
   if(!ids.includes('dockhand')) d.dockhand = null;
+  if(!ids.includes('firewall')) d.firewall = null;
+  if(!ids.includes('truenas')) d.truenas = null;
+  if(!ids.includes('qnap')) d.qnap = null;
+  if(!ids.includes('ugreen')) d.ugreen = null;
+  if(!ids.includes('pbs')) d.pbs = null;
+  if(!ids.includes('cloudflare')) d.cloudflare = null;
+  if(!ids.includes('cicd')) d.cicd = null;
+  if(!ids.includes('veeam')) d.veeam = null;
+  if(!ids.includes('portainer')) d.portainer = null;
   if(!ids.includes('database')) d.database = [];
   if(cfg){
     const mergeC = (arr, items, keyFn) => {
@@ -1875,6 +1934,79 @@ function applyConfigured(ids, cfg){
         summary: { servers: instances.length, serverUp: 0, serverDown: 0, total: 0, running: 0, stopped: 0, pending: 0 },
         instances: instances.map((inst, idx) => ({ name: inst.name || inst.url || `Dockhand ${idx + 1}`, url: inst.url || '', online: false, _connecting: true, summary: { total: 0, running: 0, stopped: 0, pending: 0 }, containers: [] })),
         containers: [],
+      };
+    }
+    if(ids.includes('firewall') && !d.firewall){
+      const instances = Array.isArray(cfg.firewall?.instances) ? cfg.firewall.instances : (cfg.firewall?.url ? [cfg.firewall] : []);
+      d.firewall = {
+        _connecting: true,
+        online: false,
+        summary: { instances: instances.length, up: 0, down: 0, interfaces: 0, interfacesUp: 0, interfacesDown: 0, updates: 0, rebootRequired: 0 },
+        instances: instances.map((inst, idx) => ({ name: inst.name || inst.url || `Firewall ${idx + 1}`, type: inst.type || 'opnsense', url: inst.url || '', online: false, _connecting: true, summary: { interfaces: 0, interfacesUp: 0, interfacesDown: 0 } })),
+      };
+    }
+    if(ids.includes('truenas') && !d.truenas){
+      const instances = Array.isArray(cfg.truenas?.instances) ? cfg.truenas.instances : (cfg.truenas?.url ? [cfg.truenas] : []);
+      d.truenas = {
+        _connecting: true,
+        online: false,
+        summary: { instances: instances.length, up: 0, down: 0, pools: 0, poolsHealthy: 0, poolsWarn: 0, disks: 0, disksWarn: 0, alertsCritical: 0, alertsWarning: 0 },
+        instances: instances.map((inst, idx) => ({ name: inst.name || inst.url || `TrueNAS ${idx + 1}`, url: inst.url || '', apiMode: inst.apiMode || 'auto', online: false, _connecting: true, pools: [], disks: [], alerts: [], summary: { pools: 0, poolsHealthy: 0, poolsWarn: 0, disks: 0, disksWarn: 0 } })),
+      };
+    }
+    if(ids.includes('qnap') && !d.qnap){
+      const instances = Array.isArray(cfg.qnap?.instances) ? cfg.qnap.instances : (cfg.qnap?.url ? [cfg.qnap] : []);
+      d.qnap = { _connecting: true, online: false, summary: { instances: instances.length, up: 0, down: 0 }, instances: instances.map((inst, idx) => ({ name: inst.name || inst.url || `QNAP ${idx + 1}`, url: inst.url || '', online: false, _connecting: true, summary: { instances: 1, up: 0, down: 0 } })) };
+    }
+    if(ids.includes('ugreen') && !d.ugreen){
+      const instances = Array.isArray(cfg.ugreen?.instances) ? cfg.ugreen.instances : (cfg.ugreen?.url ? [cfg.ugreen] : []);
+      d.ugreen = { _connecting: true, online: false, summary: { instances: instances.length, up: 0, down: 0 }, instances: instances.map((inst, idx) => ({ name: inst.name || inst.url || `Ugreen ${idx + 1}`, url: inst.url || '', online: false, _connecting: true, summary: { instances: 1, up: 0, down: 0 } })) };
+    }
+    if(ids.includes('pbs') && !d.pbs){
+      const instances = Array.isArray(cfg.pbs?.instances) ? cfg.pbs.instances : (cfg.pbs?.url ? [cfg.pbs] : []);
+      d.pbs = {
+        _connecting: true,
+        online: false,
+        summary: { instances: instances.length, up: 0, down: 0, datastores: 0, datastoresWarn: 0, snapshots: 0, groups: 0, failedTasks: 0 },
+        instances: instances.map((inst, idx) => ({ name: inst.name || inst.url || `PBS ${idx + 1}`, url: inst.url || '', online: false, _connecting: true, datastores: [], tasks: [], summary: { datastores: 0, datastoresWarn: 0, snapshots: 0, groups: 0, failedTasks: 0 } })),
+      };
+    }
+    if(ids.includes('cloudflare') && !d.cloudflare){
+      const zones = Array.isArray(cfg.cloudflare?.zones) ? cfg.cloudflare.zones.filter(Boolean) : [];
+      d.cloudflare = {
+        _connecting: true,
+        online: false,
+        summary: { zones: zones.length, zonesActive: 0, zonesWarn: 0, tunnels: 0, tunnelsHealthy: 0, tunnelsDown: 0, domains: 0, domainsExpiring: 0, domainsExpired: 0, domainsAutoRenew: 0 },
+        zones: zones.map(name => ({ name, status: 'connecting', online: false, _connecting: true })),
+        tunnels: [],
+        domains: [],
+      };
+    }
+    if(ids.includes('cicd') && !d.cicd){
+      const projects = Array.isArray(cfg.cicd?.projects) ? cfg.cicd.projects : (Array.isArray(cfg.cicd?.instances) ? cfg.cicd.instances : []);
+      d.cicd = {
+        _connecting: true,
+        online: false,
+        summary: { projects: projects.length, up: 0, down: 0, partial: 0, pipelines: 0, success: 0, failed: 0, running: 0, canceled: 0, jobs: 0, jobsFailed: 0, jobsRunning: 0 },
+        projects: projects.map((row, idx) => ({ name: row.name || row.repo || row.projectId || `CI Project ${idx + 1}`, provider: row.provider || 'github', branch: row.branch || row.ref || '', online: false, _connecting: true, pipelines: [], jobs: [] })),
+      };
+    }
+    if(ids.includes('veeam') && !d.veeam){
+      const instances = Array.isArray(cfg.veeam?.instances) ? cfg.veeam.instances : (cfg.veeam?.url ? [cfg.veeam] : []);
+      d.veeam = {
+        _connecting: true,
+        online: false,
+        summary: { instances: instances.length, up: 0, down: 0, partial: 0, jobs: 0, jobsDisabled: 0, sessions: 0, failedSessions: 0, warningSessions: 0, runningSessions: 0, repositories: 0, repositoriesWarn: 0 },
+        instances: instances.map((inst, idx) => ({ name: inst.name || inst.url || `Veeam ${idx + 1}`, url: inst.url || '', online: false, _connecting: true, jobs: [], sessions: [], repositories: [], summary: { jobs: 0, sessions: 0, repositories: 0, failedSessions: 0, warningSessions: 0, runningSessions: 0, repositoriesWarn: 0 } })),
+      };
+    }
+    if(ids.includes('portainer') && !d.portainer){
+      const instances = Array.isArray(cfg.portainer?.instances) ? cfg.portainer.instances : (cfg.portainer?.url ? [cfg.portainer] : []);
+      d.portainer = {
+        _connecting: true,
+        online: false,
+        summary: { instances: instances.length, up: 0, down: 0, environments: 0, environmentsUp: 0, environmentsDown: 0, stacks: 0, stacksWarn: 0, containers: 0, running: 0, stopped: 0 },
+        instances: instances.map((inst, idx) => ({ name: inst.name || inst.url || `Portainer ${idx + 1}`, url: inst.url || '', online: false, _connecting: true, environments: [], stacks: [], containers: [], summary: { environments: 0, environmentsUp: 0, environmentsDown: 0, stacks: 0, stacksWarn: 0, containers: 0, running: 0, stopped: 0 } })),
       };
     }
   }
@@ -2277,17 +2409,29 @@ function togglePrometheusInstance(idx, key){
 }
 
 function toggleLinux(key){
-  linuxOpen[key] = !linuxOpen[key];
-  setOverride('linux:'+key, linuxOpen[key]);
+  const stateKey = 'linux:'+key;
+  linuxOpen[key] = !panelOpenState(stateKey, linuxOpen[key]);
+  setOverride(stateKey, linuxOpen[key]);
   const el = document.getElementById(`lx-${key}`);
   const chev = document.querySelector(`[onclick="toggleLinux('${key}')"] .chevron`);
   if(el){ el.classList.toggle('open', !!linuxOpen[key]); el.style.display = ''; }
   if(chev) chev.classList.toggle('open', !!linuxOpen[key]);
 }
 
+function toggleWindows(key){
+  const stateKey = 'windows:'+key;
+  windowsOpen[key] = !panelOpenState(stateKey, windowsOpen[key]);
+  setOverride(stateKey, windowsOpen[key]);
+  const el = document.getElementById(`win-${key}`);
+  const chev = el?.previousElementSibling?.querySelector('.chevron');
+  if(el){ el.classList.toggle('open', !!windowsOpen[key]); el.style.display = ''; }
+  if(chev) chev.classList.toggle('open', !!windowsOpen[key]);
+}
+
 function toggleHC(){
-  hcOpen.checks = !hcOpen.checks;
-  setOverride('healthchecks:checks', hcOpen.checks);
+  const stateKey = 'healthchecks:checks';
+  hcOpen.checks = !panelOpenState(stateKey, hcOpen.checks);
+  setOverride(stateKey, hcOpen.checks);
   const el = document.getElementById('hc-checks');
   const chev = document.querySelector('[onclick="toggleHC()"] .chevron');
   if(el) el.style.display = hcOpen.checks ? 'block' : 'none';
@@ -2869,7 +3013,7 @@ function buildLinux(linux){
 
   return {
     id: 'linux',
-    title: 'Linux Servers',
+    title: 'Linux Server',
     iconKey: 'linux',
     color: 'var(--green)',
     meta: `${reachable}/${linux.length} reachable`,
@@ -2877,6 +3021,139 @@ function buildLinux(linux){
       connecting && !realLinux.length ? 'gray' : allOk && !connecting ? 'green' : (failed || reachable === 0) ? 'red' : 'yellow',
       connecting ? 'connecting…' : allOk ? 'healthy' : failed ? `${failed} services failed` : reachable === 0 ? 'offline' : `${reachable}/${linux.length} reachable`
     ),
+    sbSummary: sbSummaryHtml,
+    summary: summaryHtml,
+    body,
+  };
+}
+
+function buildWindows(windows){
+  if(!windows?.length) return null;
+  const connecting = windows.filter(s=>s._connecting).length;
+  const real = windows.filter(s=>!s._connecting);
+  const reachable = windows.filter(s=>s.online).length;
+  const failed = windows.flatMap(s=>s.services||[]).filter(s=>!s.active&&s.state!=='unknown'&&!s.excluded).length;
+  const totalSvcs = windows.flatMap(s=>s.services||[]).length;
+  const upSvcs = windows.flatMap(s=>s.services||[]).filter(s=>s.active).length;
+  const allOk = real.length > 0 && real.every(s=>s.online && s.services?.every(sv=>sv.active || sv.excluded));
+  const cpuVals = windows.filter(s=>s.online&&s.cpu!=null).map(s=>s.cpu);
+  const ramVals = windows.filter(s=>s.online&&s.ram).map(s=>s.ram.percent);
+  const metric = (vals, limit) => {
+    if(!vals.length) return null;
+    if(vals.length===1){ const v=vals[0]; return { val:v+'%', color:bc(v) }; }
+    const ok = vals.every(v=>v<limit);
+    return { val: ok?'healthy':'high', color: ok?'var(--green)':'var(--red)' };
+  };
+  const cpuM = metric(cpuVals,90), ramM = metric(ramVals,90);
+  const sbSummaryHtml = `<div class="sb-csum">
+    <div class="sb-csum-item"><div class="sb-csum-val">${reachable}/${windows.length}</div><div class="sb-csum-lbl">Servers</div></div>
+    ${cpuM?`<div class="sb-csum-item"><div class="sb-csum-val" style="color:${cpuM.color}">${cpuM.val}</div><div class="sb-csum-lbl">CPU usage</div></div>`:''}
+    ${ramM?`<div class="sb-csum-item"><div class="sb-csum-val" style="color:${ramM.color}">${ramM.val}</div><div class="sb-csum-lbl">RAM usage</div></div>`:''}
+    <div class="sb-csum-item"><div class="sb-csum-val">${upSvcs}/${totalSvcs}</div><div class="sb-csum-lbl">Services up</div></div>
+  </div>`;
+  const summaryHtml = `<div class="csum">
+    <div class="csum-item"><div class="csum-val">${reachable}/${windows.length}</div><div class="csum-lbl">Servers</div></div>
+    <div class="csum-item"><div class="csum-val">${upSvcs}/${totalSvcs}</div><div class="csum-lbl">Services up</div></div>
+  </div>`;
+  const body = windows.map(srv=>{
+    if(srv._connecting) return `
+      <div class="node-hdr" style="cursor:default">
+        <div class="mon-dot md-gray"></div>
+        <div class="node-name">${escHtml(srv.name)}</div>
+        <div class="node-info">${escHtml(srv.host||'')}</div>
+        ${bdg('gray','connecting...')}
+      </div>`;
+    const svcFailed = (srv.services||[]).filter(s=>!s.active&&s.state!=='unknown'&&!s.excluded).length;
+    if(!srv.online) return `
+      <div class="offline-row">
+        <div class="mon-dot md-red" style="margin-top:2px"></div>
+        <div style="flex:1">
+          <div>${escHtml(srv.name)} <span style="color:var(--muted);font-size:11px">${escHtml(srv.ip||srv.host||'')}</span></div>
+          <div class="offline-err">Agent offline${srv.error?` - ${escHtml(srv.error)}`:''}</div>
+        </div>
+        ${bdg('red','offline')}
+        ${notifyBell('win:'+srv.name)}
+      </div>`;
+    const key = srv.host || srv.name;
+    const cpuPct = srv.cpu ?? null;
+    const ramPct = srv.ram?.percent ?? null;
+    const diskIO = srv.metrics?.diskIO || null;
+    const bw = srv.metrics?.bandwidth || null;
+    const diskRead = hasNum(diskIO?.readBps) ? Number(diskIO.readBps) : null;
+    const diskWrite = hasNum(diskIO?.writeBps) ? Number(diskIO.writeBps) : null;
+    const diskTotal = diskIO && (diskRead != null || diskWrite != null) ? (diskRead || 0) + (diskWrite || 0) : null;
+    const diskIOMbps = rateToMBps(diskTotal);
+    const bwRx = hasNum(bw?.rxBps) ? Number(bw.rxBps) : null;
+    const bwTx = hasNum(bw?.txBps) ? Number(bw.txBps) : null;
+    const bwTotal = bw && (bwRx != null || bwTx != null) ? (bwRx || 0) + (bwTx || 0) : null;
+    const bwMbps = rateToMBps(bwTotal);
+    const diskHistory = Array.isArray(srv.history) ? srv.history.map(h => ({
+      time: h?.time,
+      diskReadMBps: hasNum(h?.diskReadBps) ? rateToMBps(h.diskReadBps) : null,
+      diskWriteMBps: hasNum(h?.diskWriteBps) ? rateToMBps(h.diskWriteBps) : null,
+    })) : [];
+    const bwHistory = Array.isArray(srv.history) ? srv.history.map(h => {
+      const rx = hasNum(h?.bandwidthRxBps) ? Number(h.bandwidthRxBps) : null;
+      const tx = hasNum(h?.bandwidthTxBps) ? Number(h.bandwidthTxBps) : null;
+      return { time: h?.time, bandwidthMbps: (rx != null || tx != null) ? rateToMBps((rx || 0) + (tx || 0)) : null };
+    }) : [];
+    const svcTotal = (srv.services || []).filter(s => !s.excluded).length;
+    const svcUp = (srv.services || []).filter(s => s.active && !s.excluded).length;
+    const isOpen = panelOpenState('windows:'+key, windowsOpen[key]);
+    windowsOpen[key] = isOpen;
+    const stats = [
+      pveHeadStat('Host', srv.ip || srv.host || '-', 'var(--text)', '', 'is-host'),
+      cpuPct != null ? pveHeadStat('CPU', `${cpuPct}%`, bc(cpuPct), miniSparkline(srv.history, 'cpu', cpuPct)) : '',
+      ramPct != null ? pveHeadStat('RAM', `${ramPct}%`, bc(ramPct), miniSparkline(srv.history, 'ram', ramPct)) : '',
+      srv.disk ? pveHeadStat('Disk', `${srv.disk.percent}%`, bc(srv.disk.percent), miniSparkline(srv.history, 'disk', srv.disk.percent)) : '',
+      diskTotal != null ? pveHeadStat('Disk I/O', fmtRate(diskTotal), 'var(--cyan)', diskIOMbps != null ? miniSparkline(diskHistory.map(h=>({ time:h.time, diskIOMbps:(h.diskReadMBps||0)+(h.diskWriteMBps||0) })), 'diskIOMbps', diskIOMbps, rateColor, rateSparkMax(diskHistory, 'diskReadMBps', diskIOMbps), ' MB/s', 'Disk I/O') : '') : '',
+      bwTotal != null ? pveHeadStat('BW', fmtRate(bwTotal), 'var(--green)', bwMbps != null ? miniSparkline(bwHistory, 'bandwidthMbps', bwMbps, ()=>'#34D399', rateSparkMax(bwHistory, 'bandwidthMbps', bwMbps), ' MB/s', 'Bandwidth') : '') : '',
+      svcTotal ? pveHeadStat('Services', `${svcUp}/${svcTotal}`) : '',
+      srv.uptime ? pveHeadStat('Uptime', fmtUptime(srv.uptime)) : '',
+    ].filter(Boolean).join('');
+    return `
+      <div class="node-hdr pve-node-hdr" onclick="toggleWindows(${jsStr(key)})">
+        <div class="mon-dot ${svcFailed?'md-yellow':'md-green'}"></div>
+        <div class="pve-head-main">
+          <div class="pve-head-title">
+            <div class="node-name">${escHtml(srv.name)}</div>
+            <div class="pve-head-sub">${svcFailed ? `${svcFailed} failed` : 'online'}</div>
+          </div>
+          ${stats}
+        </div>
+        ${bdg(svcFailed?'red':'green', svcFailed?`${svcFailed} failed`:'all ok')}
+        ${notifyBell('win:'+srv.name)}
+        <span class="chevron ${isOpen?'open':''}" style="margin-left:4px">▼</span>
+      </div>
+      <div class="node-body ${isOpen?'open':''}" id="win-${key}">
+        ${(()=>{ const lim=historyLimitFor('win:'+key); return (cpuPct!=null||srv.ram!=null||srv.disk!=null||bwMbps!=null)?`<div style="display:flex; justify-content:flex-end; margin-bottom:4px;">${drawTimeSelect('win:'+key, lim)}</div>`:'' })()}
+        ${(()=>{ const lim=historyLimitFor('win:'+key); return cpuPct!=null?`<div class="chart-row"><div class="chart-hdr"><span class="nb-label">CPU</span><span class="nb-pct" style="color:${bc(cpuPct)}">${cpuPct}%</span></div>${histChart(srv.history,'cpu',cpuPct,lim)}</div>`:'' })()}
+        ${(()=>{ const lim=historyLimitFor('win:'+key); return srv.ram?`<div class="chart-row"><div class="chart-hdr"><span class="nb-label">RAM</span><span class="nb-pct" style="color:${bc(ramPct)}">${ramPct}%</span></div>${histChart(srv.history,'ram',ramPct,lim)}<div class="chart-foot">${srv.ram.usedGB}/${srv.ram.totalGB} GB</div></div>`:'' })()}
+        ${(()=>{ const lim=historyLimitFor('win:'+key); const diskPct=srv.disk?.percent ?? null; return srv.disk?`<div class="chart-row"><div class="chart-hdr"><span class="nb-label">Disk</span><span class="nb-pct" style="color:${bc(diskPct)}">${diskPct}%</span></div>${histChart(srv.history,'disk',diskPct,lim)}<div class="chart-foot">${srv.disk.usedGB}/${srv.disk.totalGB} GB</div></div>`:'' })()}
+        ${(()=>{ const lim=historyLimitFor('win:'+key); return diskIOMbps!=null?`<div class="chart-row"><div class="chart-hdr"><span class="nb-label">Disk I/O</span><span class="nb-pct"><span style="color:#22D3EE">Read ${diskRead != null ? fmtRate(diskRead) : '--'}</span> <span style="color:var(--muted)">/</span> <span style="color:#34D399">Write ${diskWrite != null ? fmtRate(diskWrite) : '--'}</span></span></div>${splitRateChart(diskHistory,'diskReadMBps','diskWriteMBps',diskRead,diskWrite,lim,'Disk I/O')}</div>`:'' })()}
+        ${(()=>{ const lim=historyLimitFor('win:'+key); return bwMbps!=null?`<div class="chart-row"><div class="chart-hdr"><span class="nb-label">Bandwidth</span><span class="nb-pct" style="color:var(--green)">↓ ${bwRx != null ? fmtRate(bwRx) : '--'} / ↑ ${bwTx != null ? fmtRate(bwTx) : '--'}</span></div>${histChart(bwHistory,'bandwidthMbps',bwMbps,lim,()=>'#34D399',rateSparkMax(bwHistory,'bandwidthMbps',bwMbps),' MB/s','Bandwidth')}</div>`:'' })()}
+        ${srv.os||srv.kernel||srv.agentVersion?`<div class="row" style="padding:8px 0;margin-top:6px;border-top:1px solid var(--border);flex-wrap:wrap;gap:14px">
+          ${srv.os?`<span style="font-size:12px;color:var(--muted)">OS <span style="color:var(--text);font-weight:600">${escHtml(srv.os)}</span></span>`:''}
+          ${srv.kernel?`<span style="font-size:12px;color:var(--muted)">Build <span style="color:var(--text);font-weight:600">${escHtml(srv.kernel)}</span></span>`:''}
+          ${srv.agentVersion?`<span style="font-size:12px;color:var(--muted)">Agent <span style="color:var(--text);font-weight:600">v${escHtml(srv.agentVersion)}</span></span>`:''}
+        </div>`:''}
+        ${(srv.services||[]).length?`<div class="syn-section" style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">Services</div>`:''}
+        ${sortSvcs(srv.services || []).map(s=>`
+          <div class="row" style="padding:8px 0;${s.excluded?'opacity:0.6':''}">
+            <div class="mon-dot ${s.excluded?'md-gray':(s.active?'md-green':s.state==='unknown'?'md-gray':'md-red')}" style="flex-shrink:0"></div>
+            <span class="nb-label" style="flex:1;margin-left:8px;font-size:14px;${s.excluded?'text-decoration:line-through':''}">${escHtml(s.name)}</span>
+            ${s.excluded ? `<button class="btn-act" style="padding:4px 12px;margin-left:8px;font-size:13px" onclick="includeService('windows', ${jsStr(srv.host)}, ${jsStr(s.name)}, this)">Include</button>` : (!s.active ? `<button class="btn-act exclude" style="padding:4px 12px;margin-left:8px;font-size:13px" onclick="excludeService('windows', ${jsStr(srv.host)}, ${jsStr(s.name)}, this)">Exclude</button><button class="btn-act" style="padding:4px 12px;margin-left:6px;font-size:13px" onclick="winSvcAction(${jsStr(srv.host)},${jsStr(s.name)},'status',this)">Status</button><button class="btn-act" style="padding:4px 12px;margin-left:6px;font-size:13px" onclick="winSvcAction(${jsStr(srv.host)},${jsStr(s.name)},'start',this)">Start</button><button class="btn-act" style="padding:4px 12px;margin-left:6px;font-size:13px" onclick="winSvcAction(${jsStr(srv.host)},${jsStr(s.name)},'restart',this)">Restart</button>` : '')}
+            <span class="badge bg-${s.excluded?'gray':(s.active?'green':s.state==='unknown'?'gray':'red')}" style="font-size:13px;margin-left:10px;min-width:54px;text-align:center">${s.excluded?'excluded':(s.active?'active':escHtml(s.state||'unknown'))}</span>
+          </div>`).join('')}
+      </div>`;
+  }).join('');
+  return {
+    id: 'windows',
+    title: 'Windows Server',
+    iconKey: 'windows',
+    color: 'var(--blue)',
+    meta: `${reachable}/${windows.length} reachable`,
+    badge: bdg(connecting && !real.length ? 'gray' : allOk && !connecting ? 'green' : (failed || reachable === 0) ? 'red' : 'yellow', connecting ? 'connecting...' : allOk ? 'healthy' : failed ? `${failed} services failed` : reachable === 0 ? 'offline' : `${reachable}/${windows.length} reachable`),
     sbSummary: sbSummaryHtml,
     summary: summaryHtml,
     body,
@@ -4054,6 +4331,667 @@ function toggleDockhandInstance(idx, key){
   document.getElementById(`dockhand-chev-${idx}`)?.classList.toggle('open', next);
 }
 
+/* ── Firewalls ── */
+function buildFirewall(fw){
+  if(!fw) return null;
+  const instances = fw.instances || [];
+  if(!instances.length && !fw._connecting && fw.online === undefined) return null;
+  const sm = fw.summary || {};
+  const up = Number(sm.up || 0);
+  const total = Number(sm.instances || instances.length || 0);
+  const down = Number(sm.down || Math.max(0, total - up));
+  const updates = Number(sm.updates || 0);
+  const reboot = Number(sm.rebootRequired || 0);
+  const connecting = !!fw._connecting || instances.some(i => i._connecting && !i.online);
+  const healthCls = connecting && !up ? 'gray' : up === 0 ? 'red' : (down > 0 || updates > 0 || reboot > 0 ? 'yellow' : 'green');
+  const healthTxt = connecting && !up ? 'connecting...' : up === 0 ? 'offline' : (down > 0 ? `${up}/${total} online` : updates > 0 ? `${updates} updates` : reboot > 0 ? 'reboot required' : 'healthy');
+
+  const sbSummaryHtml = `<div class="sb-csum">
+    <div class="sb-csum-item"><div class="sb-csum-val">${up}/${total}</div><div class="sb-csum-lbl">Gateways</div></div>
+    <div class="sb-csum-item"><div class="sb-csum-val" style="color:var(--green)">${sm.interfacesUp || 0}</div><div class="sb-csum-lbl">Links up</div></div>
+    ${sm.interfacesDown ? `<div class="sb-csum-item"><div class="sb-csum-val" style="color:var(--yellow)">${sm.interfacesDown}</div><div class="sb-csum-lbl">Links down</div></div>` : ''}
+    ${updates ? `<div class="sb-csum-item"><div class="sb-csum-val" style="color:var(--yellow)">${updates}</div><div class="sb-csum-lbl">Updates</div></div>` : ''}
+  </div>`;
+
+  const ifaceRows = (inst) => (inst.interfaces || []).slice(0, 12).map(row => {
+    const status = String(row.status || '').toLowerCase();
+    const dot = ['up','active','1','true'].includes(status) ? 'md-green' : status ? 'md-yellow' : 'md-gray';
+    const rate = [row.inBytes != null ? `in ${fmtBytes(row.inBytes)}` : '', row.outBytes != null ? `out ${fmtBytes(row.outBytes)}` : ''].filter(Boolean).join(' · ');
+    return `<div class="mon-row" style="grid-template-columns:18px minmax(120px,1fr) minmax(120px,1fr) minmax(120px,1fr)">
+      <div class="mon-dot ${dot}"></div>
+      <div class="mon-name" title="${escAttr(row.description || row.name || row.id)}">${escHtml(row.name || row.id || 'interface')}</div>
+      <span style="color:var(--muted);font-size:12px">${escHtml(row.address || row.description || '')}</span>
+      <span style="color:var(--muted);font-size:12px;text-align:right">${escHtml(rate || status || '')}</span>
+    </div>`;
+  }).join('');
+
+  const body = instances.length ? instances.map((inst, idx) => {
+    const key = inst.url || inst.name || String(idx);
+    const isOpen = panelOpenState('firewall:' + key, true);
+    const stateClass = inst._connecting ? 'connecting' : !inst.online ? 'offline' : (inst.partial || inst.summary?.updates || inst.summary?.rebootRequired || inst.summary?.interfacesDown) ? 'warn' : 'online';
+    const badge = inst._connecting ? bdg('gray','connecting...') : inst.online ? bdg(stateClass === 'warn' ? 'yellow' : 'green', stateClass === 'warn' ? 'attention' : 'online') : bdg('red','offline');
+    const sys = inst.system || {};
+    const stats = inst.firewall || {};
+    return `<section class="prom-instance">
+      <div class="prom-instance-h service-node-hdr ${stateClass}" onclick="toggleFirewallInstance(${idx},${jsStr(key)})">
+        <div class="mon-dot ${inst._connecting?'md-gray':inst.online?(stateClass==='warn'?'md-yellow':'md-green'):'md-red'}"></div>
+        <div class="prom-instance-main">
+          <div class="prom-instance-name">${escHtml(inst.name || sys.hostname || inst.url || 'Firewall')}</div>
+          <div class="prom-instance-url">${escHtml(inst.url || inst.error || '')}</div>
+        </div>
+        <div class="prom-instance-meta">${inst.online ? `${inst.summary?.interfacesUp || 0}/${inst.summary?.interfaces || 0} links${stats.states != null ? ` · ${stats.states} states` : ''}` : inst._connecting ? 'waiting for first check' : 'unreachable'}</div>
+        ${badge}
+        ${notifyBell('firewall:' + (inst.name || inst.url || 'default'))}
+        <span class="chevron ${isOpen?'open':''}" id="firewall-chev-${idx}" style="margin-left:4px">▼</span>
+      </div>
+      <div class="prom-instance-body ${isOpen?'open':''}" id="firewall-body-${idx}">
+        ${inst.online ? `<div class="node-hdr pve-node-hdr db-node-hdr online" style="cursor:default;margin:10px 0">
+          <div class="pve-head-main db-head-main">
+            <div class="pve-head-title">
+              <div class="node-name">${escHtml(sys.hostname || inst.name || 'Firewall')}</div>
+              <div class="pve-head-sub">${escHtml(inst.type || 'opnsense')}</div>
+            </div>
+            ${sys.cpuPercent != null ? pveHeadStat('CPU', fmtPct(sys.cpuPercent), bc(sys.cpuPercent), '', 'is-db-primary') : ''}
+            ${sys.memoryPercent != null ? pveHeadStat('RAM', fmtPct(sys.memoryPercent), bc(sys.memoryPercent), '', 'is-db-primary') : ''}
+            ${stats.states != null ? pveHeadStat('States', stats.maxStates ? `${stats.states}/${stats.maxStates}` : stats.states, 'var(--green)', '', 'is-db-primary') : ''}
+            ${sys.updateCount != null ? pveHeadStat('Updates', sys.updateCount, sys.updateCount > 0 ? 'var(--yellow)' : 'var(--text)') : ''}
+            ${sys.rebootRequired ? pveHeadStat('Reboot', 'required', 'var(--yellow)') : ''}
+            ${sys.version ? pveHeadStat('Version', sys.version, 'var(--text)', '', 'is-version-wrap') : ''}
+          </div>
+        </div>
+        ${ifaceRows(inst) || '<div class="empty">No interface details available</div>'}
+        ${inst.partial && inst.errors?.length ? `<div class="offline-err" style="margin-top:10px">Partial API data: ${escHtml(inst.errors.join(' · '))}</div>` : ''}` : `<div class="offline-row"><div class="mon-dot ${inst._connecting?'md-gray':'md-red'}"></div><div>${inst._connecting?'Connecting to firewall...':'Firewall unreachable'}<div class="offline-err">${escHtml(inst._connecting ? (inst.url||'') : (inst.error||inst.url||''))}</div></div></div>`}
+      </div>
+    </section>`;
+  }).join('') : `<div class="offline-row"><div class="mon-dot md-gray"></div><div>Connecting to firewalls...</div></div>`;
+
+  return {
+    id: 'firewall',
+    title: 'Firewalls',
+    iconKey: 'firewall',
+    color: 'var(--yellow)',
+    meta: connecting && !up ? 'connecting...' : `${up}/${total} gateways · ${sm.interfacesUp || 0}/${sm.interfaces || 0} links`,
+    badge: bdg(healthCls, healthTxt),
+    sbSummary: sbSummaryHtml,
+    summary: '',
+    body,
+  };
+}
+
+function toggleFirewallInstance(idx, key){
+  const k = 'firewall:' + key;
+  const next = !panelOpenState(k, true);
+  setOverride(k, next);
+  document.getElementById(`firewall-body-${idx}`)?.classList.toggle('open', next);
+  document.getElementById(`firewall-chev-${idx}`)?.classList.toggle('open', next);
+}
+
+function trueNasAlertText(text, lang = currentLang()){
+  const msg = String(text || '');
+  if (lang !== 'tr') return msg;
+  const norm = msg.replace(/\s+/g, ' ').trim();
+  if (/^Boot pool status is ONLINE:/i.test(norm) && /unrecoverable error/i.test(norm) && /Applications are unaffected/i.test(norm)) {
+    return 'Boot pool durumu ONLINE: Bir veya daha fazla aygıt düzeltilemeyen bir hata yaşamış. Hata düzeltilmeye çalışıldı ve uygulamalar etkilenmedi.';
+  }
+  return trText(msg, lang);
+}
+
+function trueNasAlertSeverity(alert = {}){
+  const raw = String(alert.level || alert.severity || alert.priority || alert.type || '').toLowerCase();
+  const title = String(alert.title || alert.message || alert.text || alert.formatted || '').toLowerCase();
+  const haystack = `${raw} ${title}`;
+  if (['critical', 'alert', 'emergency'].includes(raw) || /(emerg|fatal|unrecoverable|failed|failure)/.test(haystack)) {
+    return { cls:'red', dot:'md-red', label:trText('critical') };
+  }
+  if (/(warn|degrad|error|fault|scrub|pool)/.test(haystack)) {
+    return { cls:'yellow', dot:'md-yellow', label:trText('warning') };
+  }
+  return { cls:'gray', dot:'md-gray', label:trText('alert') };
+}
+
+function trueNasAlertDate(value){
+  if(!value) return '';
+  const date = new Date(value);
+  if(Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleString();
+}
+
+function trueNasAlertsHtml(inst){
+  const alerts = (inst.alerts || []).filter(Boolean);
+  if(!alerts.length) return '';
+  const visible = alerts.slice(0, 6);
+  const critical = alerts.filter(a => trueNasAlertSeverity(a).cls === 'red').length;
+  const headerBadge = critical ? bdg('red', `${critical} ${trText('critical')}`) : bdg('yellow', `${alerts.length} ${trText('warning')}`);
+  const rows = visible.map(alert => {
+    const sev = trueNasAlertSeverity(alert);
+    const title = trueNasAlertText(alert.title || alert.message || alert.text || alert.formatted || trText('Alert'));
+    const source = alert.source || alert.klass || alert.class || alert.category || alert.node || '';
+    const when = trueNasAlertDate(alert.datetime || alert.createdAt || alert.time || alert.lastOccured || alert.lastOccurred);
+    const meta = [sev.label, source, when].filter(Boolean).join(' - ');
+    return `<div class="tn-alert-row ${sev.cls}">
+      <div class="mon-dot ${sev.dot}"></div>
+      <div class="tn-alert-main">
+        <div class="tn-alert-title">${escHtml(title)}</div>
+        <div class="tn-alert-meta">${escHtml(meta || sev.label)}</div>
+      </div>
+      ${bdg(sev.cls, sev.label)}
+    </div>`;
+  }).join('');
+  const more = alerts.length > visible.length ? `<div class="tn-alert-more">+${alerts.length - visible.length} ${escHtml(trText('more alerts'))}</div>` : '';
+  return `<div class="tn-alerts">
+    <div class="tn-alerts-h">
+      <div class="tn-alerts-title">${escHtml(trText('Active alerts'))}</div>
+      ${headerBadge}
+    </div>
+    ${rows}
+    ${more}
+  </div>`;
+}
+
+function buildTrueNas(tn){
+  if(!tn) return null;
+  const instances = tn.instances || [];
+  if(!instances.length && !tn._connecting && tn.online === undefined) return null;
+  const sm = tn.summary || {};
+  const up = Number(sm.up || 0);
+  const total = Number(sm.instances || instances.length || 0);
+  const down = Number(sm.down || Math.max(0, total - up));
+  const warnCount = Number(sm.poolsWarn || 0) + Number(sm.disksWarn || 0) + Number(sm.alertsCritical || 0) + Number(sm.alertsWarning || 0);
+  const connecting = !!tn._connecting || instances.some(i => i._connecting && !i.online);
+  const healthCls = connecting && !up ? 'gray' : up === 0 ? 'red' : (down > 0 || warnCount > 0 || instances.some(i => i.partial) ? 'yellow' : 'green');
+  const healthTxt = connecting && !up ? 'connecting...' : up === 0 ? 'offline' : warnCount > 0 ? 'attention' : 'healthy';
+  const pct = hasNum(sm.usedPercent) ? fmtPct(sm.usedPercent) : '--';
+  const sbSummaryHtml = `<div class="sb-csum">
+    <div class="sb-csum-item"><div class="sb-csum-val">${up}/${total}</div><div class="sb-csum-lbl">Systems</div></div>
+    <div class="sb-csum-item"><div class="sb-csum-val" style="color:var(--green)">${sm.poolsHealthy || 0}</div><div class="sb-csum-lbl">Pools OK</div></div>
+    <div class="sb-csum-item"><div class="sb-csum-val" style="color:${warnCount?'var(--yellow)':'var(--text)'}">${sm.poolsWarn || 0}</div><div class="sb-csum-lbl">Pool warn</div></div>
+    <div class="sb-csum-item"><div class="sb-csum-val">${pct}</div><div class="sb-csum-lbl">Used</div></div>
+  </div>`;
+  const poolRows = inst => (inst.pools || []).map(pool => {
+    const warn = pool.health !== 'online';
+    const sub = [pool.status || pool.health, hasNum(pool.usedPercent) ? `used ${fmtPct(pool.usedPercent)}` : '', pool.totalBytes ? fmtBytes(pool.totalBytes) : '', pool.scan || ''].filter(Boolean).join(' - ');
+    return `<div class="mon-row" style="grid-template-columns:18px minmax(160px,1fr) minmax(120px,1fr) 90px">
+      <div class="mon-dot ${warn?'md-yellow':'md-green'}"></div>
+      <div class="mon-name" title="${escAttr(pool.name)}">${escHtml(pool.name)}</div>
+      <span style="color:var(--muted);font-size:12px">${escHtml(sub)}</span>
+      <span style="text-align:right">${bdg(warn?'yellow':'green', warn ? (pool.status || 'warn') : 'online')}</span>
+    </div>`;
+  }).join('');
+  const diskRows = inst => (inst.disks || []).filter(d => d.health !== 'online' || d.temperature != null).slice(0, 16).map(disk => {
+    const warn = disk.health !== 'online';
+    const sub = [disk.model, disk.pool, disk.temperature != null ? `${disk.temperature}C` : '', disk.sizeBytes ? fmtBytes(disk.sizeBytes) : ''].filter(Boolean).join(' - ');
+    return `<div class="mon-row" style="grid-template-columns:18px minmax(160px,1fr) minmax(120px,1fr) 90px">
+      <div class="mon-dot ${warn?'md-yellow':'md-green'}"></div>
+      <div class="mon-name" title="${escAttr(disk.name)}">${escHtml(disk.name)}</div>
+      <span style="color:var(--muted);font-size:12px">${escHtml(sub)}</span>
+      <span style="text-align:right">${bdg(warn?'yellow':'green', disk.status || disk.health || 'ok')}</span>
+    </div>`;
+  }).join('');
+  const body = instances.length ? instances.map((inst, idx) => {
+    const key = inst.url || inst.name || String(idx);
+    const isOpen = panelOpenState('truenas:' + key, true);
+    const warn = inst.partial || Number(inst.summary?.poolsWarn || 0) > 0 || Number(inst.summary?.disksWarn || 0) > 0 || Number(inst.summary?.alertsCritical || 0) > 0;
+    const stateClass = inst._connecting ? 'connecting' : !inst.online ? 'offline' : warn ? 'warn' : 'online';
+    const badge = inst._connecting ? bdg('gray','connecting...') : inst.online ? bdg(warn ? 'yellow' : 'green', warn ? 'attention' : 'online') : bdg('red','offline');
+    const sys = inst.system || {};
+    const disksHtml = diskRows(inst);
+    return `<section class="prom-instance">
+      <div class="prom-instance-h service-node-hdr ${stateClass}" onclick="toggleTrueNasInstance(${idx},${jsStr(key)})">
+        <div class="mon-dot ${inst._connecting?'md-gray':inst.online?(warn?'md-yellow':'md-green'):'md-red'}"></div>
+        <div class="prom-instance-main">
+          <div class="prom-instance-name">${escHtml(inst.name || sys.hostname || inst.url || 'TrueNAS')}</div>
+          <div class="prom-instance-url">${escHtml(inst.url || inst.error || '')}</div>
+        </div>
+        <div class="prom-instance-meta">${inst.online ? `${inst.summary?.poolsHealthy || 0}/${inst.summary?.pools || 0} pools${inst.summary?.disksWarn ? ` - ${inst.summary.disksWarn} disk warn` : ''}` : inst._connecting ? 'waiting for first check' : 'unreachable'}</div>
+        ${badge}
+        ${notifyBell('truenas:' + (inst.name || inst.url || 'default'))}
+        <span class="chevron ${isOpen?'open':''}" id="truenas-chev-${idx}" style="margin-left:4px">▼</span>
+      </div>
+      <div class="prom-instance-body ${isOpen?'open':''}" id="truenas-body-${idx}">
+        ${inst.online ? `<div class="node-hdr pve-node-hdr db-node-hdr online" style="cursor:default;margin:10px 0">
+          <div class="pve-head-main db-head-main">
+            <div class="pve-head-title">
+              <div class="node-name">${escHtml(sys.hostname || inst.name || 'TrueNAS')}</div>
+              <div class="pve-head-sub">${escHtml([inst.apiMode, sys.version].filter(Boolean).join(' - '))}</div>
+            </div>
+            ${hasNum(inst.summary?.usedPercent) ? pveHeadStat('Used', fmtPct(inst.summary.usedPercent), bc(inst.summary.usedPercent), '', 'is-db-primary') : ''}
+            ${pveHeadStat('Pools', `${inst.summary?.poolsHealthy || 0}/${inst.summary?.pools || 0}`, inst.summary?.poolsWarn ? 'var(--yellow)' : 'var(--green)', '', 'is-db-primary')}
+            ${pveHeadStat('Disks', inst.summary?.disks || 0, inst.summary?.disksWarn ? 'var(--yellow)' : 'var(--text)', '', 'is-db-primary')}
+            ${inst.summary?.alertsCritical ? pveHeadStat('Alerts', inst.summary.alertsCritical, 'var(--red)') : ''}
+            ${sys.model ? pveHeadStat('Model', sys.model, 'var(--text)', '', 'is-version-wrap') : ''}
+          </div>
+        </div>
+        ${poolRows(inst) || '<div class="empty">No pool details available</div>'}
+        ${disksHtml ? `<div style="margin-top:10px">${disksHtml}</div>` : ''}
+        ${trueNasAlertsHtml(inst)}
+        ${inst.partial && inst.errors?.length ? `<div class="offline-err" style="margin-top:10px">Partial API data: ${escHtml(inst.errors.join(' - '))}</div>` : ''}` : `<div class="offline-row"><div class="mon-dot ${inst._connecting?'md-gray':'md-red'}"></div><div>${inst._connecting?'Connecting to TrueNAS...':'TrueNAS unreachable'}<div class="offline-err">${escHtml(inst._connecting ? (inst.url||'') : (inst.error||inst.url||''))}</div></div></div>`}
+      </div>
+    </section>`;
+  }).join('') : `<div class="offline-row"><div class="mon-dot md-gray"></div><div>Connecting to TrueNAS...</div></div>`;
+  return { id: 'truenas', title: 'TrueNAS', iconKey: 'truenas', color: 'var(--blue)', meta: connecting && !up ? 'connecting...' : `${up}/${total} systems - ${sm.poolsHealthy || 0}/${sm.pools || 0} pools`, badge: bdg(healthCls, healthTxt), sbSummary: sbSummaryHtml, summary: '', body };
+}
+
+function toggleTrueNasInstance(idx, key){
+  const k = 'truenas:' + key;
+  const next = !panelOpenState(k, true);
+  setOverride(k, next);
+  document.getElementById(`truenas-body-${idx}`)?.classList.toggle('open', next);
+  document.getElementById(`truenas-chev-${idx}`)?.classList.toggle('open', next);
+}
+
+function buildSimpleNasPanel(value, opts){
+  if(!value) return null;
+  const instances = value.instances || [];
+  if(!instances.length && !value._connecting && value.online === undefined) return null;
+  const sm = value.summary || {};
+  const up = Number(sm.up || 0);
+  const total = Number(sm.instances || instances.length || 0);
+  const connecting = !!value._connecting || instances.some(i => i._connecting && !i.online);
+  const healthCls = connecting && !up ? 'gray' : up === 0 ? 'red' : up < total ? 'yellow' : 'green';
+  const healthTxt = connecting && !up ? 'connecting...' : up === 0 ? 'offline' : up < total ? 'partial' : 'online';
+  const sbSummaryHtml = `<div class="sb-mini"><span>${up}/${total}</span><small>online</small></div>`;
+  const body = instances.length ? instances.map((inst, idx) => {
+    const key = inst.name || inst.url || String(idx);
+    const isOpen = panelOpenState(opts.id + ':' + key, true);
+    const stateClass = inst._connecting ? 'connecting' : !inst.online ? 'offline' : 'online';
+    return `<section class="prom-instance">
+      <div class="prom-instance-h service-node-hdr ${stateClass}" onclick="toggleSimpleNasInstance(${jsStr(opts.id)},${idx},${jsStr(key)})">
+        <div class="mon-dot ${inst._connecting?'md-gray':inst.online?'md-green':'md-red'}"></div>
+        <div class="prom-instance-main">
+          <div class="prom-instance-name">${escHtml(inst.name || inst.system?.hostname || inst.url || opts.title)}</div>
+          <div class="prom-instance-url">${escHtml(inst.url || inst.error || '')}</div>
+        </div>
+        ${notifyBell(opts.id + ':' + (inst.name || inst.url || 'default'))}
+        <span class="chevron ${isOpen?'open':''}" id="${opts.id}-chev-${idx}" style="margin-left:4px">▼</span>
+      </div>
+      <div class="prom-instance-body ${isOpen?'open':''}" id="${opts.id}-body-${idx}">
+        ${inst.online ? `<div class="node-hdr pve-node-hdr db-node-hdr online" style="cursor:default;margin:10px 0">
+          <div class="pve-head-main db-head-main">
+            <div>
+              <div class="node-name">${escHtml(inst.system?.hostname || inst.name || opts.title)}</div>
+              <div class="pve-head-sub">${escHtml([inst.statusCode ? `HTTP ${inst.statusCode}` : '', inst.url].filter(Boolean).join(' - '))}</div>
+            </div>
+          </div>
+        </div>` : `<div class="offline-row"><div class="mon-dot ${inst._connecting?'md-gray':'md-red'}"></div><div>${inst._connecting?`Connecting to ${escHtml(opts.title)}...`:`${escHtml(opts.title)} unreachable`}<div class="offline-err">${escHtml(inst._connecting ? (inst.url||'') : (inst.error||inst.url||''))}</div></div></div>`}
+      </div>
+    </section>`;
+  }).join('') : `<div class="offline-row"><div class="mon-dot md-gray"></div><div>Connecting to ${escHtml(opts.title)}...</div></div>`;
+  return { id: opts.id, title: opts.title, iconKey: opts.id, color: opts.color || 'var(--blue)', meta: connecting && !up ? 'connecting...' : `${up}/${total} systems`, badge: bdg(healthCls, healthTxt), sbSummary: sbSummaryHtml, summary: '', body };
+}
+
+function toggleSimpleNasInstance(id, idx, key){
+  const k = id + ':' + key;
+  const next = !panelOpenState(k, true);
+  setOverride(k, next);
+  document.getElementById(`${id}-body-${idx}`)?.classList.toggle('open', next);
+  document.getElementById(`${id}-chev-${idx}`)?.classList.toggle('open', next);
+}
+
+function buildQnap(qnap){ return buildSimpleNasPanel(qnap, { id:'qnap', title:'QNAP', color:'var(--blue)' }); }
+function buildUgreen(ugreen){ return buildSimpleNasPanel(ugreen, { id:'ugreen', title:'Ugreen', color:'var(--green)' }); }
+
+function buildPbs(pbs){
+  if(!pbs) return null;
+  const instances = pbs.instances || [];
+  if(!instances.length && !pbs._connecting && pbs.online === undefined) return null;
+  const sm = pbs.summary || {};
+  const up = Number(sm.up || 0);
+  const total = Number(sm.instances || instances.length || 0);
+  const warnCount = Number(sm.datastoresWarn || 0) + Number(sm.failedTasks || 0);
+  const connecting = !!pbs._connecting || instances.some(i => i._connecting && !i.online);
+  const healthCls = connecting && !up ? 'gray' : up === 0 ? 'red' : warnCount > 0 || instances.some(i => i.partial) ? 'yellow' : 'green';
+  const healthTxt = connecting && !up ? 'connecting...' : up === 0 ? 'offline' : warnCount > 0 ? 'attention' : 'healthy';
+  const sbSummaryHtml = `<div class="sb-csum">
+    <div class="sb-csum-item"><div class="sb-csum-val">${up}/${total}</div><div class="sb-csum-lbl">Servers</div></div>
+    <div class="sb-csum-item"><div class="sb-csum-val">${sm.datastores || 0}</div><div class="sb-csum-lbl">Stores</div></div>
+    <div class="sb-csum-item"><div class="sb-csum-val">${sm.snapshots || 0}</div><div class="sb-csum-lbl">Snapshots</div></div>
+    <div class="sb-csum-item"><div class="sb-csum-val">${hasNum(sm.usedPercent) ? fmtPct(sm.usedPercent) : '--'}</div><div class="sb-csum-lbl">Used</div></div>
+  </div>`;
+  const storeRows = inst => (inst.datastores || []).map(store => {
+    const warn = store.health !== 'online';
+    const sub = [hasNum(store.usedPercent) ? `used ${fmtPct(store.usedPercent)}` : '', store.snapshots != null ? `${store.snapshots} snapshots` : '', store.groups != null ? `${store.groups} groups` : '', store.gcStatus || '', store.error || ''].filter(Boolean).join(' - ');
+    return `<div class="mon-row" style="grid-template-columns:18px minmax(160px,1fr) minmax(120px,1fr) 90px">
+      <div class="mon-dot ${warn?'md-yellow':'md-green'}"></div>
+      <div class="mon-name" title="${escAttr(store.comment || store.name)}">${escHtml(store.name)}</div>
+      <span style="color:var(--muted);font-size:12px">${escHtml(sub)}</span>
+      <span style="text-align:right">${bdg(warn?'yellow':'green', warn ? 'warn' : 'online')}</span>
+    </div>`;
+  }).join('');
+  const body = instances.length ? instances.map((inst, idx) => {
+    const key = inst.url || inst.name || String(idx);
+    const isOpen = panelOpenState('pbs:' + key, true);
+    const warn = inst.partial || Number(inst.summary?.datastoresWarn || 0) > 0 || Number(inst.summary?.failedTasks || 0) > 0;
+    const stateClass = inst._connecting ? 'connecting' : !inst.online ? 'offline' : warn ? 'warn' : 'online';
+    const badge = inst._connecting ? bdg('gray','connecting...') : inst.online ? bdg(warn ? 'yellow' : 'green', warn ? 'attention' : 'online') : bdg('red','offline');
+    const node = (inst.nodes || [])[0] || {};
+    return `<section class="prom-instance">
+      <div class="prom-instance-h service-node-hdr ${stateClass}" onclick="togglePbsInstance(${idx},${jsStr(key)})">
+        <div class="mon-dot ${inst._connecting?'md-gray':inst.online?(warn?'md-yellow':'md-green'):'md-red'}"></div>
+        <div class="prom-instance-main">
+          <div class="prom-instance-name">${escHtml(inst.name || inst.url || 'Proxmox Backup')}</div>
+          <div class="prom-instance-url">${escHtml(inst.url || inst.error || '')}</div>
+        </div>
+        <div class="prom-instance-meta">${inst.online ? `${inst.summary?.datastores || 0} datastores${inst.summary?.failedTasks ? ` - ${inst.summary.failedTasks} failed tasks` : ''}` : inst._connecting ? 'waiting for first check' : 'unreachable'}</div>
+        ${badge}
+        ${notifyBell('pbs:' + (inst.name || inst.url || 'default'))}
+        <span class="chevron ${isOpen?'open':''}" id="pbs-chev-${idx}" style="margin-left:4px">▼</span>
+      </div>
+      <div class="prom-instance-body ${isOpen?'open':''}" id="pbs-body-${idx}">
+        ${inst.online ? `<div class="node-hdr pve-node-hdr db-node-hdr online" style="cursor:default;margin:10px 0">
+          <div class="pve-head-main db-head-main">
+            <div class="pve-head-title">
+              <div class="node-name">${escHtml(inst.name || node.name || 'Proxmox Backup')}</div>
+              <div class="pve-head-sub">${escHtml([inst.version?.version, inst.version?.release].filter(Boolean).join(' - '))}</div>
+            </div>
+            ${hasNum(node.cpuPercent) ? pveHeadStat('CPU', fmtPct(node.cpuPercent), bc(node.cpuPercent), '', 'is-db-primary') : ''}
+            ${hasNum(node.memoryPercent) ? pveHeadStat('RAM', fmtPct(node.memoryPercent), bc(node.memoryPercent), '', 'is-db-primary') : ''}
+            ${hasNum(inst.summary?.usedPercent) ? pveHeadStat('Used', fmtPct(inst.summary.usedPercent), bc(inst.summary.usedPercent), '', 'is-db-primary') : ''}
+            ${pveHeadStat('Stores', inst.summary?.datastores || 0, inst.summary?.datastoresWarn ? 'var(--yellow)' : 'var(--green)', '', 'is-db-primary')}
+            ${inst.summary?.failedTasks ? pveHeadStat('Tasks', inst.summary.failedTasks, 'var(--yellow)') : ''}
+          </div>
+        </div>
+        ${storeRows(inst) || '<div class="empty">No datastore details available</div>'}
+        ${inst.partial && inst.errors?.length ? `<div class="offline-err" style="margin-top:10px">Partial API data: ${escHtml(inst.errors.join(' - '))}</div>` : ''}` : `<div class="offline-row"><div class="mon-dot ${inst._connecting?'md-gray':'md-red'}"></div><div>${inst._connecting?'Connecting to Proxmox Backup...':'Proxmox Backup unreachable'}<div class="offline-err">${escHtml(inst._connecting ? (inst.url||'') : (inst.error||inst.url||''))}</div></div></div>`}
+      </div>
+    </section>`;
+  }).join('') : `<div class="offline-row"><div class="mon-dot md-gray"></div><div>Connecting to Proxmox Backup...</div></div>`;
+  return { id: 'pbs', title: 'Proxmox Backup', iconKey: 'pbs', color: 'var(--orange,#f59e0b)', meta: connecting && !up ? 'connecting...' : `${up}/${total} servers - ${sm.datastores || 0} datastores`, badge: bdg(healthCls, healthTxt), sbSummary: sbSummaryHtml, summary: '', body };
+}
+
+function togglePbsInstance(idx, key){
+  const k = 'pbs:' + key;
+  const next = !panelOpenState(k, true);
+  setOverride(k, next);
+  document.getElementById(`pbs-body-${idx}`)?.classList.toggle('open', next);
+  document.getElementById(`pbs-chev-${idx}`)?.classList.toggle('open', next);
+}
+
+function buildCloudflare(cf){
+  if(!cf) return null;
+  if(!cf._connecting && cf.online === undefined && !(cf.zones||[]).length && !(cf.tunnels||[]).length) return null;
+  const sm = cf.summary || {};
+  const zones = cf.zones || [];
+  const tunnels = cf.tunnels || [];
+  const domains = cf.domains || [];
+  const active = Number(sm.zonesActive || zones.filter(z=>z.online).length || 0);
+  const total = Number(sm.zones || zones.length || 0);
+  const domainWarn = Number(sm.domainsExpiring || 0) + Number(sm.domainsExpired || 0);
+  const warnCount = Number(sm.zonesWarn || 0) + Number(sm.tunnelsDown || 0) + domainWarn + Number(sm.errors || 0);
+  const connecting = !!cf._connecting;
+  const healthCls = connecting && !cf.online ? 'gray' : !cf.online ? 'red' : warnCount > 0 || cf.partial ? 'yellow' : 'green';
+  const healthTxt = connecting && !cf.online ? 'connecting...' : !cf.online ? 'offline' : warnCount > 0 || cf.partial ? 'attention' : 'healthy';
+  const sbSummaryHtml = `<div class="sb-csum">
+    <div class="sb-csum-item"><div class="sb-csum-val">${active}/${total}</div><div class="sb-csum-lbl">Zones</div></div>
+    <div class="sb-csum-item"><div class="sb-csum-val">${sm.tunnelsHealthy || 0}/${sm.tunnels || 0}</div><div class="sb-csum-lbl">Tunnels</div></div>
+    ${sm.domains ? `<div class="sb-csum-item"><div class="sb-csum-val" style="color:${domainWarn?'var(--yellow)':'var(--text)'}">${domainWarn}/${sm.domains}</div><div class="sb-csum-lbl">Expiring</div></div>` : ''}
+  </div>`;
+  const zoneRows = zones.map(z => {
+    const warn = z.warn || !z.online;
+    const sub = [z.status, z.paused ? 'paused' : '', z.plan || '', z.accountName || ''].filter(Boolean).join(' - ');
+    return `<div class="mon-row" style="grid-template-columns:18px minmax(180px,1.3fr) minmax(120px,1fr) 86px">
+      <div class="mon-dot ${z._connecting?'md-gray':z.online?'md-green':warn?'md-yellow':'md-gray'}"></div>
+      <div class="mon-name" title="${escAttr(z.name)}">${escHtml(z.name)}</div>
+      <span style="color:var(--muted);font-size:12px">${escHtml(sub || 'zone')}</span>
+      <span style="text-align:right">${bdg(z._connecting?'gray':z.online?'green':'yellow', z._connecting?'connecting':(z.status || 'unknown'))}</span>
+    </div>`;
+  }).join('');
+  const tunnelRows = tunnels.map(t => {
+    const warn = !t.online;
+    const sub = [`${t.activeConnections || 0} active connections`, t.pendingReconnect ? `${t.pendingReconnect} reconnecting` : ''].filter(Boolean).join(' - ');
+    return `<div class="mon-row" style="grid-template-columns:18px minmax(180px,1fr) minmax(150px,1fr) 90px">
+      <div class="mon-dot ${t.online?'md-green':warn?'md-red':'md-gray'}"></div>
+      <div class="mon-name" title="${escAttr(t.name)}">${escHtml(t.name || 'tunnel')}</div>
+      <span style="color:var(--muted);font-size:12px">${escHtml(sub || t.id || '')}</span>
+      <span style="text-align:right">${bdg(t.online?'green':'red', t.status || 'unknown')}</span>
+    </div>`;
+  }).join('');
+  const domainRows = domains.map(d => {
+    const days = hasNum(d.daysToExpire) ? Number(d.daysToExpire) : null;
+    const status = d.expired ? 'expired' : d.expiring ? `${days}d left` : days !== null ? `${days}d left` : 'unknown';
+    const sub = [d.expiresAt ? `expires ${String(d.expiresAt).slice(0, 10)}` : '', d.autoRenew ? 'auto-renew' : '', d.currentRegistrar || ''].filter(Boolean).join(' - ');
+    return `<div class="mon-row" style="grid-template-columns:18px minmax(180px,1.1fr) minmax(150px,1fr) 96px">
+      <div class="mon-dot ${d.expired?'md-red':d.expiring?'md-yellow':'md-green'}"></div>
+      <div class="mon-name" title="${escAttr(d.name)}">${escHtml(d.name || 'domain')}</div>
+      <span style="color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escAttr(sub)}">${escHtml(sub || 'Cloudflare Registrar')}</span>
+      <span style="text-align:right">${bdg(d.expired?'red':d.expiring?'yellow':'green', status)}</span>
+    </div>`;
+  }).join('');
+  const body = cf.online || cf._connecting ? `<div class="node-hdr pve-node-hdr db-node-hdr ${healthCls === 'green' ? 'online' : healthCls === 'yellow' ? 'warn' : 'offline'}" style="cursor:default;margin:0 0 10px">
+    <div class="pve-head-main db-head-main">
+      <div class="pve-head-title">
+        <div class="node-name">Cloudflare</div>
+        <div class="pve-head-sub">${escHtml(cf._connecting ? 'Waiting for first check' : (cf.partial ? (cf.error || 'Partial API data') : 'API reachable'))}</div>
+      </div>
+      ${pveHeadStat('Zones', `${active}/${total}`, warnCount ? 'var(--yellow)' : 'var(--green)', '', 'is-db-primary')}
+      ${pveHeadStat('Tunnels', `${sm.tunnelsHealthy || 0}/${sm.tunnels || 0}`, sm.tunnelsDown ? 'var(--yellow)' : 'var(--green)', '', 'is-db-primary')}
+      ${sm.domains ? pveHeadStat('Domains', `${domainWarn}/${sm.domains}`, domainWarn ? 'var(--yellow)' : 'var(--green)', '', 'is-db-primary') : ''}
+    </div>
+  </div>
+  ${zoneRows ? `<div class="overview-nested-title"><span>Zones</span></div>${zoneRows}` : '<div class="empty">No zones reported</div>'}
+  ${tunnelRows ? `<div class="overview-nested-title" style="margin-top:10px"><span>Tunnels</span></div>${tunnelRows}` : ''}
+  ${domainRows ? `<div class="overview-nested-title" style="margin-top:10px"><span>Domain expiration</span></div>${domainRows}` : ''}
+  ${cf.partial && cf.errors?.length ? `<div class="offline-err" style="margin-top:10px">Partial API data: ${escHtml(cf.errors.join(' - '))}</div>` : ''}` :
+  `<div class="offline-row"><div class="mon-dot md-red"></div><div>Cloudflare unreachable<div class="offline-err">${escHtml(cf.error || '')}</div></div></div>`;
+  const tunnelMeta = Number(sm.tunnels || 0) ? ` - ${sm.tunnelsHealthy || 0}/${sm.tunnels} tunnels` : '';
+  const domainMeta = Number(sm.domains || 0) ? ` - ${domainWarn}/${sm.domains} domains expiring` : '';
+  return { id: 'cloudflare', title: 'Cloudflare', iconKey: 'cloudflare', color: 'var(--orange,#f59e0b)', meta: connecting && !cf.online ? 'connecting...' : `${active}/${total} zones${tunnelMeta}${domainMeta}`, badge: bdg(healthCls, healthTxt), sbSummary: sbSummaryHtml, summary: '', body };
+}
+
+function buildCiCd(ci){
+  if(!ci) return null;
+  const projects = ci.projects || [];
+  if(!projects.length && !ci._connecting && ci.online === undefined) return null;
+  const sm = ci.summary || {};
+  const up = Number(sm.up || projects.filter(p=>p.online).length || 0);
+  const total = Number(sm.projects || projects.length || 0);
+  const failed = Number(sm.failed || 0) + Number(sm.jobsFailed || 0);
+  const running = Number(sm.running || 0) + Number(sm.jobsRunning || 0);
+  const partial = Number(sm.partial || 0) > 0 || projects.some(p=>p.partial);
+  const connecting = !!ci._connecting || projects.some(p=>p._connecting && !p.online);
+  const healthCls = connecting && !up ? 'gray' : up === 0 ? 'red' : failed > 0 || partial ? 'yellow' : 'green';
+  const healthTxt = connecting && !up ? 'connecting...' : up === 0 ? 'offline' : failed > 0 ? 'failing' : partial ? 'partial' : 'healthy';
+  const sbSummaryHtml = `<div class="sb-csum">
+    <div class="sb-csum-item"><div class="sb-csum-val">${up}/${total}</div><div class="sb-csum-lbl">Projects</div></div>
+    <div class="sb-csum-item"><div class="sb-csum-val" style="color:var(--green)">${sm.success || 0}</div><div class="sb-csum-lbl">Green</div></div>
+    <div class="sb-csum-item"><div class="sb-csum-val" style="color:${failed?'var(--yellow)':'var(--text)'}">${failed}</div><div class="sb-csum-lbl">Failed</div></div>
+    <div class="sb-csum-item"><div class="sb-csum-val">${running}</div><div class="sb-csum-lbl">Running</div></div>
+  </div>`;
+  const statusBadge = row => row.running ? bdg('gray','running') : row.failed ? bdg('yellow','failed') : row.success ? bdg('green','success') : bdg('gray', row.status || 'unknown');
+  const pipelineRows = project => (project.pipelines || []).slice(0, 8).map(p => {
+    const sub = [p.ref || project.branch || '', p.actor || '', p.title || '', p.updatedAt || p.createdAt || ''].filter(Boolean).join(' - ');
+    return `<div class="mon-row" style="grid-template-columns:18px minmax(180px,1.2fr) minmax(140px,1fr) 90px">
+      <div class="mon-dot ${p.running?'md-gray':p.failed?'md-yellow':p.success?'md-green':'md-gray'}"></div>
+      <div class="mon-name" title="${escAttr(p.name || p.workflowName || 'pipeline')}">${escHtml(p.name || p.workflowName || 'pipeline')}</div>
+      <span style="color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escAttr(sub)}">${escHtml(sub)}</span>
+      <span style="text-align:right">${statusBadge(p)}</span>
+    </div>`;
+  }).join('');
+  const body = projects.length ? projects.map((project, idx) => {
+    const failedProject = (project.pipelines || []).some(p=>p.failed) || (project.jobs || []).some(j=>j.failed);
+    const stateClass = project._connecting ? 'connecting' : !project.online ? 'offline' : failedProject || project.partial ? 'warn' : 'online';
+    const provider = String(project.provider || '').toUpperCase();
+    const meta = project.online ? `${(project.pipelines || []).filter(p=>p.success).length}/${(project.pipelines || []).length} green` : project._connecting ? 'waiting for first check' : 'unreachable';
+    return `<section class="prom-instance">
+      <div class="prom-instance-h service-node-hdr ${stateClass}">
+        <div class="mon-dot ${project._connecting?'md-gray':project.online?(failedProject||project.partial?'md-yellow':'md-green'):'md-red'}"></div>
+        <div class="prom-instance-main">
+          <div class="prom-instance-name">${escHtml(project.name || 'CI Project')}</div>
+          <div class="prom-instance-url">${escHtml([provider, project.branch || project.ref || '', project.error || ''].filter(Boolean).join(' - '))}</div>
+        </div>
+        <div class="prom-instance-meta">${escHtml(meta)}</div>
+        ${project._connecting ? bdg('gray','connecting...') : project.online ? bdg(failedProject || project.partial ? 'yellow' : 'green', failedProject ? 'failing' : project.partial ? 'partial' : 'online') : bdg('red','offline')}
+        ${notifyBell('cicd:' + (project.name || idx))}
+      </div>
+      <div class="prom-instance-body open">
+        ${project.online ? (pipelineRows(project) || '<div class="empty">No pipelines reported</div>') : `<div class="offline-row"><div class="mon-dot ${project._connecting?'md-gray':'md-red'}"></div><div>${project._connecting?'Connecting to CI/CD...':'CI/CD project unreachable'}<div class="offline-err">${escHtml(project.error || '')}</div></div></div>`}
+        ${project.partial && project.errors?.length ? `<div class="offline-err" style="margin-top:10px">Partial API data: ${escHtml(project.errors.join(' - '))}</div>` : ''}
+      </div>
+    </section>`;
+  }).join('') : `<div class="offline-row"><div class="mon-dot md-gray"></div><div>Connecting to CI/CD...</div></div>`;
+  return { id: 'cicd', title: 'GitHub/GitLab CI', iconKey: 'cicd', color: 'var(--green)', meta: connecting && !up ? 'connecting...' : `${up}/${total} projects - ${sm.success || 0}/${sm.pipelines || 0} green`, badge: bdg(healthCls, healthTxt), sbSummary: sbSummaryHtml, summary: '', body };
+}
+
+function buildVeeam(veeam){
+  if(!veeam) return null;
+  const instances = veeam.instances || [];
+  if(!instances.length && !veeam._connecting && veeam.online === undefined) return null;
+  const sm = veeam.summary || {};
+  const up = Number(sm.up || 0);
+  const total = Number(sm.instances || instances.length || 0);
+  const failed = Number(sm.failedSessions || 0);
+  const warnings = Number(sm.warningSessions || 0);
+  const repoWarn = Number(sm.repositoriesWarn || 0);
+  const connecting = !!veeam._connecting || instances.some(i => i._connecting && !i.online);
+  const partial = Number(sm.partial || 0) > 0 || instances.some(i => i.partial);
+  const healthCls = connecting && !up ? 'gray' : up === 0 ? 'red' : failed || warnings || repoWarn || partial ? 'yellow' : 'green';
+  const healthTxt = connecting && !up ? 'connecting...' : up === 0 ? 'offline' : failed ? 'failing' : warnings || repoWarn || partial ? 'attention' : 'healthy';
+  const sbSummaryHtml = `<div class="sb-csum">
+    <div class="sb-csum-item"><div class="sb-csum-val">${up}/${total}</div><div class="sb-csum-lbl">Servers</div></div>
+    <div class="sb-csum-item"><div class="sb-csum-val">${sm.jobs || 0}</div><div class="sb-csum-lbl">Jobs</div></div>
+    <div class="sb-csum-item"><div class="sb-csum-val" style="color:${failed?'var(--yellow)':'var(--text)'}">${failed}</div><div class="sb-csum-lbl">Failed</div></div>
+    <div class="sb-csum-item"><div class="sb-csum-val">${sm.repositories || 0}</div><div class="sb-csum-lbl">Repos</div></div>
+  </div>`;
+  const sessionBadge = s => s.running ? bdg('gray','running') : s.failed ? bdg('yellow','failed') : s.warning ? bdg('yellow','warning') : s.result ? bdg('green', s.result) : bdg('gray', s.state || 'unknown');
+  const sessionRows = inst => (inst.sessions || []).slice(0, 10).map(s => {
+    const sub = [s.type, s.creationTime || '', s.endTime || '', hasNum(s.progressPercent) ? `${fmtPct(s.progressPercent)} progress` : ''].filter(Boolean).join(' - ');
+    return `<div class="mon-row" style="grid-template-columns:18px minmax(190px,1.1fr) minmax(150px,1fr) 96px">
+      <div class="mon-dot ${s.running?'md-gray':s.failed?'md-yellow':s.warning?'md-yellow':'md-green'}"></div>
+      <div class="mon-name" title="${escAttr(s.name || 'session')}">${escHtml(s.name || 'session')}</div>
+      <span style="color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escAttr(sub)}">${escHtml(sub)}</span>
+      <span style="text-align:right">${sessionBadge(s)}</span>
+    </div>`;
+  }).join('');
+  const repoRows = inst => (inst.repositories || []).map(r => {
+    const sub = [hasNum(r.usedPercent) ? `${fmtPct(r.usedPercent)} used` : '', r.path || '', r.error || ''].filter(Boolean).join(' - ');
+    return `<div class="mon-row" style="grid-template-columns:18px minmax(180px,1fr) minmax(140px,1fr) 90px">
+      <div class="mon-dot ${r.warning?'md-yellow':'md-green'}"></div>
+      <div class="mon-name" title="${escAttr(r.name || 'repository')}">${escHtml(r.name || 'repository')}</div>
+      <span style="color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escAttr(sub)}">${escHtml(sub)}</span>
+      <span style="text-align:right">${bdg(r.warning?'yellow':'green', r.status || 'online')}</span>
+    </div>`;
+  }).join('');
+  const body = instances.length ? instances.map((inst, idx) => {
+    const failedInst = Number(inst.summary?.failedSessions || 0);
+    const warnInst = Number(inst.summary?.warningSessions || 0) + Number(inst.summary?.repositoriesWarn || 0);
+    const warn = inst.partial || failedInst || warnInst;
+    const stateClass = inst._connecting ? 'connecting' : !inst.online ? 'offline' : warn ? 'warn' : 'online';
+    const badge = inst._connecting ? bdg('gray','connecting...') : inst.online ? bdg(warn ? 'yellow' : 'green', failedInst ? 'failing' : warn ? 'attention' : 'online') : bdg('red','offline');
+    return `<section class="prom-instance">
+      <div class="prom-instance-h service-node-hdr ${stateClass}">
+        <div class="mon-dot ${inst._connecting?'md-gray':inst.online?(warn?'md-yellow':'md-green'):'md-red'}"></div>
+        <div class="prom-instance-main">
+          <div class="prom-instance-name">${escHtml(inst.name || inst.url || 'Veeam')}</div>
+          <div class="prom-instance-url">${escHtml(inst.url || inst.error || '')}</div>
+        </div>
+        <div class="prom-instance-meta">${inst.online ? `${inst.summary?.jobs || 0} jobs - ${inst.summary?.failedSessions || 0}/${inst.summary?.sessions || 0} failed sessions` : inst._connecting ? 'waiting for first check' : 'unreachable'}</div>
+        ${badge}
+        ${notifyBell('veeam:' + (inst.name || inst.url || idx))}
+      </div>
+      <div class="prom-instance-body open">
+        ${inst.online ? `<div class="node-hdr pve-node-hdr db-node-hdr ${warn?'warn':'online'}" style="cursor:default;margin:10px 0">
+          <div class="pve-head-main db-head-main">
+            <div class="pve-head-title">
+              <div class="node-name">${escHtml(inst.name || 'Veeam')}</div>
+              <div class="pve-head-sub">${escHtml(inst.partial ? 'Partial API data' : 'API reachable')}</div>
+            </div>
+            ${pveHeadStat('Jobs', inst.summary?.jobs || 0, inst.summary?.jobsDisabled ? 'var(--yellow)' : 'var(--text)', '', 'is-db-primary')}
+            ${pveHeadStat('Sessions', `${inst.summary?.failedSessions || 0}/${inst.summary?.sessions || 0}`, inst.summary?.failedSessions ? 'var(--yellow)' : 'var(--green)', '', 'is-db-primary')}
+            ${pveHeadStat('Repos', `${inst.summary?.repositoriesWarn || 0}/${inst.summary?.repositories || 0}`, inst.summary?.repositoriesWarn ? 'var(--yellow)' : 'var(--green)', '', 'is-db-primary')}
+          </div>
+        </div>
+        ${sessionRows(inst) ? `<div class="overview-nested-title"><span>Recent sessions</span></div>${sessionRows(inst)}` : '<div class="empty">No sessions reported</div>'}
+        ${repoRows(inst) ? `<div class="overview-nested-title" style="margin-top:10px"><span>Repositories</span></div>${repoRows(inst)}` : ''}
+        ${inst.partial && inst.errors?.length ? `<div class="offline-err" style="margin-top:10px">Partial API data: ${escHtml(inst.errors.join(' - '))}</div>` : ''}` : `<div class="offline-row"><div class="mon-dot ${inst._connecting?'md-gray':'md-red'}"></div><div>${inst._connecting?'Connecting to Veeam...':'Veeam unreachable'}<div class="offline-err">${escHtml(inst._connecting ? (inst.url||'') : (inst.error||inst.url||''))}</div></div></div>`}
+      </div>
+    </section>`;
+  }).join('') : `<div class="offline-row"><div class="mon-dot md-gray"></div><div>Connecting to Veeam...</div></div>`;
+  return { id: 'veeam', title: 'Veeam', iconKey: 'veeam', color: 'var(--green)', meta: connecting && !up ? 'connecting...' : `${up}/${total} servers - ${failed}/${sm.sessions || 0} failed sessions`, badge: bdg(healthCls, healthTxt), sbSummary: sbSummaryHtml, summary: '', body };
+}
+
+function buildPortainer(pt){
+  if(!pt) return null;
+  const instances = pt.instances || [];
+  if(!instances.length && !pt._connecting && pt.online === undefined) return null;
+  const sm = pt.summary || {};
+  const up = Number(sm.up || 0);
+  const total = Number(sm.instances || instances.length || 0);
+  const warnCount = Number(sm.environmentsDown || 0) + Number(sm.stacksWarn || 0);
+  const connecting = !!pt._connecting || instances.some(i => i._connecting && !i.online);
+  const healthCls = connecting && !up ? 'gray' : up === 0 ? 'red' : warnCount > 0 || instances.some(i => i.partial) ? 'yellow' : 'green';
+  const healthTxt = connecting && !up ? 'connecting...' : up === 0 ? 'offline' : warnCount > 0 ? 'attention' : 'healthy';
+  const sbSummaryHtml = `<div class="sb-csum">
+    <div class="sb-csum-item"><div class="sb-csum-val">${up}/${total}</div><div class="sb-csum-lbl">Servers</div></div>
+    <div class="sb-csum-item"><div class="sb-csum-val" style="color:var(--green)">${sm.environmentsUp || 0}</div><div class="sb-csum-lbl">Env up</div></div>
+    <div class="sb-csum-item"><div class="sb-csum-val">${sm.stacks || 0}</div><div class="sb-csum-lbl">Stacks</div></div>
+    <div class="sb-csum-item"><div class="sb-csum-val">${sm.running || 0}/${sm.containers || 0}</div><div class="sb-csum-lbl">Containers</div></div>
+  </div>`;
+  const envRows = inst => (inst.environments || []).map(env => {
+    const warn = env.online === false;
+    const sub = [env.type, env.url || '', env.error || ''].filter(Boolean).join(' - ');
+    return `<div class="mon-row" style="grid-template-columns:18px minmax(160px,1fr) minmax(120px,1fr) 90px">
+      <div class="mon-dot ${warn?'md-red':env.online===true?'md-green':'md-gray'}"></div>
+      <div class="mon-name" title="${escAttr(env.name)}">${escHtml(env.name)}</div>
+      <span style="color:var(--muted);font-size:12px">${escHtml(sub)}</span>
+      <span style="text-align:right">${bdg(warn?'red':env.online===true?'green':'gray', env.status || 'unknown')}</span>
+    </div>`;
+  }).join('');
+  const containerRows = inst => (inst.containers || []).map(c => {
+    const dotCls = c.color==='green'?'md-green':c.color==='yellow'?'md-yellow':c.color==='red'?'md-red':'md-gray';
+    const portsTxt = (c.ports || []).join(' ');
+    const state = c.state || (c.running ? 'running' : 'unknown');
+    const color = c.color || (state === 'running' ? 'green' : state === 'unknown' ? 'gray' : 'yellow');
+    return `<div class="mon-row docker-row clickable" onclick="showPortainerLogs(${jsStr(inst.name || inst.url)},${jsStr(c.endpointId)},${jsStr(c.id)},${jsStr(c.name || c.id)})" title="View logs">
+      <div class="mon-dot ${dotCls}"></div>
+      <div class="docker-cell name" title="${escAttr(c.name || c.id)}">${escHtml(c.name || c.id || 'container')}</div>
+      <div class="docker-cell image" title="${escAttr(c.image || '')}">${escHtml(c.imageShort || c.image || '')}</div>
+      <div class="docker-cell cpu"></div>
+      <div class="docker-cell mem"></div>
+      <div class="docker-cell net"></div>
+      <div class="docker-cell io"></div>
+      <div class="docker-cell ports" title="${escAttr(portsTxt)}">${escHtml(portsTxt)}</div>
+      <div class="docker-cell update"></div>
+      <div class="docker-cell state">${bdg(color, state)}</div>
+    </div>`;
+  }).join('');
+  const body = instances.length ? instances.map((inst, idx) => {
+    const key = inst.url || inst.name || String(idx);
+    const isOpen = panelOpenState('portainer:' + key, true);
+    const warn = inst.partial || Number(inst.summary?.environmentsDown || 0) > 0 || Number(inst.summary?.stacksWarn || 0) > 0;
+    const stateClass = inst._connecting ? 'connecting' : !inst.online ? 'offline' : warn ? 'warn' : 'online';
+    const badge = inst._connecting ? bdg('gray','connecting...') : inst.online ? bdg(warn ? 'yellow' : 'green', warn ? 'attention' : 'online') : bdg('red','offline');
+    return `<section class="prom-instance">
+      <div class="prom-instance-h service-node-hdr ${stateClass}" onclick="togglePortainerInstance(${idx},${jsStr(key)})">
+        <div class="mon-dot ${inst._connecting?'md-gray':inst.online?(warn?'md-yellow':'md-green'):'md-red'}"></div>
+        <div class="prom-instance-main">
+          <div class="prom-instance-name">${escHtml(inst.name || inst.url || 'Portainer')}</div>
+          <div class="prom-instance-url">${escHtml(inst.url || inst.error || '')}</div>
+        </div>
+        <div class="prom-instance-meta">${inst.online ? `${inst.summary?.environmentsUp || 0}/${inst.summary?.environments || 0} environments - ${inst.summary?.running || 0}/${inst.summary?.containers || 0} containers` : inst._connecting ? 'waiting for first check' : 'unreachable'}</div>
+        ${badge}
+        ${notifyBell('portainer:' + (inst.name || inst.url || 'default'))}
+        <span class="chevron ${isOpen?'open':''}" id="portainer-chev-${idx}" style="margin-left:4px">▼</span>
+      </div>
+      <div class="prom-instance-body ${isOpen?'open':''}" id="portainer-body-${idx}">
+        ${inst.online ? `
+        ${inst.containers?.length ? dockerContainerHeader() : ''}
+        ${containerRows(inst) || '<div class="empty">No containers reported</div>'}
+        <div class="overview-nested-title" style="margin-top:10px"><span>Environments</span></div>
+        ${envRows(inst) || '<div class="empty">No environments reported</div>'}
+        ${inst.partial && inst.errors?.length ? `<div class="offline-err" style="margin-top:10px">Partial API data: ${escHtml(inst.errors.join(' - '))}</div>` : ''}` : `<div class="offline-row"><div class="mon-dot ${inst._connecting?'md-gray':'md-red'}"></div><div>${inst._connecting?'Connecting to Portainer...':'Portainer unreachable'}<div class="offline-err">${escHtml(inst._connecting ? (inst.url||'') : (inst.error||inst.url||''))}</div></div></div>`}
+      </div>
+    </section>`;
+  }).join('') : `<div class="offline-row"><div class="mon-dot md-gray"></div><div>Connecting to Portainer...</div></div>`;
+  return { id: 'portainer', title: 'Portainer', iconKey: 'portainer', color: 'var(--blue)', meta: connecting && !up ? 'connecting...' : `${up}/${total} servers - ${sm.environmentsUp || 0}/${sm.environments || 0} environments`, badge: bdg(healthCls, healthTxt), sbSummary: sbSummaryHtml, summary: '', body };
+}
+
+function togglePortainerInstance(idx, key){
+  const k = 'portainer:' + key;
+  const next = !panelOpenState(k, true);
+  setOverride(k, next);
+  document.getElementById(`portainer-body-${idx}`)?.classList.toggle('open', next);
+  document.getElementById(`portainer-chev-${idx}`)?.classList.toggle('open', next);
+}
+
 /* ── Databases ── */
 function fmtBytes(b){
   if(b==null) return '';
@@ -4160,8 +5098,9 @@ function buildDatabase(dbs){
 }
 
 function toggleDocker(key){
-  dockerOpen[key] = !dockerOpen[key];
-  setOverride('docker:'+key, dockerOpen[key]);
+  const stateKey = 'docker:'+key;
+  dockerOpen[key] = !panelOpenState(stateKey, dockerOpen[key]);
+  setOverride(stateKey, dockerOpen[key]);
   const el = document.getElementById(`dk-${key}`);
   if(el){ el.classList.toggle('open', !!dockerOpen[key]); el.style.display=''; }
   const chev = document.querySelector(`[onclick="toggleDocker('${key}')"] .chevron`);
@@ -4238,6 +5177,23 @@ async function svcAction(host, service, action, btn){
     if(action==='status'){
       const m=document.getElementById('logmodal'); m.classList.add('open');
       document.getElementById('logtitle').textContent=service+' — status';
+      document.getElementById('logbody').innerHTML=highlightLog(b.output||'(empty)');
+      _logCtx=null;
+    } else { doRefresh(); }
+  }catch(e){ if(e.message!=='Unauthorized') console.error(e); }
+  finally{ if(btn){ btn.disabled=false; btn.textContent=orig; } }
+}
+async function winSvcAction(host, service, action, btn){
+  const orig = btn ? btn.textContent : '';
+  if(btn){ btn.disabled=true; btn.textContent='...'; }
+  try{
+    const r = await fetch('/api/windows/service?host='+encodeURIComponent(host)+'&service='+encodeURIComponent(service)+'&action='+action,{method:'POST',headers:authHeaders()});
+    handleUnauth(r);
+    const b = await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(b.error||r.statusText);
+    if(action==='status'){
+      const m=document.getElementById('logmodal'); m.classList.add('open');
+      document.getElementById('logtitle').textContent=service+' - status';
       document.getElementById('logbody').innerHTML=highlightLog(b.output||'(empty)');
       _logCtx=null;
     } else { doRefresh(); }
@@ -4650,16 +5606,29 @@ function iconFallback(img, iconKey, color){
   span.innerHTML = html;
   img.replaceWith(span);
 }
-const DEFAULT_ICON = { proxmox:'proxmox', kubernetes:'kubernetes', healthchecks:'healthchecks', uptimekuma:'uptime-kuma', checks:'', prometheus:'prometheus', docker:'docker', dockhand:'https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/dockhand.png' };
+const DEFAULT_ICON = { proxmox:'proxmox', kubernetes:'kubernetes', healthchecks:'healthchecks', uptimekuma:'uptime-kuma', checks:'', prometheus:'prometheus', docker:'docker', dockhand:'https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/dockhand.png', firewall:'opnsense', truenas:'truenas', qnap:'qnap', ugreen:'ugreen', pbs:'proxmox', cloudflare:'cloudflare', cicd:'github', veeam:'veeam', portainer:'portainer' };
+function useInlineThemedIcon(panel, name){
+  const normalized = String(name || '').trim().toLowerCase();
+  if (panel?.id === 'cicd') {
+    return ['github', 'github.svg', 'github.png', 'github.webp'].includes(normalized)
+      || /\/github\.(svg|png|webp)(?:[?#].*)?$/.test(normalized);
+  }
+  if (panel?.id === 'portainer') {
+    return ['portainer', 'portainer.svg', 'portainer.png', 'portainer.webp'].includes(normalized)
+      || /\/portainer\.(svg|png|webp)(?:[?#].*)?$/.test(normalized);
+  }
+  return false;
+}
 function platformIcon(panel){
   const name = (window._lastData?.icons||{})[panel.id] || DEFAULT_ICON[panel.id];
+  if(useInlineThemedIcon(panel, name)) return SEC_ICONS[panel.iconKey] ? SEC_ICONS[panel.iconKey]('currentColor') : '';
   const url = iconUrl(name);
   if(url) return `<img src="${url}" alt="" style="width:100%;height:100%;object-fit:contain" onerror="iconFallback(this,'${panel.iconKey}','${panel.color}')">`;
   return SEC_ICONS[panel.iconKey] ? SEC_ICONS[panel.iconKey](panel.color) : '';
 }
 function sidebarMetaHtml(meta){
   return String(meta || '')
-    .split(/\s*(?:[·•]|\r?\n)+\s*/g)
+    .split(/\s*(?:[·•]|\s+-\s+|\r?\n)+\s*/g)
     .filter(Boolean)
     .map(part => `<span class="sb-meta-part">${escHtml(part)}</span>`)
     .join('');
@@ -4984,6 +5953,16 @@ function overviewRows(id, data){
     });
     return rows.join('');
   }
+  if(id === 'windows'){
+    const rows = (data.windows||[]).slice(0,6).map(srv => {
+      const failed = (srv.services||[]).filter(s=>!s.active&&s.state!=='unknown'&&!s.excluded).length;
+      const sub = srv._connecting ? (srv.host||'Waiting for agent') :
+        srv.online ? [srv.ip||srv.host, hasNum(srv.cpu)?`CPU ${srv.cpu}%`:'', srv.ram?`Memory ${srv.ram.percent}%`:'', srv.disk?`Disk ${srv.disk.percent}%`:'' ].filter(Boolean).join(' - ') :
+        (srv.error || 'Agent offline');
+      return overviewRow('windows', srv.name, sub, srv._connecting?'gray':!srv.online?'red':failed?'yellow':'green', srv._connecting?'connecting':!srv.online?'offline':failed?`${failed} failed`:'healthy', srv._connecting?'md-gray':!srv.online?'md-red':failed?'md-yellow':'md-green');
+    });
+    return rows.join('');
+  }
   if(id === 'snmp'){
     const rows = (data.snmp||[]).slice(0,6).map(dev => {
       const primaryFan = snmpPrimaryFan(dev.fanSpeeds || dev.sensors?.fanSpeeds || []);
@@ -5048,6 +6027,221 @@ function overviewRows(id, data){
     return [
       overviewGroup('dockhandHosts', 'Servers', hostRows, 'No Dockhand servers found'),
       overviewGroup('dockhandContainers', 'Containers', containerRows, 'No containers found'),
+    ].join('');
+  }
+  if(id === 'firewall'){
+    const fw = data.firewall || {};
+    const instances = fw.instances || [];
+    const gatewayRows = instances.map(inst => {
+      const sm = inst.summary || {};
+      const sub = inst._connecting ? (inst.url || 'Connecting') :
+        inst.online ? [`${sm.interfacesUp || 0}/${sm.interfaces || 0} links`, sm.updates ? `${sm.updates} updates` : '', sm.rebootRequired ? 'reboot required' : '', inst.url || ''].filter(Boolean).join(' · ') :
+        (inst.error || inst.url || 'Unreachable');
+      const warn = inst.partial || sm.interfacesDown || sm.updates || sm.rebootRequired;
+      return overviewRow('firewall', inst.name || inst.url || 'Firewall', sub,
+        inst._connecting ? 'gray' : !inst.online ? 'red' : warn ? 'yellow' : 'green',
+        inst._connecting ? 'connecting' : !inst.online ? 'offline' : warn ? 'attention' : 'healthy',
+        inst._connecting ? 'md-gray' : !inst.online ? 'md-red' : warn ? 'md-yellow' : 'md-green');
+    }).join('');
+    const linkRows = instances.filter(i => i.online).map(inst => {
+      const rows = (inst.interfaces || []).map(row => {
+        const status = String(row.status || '').toLowerCase();
+        const up = ['up','active','1','true'].includes(status);
+        const sub = [inst.name || inst.url, row.address || row.description, row.inBytes != null ? `in ${fmtBytes(row.inBytes)}` : '', row.outBytes != null ? `out ${fmtBytes(row.outBytes)}` : ''].filter(Boolean).join(' · ');
+        return overviewRow('firewall', row.name || row.id || 'interface', sub, up ? 'green' : status ? 'yellow' : 'gray', status || 'unknown', up ? 'md-green' : status ? 'md-yellow' : 'md-gray');
+      }).join('');
+      return `<div class="overview-nested-title"><div class="mon-dot ${inst.online?'md-green':'md-gray'}"></div><span>${escHtml(inst.name || inst.url || 'Firewall')}</span></div>${rows || '<div class="overview-empty">No links reported</div>'}`;
+    }).join('');
+    return [
+      overviewGroup('firewallGateways', 'Gateways', gatewayRows, 'No firewalls configured'),
+      overviewGroup('firewallLinks', 'Links', linkRows, 'No links reported'),
+    ].join('');
+  }
+  if(id === 'truenas'){
+    const tn = data.truenas || {};
+    const instances = tn.instances || [];
+    const systemRows = instances.map(inst => {
+      const sm = inst.summary || {};
+      const warn = inst.partial || sm.poolsWarn || sm.disksWarn || sm.alertsCritical;
+      const sub = inst._connecting ? (inst.url || 'Connecting') :
+        inst.online ? [`${sm.poolsHealthy || 0}/${sm.pools || 0} pools`, hasNum(sm.usedPercent) ? `used ${fmtPct(sm.usedPercent)}` : '', sm.disksWarn ? `${sm.disksWarn} disk warn` : '', inst.url || ''].filter(Boolean).join(' · ') :
+        (inst.error || inst.url || 'Unreachable');
+      return overviewRow('truenas', inst.name || inst.url || 'TrueNAS', sub,
+        inst._connecting ? 'gray' : !inst.online ? 'red' : warn ? 'yellow' : 'green',
+        inst._connecting ? 'connecting' : !inst.online ? 'offline' : warn ? 'attention' : 'healthy',
+        inst._connecting ? 'md-gray' : !inst.online ? 'md-red' : warn ? 'md-yellow' : 'md-green');
+    }).join('');
+    const poolRows = instances.filter(i => i.online).map(inst => {
+      const rows = (inst.pools || []).map(pool => {
+        const warn = pool.health !== 'online';
+        const sub = [inst.name || inst.url, pool.status || pool.health, hasNum(pool.usedPercent) ? `used ${fmtPct(pool.usedPercent)}` : ''].filter(Boolean).join(' · ');
+        return overviewRow('truenas', pool.name || 'pool', sub, warn ? 'yellow' : 'green', warn ? (pool.status || 'warn') : 'online', warn ? 'md-yellow' : 'md-green');
+      }).join('');
+      return `<div class="overview-nested-title"><div class="mon-dot ${inst.online?'md-green':'md-gray'}"></div><span>${escHtml(inst.name || inst.url || 'TrueNAS')}</span></div>${rows || '<div class="overview-empty">No pools reported</div>'}`;
+    }).join('');
+    return [
+      overviewGroup('truenasSystems', 'Systems', systemRows, 'No TrueNAS systems configured'),
+      overviewGroup('truenasPools', 'Pools', poolRows, 'No pools reported'),
+    ].join('');
+  }
+  if(id === 'pbs'){
+    const pbs = data.pbs || {};
+    const instances = pbs.instances || [];
+    const serverRows = instances.map(inst => {
+      const sm = inst.summary || {};
+      const warn = inst.partial || sm.datastoresWarn || sm.failedTasks;
+      const sub = inst._connecting ? (inst.url || 'Connecting') :
+        inst.online ? [`${sm.datastores || 0} datastores`, sm.snapshots ? `${sm.snapshots} snapshots` : '', hasNum(sm.usedPercent) ? `used ${fmtPct(sm.usedPercent)}` : '', sm.failedTasks ? `${sm.failedTasks} failed tasks` : '', inst.url || ''].filter(Boolean).join(' · ') :
+        (inst.error || inst.url || 'Unreachable');
+      return overviewRow('pbs', inst.name || inst.url || 'Proxmox Backup', sub,
+        inst._connecting ? 'gray' : !inst.online ? 'red' : warn ? 'yellow' : 'green',
+        inst._connecting ? 'connecting' : !inst.online ? 'offline' : warn ? 'attention' : 'healthy',
+        inst._connecting ? 'md-gray' : !inst.online ? 'md-red' : warn ? 'md-yellow' : 'md-green');
+    }).join('');
+    const storeRows = instances.filter(i => i.online).map(inst => {
+      const rows = (inst.datastores || []).map(store => {
+        const warn = store.health !== 'online';
+        const sub = [inst.name || inst.url, hasNum(store.usedPercent) ? `used ${fmtPct(store.usedPercent)}` : '', store.snapshots != null ? `${store.snapshots} snapshots` : '', store.error || ''].filter(Boolean).join(' · ');
+        return overviewRow('pbs', store.name || 'datastore', sub, warn ? 'yellow' : 'green', warn ? 'warn' : 'online', warn ? 'md-yellow' : 'md-green');
+      }).join('');
+      return `<div class="overview-nested-title"><div class="mon-dot ${inst.online?'md-green':'md-gray'}"></div><span>${escHtml(inst.name || inst.url || 'Proxmox Backup')}</span></div>${rows || '<div class="overview-empty">No datastores reported</div>'}`;
+    }).join('');
+    return [
+      overviewGroup('pbsServers', 'Servers', serverRows, 'No Proxmox Backup servers configured'),
+      overviewGroup('pbsDatastores', 'Datastores', storeRows, 'No datastores reported'),
+    ].join('');
+  }
+  if(id === 'qnap' || id === 'ugreen'){
+    const value = data[id] || {};
+    const instances = value.instances || [];
+    const title = id === 'qnap' ? 'QNAP' : 'Ugreen';
+    const rows = instances.map(inst => {
+      const sub = [inst.url, inst.statusCode ? `HTTP ${inst.statusCode}` : ''].filter(Boolean).join(' - ');
+      return overviewRow(id, inst.name || inst.url || title, sub,
+        inst._connecting ? 'gray' : !inst.online ? 'red' : 'green',
+        inst._connecting ? 'connecting' : !inst.online ? 'offline' : 'online',
+        inst._connecting ? 'md-gray' : inst.online ? 'md-green' : 'md-red');
+    }).join('');
+    return overviewGroup(id + 'Systems', 'Systems', rows, `No ${title} systems configured`);
+  }
+  if(id === 'cloudflare'){
+    const cf = data.cloudflare || {};
+    const zoneRows = (cf.zones || []).map(z => {
+      const warn = z.warn || !z.online;
+      const sub = z._connecting ? 'Connecting' : [z.status, z.paused ? 'paused' : '', z.plan || ''].filter(Boolean).join(' - ');
+      return overviewRow('cloudflare', z.name || 'zone', sub,
+        z._connecting ? 'gray' : z.online ? 'green' : warn ? 'yellow' : 'gray',
+        z._connecting ? 'connecting' : (z.status || 'unknown'),
+        z._connecting ? 'md-gray' : z.online ? 'md-green' : warn ? 'md-yellow' : 'md-gray');
+    }).join('');
+    const tunnelRows = (cf.tunnels || []).map(t => {
+      const sub = [`${t.activeConnections || 0} active connections`, t.pendingReconnect ? `${t.pendingReconnect} reconnecting` : ''].filter(Boolean).join(' - ');
+      return overviewRow('cloudflare', t.name || 'tunnel', sub,
+        t.online ? 'green' : 'red',
+        t.status || 'unknown',
+        t.online ? 'md-green' : 'md-red');
+    }).join('');
+    const domainRows = (cf.domains || []).map(d => {
+      const days = hasNum(d.daysToExpire) ? Number(d.daysToExpire) : null;
+      const status = d.expired ? 'expired' : d.expiring ? `${days}d left` : days !== null ? `${days}d left` : 'unknown';
+      const sub = [d.expiresAt ? `expires ${String(d.expiresAt).slice(0, 10)}` : '', d.autoRenew ? 'auto-renew' : '', d.currentRegistrar || ''].filter(Boolean).join(' - ');
+      return overviewRow('cloudflare', d.name || 'domain', sub,
+        d.expired ? 'red' : d.expiring ? 'yellow' : 'green',
+        status,
+        d.expired ? 'md-red' : d.expiring ? 'md-yellow' : 'md-green');
+    }).join('');
+    return [
+      overviewGroup('cloudflareZones', 'Zones', zoneRows, 'No zones reported'),
+      overviewGroup('cloudflareTunnels', 'Tunnels', tunnelRows, 'No tunnels reported'),
+      overviewGroup('cloudflareDomains', 'Domain expiration', domainRows, 'No Cloudflare Registrar domains reported'),
+    ].join('');
+  }
+  if(id === 'cicd'){
+    const ci = data.cicd || {};
+    const projects = ci.projects || [];
+    const projectRows = projects.map(p => {
+      const failed = (p.pipelines || []).some(x=>x.failed) || (p.jobs || []).some(j=>j.failed);
+      const sub = p._connecting ? 'Connecting' : p.online ? [String(p.provider || '').toUpperCase(), p.branch || p.ref || '', `${(p.pipelines || []).length} runs`].filter(Boolean).join(' - ') : (p.error || 'Unreachable');
+      return overviewRow('cicd', p.name || 'CI Project', sub,
+        p._connecting ? 'gray' : !p.online ? 'red' : failed || p.partial ? 'yellow' : 'green',
+        p._connecting ? 'connecting' : !p.online ? 'offline' : failed ? 'failing' : 'healthy',
+        p._connecting ? 'md-gray' : !p.online ? 'md-red' : failed || p.partial ? 'md-yellow' : 'md-green');
+    }).join('');
+    const pipelineRows = projects.flatMap(p => (p.pipelines || []).slice(0, 4).map(run => ({ ...run, project: p.name }))).slice(0, 20).map(run => {
+      const sub = [run.project, run.ref, run.actor].filter(Boolean).join(' - ');
+      return overviewRow('cicd', run.name || 'pipeline', sub, run.failed ? 'yellow' : run.success ? 'green' : 'gray', run.status || 'unknown', run.failed ? 'md-yellow' : run.success ? 'md-green' : 'md-gray');
+    }).join('');
+    return [
+      overviewGroup('cicdProjects', 'Projects', projectRows, 'No CI/CD projects configured'),
+      overviewGroup('cicdPipelines', 'Recent runs', pipelineRows, 'No CI/CD runs reported'),
+    ].join('');
+  }
+  if(id === 'veeam'){
+    const veeam = data.veeam || {};
+    const instances = veeam.instances || [];
+    const serverRows = instances.map(inst => {
+      const sm = inst.summary || {};
+      const warn = inst.partial || Number(sm.failedSessions || 0) > 0 || Number(sm.warningSessions || 0) > 0 || Number(sm.repositoriesWarn || 0) > 0;
+      const sub = inst._connecting ? (inst.url || 'Connecting') :
+        inst.online ? [`${sm.jobs || 0} jobs`, `${sm.failedSessions || 0}/${sm.sessions || 0} failed sessions`, `${sm.repositories || 0} repositories`, inst.url || ''].filter(Boolean).join(' Â· ') :
+        (inst.error || inst.url || 'Unreachable');
+      return overviewRow('veeam', inst.name || inst.url || 'Veeam', sub,
+        inst._connecting ? 'gray' : !inst.online ? 'red' : warn ? 'yellow' : 'green',
+        inst._connecting ? 'connecting' : !inst.online ? 'offline' : warn ? 'attention' : 'healthy',
+        inst._connecting ? 'md-gray' : !inst.online ? 'md-red' : warn ? 'md-yellow' : 'md-green');
+    }).join('');
+    const sessionRows = instances.filter(i => i.online).flatMap(inst => (inst.sessions || []).slice(0, 5).map(s => ({ ...s, instance: inst.name || inst.url }))).slice(0, 24).map(s => {
+      const sub = [s.instance, s.type, s.creationTime || ''].filter(Boolean).join(' Â· ');
+      return overviewRow('veeam', s.name || 'session', sub,
+        s.failed || s.warning ? 'yellow' : s.running ? 'gray' : 'green',
+        s.failed ? 'failed' : s.warning ? 'warning' : s.running ? 'running' : (s.result || 'success'),
+        s.failed || s.warning ? 'md-yellow' : s.running ? 'md-gray' : 'md-green');
+    }).join('');
+    const repoRows = instances.filter(i => i.online).flatMap(inst => (inst.repositories || []).map(r => ({ ...r, instance: inst.name || inst.url }))).slice(0, 24).map(r => {
+      const sub = [r.instance, hasNum(r.usedPercent) ? `${fmtPct(r.usedPercent)} used` : '', r.path || ''].filter(Boolean).join(' Â· ');
+      return overviewRow('veeam', r.name || 'repository', sub, r.warning ? 'yellow' : 'green', r.status || 'online', r.warning ? 'md-yellow' : 'md-green');
+    }).join('');
+    return [
+      overviewGroup('veeamServers', 'Servers', serverRows, 'No Veeam servers configured'),
+      overviewGroup('veeamSessions', 'Recent sessions', sessionRows, 'No Veeam sessions reported'),
+      overviewGroup('veeamRepositories', 'Repositories', repoRows, 'No repositories reported'),
+    ].join('');
+  }
+  if(id === 'portainer'){
+    const pt = data.portainer || {};
+    const instances = pt.instances || [];
+    const serverRows = instances.map(inst => {
+      const sm = inst.summary || {};
+      const warn = inst.partial || sm.environmentsDown || sm.stacksWarn;
+      const sub = inst._connecting ? (inst.url || 'Connecting') :
+        inst.online ? [`${sm.environmentsUp || 0}/${sm.environments || 0} environments`, `${sm.running || 0}/${sm.containers || 0} containers`, sm.stacks ? `${sm.stacks} stacks` : '', inst.url || ''].filter(Boolean).join(' · ') :
+        (inst.error || inst.url || 'Unreachable');
+      return overviewRow('portainer', inst.name || inst.url || 'Portainer', sub,
+        inst._connecting ? 'gray' : !inst.online ? 'red' : warn ? 'yellow' : 'green',
+        inst._connecting ? 'connecting' : !inst.online ? 'offline' : warn ? 'attention' : 'healthy',
+        inst._connecting ? 'md-gray' : !inst.online ? 'md-red' : warn ? 'md-yellow' : 'md-green');
+    }).join('');
+    const envRows = instances.filter(i => i.online).map(inst => {
+      const rows = (inst.environments || []).map(env => {
+        const warn = env.online === false;
+        const sub = [inst.name || inst.url, env.type, env.url || ''].filter(Boolean).join(' · ');
+        return overviewRow('portainer', env.name || 'environment', sub, warn ? 'red' : env.online === true ? 'green' : 'gray', env.status || 'unknown', warn ? 'md-red' : env.online === true ? 'md-green' : 'md-gray');
+      }).join('');
+      return `<div class="overview-nested-title"><div class="mon-dot ${inst.online?'md-green':'md-gray'}"></div><span>${escHtml(inst.name || inst.url || 'Portainer')}</span></div>${rows || '<div class="overview-empty">No environments reported</div>'}`;
+    }).join('');
+    const containerRows = instances.filter(i => i.online).map(inst => {
+      const rows = (inst.containers || []).map(c => {
+        const dotCls = c.color==='green'?'md-green':c.color==='yellow'?'md-yellow':c.color==='red'?'md-red':'md-gray';
+        const badgeCls = c.color==='green'?'green':c.color==='yellow'?'yellow':c.color==='red'?'red':'gray';
+        const sub = [c.endpointName || c.sourceName, c.imageShort || c.image, c.status || ''].filter(Boolean).join(' · ');
+        return overviewRow('portainer', c.name || c.id, sub, badgeCls, c.state || 'unknown', dotCls, `showPortainerLogs(${jsStr(inst.name || inst.url)},${jsStr(c.endpointId)},${jsStr(c.id)},${jsStr(c.name || c.id)})`);
+      }).join('');
+      return `<div class="overview-nested-title"><div class="mon-dot ${inst.online?'md-green':'md-gray'}"></div><span>${escHtml(inst.name || inst.url || 'Portainer')}</span></div>${rows || '<div class="overview-empty">No containers reported</div>'}`;
+    }).join('');
+    return [
+      overviewGroup('portainerServers', 'Servers', serverRows, 'No Portainer instances configured'),
+      overviewGroup('portainerEnvironments', 'Environments', envRows, 'No environments reported'),
+      overviewGroup('portainerContainers', 'Containers', containerRows, 'No containers reported'),
     ].join('');
   }
   if(id === 'proxmox'){
@@ -5189,6 +6383,43 @@ function activeAlerts(data){
   const prom = data.prometheus;
   (prom?.instances||[]).filter(i=>!i.online).forEach(i=>out.push(['Prometheus unreachable', i.name || i.url]));
   (prom?.targets||[]).filter(t=>prometheusTargetState(t)==='down').forEach(t=>out.push(['Prometheus target down', [t.sourceName, t.name || t.scrapeUrl].filter(Boolean).join(' / ')]));
+  (data.firewall?.instances||[]).forEach(i => {
+    if(i._connecting) return;
+    if(!i.online) out.push(['Firewall unreachable', i.name || i.url || 'Firewall']);
+    else if(i.partial) out.push(['Firewall partial data', i.name || i.url || 'Firewall']);
+    else if(i.summary?.interfacesDown) out.push(['Firewall link down', `${i.name || i.url}: ${i.summary.interfacesDown}`]);
+    else if(i.summary?.updates) out.push(['Firewall updates available', `${i.name || i.url}: ${i.summary.updates}`]);
+  });
+  (data.truenas?.instances||[]).forEach(i => {
+    if(i._connecting) return;
+    if(!i.online) out.push(['TrueNAS unreachable', i.name || i.url || 'TrueNAS']);
+    else if(i.partial) out.push(['TrueNAS partial data', i.name || i.url || 'TrueNAS']);
+    else if(i.summary?.poolsWarn) out.push(['TrueNAS pool issue', `${i.name || i.url}: ${i.summary.poolsWarn}`]);
+    else if(i.summary?.disksWarn) out.push(['TrueNAS disk issue', `${i.name || i.url}: ${i.summary.disksWarn}`]);
+    else if(i.summary?.alertsCritical) out.push(['TrueNAS alert', `${i.name || i.url}: ${i.summary.alertsCritical}`]);
+  });
+  (data.qnap?.instances||[]).forEach(i => {
+    if(i._connecting) return;
+    if(!i.online) out.push(['QNAP unreachable', i.name || i.url || 'QNAP']);
+  });
+  (data.ugreen?.instances||[]).forEach(i => {
+    if(i._connecting) return;
+    if(!i.online) out.push(['Ugreen unreachable', i.name || i.url || 'Ugreen']);
+  });
+  (data.pbs?.instances||[]).forEach(i => {
+    if(i._connecting) return;
+    if(!i.online) out.push(['PBS unreachable', i.name || i.url || 'Proxmox Backup']);
+    else if(i.partial) out.push(['PBS partial data', i.name || i.url || 'Proxmox Backup']);
+    else if(i.summary?.datastoresWarn) out.push(['PBS datastore issue', `${i.name || i.url}: ${i.summary.datastoresWarn}`]);
+    else if(i.summary?.failedTasks) out.push(['PBS failed tasks', `${i.name || i.url}: ${i.summary.failedTasks}`]);
+  });
+  (data.portainer?.instances||[]).forEach(i => {
+    if(i._connecting) return;
+    if(!i.online) out.push(['Portainer unreachable', i.name || i.url || 'Portainer']);
+    else if(i.partial) out.push(['Portainer partial data', i.name || i.url || 'Portainer']);
+    else if(i.summary?.environmentsDown) out.push(['Portainer environment down', `${i.name || i.url}: ${i.summary.environmentsDown}`]);
+    else if(i.summary?.stacksWarn) out.push(['Portainer stack issue', `${i.name || i.url}: ${i.summary.stacksWarn}`]);
+  });
   (data.database||[]).forEach(d => { if(!d._connecting && !d.online) out.push(['Database offline', d.name]); });
   const k = data.kubernetes;
   if(k?.online && (k._empty || k.error || k.resourceError)) out.push(['Kubernetes inventory issue', k.error || k.resourceError || 'No resources found']);
@@ -5335,6 +6566,11 @@ function renderDashboardOverview(data, ids, panels, opts = {}){
     const iconSvg = platformIcon(panel);
     const title = id === 'snmp' ? 'Network devices' : panel.title;
     const rows = overviewRows(id, data);
+    const listHtml = rows
+      ? `<div class="overview-list ${['healthchecks','database','checks','dockhand','portainer'].includes(id)?'is-scroll':''}" data-scroll-key="overview-${id}">${rows}</div>`
+      : id === 'windows'
+        ? ''
+        : `<div class="overview-list ${['healthchecks','database','checks','dockhand','portainer'].includes(id)?'is-scroll':''}" data-scroll-key="overview-${id}"><div class="overview-empty">No rows to show yet</div></div>`;
     const collapsed = !!overviewCardCollapsed[id];
     return `<section class="overview-card ${collapsed?'collapsed':''}" data-id="${id}">
       <div class="overview-card-h" style="cursor:pointer" title="${collapsed?'Expand':'Collapse'} ${escAttr(title)}">
@@ -5350,7 +6586,7 @@ function renderDashboardOverview(data, ids, panels, opts = {}){
         </button>
       </div>
       ${panel.sbSummary || ''}
-      <div class="overview-list ${['healthchecks','database','checks','dockhand'].includes(id)?'is-scroll':''}" data-scroll-key="overview-${id}">${rows || '<div class="overview-empty">No rows to show yet</div>'}</div>
+      ${listHtml}
     </section>`;
   }).join('');
   document.querySelectorAll('.sb-card.active').forEach(c=>c.classList.remove('active'));
@@ -5434,6 +6670,7 @@ function buildPanels(data){
     proxmox:      () => buildProxmox(data.proxmox),
     kubernetes:   () => buildKubernetes(data.kubernetes),
     linux:        () => buildLinux(data.linux),
+    windows:      () => buildWindows(data.windows),
     snmp:         () => buildSynology(data.snmp),
     healthchecks: () => buildHealthchecks(data.healthchecks),
     uptimekuma:   () => buildUptimeKuma(data.uptimekuma),
@@ -5441,13 +6678,25 @@ function buildPanels(data){
     prometheus:   () => buildPrometheus(data.prometheus),
     docker:       () => buildDocker(data.docker),
     dockhand:     () => buildDockhand(data.dockhand),
+    firewall:     () => buildFirewall(data.firewall),
+    truenas:      () => buildTrueNas(data.truenas),
+    qnap:         () => buildQnap(data.qnap),
+    ugreen:       () => buildUgreen(data.ugreen),
+    pbs:          () => buildPbs(data.pbs),
+    cloudflare:   () => buildCloudflare(data.cloudflare),
+    cicd:         () => buildCiCd(data.cicd),
+    veeam:        () => buildVeeam(data.veeam),
+    portainer:    () => buildPortainer(data.portainer),
     database:     () => buildDatabase(data.database),
   };
   const panels = {};
   ALL_IDS.forEach(id => {
     try {
       const p = builders[id]?.();
-      if(p) panels[id] = p;
+      if(p) {
+        p.title = platformTitle(id, p.title);
+        panels[id] = p;
+      }
     } catch (err) {
       console.error(`Panel render failed: ${id}`, err);
     }
@@ -5698,7 +6947,7 @@ function selectPanel(id, opts = {}){
   if(id === 'healthchecks'){
     const s = data.healthchecks?.summary || {};
     const hasIssue = (s.down??0) > 0 || (s.grace??0) > 0;
-    if(shouldOpen('hc:checks', hasIssue)){
+    if(shouldOpen('healthchecks:checks', hasIssue)){
       hcOpen.checks = true;
       const el = document.getElementById('hc-checks');
       if(el) el.style.display='block';
@@ -5785,6 +7034,7 @@ function render(data, opts = {}){
     }
   }
   if((data.linux||[]).length){ if(data.linux.some(l=>l._connecting)) platforms.push('connecting'); else { const o=data.linux.filter(l=>l.online).length; const svcBad=data.linux.some(l=>l.online&&(l.services||[]).some(s=>!s.active && !s.excluded)); platforms.push(o===0?'down':(o<data.linux.length||svcBad)?'degraded':'ok'); } }
+  if((data.windows||[]).length){ if(data.windows.some(w=>w._connecting)) platforms.push('connecting'); else { const o=data.windows.filter(w=>w.online).length; const svcBad=data.windows.some(w=>w.online&&(w.services||[]).some(s=>!s.active && !s.excluded)); platforms.push(o===0?'down':(o<data.windows.length||svcBad)?'degraded':'ok'); } }
   const k=data.kubernetes;
   if(k && (k._connecting || (k.online!==undefined && (k.online||k.summary)))){
     const kres = Number(k.summary?.resources ?? ((k.pods||[]).length + (k.services||[]).length + (k.deployments||[]).length));
@@ -5835,6 +7085,71 @@ function render(data, opts = {}){
     }
   }
   if((data.database||[]).length){ if(data.database.some(d=>d._connecting)) platforms.push('connecting'); }
+  const fw=data.firewall;
+  if(fw && (fw._connecting || fw.online!==undefined)){
+    const sm = fw.summary || {};
+    const up = Number(sm.up || 0);
+    const total = Number(sm.instances || (fw.instances || []).length || 0);
+    const warn = Number(sm.down || 0) > 0 || Number(sm.updates || 0) > 0 || Number(sm.rebootRequired || 0) > 0 || Number(sm.interfacesDown || 0) > 0 || (fw.instances || []).some(i => i.partial);
+    platforms.push(fw._connecting && !up ? 'connecting' : !fw.online || up === 0 ? 'down' : (up < total || warn ? 'degraded' : 'ok'));
+  }
+  const tn=data.truenas;
+  if(tn && (tn._connecting || tn.online!==undefined)){
+    const sm = tn.summary || {};
+    const up = Number(sm.up || 0);
+    const total = Number(sm.instances || (tn.instances || []).length || 0);
+    const warn = Number(sm.down || 0) > 0 || Number(sm.poolsWarn || 0) > 0 || Number(sm.disksWarn || 0) > 0 || Number(sm.alertsCritical || 0) > 0 || Number(sm.alertsWarning || 0) > 0 || (tn.instances || []).some(i => i.partial);
+    platforms.push(tn._connecting && !up ? 'connecting' : !tn.online || up === 0 ? 'down' : (up < total || warn ? 'degraded' : 'ok'));
+  }
+  const pbs=data.pbs;
+  if(pbs && (pbs._connecting || pbs.online!==undefined)){
+    const sm = pbs.summary || {};
+    const up = Number(sm.up || 0);
+    const total = Number(sm.instances || (pbs.instances || []).length || 0);
+    const warn = Number(sm.down || 0) > 0 || Number(sm.datastoresWarn || 0) > 0 || Number(sm.failedTasks || 0) > 0 || (pbs.instances || []).some(i => i.partial);
+    platforms.push(pbs._connecting && !up ? 'connecting' : !pbs.online || up === 0 ? 'down' : (up < total || warn ? 'degraded' : 'ok'));
+  }
+  ['qnap','ugreen'].forEach(id => {
+    const value = data[id];
+    if(value && (value._connecting || value.online!==undefined)){
+      const sm = value.summary || {};
+      const up = Number(sm.up || 0);
+      const total = Number(sm.instances || (value.instances || []).length || 0);
+      platforms.push(value._connecting && !up ? 'connecting' : !value.online || up === 0 ? 'down' : (up < total ? 'degraded' : 'ok'));
+    }
+  });
+  const cf=data.cloudflare;
+  if(cf && (cf._connecting || cf.online!==undefined)){
+    const sm = cf.summary || {};
+    const zones = Number(sm.zones || (cf.zones || []).length || 0);
+    const active = Number(sm.zonesActive || (cf.zones || []).filter(z=>z.online).length || 0);
+    const warn = Number(sm.zonesWarn || 0) > 0 || Number(sm.tunnelsDown || 0) > 0 || Number(sm.errors || 0) > 0 || cf.partial;
+    platforms.push(cf._connecting && !cf.online ? 'connecting' : !cf.online ? 'down' : (zones && active < zones || warn ? 'degraded' : 'ok'));
+  }
+  const ci=data.cicd;
+  if(ci && (ci._connecting || ci.online!==undefined)){
+    const sm = ci.summary || {};
+    const up = Number(sm.up || (ci.projects || []).filter(p=>p.online).length || 0);
+    const total = Number(sm.projects || (ci.projects || []).length || 0);
+    const warn = Number(sm.failed || 0) > 0 || Number(sm.jobsFailed || 0) > 0 || Number(sm.partial || 0) > 0 || (ci.projects || []).some(p => p.partial);
+    platforms.push(ci._connecting && !up ? 'connecting' : !ci.online || up === 0 ? 'down' : (up < total || warn ? 'degraded' : 'ok'));
+  }
+  const veeam=data.veeam;
+  if(veeam && (veeam._connecting || veeam.online!==undefined)){
+    const sm = veeam.summary || {};
+    const up = Number(sm.up || 0);
+    const total = Number(sm.instances || (veeam.instances || []).length || 0);
+    const warn = Number(sm.down || 0) > 0 || Number(sm.failedSessions || 0) > 0 || Number(sm.warningSessions || 0) > 0 || Number(sm.repositoriesWarn || 0) > 0 || Number(sm.partial || 0) > 0 || (veeam.instances || []).some(i => i.partial);
+    platforms.push(veeam._connecting && !up ? 'connecting' : !veeam.online || up === 0 ? 'down' : (up < total || warn ? 'degraded' : 'ok'));
+  }
+  const pt=data.portainer;
+  if(pt && (pt._connecting || pt.online!==undefined)){
+    const sm = pt.summary || {};
+    const up = Number(sm.up || 0);
+    const total = Number(sm.instances || (pt.instances || []).length || 0);
+    const warn = Number(sm.down || 0) > 0 || Number(sm.environmentsDown || 0) > 0 || Number(sm.stacksWarn || 0) > 0 || (pt.instances || []).some(i => i.partial);
+    platforms.push(pt._connecting && !up ? 'connecting' : !pt.online || up === 0 ? 'down' : (up < total || warn ? 'degraded' : 'ok'));
+  }
 
   const downCount=platforms.filter(p=>p==='down').length;
   const degradedCount=platforms.filter(p=>p==='degraded').length;
@@ -5844,7 +7159,7 @@ function render(data, opts = {}){
   setFavicon(anyOff);
   setLogoDot(anyOff);
 
-  const dataHas={ proxmox:!!(data.proxmox?.nodes?.length), linux:!!((data.linux||[]).length), kubernetes:!!data.kubernetes, snmp:!!((data.snmp||[]).length), healthchecks:!!data.healthchecks, uptimekuma:!!data.uptimekuma, checks:!!data.checks, prometheus:!!data.prometheus, docker:!!((data.docker||[]).length), dockhand:!!data.dockhand, database:!!((data.database||[]).length) };
+  const dataHas={ proxmox:!!(data.proxmox?.nodes?.length), linux:!!((data.linux||[]).length), windows:!!((data.windows||[]).length), kubernetes:!!data.kubernetes, snmp:!!((data.snmp||[]).length), healthchecks:!!data.healthchecks, uptimekuma:!!data.uptimekuma, checks:!!data.checks, prometheus:!!data.prometheus, docker:!!((data.docker||[]).length), dockhand:!!data.dockhand, firewall:!!data.firewall, truenas:!!data.truenas, qnap:!!data.qnap, ugreen:!!data.ugreen, pbs:!!data.pbs, cloudflare:!!data.cloudflare, cicd:!!data.cicd, veeam:!!data.veeam, portainer:!!data.portainer, database:!!((data.database||[]).length) };
   const connectingCount=platformConnectingCount + configuredIds.filter(id=>id!=='linux'&&!dataHas[id]).length;
   window._connecting = connectingCount;
 
@@ -5953,7 +7268,28 @@ function toggleRail(){
   const handle = document.getElementById('rail-resizer');
   if(!shell || !handle) return;
   const clamp = v => Math.max(238, Math.min(440, Math.round(v)));
-  const apply = v => shell.style.setProperty('--rail-w', clamp(v) + 'px');
+  let resizeRaf = 0;
+  let resizePendingWidth = 0;
+  let resizeCurrentWidth = 0;
+  const notifySettingsResize = active => {
+    document.querySelectorAll('#detail iframe.embed-frame.active,#embed-cache-bin iframe.embed-frame').forEach(ifr => {
+      if(!String(ifr.dataset.embedKey || '').includes('/settings')) return;
+      try{ ifr.contentWindow?.postMessage({ type:'omnisight-shell-resize', active:!!active }, location.origin); }catch(e){}
+    });
+  };
+  const apply = v => {
+    resizeCurrentWidth = clamp(v);
+    shell.style.setProperty('--rail-w', resizeCurrentWidth + 'px');
+    shell.classList.toggle('rail-narrow', resizeCurrentWidth <= 254);
+  };
+  const scheduleApply = v => {
+    resizePendingWidth = clamp(v);
+    if(resizeRaf) return;
+    resizeRaf = requestAnimationFrame(() => {
+      resizeRaf = 0;
+      apply(resizePendingWidth);
+    });
+  };
   if(railWidthPref) apply(railWidthPref);
   applyRailCollapsed(railCollapsedPref);
   applyMainNavCollapsed(navCollapsedPref);
@@ -5964,13 +7300,24 @@ function toggleRail(){
     e.preventDefault();
     handle.setPointerCapture(e.pointerId);
     document.body.classList.add('os-resizing');
-    const move = ev => apply(ev.clientX - shell.getBoundingClientRect().left);
+    notifySettingsResize(true);
+    const railLeft = shell.getBoundingClientRect().left;
+    resizeCurrentWidth = parseInt(getComputedStyle(shell).getPropertyValue('--rail-w').trim().replace('px',''), 10) || railWidthPref || 264;
+    resizePendingWidth = resizeCurrentWidth;
+    const move = ev => scheduleApply(ev.clientX - railLeft);
     const up = ev => {
-      handle.releasePointerCapture(ev.pointerId);
+      try { handle.releasePointerCapture(ev.pointerId); } catch {}
+      if(resizeRaf){
+        cancelAnimationFrame(resizeRaf);
+        resizeRaf = 0;
+        apply(resizePendingWidth);
+      }
       document.body.classList.remove('os-resizing');
-      railWidthPref = parseInt(getComputedStyle(shell).getPropertyValue('--rail-w').trim().replace('px',''), 10) || railWidthPref;
+      notifySettingsResize(false);
+      railWidthPref = resizeCurrentWidth || railWidthPref;
       try { localStorage.setItem('os_rail_width', String(railWidthPref)); } catch {}
       scheduleUiPreferencesSave();
+      requestAnimationFrame(updateSidebarOverflow);
       handle.removeEventListener('pointermove', move);
       handle.removeEventListener('pointerup', up);
       handle.removeEventListener('pointercancel', up);
@@ -6368,6 +7715,60 @@ function commandPaletteItems(){
   (data.dockhand?.containers || []).forEach(c => {
     items.push(commandItem(c.name || c.id, `${c.sourceName || c.sourceUrl || 'Dockhand'} - ${c.image || c.state || 'container'}`, 'container', cmdIcon('container'), () => showDockhandLogs(c.sourceName || c.sourceUrl, c.id, c.name || c.id)));
   });
+  (data.firewall?.instances || []).forEach(inst => {
+    items.push(commandItem(inst.name || inst.url || 'Firewall', [inst.url, inst.online ? 'online' : inst._connecting ? 'connecting' : 'offline'].filter(Boolean).join(' - '), 'firewall', cmdIcon('firewall'), () => selectPanel('firewall')));
+    (inst.interfaces || []).forEach(row => {
+      items.push(commandItem(row.name || row.id || 'interface', [inst.name || inst.url, row.status || 'interface', row.address || row.description].filter(Boolean).join(' - '), 'link', cmdIcon('firewall'), () => selectPanel('firewall')));
+    });
+  });
+  (data.truenas?.instances || []).forEach(inst => {
+    items.push(commandItem(inst.name || inst.url || 'TrueNAS', [inst.url, inst.online ? 'online' : inst._connecting ? 'connecting' : 'offline'].filter(Boolean).join(' - '), 'truenas', cmdIcon('truenas'), () => selectPanel('truenas')));
+    (inst.pools || []).forEach(pool => {
+      items.push(commandItem(pool.name || 'pool', [inst.name || inst.url, pool.status || pool.health, hasNum(pool.usedPercent) ? `${fmtPct(pool.usedPercent)} used` : ''].filter(Boolean).join(' - '), 'pool', cmdIcon('truenas'), () => selectPanel('truenas')));
+    });
+  });
+  (data.qnap?.instances || []).forEach(inst => {
+    items.push(commandItem(inst.name || inst.url || 'QNAP', [inst.url, inst.online ? 'online' : inst._connecting ? 'connecting' : 'offline'].filter(Boolean).join(' - '), 'qnap', cmdIcon('qnap'), () => selectPanel('qnap')));
+  });
+  (data.ugreen?.instances || []).forEach(inst => {
+    items.push(commandItem(inst.name || inst.url || 'Ugreen', [inst.url, inst.statusCode ? `HTTP ${inst.statusCode}` : '', inst.online ? 'online' : inst._connecting ? 'connecting' : 'offline'].filter(Boolean).join(' - '), 'ugreen', cmdIcon('ugreen'), () => selectPanel('ugreen')));
+  });
+  (data.pbs?.instances || []).forEach(inst => {
+    items.push(commandItem(inst.name || inst.url || 'Proxmox Backup', [inst.url, inst.online ? 'online' : inst._connecting ? 'connecting' : 'offline'].filter(Boolean).join(' - '), 'pbs', cmdIcon('pbs'), () => selectPanel('pbs')));
+    (inst.datastores || []).forEach(store => {
+      items.push(commandItem(store.name || 'datastore', [inst.name || inst.url, hasNum(store.usedPercent) ? `${fmtPct(store.usedPercent)} used` : '', store.snapshots != null ? `${store.snapshots} snapshots` : ''].filter(Boolean).join(' - '), 'datastore', cmdIcon('pbs'), () => selectPanel('pbs')));
+    });
+  });
+  (data.cloudflare?.zones || []).forEach(zone => {
+    items.push(commandItem(zone.name || 'Cloudflare zone', [zone.status, zone.paused ? 'paused' : '', zone.plan || ''].filter(Boolean).join(' - '), 'cloudflare', cmdIcon('cloudflare'), () => selectPanel('cloudflare')));
+  });
+  (data.cloudflare?.tunnels || []).forEach(tunnel => {
+    items.push(commandItem(tunnel.name || 'Cloudflare tunnel', [tunnel.status, tunnel.activeConnections != null ? `${tunnel.activeConnections} active` : ''].filter(Boolean).join(' - '), 'cloudflare', cmdIcon('cloudflare'), () => selectPanel('cloudflare')));
+  });
+  (data.cicd?.projects || []).forEach(project => {
+    items.push(commandItem(project.name || 'CI Project', [project.provider, project.branch || project.ref, project.online ? 'online' : project._connecting ? 'connecting' : 'offline'].filter(Boolean).join(' - '), 'cicd', cmdIcon('cicd'), () => selectPanel('cicd')));
+    (project.pipelines || []).slice(0, 5).forEach(run => {
+      items.push(commandItem(run.name || 'pipeline', [project.name, run.ref, run.status].filter(Boolean).join(' - '), 'pipeline', cmdIcon('cicd'), () => selectPanel('cicd')));
+    });
+  });
+  (data.veeam?.instances || []).forEach(inst => {
+    items.push(commandItem(inst.name || inst.url || 'Veeam', [inst.url, inst.online ? 'online' : inst._connecting ? 'connecting' : 'offline'].filter(Boolean).join(' - '), 'veeam', cmdIcon('veeam'), () => selectPanel('veeam')));
+    (inst.sessions || []).slice(0, 5).forEach(session => {
+      items.push(commandItem(session.name || 'session', [inst.name || inst.url, session.type, session.result || session.state].filter(Boolean).join(' - '), 'session', cmdIcon('veeam'), () => selectPanel('veeam')));
+    });
+    (inst.repositories || []).slice(0, 5).forEach(repo => {
+      items.push(commandItem(repo.name || 'repository', [inst.name || inst.url, hasNum(repo.usedPercent) ? `${fmtPct(repo.usedPercent)} used` : '', repo.status].filter(Boolean).join(' - '), 'repository', cmdIcon('veeam'), () => selectPanel('veeam')));
+    });
+  });
+  (data.portainer?.instances || []).forEach(inst => {
+    items.push(commandItem(inst.name || inst.url || 'Portainer', [inst.url, inst.online ? 'online' : inst._connecting ? 'connecting' : 'offline'].filter(Boolean).join(' - '), 'portainer', cmdIcon('portainer'), () => selectPanel('portainer')));
+    (inst.environments || []).forEach(env => {
+      items.push(commandItem(env.name || 'environment', [inst.name || inst.url, env.type, env.status || ''].filter(Boolean).join(' - '), 'environment', cmdIcon('portainer'), () => selectPanel('portainer')));
+    });
+    (inst.containers || []).forEach(c => {
+      items.push(commandItem(c.name || c.id, [inst.name || inst.url, c.endpointName || c.sourceName, c.image || c.state || 'container'].filter(Boolean).join(' - '), 'container', cmdIcon('container'), () => showPortainerLogs(inst.name || inst.url, c.endpointId, c.id, c.name || c.id)));
+    });
+  });
   (data.uptimekuma?.monitors || []).forEach(m => {
     items.push(commandItem(m.name, [m.status || m.state, m.ping ? `${m.ping} ms` : ''].filter(Boolean).join(' - '), 'monitor', cmdIcon('uptimekuma'), () => selectPanel('uptimekuma')));
   });
@@ -6691,6 +8092,10 @@ function showDockhandLogs(instance,id,name,env){
   if(env) q.set('env', env);
   fetchLogs('/api/dockhand/logs?' + q.toString(), name+' \u2014 logs');
 }
+function showPortainerLogs(instance,endpoint,id,name){
+  const q = new URLSearchParams({ instance, endpoint, id, tail: '300' });
+  fetchLogs('/api/portainer/logs?' + q.toString(), name+' \u2014 logs');
+}
 function showPodLogs(ns,pod){ fetchLogs('/api/kubernetes/logs?namespace='+encodeURIComponent(ns)+'&pod='+encodeURIComponent(pod)+'&tail=300', pod+' \u2014 logs'); }
 function showK8sDetail(title, rows){
   const m=document.getElementById('logmodal');
@@ -6811,6 +8216,50 @@ function statusCacheKey(){
   const token = sessionStorage.getItem('os_token') || localStorage.getItem('os_token') || 'anon';
   return `${STATUS_CACHE_KEY}:${String(token).slice(-18)}`;
 }
+const STATUS_INSTANCE_IDS = new Set(['prometheus','dockhand','firewall','truenas','qnap','ugreen','pbs','cloudflare','cicd','veeam','portainer']);
+function statusPlatformPresent(data = {}, id){
+  const value = data?.[id];
+  if(Array.isArray(value)) return value.length > 0;
+  if(id === 'proxmox') return Array.isArray(value?.nodes) && value.nodes.length > 0;
+  if(id === 'kubernetes' || id === 'healthchecks' || id === 'uptimekuma' || id === 'checks') return !!value;
+  if(STATUS_INSTANCE_IDS.has(id)) return !!value && (Array.isArray(value.instances) ? value.instances.length > 0 : true);
+  return !!value;
+}
+function statusPlatformObserved(data = {}, id){
+  const value = data?.[id];
+  if(Array.isArray(value)) return value.some(row => row && !row._connecting);
+  if(id === 'proxmox') return (value?.nodes || []).some(row => row && !row._connecting);
+  if(id === 'kubernetes') return !!value && !value._connecting && (value.online !== undefined || value.error || value.resourceError || value.summary);
+  if(id === 'healthchecks') return !!value && !value._connecting && (value.online !== undefined || value.error || (value.checks || []).length);
+  if(id === 'uptimekuma') return !!value && !value._connecting && (value.online !== undefined || value.error || (value.monitors || []).length);
+  if(id === 'checks') return !!value && !value._connecting && (value.online !== undefined || value.error || (value.checks || []).some(c => c && !c._connecting && c.status !== 'connecting'));
+  if(STATUS_INSTANCE_IDS.has(id)){
+    if(!value || value._connecting) return false;
+    const instances = Array.isArray(value.instances) ? value.instances : [];
+    return value.online !== undefined || value.error || instances.some(inst => inst && !inst._connecting);
+  }
+  return !!value && !value._connecting;
+}
+function statusPayloadHasUsefulData(data){
+  const ids = cleanUiOrder(Array.isArray(data?.configured) ? data.configured : (configuredIds || ALL_IDS));
+  return ids.some(id => statusPlatformObserved(data, id));
+}
+function statusPayloadLooksTransientShell(data){
+  if(!data || data.loading) return false;
+  const ids = cleanUiOrder(Array.isArray(data.configured) ? data.configured : configuredIds).filter(id => id !== 'linux');
+  if(ids.length < 3) return false;
+  const present = ids.filter(id => statusPlatformPresent(data, id)).length;
+  const observed = ids.filter(id => statusPlatformObserved(data, id)).length;
+  return present >= Math.max(2, Math.floor(ids.length * 0.5)) && observed === 0;
+}
+function statusCachedFallback(data){
+  if(!statusPayloadLooksTransientShell(data)) return data;
+  const cached = readStatusCache();
+  if(cached && statusPayloadHasUsefulData(cached)) {
+    return { ...cached, refreshing: !!data?.refreshing, _transientShellFallback: true };
+  }
+  return data;
+}
 function readStatusCache(){
   try{
     const key = statusCacheKey();
@@ -6819,12 +8268,14 @@ function readStatusCache(){
     const box = JSON.parse(raw);
     if(!box || !box.data || Date.now() - Number(box.t || 0) > STATUS_CACHE_MAX_AGE) return null;
     if(box.data.loading) return null;
+    if(statusPayloadLooksTransientShell(box.data)) return null;
     return box.data;
   }catch{ return null; }
 }
 let statusCacheWriteTimer = null;
 function writeStatusCache(data){
   if(!data || data.loading) return;
+  if(statusPayloadLooksTransientShell(data)) return;
   const run = () => {
     statusCacheWriteTimer = null;
     try{
@@ -6903,7 +8354,7 @@ async function fetchStatus(opts = {}){
     if(!r.ok) throw new Error('HTTP ' + r.status);
     const ct = r.headers.get('content-type') || '';
     if(!ct.toLowerCase().includes('application/json')) throw new Error(`Expected JSON from ${url}, got ${ct || 'unknown content type'}`);
-    const data = await r.json();
+    const data = statusCachedFallback(await r.json());
     writeStatusCache(data);
     return data;
   }finally{
@@ -7172,7 +8623,7 @@ async function doRefresh(){
   try{
     const r = await fetch('/api/refresh?wait=700',{headers:authHeaders(), cache:'no-store', signal:ctrl.signal});
     handleUnauth(r);
-    const data = await r.json();
+    const data = statusCachedFallback(await r.json());
     render(data);
     if(data?.loading) scheduleInitialLoadRetry(0);
     else clearInitialLoadRetry();

@@ -471,7 +471,7 @@ function demoStatus() {
     loading: false,
     refreshing: false,
     publicStatus: true,
-    configured: ['proxmox', 'linux', 'kubernetes', 'snmp', 'healthchecks', 'uptimekuma', 'checks', 'prometheus', 'docker', 'dockhand', 'database'],
+    configured: ['proxmox', 'linux', 'kubernetes', 'snmp', 'healthchecks', 'uptimekuma', 'checks', 'prometheus', 'docker', 'dockhand', 'qnap', 'ugreen', 'database'],
       preferredLanguage: 'en',
       timeFormat: '24h',
       defaultTimePeriodHours: 1,
@@ -793,6 +793,29 @@ function demoStatus() {
       imageUpdate: i === 2 ? { status: 'update', checkedAt: nowIso(-240_000) } : { status: 'current', checkedAt: nowIso(-240_000) },
     })),
   };
+  data.qnap = {
+    online: true,
+    summary: { instances: 1, up: 1, down: 0 },
+    instances: [{
+      name: 'qnap-demo',
+      url: 'https://qnap.example.invalid',
+      online: true,
+      system: { hostname: 'qnap-demo' },
+      summary: { instances: 1, up: 1, down: 0 },
+    }],
+  };
+  data.ugreen = {
+    online: true,
+    summary: { instances: 1, up: 1, down: 0 },
+    instances: [{
+      name: 'ugreen-demo',
+      url: 'https://ugreen.example.invalid',
+      statusCode: 200,
+      online: true,
+      system: { hostname: 'ugreen-demo' },
+      summary: { instances: 1, up: 1, down: 0 },
+    }],
+  };
   data.database = [{
     name: 'demo-postgres',
     type: 'postgresql',
@@ -818,9 +841,10 @@ function demoStatus() {
 function publicSummary(data = demoStatus()) {
   return data.configured.map(id => {
     const names = {
-      proxmox: 'Proxmox', linux: 'Linux Servers', kubernetes: 'Kubernetes', snmp: 'SNMP',
+      proxmox: 'Proxmox', linux: 'Linux Server', kubernetes: 'Kubernetes', snmp: 'SNMP',
       healthchecks: 'Healthchecks', uptimekuma: 'Uptime Kuma', checks: 'Service checks',
-      prometheus: 'Prometheus', docker: 'Docker', dockhand: 'Dockhand', database: 'Databases',
+      prometheus: 'Prometheus', docker: 'Docker', dockhand: 'Dockhand', qnap: 'QNAP',
+      ugreen: 'Ugreen', database: 'Databases',
     };
     const detail = (() => {
       if (id === 'proxmox') return `${data.proxmox.nodes.filter(n => n.online).length}/${data.proxmox.nodes.length} nodes up`;
@@ -833,6 +857,8 @@ function publicSummary(data = demoStatus()) {
       if (id === 'prometheus') return `${data.prometheus.summary.up}/${data.prometheus.summary.total} up`;
       if (id === 'docker') return `${data.docker.reduce((n, h) => n + (h.summary?.running || 0), 0)}/${data.docker.reduce((n, h) => n + (h.summary?.total || 0), 0)}\ncontainers running`;
       if (id === 'dockhand') return `${data.dockhand.summary.running}/${data.dockhand.summary.total} running`;
+      if (id === 'qnap') return `${data.qnap.summary.up}/${data.qnap.summary.instances} systems up`;
+      if (id === 'ugreen') return `${data.ugreen.summary.up}/${data.ugreen.summary.instances} systems up`;
       if (id === 'database') return `${data.database.filter(d => d.online).length}/${data.database.length} up`;
       return 'demo data online';
     })();
@@ -907,6 +933,8 @@ function topologyData() {
     kubernetes: { online: true, summary: d.kubernetes.summary, pods: d.kubernetes.pods.map(p => ({ name: p.name, namespace: p.namespace, status: p.status, containers: p.containers })) },
     docker: d.docker.map(h => ({ name: h.name, host: h.host, online: true, summary: h.summary, containers: h.containers })),
     dockhand: d.dockhand,
+    qnap: d.qnap,
+    ugreen: d.ugreen,
     snmp: d.snmp.map(s => ({ name: s.name, host: s.host, online: true, profile: s.profile, vendor: s.vendor, model: s.model })),
   };
 }
@@ -1055,6 +1083,10 @@ app.get('/api/docker/logs', (req, res) => {
 app.get('/api/dockhand/logs', (req, res) => {
   const name = req.query.name || req.query.id || 'dockhand-container';
   res.type('text/plain').send(demoLogStream('dockhand', name));
+});
+app.get(['/api/portainer/logs', '/api/portainer/container/logs'], (req, res) => {
+  const name = req.query.name || req.query.id || 'portainer-container';
+  res.type('text/plain').send(demoLogStream('portainer', name));
 });
 app.get('/api/kubernetes/logs', (req, res) => {
   const name = req.query.pod || req.query.name || 'kubernetes-pod';

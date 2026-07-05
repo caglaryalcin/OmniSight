@@ -267,9 +267,9 @@ function cleanupPendingInstalls(now = Date.now()) {
 
 function addPendingInstall(kind = 'linux') {
   cleanupPendingInstalls();
-  kind = ['linux', 'proxmox', 'docker'].includes(kind) ? kind : 'linux';
+  kind = ['linux', 'windows', 'proxmox', 'docker'].includes(kind) ? kind : 'linux';
   const id = `${kind}-${crypto.randomBytes(6).toString('hex')}`;
-  const title = kind === 'proxmox' ? 'New Proxmox node' : kind === 'docker' ? 'New Docker host' : 'New system';
+  const title = kind === 'proxmox' ? 'New Proxmox node' : kind === 'docker' ? 'New Docker host' : kind === 'windows' ? 'New Windows host' : 'New system';
   const p = { id, kind, name: title, createdAt: Date.now(), expiresAt: Date.now() + INSTALL_PENDING_TTL };
   pendingInstalls.set(id, p);
   bumpStateVersion();
@@ -362,8 +362,8 @@ function handleReport(r) {
     ip: String(r.ip || '').slice(0, 64),
     os: String(r.os || '').slice(0, 128),
     kernel: String(r.kernel || '').slice(0, 64),
-    platform: ['proxmox', 'synology'].includes(r.platform) ? r.platform : 'linux',
-    role: ['linux', 'docker', 'proxmox', 'synology', 'auto'].includes(r.role) ? r.role : 'auto',
+    platform: ['proxmox', 'synology', 'windows'].includes(r.platform) ? r.platform : 'linux',
+    role: ['linux', 'windows', 'docker', 'proxmox', 'synology', 'auto'].includes(r.role) ? r.role : 'auto',
     agentVersion: String(r.agentVersion || '').slice(0, 16),
     interval: Math.min(Math.max(num(r.interval) || 15, 5), 300),
     uptime: num(r.uptime),
@@ -388,7 +388,7 @@ function handleReport(r) {
   };
   agents.set(id, a);
   bumpStateVersion();
-  const reportKinds = (a.pve || a.platform === 'proxmox' || a.role === 'proxmox') ? ['proxmox'] : (a.role === 'docker' ? ['docker'] : ['linux']);
+  const reportKinds = (a.pve || a.platform === 'proxmox' || a.role === 'proxmox') ? ['proxmox'] : (a.role === 'docker' ? ['docker'] : (a.platform === 'windows' || a.role === 'windows') ? ['windows'] : ['linux']);
   clearPendingForKinds(reportKinds);
 
   if (cpu != null || a.temp != null) {
@@ -438,7 +438,7 @@ function agentHistoryForUi(id) {
 function getAllAgentData(config) {
   const excluded = (config && config.excludedServices?.linux) || {};
   const now = Date.now();
-  const rows = [...agents.values()].filter(a => a.platform !== 'proxmox' && a.role !== 'docker').map(a => {
+  const rows = [...agents.values()].filter(a => a.platform !== 'proxmox' && a.platform !== 'windows' && a.role !== 'docker' && a.role !== 'windows').map(a => {
     const staleMs = ((a.interval || 15) * 2.5 + 10) * 1000;
     const online = a.live && (now - (a.lastSeen || 0)) < staleMs;
     const connecting = isConnecting(a, now);
@@ -495,6 +495,68 @@ function getAllAgentData(config) {
     ip: '',
     os: '',
     platform: 'linux',
+    online: false,
+    _connecting: true,
+    error: 'waiting for first report',
+    lastSeen: p.createdAt,
+    services: [],
+    history: [],
+  }));
+  return rows.sort((x, y) => (x._connecting === y._connecting ? x.name.localeCompare(y.name) : x._connecting ? -1 : 1));
+}
+
+function getWindowsData(config) {
+  const excluded = (config && config.excludedServices?.windows) || {};
+  const now = Date.now();
+  const rows = [...agents.values()].filter(a => a.platform === 'windows' || a.role === 'windows').map(a => {
+    const staleMs = ((a.interval || 15) * 2.5 + 10) * 1000;
+    const online = a.live && (now - (a.lastSeen || 0)) < staleMs;
+    const connecting = isConnecting(a, now);
+    const exList = excluded[a.hostname] || [];
+    const services = (a.services || []).map(s => ({ ...s, excluded: exList.includes(s.name) }))
+      .sort((x, y) => (x.active === y.active) ? x.name.localeCompare(y.name) : (x.active ? 1 : -1));
+    const ram = a.mem ? {
+      percent: Math.min(100, Math.round((a.mem.usedKB / a.mem.totalKB) * 100)),
+      usedGB: (a.mem.usedKB / 1048576).toFixed(1),
+      totalGB: (a.mem.totalKB / 1048576).toFixed(1),
+    } : null;
+    const disk = a.disk ? {
+      percent: Math.min(100, Math.round((a.disk.usedKB / a.disk.totalKB) * 100)),
+      usedGB: (a.disk.usedKB / 1048576).toFixed(1),
+      totalGB: (a.disk.totalKB / 1048576).toFixed(1),
+    } : null;
+    return {
+      id: a.id,
+      name: a.hostname,
+      host: a.hostname,
+      ip: a.ip,
+      os: a.os,
+      kernel: a.kernel,
+      platform: 'windows',
+      role: a.role,
+      agentVersion: a.agentVersion,
+      online,
+      _connecting: connecting,
+      error: online ? undefined : (connecting ? 'waiting for first report after restart' : (a.lastSeen ? `no report for ${Math.round((now - a.lastSeen) / 1000)}s` : 'never reported')),
+      cpu: online ? a.cpu : null,
+      ram: online ? ram : null,
+      disk: online ? disk : null,
+      metrics: online ? { diskIO: a.metrics?.diskIO || null, bandwidth: a.metrics?.bandwidth || null } : null,
+      temp: online ? a.temp : null,
+      load: online ? a.load : null,
+      uptime: online ? a.uptime : null,
+      lastSeen: a.lastSeen || null,
+      services: online ? services : [],
+      history: agentHistoryForUi(a.id),
+    };
+  });
+  pendingByKind('windows').forEach(p => rows.push({
+    id: p.id,
+    name: p.name,
+    host: 'waiting for agent',
+    ip: '',
+    os: '',
+    platform: 'windows',
     online: false,
     _connecting: true,
     error: 'waiting for first report',
@@ -705,7 +767,12 @@ function hasDocker() {
 
 function hasLinux() {
   cleanupPendingInstalls();
-  return [...agents.values()].some(a => !a.pve && !a.pveNode && a.platform !== 'proxmox' && a.role !== 'docker') || pendingByKind('linux').length > 0;
+  return [...agents.values()].some(a => !a.pve && !a.pveNode && a.platform !== 'proxmox' && a.platform !== 'windows' && a.role !== 'docker' && a.role !== 'windows') || pendingByKind('linux').length > 0;
+}
+
+function hasWindows() {
+  cleanupPendingInstalls();
+  return [...agents.values()].some(a => a.platform === 'windows' || a.role === 'windows') || pendingByKind('windows').length > 0;
 }
 
 function findAgent(hostOrName) {
@@ -799,4 +866,4 @@ function removeAgent(id) {
   return true;
 }
 
-module.exports = { handleReport, getAllAgentData, getDockerData, getProxmoxData, hasPve, hasDocker, hasLinux, queueCommand, takeCommands, waitForCommands, handleResult, removeAgent, findAgent, listAgents, commandLines, addPendingInstall, listPendingInstalls, setSaveDelay, flushSaves, reload, revision };
+module.exports = { handleReport, getAllAgentData, getWindowsData, getDockerData, getProxmoxData, hasPve, hasDocker, hasLinux, hasWindows, queueCommand, takeCommands, waitForCommands, handleResult, removeAgent, findAgent, listAgents, commandLines, addPendingInstall, listPendingInstalls, setSaveDelay, flushSaves, reload, revision };

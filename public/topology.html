@@ -232,13 +232,15 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 const ICONS = {
-  proxmox:'PX', kubernetes:'K8', docker:'D', dockhand:'DH', snmp:'SN', synology:'SY', mikrotik:'MT', unifi:'UI', router:'RT', switch:'SW', nas:'NAS', linux:'LX', node:'N', host:'H', guest:'G'
+  proxmox:'PX', kubernetes:'K8', docker:'D', dockhand:'DH', snmp:'SN', synology:'SY', qnap:'QP', ugreen:'UG', mikrotik:'MT', unifi:'UI', router:'RT', switch:'SW', nas:'NAS', linux:'LX', node:'N', host:'H', guest:'G'
 };
 const ICON_URLS = {
   proxmox:'https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/proxmox.svg',
   kubernetes:'https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/kubernetes.svg',
   dockhand:'https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/dockhand.png',
   synology:'https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/synology.svg',
+  qnap:'https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/qnap.svg',
+  ugreen:'https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/ugreen.svg',
   mikrotik:'https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/mikrotik.svg',
   unifi:'https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/unifi.svg'
 };
@@ -422,6 +424,8 @@ function guestOsIcon(v){
     [/opnsense/, 'opnsense'],
     [/pfsense/, 'pfsense'],
     [/truenas/, 'truenas'],
+    [/qnap/, 'qnap'],
+    [/ugreen|ugos/, 'ugreen'],
     [/homeassistant|home-assistant|hass/, 'home-assistant'],
     [/synology|dsm/, 'synology'],
     [/proxmox/, 'proxmox'],
@@ -449,6 +453,8 @@ function snmpDeviceIcon(s){
   const source = snmpDeviceSource(s);
   if(/mikrotik|routeros|routerboard/.test(source)) return 'mikrotik';
   if(/unifi|ubiquiti|dream\s*(machine|router|wall)|cloud\s*gateway/.test(source)) return 'unifi';
+  if(/qnap/.test(source)) return 'qnap';
+  if(/ugreen|ugos/.test(source)) return 'ugreen';
   if(/synology|diskstation|rackstation|dsm|\bnas\b/.test(source)) return 'synology';
   if(/router|gateway|firewall/.test(source)) return 'router';
   if(/switch|bridge/.test(source)) return 'switch';
@@ -639,7 +645,7 @@ function topologyNodeLayer(node){
   const label = String(node?.label || '').toLowerCase();
   if(/^proxmox-guest:/.test(ref) || node?.kind === 'guest') return 'vm';
   if(/^proxmox-host:/.test(ref) || icon === 'proxmox') return 'proxmox';
-  if(icon === 'synology' || /\bnas\b|synology|diskstation|rackstation/.test(label) || /^snmp:.*nas/.test(ref)) return 'nas';
+  if(icon === 'synology' || icon === 'qnap' || icon === 'ugreen' || /\bnas\b|synology|qnap|ugreen|ugos|diskstation|rackstation/.test(label) || /^snmp:.*nas/.test(ref)) return 'nas';
   if(icon === 'switch' || icon === 'router' || icon === 'mikrotik' || icon === 'unifi') return 'switch';
   if(/^kubernetes:/.test(ref) || /^docker:/.test(ref) || /^dockhand:/.test(ref) || ['kubernetes','docker','dockhand'].includes(icon) || node?.kind === 'platform') return 'platform';
   return node?.kind === 'host' ? 'host' : 'node';

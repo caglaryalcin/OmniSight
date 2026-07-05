@@ -2,19 +2,19 @@
 
 ![Status](https://img.shields.io/badge/status-stable-brightgreen) [![Latest Release](https://img.shields.io/github/v/release/caglaryalcin/OmniSight?include_prereleases&color=blue)](https://github.com/caglaryalcin/OmniSight/releases)
 
-A simple, single-glance monitoring dashboard for Proxmox, Linux servers, Kubernetes, SNMP devices, Docker, Dockhand, databases, built-in service checks, Healthchecks, Uptime Kuma and Prometheus.
+A simple, single-glance monitoring dashboard for Proxmox, Linux servers, Kubernetes, SNMP devices, Docker, Dockhand, firewalls, TrueNAS/QNAP/UGREEN storage, Proxmox Backup Server, Portainer, databases, built-in service checks, Healthchecks, Uptime Kuma and Prometheus.
 
 For deeper architecture, operations and troubleshooting notes, see [DOCUMENTATION.md](DOCUMENTATION.md).
 
 ## Features
 
 - **Modern UI** — fully redesigned interface: glass header, soft-glow status indicators, card-grid summaries, draggable/collapsible dashboard cards, compact platform summaries in detail headers, Inter typography, refined dark & light themes and subtle micro-animations
-- **One agent, one command** — Linux servers, Proxmox nodes and Docker hosts can be monitored by a single tiny push agent (one bash script + systemd, nothing beyond `curl`). In Settings just click **+ Add System / Node / Host**, pick **Binary**, **Docker** or **Stack**, copy the pre-filled command, run it on the server — the system self-registers and pops up online within seconds. No inbound firewall rules, NAT-friendly (see [The agent](#the-agent))
+- **One agent, one command** — Linux servers, Windows hosts, Proxmox nodes and Docker hosts can be monitored by a small push agent. In Settings just click **+ Add System / Windows Host / Node / Host**, copy the pre-filled command, run it on the server — the system self-registers and pops up online within seconds. No inbound firewall rules, NAT-friendly (see [The agent](#the-agent))
 - **Proxmox** — node CPU/RAM/temperature/uptime, Disk I/O and bandwidth when exposed by the API, agent or optional SSH metrics fallback, VM/LXC lists with clickable detail views, per-node service status with **start/stop/restart/exclude** actions, **last backup** (vzdump) status, **Ceph cluster storage health** with active alert summaries, node storage utilization and CPU/RAM/temperature history charts — collected via API token, locally by the agent via `pvesh`, or SSH fallback for host-only metrics
 
 ![](https://raw.githubusercontent.com/caglaryalcin/OmniSight/refs/heads/main/screenshots/gifs/proxmox.gif)
 
-- **Linux servers** — CPU/RAM/disk/swap/load/temperature/uptime/OS plus disk I/O and bandwidth history, with **auto-discovered** running/failed services and near-instant **status/start/stop/restart/exclude** actions over the agent's command long-poll. Works on any systemd Linux incl. NAS devices (e.g. Synology)
+- **Linux & Windows servers** — CPU/RAM/disk/swap/load/temperature/uptime/OS where available plus disk I/O and bandwidth history, with **auto-discovered** services and near-instant **status/start/stop/restart/exclude** actions over the agent's command long-poll.
 
 ![](https://raw.githubusercontent.com/caglaryalcin/OmniSight/refs/heads/main/screenshots/gifs/linux-servers.gif)
 
@@ -33,6 +33,8 @@ For deeper architecture, operations and troubleshooting notes, see [DOCUMENTATIO
 - **Dockhand** — monitor one or more Dockhand API instances, server connectivity, container state and live container logs
 
 ![](https://raw.githubusercontent.com/caglaryalcin/OmniSight/refs/heads/main/screenshots/gifs/dockhand.gif)
+
+- **Firewalls** — monitor OPNsense gateways with API key/secret, including gateway availability, interface/link state, packet-filter state counts, update/reboot signals and partial-data handling when individual API endpoints are restricted. pfSense can be added when it exposes a compatible REST API surface.
 
 - **Databases** — **PostgreSQL**, **MySQL/MariaDB** and **MongoDB**: up/down, active/max connections, total size and version
 
@@ -82,6 +84,14 @@ For deeper architecture, operations and troubleshooting notes, see [DOCUMENTATIO
 
 ![](https://raw.githubusercontent.com/caglaryalcin/OmniSight/refs/heads/main/screenshots/light-dark.png)
 
+### Cloudflare
+
+Cloudflare support monitors zones, optional Cloudflare Tunnel connection health and Cloudflare Registrar domain expiration. Use a scoped API token with Zone Read; tunnel health needs an account ID and tunnel read access, while domain expiration needs Cloudflare Registrar read access.
+
+### GitHub/GitLab CI
+
+CI/CD support monitors GitHub Actions workflow runs and GitLab project pipelines. GitLab projects can also include recent pipeline jobs. Use read-only tokens with Actions read access for GitHub private repositories and API/read access for GitLab projects.
+
 ## Stack
 
 Node.js + Express backend · vanilla HTML/CSS/JS frontend (no framework).
@@ -120,7 +130,7 @@ Linux servers, and optionally Proxmox nodes and Docker hosts, are monitored by t
 
 **Setup :**
 
-1. Open **Settings** and click **+ Add System** (Linux Servers), **+ Add Node** (Proxmox) or **+ Add Host** (Docker). The shared agent token is generated automatically.
+1. Open **Settings** and click **+ Add System** (Linux Server), **+ Add Windows Host** (Windows Server), **+ Add Node** (Proxmox) or **+ Add Host** (Docker). The shared agent token is generated automatically.
 2. Pick an install method in the dialog and copy the pre-filled command:
 
 **Binary (systemd):**
@@ -173,20 +183,26 @@ services:
 EOF
 ```
 
+**Windows (elevated PowerShell):**
+
+```powershell
+$env:OMNISIGHT_URL="http://<omnisight-host>:3000"; $env:OMNISIGHT_TOKEN="<token>"; $env:OMNISIGHT_AGENT_ROLE="windows"; iwr -UseBasicParsing "http://<omnisight-host>:3000/agent/install-windows.ps1" | iex
+```
+
 3. Run it on the server — the dialog shows a live "✓ connected" confirmation and the system appears on the dashboard within seconds.
 
 **What one agent covers, automatically:**
 
-- **System** — hostname, IP, OS, kernel, CPU %, load, RAM, swap, root disk, disk I/O, bandwidth, temperature, uptime and all running/failed **systemd services** → *Linux Servers* card
+- **System** — hostname, IP, OS, kernel/build, CPU %, load where available, RAM, swap where available, root disk, disk I/O, bandwidth, temperature where available, uptime and services → *Linux Server* / *Windows Server* cards
 - **Docker** (when `docker` is present, or the socket is mounted) — containers, states, ports, CPU/memory, network I/O, block I/O, unused-image count → *Docker* card; `logs` and `Prune` run locally on the host and stream back over the command channel
-- **Proxmox** (when `pvesh` is present) — VM/LXC list, node storage, last vzdump backup, Ceph health → *Proxmox* card; the node moves from *Linux Servers* to *Proxmox* automatically
+- **Proxmox** (when `pvesh` is present) — VM/LXC list, node storage, last vzdump backup, Ceph health → *Proxmox* card; the node moves from *Linux Server* to *Proxmox* automatically
 
 **How actions work:** between reports the agent holds a long-poll against `/api/agent/commands`, so service `start/stop/restart`, container logs and prune clicked in the UI reach the server near-instantly and execute locally (`systemctl` / `docker`).
 
 **Details:**
 
 - Report interval: 15s by default — `OMNISIGHT_INTERVAL=<seconds>` at install time, or edit `/etc/omnisight-agent/agent.env` and restart.
-- Authentication: one shared token (`X-Agent-Token` header), auto-generated on first add and regenerable from **Settings → Linux Servers**. Regenerating invalidates all installed agents until updated.
+- Authentication: one shared token (`X-Agent-Token` header), auto-generated on first add and regenerable from **Settings → Linux Server**. Regenerating invalidates all installed agents until updated.
 - Agent identity: the installer writes a unique `OMNISIGHT_AGENT_ID` into `/etc/omnisight-agent/agent.env`, so cloned VMs with the same `/etc/machine-id` still appear as separate systems.
 - A system is marked **offline** when no report arrives for ~2.5× its interval.
 - Agent versions are visible in **Agents**. If an agent is outdated, use the Update action there; very old agents may show a one-time manual update command.
@@ -356,6 +372,13 @@ The live config is `data/config.yaml` (created automatically on first save). Eas
 - `proxmox` — `enabled`, optional `url` / `tokenId` / `tokenSecret` / `insecureTLS` for API mode, optional `sshMetrics[]` (`node`, `sshHost`, `sshUser`, `sshPassword`/`sshKey`, `sshPort`, `sudo`) to fill host CPU temperature and host Disk I/O when the API does not expose them, plus optional `icon`. Without API settings, data can come from agents running on the nodes (`pvesh`)
 - `docker` — `enabled`, optional `hosts[]` for Docker API or SSH hosts (`sshHost`, `sshUser`, `sshPassword`/`sshKey`, `sshMode`, `sudo`, `insecureTLS`), plus optional `icon`. Agent-reported Docker hosts also appear automatically
 - `dockhand` — one or more API `instances[]` with name, url, bearer token and optional `insecureTLS`
+- `firewall` — one or more gateway `instances[]` with name, type (`opnsense` or `pfsense` compatible API), url, API key/secret or username/password and optional `insecureTLS`
+- `truenas` — one or more storage `instances[]` with name, url, `apiMode: auto | websocket | rest`, username, API key/password and optional `insecureTLS`
+- `qnap` — one or more QNAP QTS `instances[]` with name, url, username/password or optional SID, and optional `insecureTLS`
+- `ugreen` — one or more UGREEN UGOS Pro web endpoints with name, url and optional `insecureTLS`; OmniSight checks endpoint reachability because UGREEN does not publish a stable public monitoring API
+- `pbs` — one or more Proxmox Backup Server `instances[]` with name, url, tokenId/tokenSecret and optional `insecureTLS`
+- `veeam` — one or more Veeam Backup & Replication `instances[]` with name, url, username/password or access token, API revision and optional `insecureTLS`
+- `portainer` — one or more Portainer `instances[]` with name, url, API access token and optional `insecureTLS`
 - `kubernetes` — kubeconfig, namespaces[] (the Settings UI has a **Browse…** button that uploads a kubeconfig from your machine into `data/` and fills in the container path automatically). Pod CPU/RAM sorting uses the Kubernetes metrics API when it is available to the configured account
 - `snmp.devices[]` — SNMP v2c (community) or v3 (username, authPassword, privPassword, …)
 - `healthchecks` — url, apiKey

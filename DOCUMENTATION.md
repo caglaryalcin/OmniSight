@@ -1,6 +1,6 @@
 # OmniSight Documentation
 
-OmniSight is a single-glance monitoring dashboard for Proxmox, Linux servers, Docker, Kubernetes, SNMP devices, Healthchecks, Uptime Kuma, Prometheus, Dockhand, and databases.
+OmniSight is a single-glance monitoring dashboard for Proxmox, Linux servers, Docker, Kubernetes, SNMP devices, Healthchecks, Uptime Kuma, Prometheus, Dockhand, firewalls, TrueNAS/QNAP/UGREEN storage, Proxmox Backup Server, Portainer, and databases.
 
 This document explains what the platform is, how it works, where it stores state, how each integration is collected, how the agent and alert flows operate, how authentication and security are handled, and how to troubleshoot production issues.
 
@@ -58,7 +58,7 @@ The center of the application is `server.js`. It owns the Express server, authen
 |---|---|---|
 | Runtime server | `server.js` | API, auth, RBAC, scheduler, cache, alerts, static serving |
 | Frontend | `public/*.html`, `public/i18n.js` | Dashboard, Settings, Event Center, Agents, Topology, Profile |
-| Agent | `agent/install.sh`, `agent/omnisight-agent.sh` | Push reports and execute commands on Linux, Proxmox, and Docker hosts |
+| Agent | `agent/install.sh`, `agent/omnisight-agent.sh`, `agent/install-windows.ps1`, `agent/omnisight-agent.ps1` | Push reports and execute commands on Linux, Windows, Proxmox, and Docker hosts |
 | Collectors | `src/*.js` | Platform-specific data collection |
 | State | `data/` | Config, users, sessions, agents, history, certificates, icons |
 
@@ -76,6 +76,13 @@ The center of the application is `server.js`. It owns the Express server, authen
 | `src/checks.js` | Built-in HTTP/TCP/Ping/DNS checks |
 | `src/prometheus.js` | Prometheus targets |
 | `src/dockhand.js` | Dockhand API |
+| `src/firewall.js` | OPNsense gateways and compatible firewall APIs |
+| `src/truenas.js` | TrueNAS SCALE/CORE storage appliances |
+| `src/qnap.js` | QNAP QTS systems using official HTTP auth and File Station SID checks |
+| `src/ugreen.js` | UGREEN UGOS Pro web endpoint reachability checks |
+| `src/pbs.js` | Proxmox Backup Server management API |
+| `src/veeam.js` | Veeam Backup & Replication REST API |
+| `src/portainer.js` | Portainer instances and environments |
 | `src/database.js` | PostgreSQL, MySQL/MariaDB, MongoDB |
 | `src/alerts.js` | ntfy, Telegram, SMTP dispatch |
 | `src/crypto.js` | Config secret encryption/decryption |
@@ -129,7 +136,7 @@ The dashboard is designed for fast operational scanning.
 ### Main Parts
 
 - Top KPI cards: CPU, Memory, Disk I/O, Bandwidth.
-- Platform cards: Proxmox, Linux, Docker, Kubernetes, SNMP, Healthchecks, Uptime Kuma, Checks, Prometheus, Dockhand, Database.
+- Platform cards: Proxmox, Linux, Docker, Kubernetes, SNMP, Healthchecks, Uptime Kuma, Checks, Prometheus, Dockhand, Firewalls, TrueNAS, QNAP, Ugreen, Proxmox Backup, Cloudflare, GitHub/GitLab CI, Portainer, Database.
 - Optional side panel for active alerts and recent logs.
 - Global health badge.
 - Public status link.
@@ -156,6 +163,13 @@ Each platform translates domain-specific signals into dashboard health:
 - Uptime Kuma: down monitor.
 - Checks: down check.
 - Prometheus: down target or instance.
+- Firewalls: unreachable gateway, partial endpoint data, link warnings, pending updates, or reboot-required signal.
+- TrueNAS: unreachable appliance, partial endpoint data, pool warnings, disk warnings, or critical appliance alerts.
+- QNAP/UGREEN: unreachable appliance or endpoint warnings.
+- Proxmox Backup Server: unreachable backup server, partial endpoint data, datastore warnings, or failed tasks.
+- Cloudflare: API unreachable, partial endpoint data, inactive/paused zones, or down Cloudflare Tunnel connections.
+- GitHub/GitLab CI: API unreachable, partial endpoint data, failed workflow runs, failed pipelines, or failed jobs.
+- Portainer: unreachable instance, partial endpoint data, down environments, or stack warnings.
 - Database: offline database or connection problem.
 
 Excluded services do not degrade health and do not generate alerts.
@@ -190,7 +204,7 @@ Notes:
 - If a Proxmox agent exists, that host is filtered out of the Linux card to avoid duplicate display.
 - Mini charts intentionally stay compact; detailed disk and health data is available in the detail view.
 
-### Linux Servers
+### Linux Server
 
 Linux data comes from push agent reports.
 
@@ -218,6 +232,89 @@ Offline behavior:
 - A host is marked offline when the agent stops reporting.
 - The offline window is based on the agent interval.
 - When the agent reports again, the host returns online.
+
+### Cloudflare
+
+Cloudflare uses the official API with a scoped API token. OmniSight reads zones, optional Cloudflare Tunnel connection state, and optional Cloudflare Registrar domain expiration. Tunnel monitoring needs `accountId` and Cloudflare Tunnel read access for that account. Domain expiration needs `accountId` plus Cloudflare Registrar read access and only applies to domains registered with Cloudflare Registrar.
+
+Recommended config:
+
+```yaml
+cloudflare:
+  enabled: true
+  apiToken: "${CLOUDFLARE_API_TOKEN}"
+  accountId: "your-account-id"
+  includeTunnels: true
+  includeRegistrarDomains: true
+  domainExpiryWarningDays: 30
+  zones:
+    - example.com
+```
+
+Collected data:
+
+- Zone active/paused/pending status.
+- Cloudflare Tunnel status and active connection counts when an account ID is configured.
+- Cloudflare Registrar domain expiration date, auto-renew state and expiring/expired warnings when enabled.
+- Partial API errors when optional tunnel or registrar permissions are missing.
+
+### GitHub/GitLab CI
+
+GitHub/GitLab CI uses read-only API collection for repository/project build status. GitHub projects read Actions workflow runs. GitLab projects read pipelines and can optionally read recent pipeline jobs.
+
+Recommended config:
+
+```yaml
+cicd:
+  enabled: true
+  projects:
+    - name: App GitHub
+      provider: github
+      repo: "owner/repo"
+      branch: main
+      token: "${GITHUB_TOKEN}"
+    - name: App GitLab
+      provider: gitlab
+      baseUrl: "https://gitlab.com"
+      projectId: "group/project"
+      branch: main
+      token: "${GITLAB_TOKEN}"
+      includeJobs: true
+```
+
+Collected data:
+
+- GitHub Actions recent workflow runs.
+- GitLab recent project pipelines.
+- GitLab jobs for recent pipelines when enabled.
+- Running, failed, canceled and successful run counts.
+
+### Veeam
+
+Veeam monitoring uses the Veeam Backup & Replication REST API. OmniSight authenticates with the password grant unless an access token is supplied, then reads jobs, recent sessions and backup repositories.
+
+Recommended config:
+
+```yaml
+veeam:
+  enabled: true
+  instances:
+    - name: VBR
+      url: "https://veeam.example.com:9419"
+      username: "DOMAIN\\monitoring"
+      password: "${VEEAM_PASSWORD}"
+      apiVersion: "1.3-rev1"
+      insecureTLS: false
+```
+
+Collected data:
+
+- VBR server online/offline state.
+- Job list, disabled job count and last-run fields when exposed.
+- Recent backup sessions with running, warning and failed states.
+- Backup repository state and usage percentage when exposed.
+- Partial API errors when optional job, session or repository endpoints are unavailable.
+- Partial API errors when jobs are unavailable but pipelines are readable.
 
 ### Docker
 
@@ -341,6 +438,79 @@ Collected data:
 - Container state.
 - Container logs.
 
+### Firewalls
+
+Firewall gateways are monitored as a first-class platform. OPNsense uses its built-in API key/secret authentication. pfSense entries are supported when the target exposes a compatible REST API surface.
+
+Collected data:
+
+- Gateway online/offline state.
+- Hostname, version, CPU, memory, update count, and reboot-required signals when exposed.
+- Interface/link state, addresses, descriptions, and counters when permitted.
+- Packet-filter state counts when permitted.
+
+If an optional endpoint is unavailable or forbidden, the instance remains online with partial data instead of failing the whole platform.
+
+### TrueNAS
+
+Supported modes:
+
+- WebSocket JSON-RPC for current TrueNAS SCALE releases.
+- REST v2.0 fallback for older TrueNAS CORE/SCALE deployments.
+- `apiMode: auto` tries WebSocket first and falls back to REST.
+
+Collected data:
+
+- Appliance online/offline state.
+- Hostname, version, model, load and memory capacity when exposed.
+- Pool health, size, used/free percentage and scan state when exposed.
+- Disk status, model, size and temperature when exposed.
+- Active TrueNAS alerts.
+
+If a pool, disk, alert or update endpoint is forbidden or unavailable, the appliance remains online with partial data so one missing permission does not hide the whole storage system.
+
+### QNAP
+
+QNAP systems use the official QTS HTTP API login flow (`authLogin.cgi`) and validate the returned session with the File Station `check_sid` request. Configure a monitoring user with username/password, or provide an existing SID/token when you want OmniSight to skip login.
+
+Collected data:
+
+- Appliance online/offline state.
+- Configured system name and URL.
+- Session validation status from the QTS/File Station HTTP API.
+
+### UGREEN
+
+UGREEN publishes product documentation and downloads, but does not currently expose a stable public UGOS Pro monitoring API. OmniSight therefore treats UGREEN entries as web reachability checks for the configured UGOS Pro endpoint.
+
+Collected data:
+
+- Endpoint online/offline state.
+- HTTP status code when reachable.
+- Configured system name and URL.
+
+### Proxmox Backup Server
+
+Collected data:
+
+- Backup server online/offline state.
+- Version and node status when exposed.
+- Datastore capacity, usage percentage, groups and snapshot counts when exposed.
+- Recent task status.
+
+Use a Proxmox Backup Server API token in `PBSAPIToken` format. If datastore status or task endpoints are forbidden, the server remains online with partial data.
+
+### Portainer
+
+Collected data:
+
+- Portainer instance online/offline state and version when exposed.
+- Environment list and environment status.
+- Stack count and warning state when exposed.
+- Lightweight Docker container summaries for Docker-compatible environments when permitted.
+
+Use a Portainer access token. If a user lacks permission for stacks or Docker gateway endpoints, the Portainer instance remains online with partial data.
+
 ### Databases
 
 Supported databases:
@@ -368,7 +538,7 @@ The agent is a small bash script that runs on a target system. It does not requi
 
 Use one of these Settings actions:
 
-- Linux Servers -> Add System.
+- Linux Server -> Add System.
 - Proxmox -> Add Node.
 - Docker -> Add Host.
 
@@ -416,6 +586,7 @@ When the UI starts an action such as service restart, Docker logs, Docker prune,
 | Role | Behavior |
 |---|---|
 | `linux` | System metrics and systemd services |
+| `windows` | Windows host metrics and Windows services |
 | `proxmox` | Linux metrics plus Proxmox `pvesh`, VM/LXC, storage, Ceph, backup, SMART |
 | `docker` | Docker host/container metrics, logs, prune |
 

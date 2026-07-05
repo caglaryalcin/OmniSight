@@ -285,6 +285,44 @@ function socketTransports(config = {}) {
   return ['polling'];
 }
 
+function createSocket(config = {}, parsed = parseStatusPage(config.url, config.slug)) {
+  const transports = socketTransports(config);
+  return socketIo(parsed.baseUrl, {
+    path: config.socketPath || defaultSocketPath(parsed),
+    transports,
+    upgrade: transports.length > 1,
+    reconnection: false,
+    forceNew: true,
+    timeout: SOCKET_TIMEOUT_MS,
+    rejectUnauthorized: allowInsecureTLS(config) ? false : undefined,
+    transportOptions: allowInsecureTLS(config) ? {
+      polling: { rejectUnauthorized: false },
+      websocket: { rejectUnauthorized: false },
+    } : undefined,
+  });
+}
+
+async function loginSocket(socket, credentials, parsed = {}) {
+  let login = null;
+  if (credentials.mode === 'token') {
+    login = await emitAck(socket, 'loginByToken', [credentials.token]);
+  } else {
+    const cacheKey = `${parsed.baseUrl}|${credentials.username}`;
+    const cachedToken = SOCKET_TOKEN_CACHE.get(cacheKey);
+    if (cachedToken) {
+      login = await emitAck(socket, 'loginByToken', [cachedToken]);
+      if (!login?.ok) SOCKET_TOKEN_CACHE.delete(cacheKey);
+    }
+    if (!login?.ok) {
+      login = await emitAck(socket, 'login', [{ username: credentials.username, password: credentials.password }]);
+      if (login?.ok && login.token) SOCKET_TOKEN_CACHE.set(cacheKey, login.token);
+    }
+  }
+  if (login?.tokenRequired) throw new Error('Uptime Kuma 2FA is not supported for history sync');
+  if (!login?.ok) throw new Error(login?.msg || 'Uptime Kuma socket login failed');
+  return login;
+}
+
 function replyData(reply) {
   if (Array.isArray(reply)) return reply;
   if (Array.isArray(reply?.data)) return reply.data;
@@ -295,6 +333,61 @@ function replyData(reply) {
   if (Array.isArray(reply?.data?.heartbeats)) return reply.data.heartbeats;
   if (Array.isArray(reply?.data?.heartbeatList)) return reply.data.heartbeatList;
   return [];
+}
+
+function monitorListData(payload) {
+  const root = payload?.monitorList || payload?.monitorListData || payload?.data?.monitorList || payload?.data || payload;
+  if (Array.isArray(root)) return root;
+  if (!root || typeof root !== 'object') return [];
+  return Object.values(root).filter(m => m && typeof m === 'object' && (m.id != null || m.monitorID != null || m.monitor_id != null));
+}
+
+function waitMonitorList(socket, timeout = SOCKET_EVENT_TIMEOUT_MS) {
+  let done = null;
+  const promise = new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('monitorList timed out')), timeout);
+    done = (payload) => {
+      clearTimeout(timer);
+      socket.off('monitorList', done);
+      socket.off('monitorListData', done);
+      resolve(monitorListData(payload));
+    };
+    socket.once('monitorList', done);
+    socket.once('monitorListData', done);
+  });
+  promise.cancel = () => {
+    if (done) done([]);
+  };
+  return promise;
+}
+
+async function fetchSocketMonitorList(config = {}, parsed = parseStatusPage(config.url, config.slug)) {
+  const credentials = socketCredentials(config);
+  const transports = socketTransports(config);
+  if (!credentials) return { used: false, monitors: [], error: null, transports };
+  const socket = createSocket(config, parsed);
+  const monitorListWait = waitMonitorList(socket);
+  const monitorListPromise = monitorListWait.catch(err => {
+    if (err.message !== 'monitorList timed out') throw err;
+    return [];
+  });
+  try {
+    await waitSocketConnect(socket);
+    await loginSocket(socket, credentials, parsed);
+    const reply = await emitAck(socket, 'getMonitorList', []).catch(() => null);
+    const replyMonitors = monitorListData(reply);
+    if (replyMonitors.length) {
+      monitorListWait.cancel?.();
+      return { used: true, monitors: replyMonitors, error: null, transports };
+    }
+    const monitors = await monitorListPromise;
+    return { used: monitors.length > 0, monitors, error: monitors.length ? null : 'No socket monitor list returned', transports };
+  } catch (err) {
+    return { used: false, monitors: [], error: err.message, transports };
+  } finally {
+    monitorListWait.cancel?.();
+    try { socket.disconnect(); } catch {}
+  }
 }
 
 function chartTimeMs(item = {}) {
@@ -399,39 +492,11 @@ async function fetchSocketHistory(config = {}, monitors = [], parsed = parseStat
   const errorsById = new Map();
   const monitorById = new Map();
   monitors.forEach(m => monitorIds(m).forEach(id => monitorById.set(id, m)));
-  const socket = socketIo(parsed.baseUrl, {
-    path: config.socketPath || defaultSocketPath(parsed),
-    transports,
-    upgrade: transports.length > 1,
-    reconnection: false,
-    forceNew: true,
-    timeout: SOCKET_TIMEOUT_MS,
-    rejectUnauthorized: allowInsecureTLS(config) ? false : undefined,
-    transportOptions: allowInsecureTLS(config) ? {
-      polling: { rejectUnauthorized: false },
-      websocket: { rejectUnauthorized: false },
-    } : undefined,
-  });
+  const socket = createSocket(config, parsed);
 
   try {
     await waitSocketConnect(socket);
-    let login = null;
-    if (credentials.mode === 'token') {
-      login = await emitAck(socket, 'loginByToken', [credentials.token]);
-    } else {
-      const cacheKey = `${parsed.baseUrl}|${credentials.username}`;
-      const cachedToken = SOCKET_TOKEN_CACHE.get(cacheKey);
-      if (cachedToken) {
-        login = await emitAck(socket, 'loginByToken', [cachedToken]);
-        if (!login?.ok) SOCKET_TOKEN_CACHE.delete(cacheKey);
-      }
-      if (!login?.ok) {
-        login = await emitAck(socket, 'login', [{ username: credentials.username, password: credentials.password }]);
-        if (login?.ok && login.token) SOCKET_TOKEN_CACHE.set(cacheKey, login.token);
-      }
-    }
-    if (login?.tokenRequired) throw new Error('Uptime Kuma 2FA is not supported for history sync');
-    if (!login?.ok) throw new Error(login?.msg || 'Uptime Kuma socket login failed');
+    await loginSocket(socket, credentials, parsed);
 
     const hours = socketHistoryHours(config);
     const results = await mapLimit(ids, SOCKET_CONCURRENCY, id => fetchMonitorSocketHistory(socket, id, hours, monitorById.get(id)));
@@ -457,6 +522,43 @@ async function fetchSocketHistory(config = {}, monitors = [], parsed = parseStat
   }
 }
 
+function publicMonitorRows(groups = []) {
+  return groups.flatMap(group => (group.monitorList || group.monitor_list || group.monitors || []).map(m => ({
+    monitor: m,
+    group: group.name || '',
+    source: 'public',
+  })));
+}
+
+function mergeMonitorRows(publicRows = [], socketMonitors = []) {
+  const byId = new Map();
+  for (const row of publicRows) {
+    const id = monitorIds(row.monitor)[0];
+    if (!id) continue;
+    byId.set(id, row);
+  }
+  for (const m of socketMonitors) {
+    const id = monitorIds(m)[0];
+    if (!id) continue;
+    const existing = byId.get(id);
+    if (existing) {
+      byId.set(id, {
+        ...existing,
+        monitor: {
+          ...m,
+          ...existing.monitor,
+          url: existing.monitor.url || m.url || m.hostname || '',
+          hostname: existing.monitor.hostname || m.hostname || '',
+        },
+        source: 'public+socket',
+      });
+    } else {
+      byId.set(id, { monitor: m, group: m.group || m.groupName || 'Authenticated', source: 'socket' });
+    }
+  }
+  return [...byId.values()];
+}
+
 async function getAllUptimeKuma(config = {}) {
   try {
     const parsed = parseStatusPage(config.url, config.slug);
@@ -476,33 +578,34 @@ async function getAllUptimeKuma(config = {}) {
 
     const monitors = [];
     const groups = page.publicGroupList || page.publicGroupListData || page.groups || [];
-    const sourceMonitors = groups.flatMap(group => (group.monitorList || group.monitor_list || group.monitors || []));
+    const socketMonitorList = await fetchSocketMonitorList(config, parsed);
+    const rows = mergeMonitorRows(publicMonitorRows(groups), socketMonitorList.monitors);
+    const sourceMonitors = rows.map(row => row.monitor);
     const socketHistory = await fetchSocketHistory(config, sourceMonitors, parsed);
     const hours = socketHistoryHours(config);
-    groups.forEach(group => {
-      (group.monitorList || group.monitor_list || group.monitors || []).forEach(m => {
-        const id = m.id ?? m.monitorID ?? m.monitor_id;
-        const socketId = monitorIds(m).find(mid => Array.isArray(socketHistory.historyById.get(mid)) && socketHistory.historyById.get(mid).length);
-        const socketList = socketId ? socketHistory.historyById.get(socketId) : null;
-        const hbList = socketList || heartbeatListFor(heartbeat, m);
-        const hb = latestHeartbeat(hbList);
-        const code = hb?.status ?? m.status ?? m.state;
-        const st = statusFromCode(code, m);
-        const lastPing = normalizeHeartbeatTime(heartbeatTimeRaw(hb));
-        monitors.push({
-          id,
-          name: m.name || m.displayName || `Monitor ${id}`,
-          type: m.type || '',
-          url: m.url || m.hostname || '',
-          group: group.name || '',
-          status: st.status,
-          healthy: st.healthy,
-          lastPing,
-          ping: hb?.ping ?? null,
-          message: hb?.msg || hb?.message || '',
-          history: heartbeatHistory(hbList, m, hours),
-          historySource: socketId ? (socketHistory.sourceById.get(socketId) || 'socket') : 'public',
-        });
+    rows.forEach(row => {
+      const m = row.monitor;
+      const id = m.id ?? m.monitorID ?? m.monitor_id;
+      const socketId = monitorIds(m).find(mid => Array.isArray(socketHistory.historyById.get(mid)) && socketHistory.historyById.get(mid).length);
+      const socketList = socketId ? socketHistory.historyById.get(socketId) : null;
+      const hbList = socketList || heartbeatListFor(heartbeat, m);
+      const hb = latestHeartbeat(hbList);
+      const code = hb?.status ?? m.status ?? m.state;
+      const st = statusFromCode(code, m);
+      const lastPing = normalizeHeartbeatTime(heartbeatTimeRaw(hb));
+      monitors.push({
+        id,
+        name: m.name || m.displayName || `Monitor ${id}`,
+        type: m.type || '',
+        url: m.url || m.hostname || '',
+        group: row.group || '',
+        status: st.status,
+        healthy: st.healthy,
+        lastPing,
+        ping: hb?.ping ?? null,
+        message: hb?.msg || hb?.message || '',
+        history: heartbeatHistory(hbList, m, hours),
+        historySource: socketId ? (socketHistory.sourceById.get(socketId) || 'socket') : 'public',
       });
     });
 
@@ -517,7 +620,18 @@ async function getAllUptimeKuma(config = {}) {
       unknown: monitors.filter(m => m.status === 'unknown').length,
     };
 
-    return { online: true, title: page.title || page.statusPage?.title || 'Uptime Kuma', slug: parsed.slug, summary, monitors, historyHours: hours, historySource: socketHistory.used ? 'socket' : 'public', historyError: socketHistory.error || null };
+    return {
+      online: true,
+      title: page.title || page.statusPage?.title || 'Uptime Kuma',
+      slug: parsed.slug,
+      summary,
+      monitors,
+      historyHours: hours,
+      monitorSource: socketMonitorList.used ? 'socket+public' : 'public',
+      monitorListError: socketMonitorList.error || null,
+      historySource: socketHistory.used ? 'socket' : 'public',
+      historyError: socketHistory.error || null,
+    };
   } catch (err) {
     console.warn('Uptime Kuma refresh failed:', err.message);
     return { online: false, error: err.message, summary: { total: 0, up: 0, down: 0, pending: 0, maintenance: 0, unknown: 0 }, monitors: [] };
@@ -540,7 +654,9 @@ async function debugUptimeKuma(config = {}) {
   ]);
   const groups = page.publicGroupList || page.publicGroupListData || page.groups || [];
   const roots = heartbeatMaps(heartbeat);
-  const sourceMonitors = groups.flatMap(group => (group.monitorList || group.monitor_list || group.monitors || []));
+  const socketMonitorList = await fetchSocketMonitorList(config, parsed);
+  const rows = mergeMonitorRows(publicMonitorRows(groups), socketMonitorList.monitors);
+  const sourceMonitors = rows.map(row => row.monitor);
   const socketHistory = await fetchSocketHistory(config, sourceMonitors, parsed);
   return {
     parsed,
@@ -549,13 +665,20 @@ async function debugUptimeKuma(config = {}) {
     heartbeatRootShapes: roots.map(root => Array.isArray(root)
       ? { type: 'array', length: root.length }
       : { type: typeof root, keys: Object.keys(root || {}).slice(0, 20) }),
-    monitors: groups.flatMap(group => (group.monitorList || group.monitor_list || group.monitors || []).map(m => ({
-      name: m.name || m.displayName || '',
-      ids: monitorIds(m),
-      historyCount: heartbeatListFor(heartbeat, m).length,
-      first: normalizeHeartbeatTime(heartbeatTimeRaw(heartbeatListFor(heartbeat, m)[0])),
-      last: normalizeHeartbeatTime(heartbeatTimeRaw(latestHeartbeat(heartbeatListFor(heartbeat, m)))),
-    }))),
+    monitorSource: socketMonitorList.used ? 'socket+public' : 'public',
+    monitorListError: socketMonitorList.error || null,
+    monitors: rows.map(row => {
+      const m = row.monitor;
+      return {
+        name: m.name || m.displayName || '',
+        ids: monitorIds(m),
+        group: row.group || '',
+        source: row.source || '',
+        historyCount: heartbeatListFor(heartbeat, m).length,
+        first: normalizeHeartbeatTime(heartbeatTimeRaw(heartbeatListFor(heartbeat, m)[0])),
+        last: normalizeHeartbeatTime(heartbeatTimeRaw(latestHeartbeat(heartbeatListFor(heartbeat, m)))),
+      };
+    }),
     socketHistory: {
       configured: !!socketCredentials(config),
       used: socketHistory.used,
