@@ -4828,7 +4828,7 @@ function collect() {
         to: getTagVals('al-smtp-to'),
       };
     }
-    if (alertsOn || a.webhook || a.ntfy || a.telegram || a.smtp) cfg.alerts = a;
+    if (alertsOn || a.maintenanceWindows || a.webhook || a.ntfy || a.telegram || a.smtp) cfg.alerts = a;
   }
 
   if (document.getElementById('en-public').checked) cfg.publicStatus = true;

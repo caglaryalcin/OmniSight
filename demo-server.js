@@ -213,6 +213,20 @@ let demoPrefs = {
   uptimekuma: { historyHours: 1 },
   checks: { historyHours: 1 },
   ui: { overviewCardCollapsed: { ...DEMO_OVERVIEW_COLLAPSED } },
+  config: {
+    preferredLanguage: 'en',
+    publicStatus: true,
+    publicTitle: 'OmniSight Demo Status',
+    publicDescription: 'Isolated demo environment',
+    publicStatusShowDetails: true,
+    publicStatusShowHistory: true,
+    publicPlatforms: [],
+    alerts: {
+      enabled: true,
+      channels: { ntfy: { enabled: true, url: 'https://ntfy.sh', topics: ['omnisight-demo'] } },
+      maintenanceWindows: [],
+    },
+  },
 };
 
 function nowIso(offsetMs = 0) {
@@ -231,6 +245,77 @@ function periodHours(value, fallback = 1) {
   const n = Number(value);
   if (!Number.isFinite(n) || n <= 0) return fallback;
   return clamp(n, 0.333333, 24);
+}
+
+function cloneJson(value) {
+  try { return JSON.parse(JSON.stringify(value)); }
+  catch { return value; }
+}
+
+function demoConfigFlag(value, fallback = false) {
+  if (value === undefined || value === null) return fallback;
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value !== 0;
+  const text = String(value).trim().toLowerCase();
+  if (['1', 'true', 'yes', 'on'].includes(text)) return true;
+  if (['0', 'false', 'no', 'off'].includes(text)) return false;
+  return fallback;
+}
+
+function parseClockMinutes(value) {
+  const m = String(value || '').match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return null;
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  if (h < 0 || h > 23 || min < 0 || min > 59) return null;
+  return h * 60 + min;
+}
+
+function dayMatches(rule, date) {
+  const days = rule?.days || rule?.day || rule?.weekdays;
+  if (!days || (Array.isArray(days) && !days.length)) return true;
+  const names = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+  const cur = names[date.getDay()];
+  return (Array.isArray(days) ? days : String(days).split(','))
+    .map(d => String(d).trim().slice(0, 3).toLowerCase())
+    .includes(cur);
+}
+
+function currentDemoMaintenanceWindow(now = Date.now()) {
+  const windows = demoPrefs.config?.alerts?.maintenanceWindows || demoPrefs.config?.alerts?.maintenance || [];
+  if (!Array.isArray(windows) || !windows.length) return null;
+  const d = new Date(now);
+  const mins = d.getHours() * 60 + d.getMinutes();
+  return windows.find(w => {
+    if (!w || w.enabled === false || !dayMatches(w, d)) return false;
+    const start = parseClockMinutes(w.start || w.from);
+    const end = parseClockMinutes(w.end || w.to);
+    if (start == null || end == null) return false;
+    return start <= end ? mins >= start && mins <= end : (mins >= start || mins <= end);
+  }) || null;
+}
+
+function rememberDemoConfig(body = {}) {
+  if (!body || typeof body !== 'object') return;
+  demoPrefs.config.preferredLanguage = String(body.preferredLanguage || 'en').trim() || 'en';
+  demoPrefs.config.publicStatus = body.publicStatus === true;
+  demoPrefs.config.publicTitle = String(body.publicTitle || 'OmniSight Demo Status').trim() || 'OmniSight Demo Status';
+  demoPrefs.config.publicDescription = String(body.publicDescription || '').trim();
+  demoPrefs.config.publicStatusShowDetails = demoConfigFlag(body.publicStatusShowDetails, false);
+  demoPrefs.config.publicStatusShowHistory = demoConfigFlag(body.publicStatusShowHistory, false);
+  demoPrefs.config.publicPlatforms = Array.isArray(body.publicPlatforms) ? body.publicPlatforms.map(String).filter(Boolean) : [];
+  if (body.alerts && typeof body.alerts === 'object') {
+    demoPrefs.config.alerts = cloneJson(body.alerts);
+  }
+  if (body.uptimekuma && typeof body.uptimekuma === 'object' && body.uptimekuma.historyHours != null) {
+    demoPrefs.uptimekuma.historyHours = periodHours(body.uptimekuma.historyHours);
+  }
+  if (body.checks && typeof body.checks === 'object' && body.checks.historyHours != null) {
+    demoPrefs.checks.historyHours = periodHours(body.checks.historyHours);
+  }
+  if (body.ui && typeof body.ui === 'object') {
+    demoPrefs.ui = { ...demoPrefs.ui, ...body.ui };
+  }
 }
 
 function historyPointCount(hours, min = 120) {
@@ -421,14 +506,19 @@ function setDemoSession(req, res, remember = false) {
 }
 
 function demoConfig() {
+  const cfg = demoPrefs.config || {};
   return {
     timezone: 'Europe/Istanbul',
     timeFormat: '24h',
     defaultTimePeriodHours: 1,
     historyRetentionDays: 1,
-    preferredLanguage: 'en',
-    publicStatus: true,
-    publicTitle: 'OmniSight Demo Status',
+    preferredLanguage: cfg.preferredLanguage || 'en',
+    publicStatus: cfg.publicStatus !== false,
+    publicTitle: cfg.publicTitle || 'OmniSight Demo Status',
+    publicDescription: cfg.publicDescription || '',
+    publicStatusShowDetails: cfg.publicStatusShowDetails === true,
+    publicStatusShowHistory: cfg.publicStatusShowHistory === true,
+    publicPlatforms: Array.isArray(cfg.publicPlatforms) ? [...cfg.publicPlatforms] : [],
     appearance: { dashboardSidePanel: false },
     performance: { lowIoMode: true },
     security: { passwordResetEnabled: true },
@@ -457,13 +547,18 @@ function demoConfig() {
     veeam: { enabled: true, instances: [{ name: 'veeam-demo', url: 'https://veeam.example.invalid:9419', username: 'DOMAIN\\monitoring', password: '__demo__', apiVersion: '1.3-rev1' }] },
     portainer: { enabled: true, instances: [{ name: 'portainer-demo', url: 'https://portainer.example.invalid:9443', apiKey: '__demo__' }] },
     database: { enabled: true, instances: [{ name: 'demo-postgres', type: 'postgresql', host: '192.0.2.40', port: 5432 }] },
-    alerts: { enabled: true, channels: { ntfy: { enabled: true, url: 'https://ntfy.sh', topics: ['omnisight-demo'] } } },
+    alerts: cloneJson(cfg.alerts || {
+      enabled: true,
+      channels: { ntfy: { enabled: true, url: 'https://ntfy.sh', topics: ['omnisight-demo'] } },
+      maintenanceWindows: [],
+    }),
     topology: { ...demoTopology },
     ui: demoPrefs.ui,
   };
 }
 
 function demoStatus() {
+  const cfg = demoPrefs.config || {};
   const uptimeKumaHours = periodHours(demoPrefs.uptimekuma.historyHours);
   const checksHours = periodHours(demoPrefs.checks.historyHours);
   const uptimeKumaPoints = historyPointCount(uptimeKumaHours);
@@ -486,9 +581,9 @@ function demoStatus() {
     timestamp: nowIso(),
     loading: false,
     refreshing: false,
-    publicStatus: true,
+    publicStatus: cfg.publicStatus !== false,
     configured: ['proxmox', 'linux', 'windows', 'kubernetes', 'synology', 'mikrotik', 'unifi', 'healthchecks', 'uptimekuma', 'checks', 'prometheus', 'docker', 'dockhand', 'firewall', 'truenas', 'qnap', 'ugreen', 'pbs', 'cloudflare', 'cicd', 'veeam', 'portainer', 'database'],
-    preferredLanguage: 'en',
+    preferredLanguage: cfg.preferredLanguage || 'en',
     timeFormat: '24h',
     defaultTimePeriodHours: 1,
     historyRetentionDays: 1,
@@ -1264,7 +1359,10 @@ app.get('/api/profile/summary', (req, res) => res.json({ username: demoUser.user
 app.post('/api/set-password', (req, res) => res.status(403).json({ ok: false, demo: true, error: 'Demo credentials cannot be changed.' }));
 
 app.get('/api/config', (req, res) => res.json(demoConfig()));
-app.post('/api/config', (req, res) => res.json({ ok: true, fullData: false, data: demoStatus(), demo: true }));
+app.post('/api/config', (req, res) => {
+  rememberDemoConfig(req.body);
+  res.json({ ok: true, fullData: false, data: demoStatus(), demo: true });
+});
 app.get('/api/settings/status', (req, res) => res.json(demoStatus()));
 app.get('/api/settings/agents', (req, res) => res.json({ agents: [{ key: 'linux:demo-agent', kind: 'linux', id: 'demo-agent', name: 'demo-linux-01', ip: '192.0.2.50', online: true, version: 'demo', latest: true }] }));
 app.get('/api/agents', (req, res) => res.json({ agents: [
@@ -1312,7 +1410,7 @@ app.get('/api/status', (req, res) => res.json(demoStatus()));
 app.get('/api/status/dashboard', (req, res) => res.json(demoStatus()));
 app.get('/api/status/summary', (req, res) => {
   const d = demoStatus();
-  res.json({ timestamp: d.timestamp, loading: false, refreshing: false, configured: d.configured, publicStatus: true, preferredLanguage: 'en', appearance: d.appearance, ui: demoPrefs.ui, health: publicSummary(d) });
+  res.json({ timestamp: d.timestamp, loading: false, refreshing: false, configured: d.configured, publicStatus: demoPrefs.config.publicStatus !== false, preferredLanguage: demoPrefs.config.preferredLanguage || 'en', appearance: d.appearance, ui: demoPrefs.ui, health: publicSummary(d) });
 });
 app.get('/api/status/topology', (req, res) => res.json(topologyData()));
 app.get('/api/status/stream', (req, res) => {
@@ -1323,14 +1421,28 @@ app.get('/api/status/stream', (req, res) => {
 });
 app.get('/api/refresh', (req, res) => res.json(demoStatus()));
 app.get('/api/public/status', (req, res) => {
+  if (demoPrefs.config.publicStatus === false) return res.status(404).json({ error: 'public status not enabled' });
   const d = demoStatus();
+  const maintenanceWindow = currentDemoMaintenanceWindow();
+  const visible = Array.isArray(demoPrefs.config.publicPlatforms) && demoPrefs.config.publicPlatforms.length
+    ? new Set(demoPrefs.config.publicPlatforms.map(String))
+    : null;
+  const services = publicServices(d).filter(s => !visible || visible.has(s.id));
   res.json({
-    title: 'OmniSight Demo Status',
-    description: 'Isolated demo environment',
+    title: demoPrefs.config.publicTitle || 'OmniSight Demo Status',
+    description: demoPrefs.config.publicDescription || '',
     status: 'warn',
     preferredLanguage: d.preferredLanguage,
     timestamp: d.timestamp,
-    services: publicServices(d),
+    version: demoAppVersion(),
+    historyEnabled: true,
+    maintenance: maintenanceWindow ? {
+      active: true,
+      start: maintenanceWindow.start || maintenanceWindow.from || '',
+      end: maintenanceWindow.end || maintenanceWindow.to || '',
+      days: maintenanceWindow.days || maintenanceWindow.day || maintenanceWindow.weekdays || '',
+    } : { active: false },
+    services,
   });
 });
 
