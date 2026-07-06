@@ -90,13 +90,13 @@ For deeper architecture, operations and troubleshooting notes, see [DOCUMENTATIO
 
 Cloudflare support monitors zones, optional Cloudflare Tunnel connection health and Cloudflare Registrar domain expiration. Use a scoped API token with Zone Read; tunnel health needs an account ID and tunnel read access, while domain expiration needs Cloudflare Registrar read access.
 
-![](https://github.com/caglaryalcin/OmniSight/blob/main/screenshots/gifs/cloudflare.gif)
+![](https://raw.githubusercontent.com/caglaryalcin/OmniSight/refs/heads/main/screenshots/gifs/cloudflare.gif)
 
 ### GitHub/GitLab CI
 
 CI/CD support monitors GitHub Actions workflow runs and GitLab project pipelines. GitLab projects can also include recent pipeline jobs. Use read-only tokens with Actions read access for GitHub private repositories and API/read access for GitLab projects.
 
-![](https://github.com/caglaryalcin/OmniSight/blob/main/screenshots/gifs/github.gif)
+![](https://raw.githubusercontent.com/caglaryalcin/OmniSight/refs/heads/main/screenshots/gifs/github.gif)
 
 ## Stack
 
