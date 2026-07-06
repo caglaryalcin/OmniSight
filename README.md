@@ -36,6 +36,8 @@ For deeper architecture, operations and troubleshooting notes, see [DOCUMENTATIO
 
 - **Firewalls** — monitor OPNsense gateways with API key/secret, including gateway availability, interface/link state, packet-filter state counts, update/reboot signals and partial-data handling when individual API endpoints are restricted. pfSense can be added when it exposes a compatible REST API surface.
 
+![](https://github.com/caglaryalcin/OmniSight/blob/main/screenshots/gifs/firewall.gif)
+
 - **Databases** — **PostgreSQL**, **MySQL/MariaDB** and **MongoDB**: up/down, active/max connections, total size and version
 
 ![](https://raw.githubusercontent.com/caglaryalcin/OmniSight/refs/heads/main/screenshots/gifs/databases.gif)
@@ -88,9 +90,13 @@ For deeper architecture, operations and troubleshooting notes, see [DOCUMENTATIO
 
 Cloudflare support monitors zones, optional Cloudflare Tunnel connection health and Cloudflare Registrar domain expiration. Use a scoped API token with Zone Read; tunnel health needs an account ID and tunnel read access, while domain expiration needs Cloudflare Registrar read access.
 
+![](https://github.com/caglaryalcin/OmniSight/blob/main/screenshots/gifs/cloudflare.gif)
+
 ### GitHub/GitLab CI
 
 CI/CD support monitors GitHub Actions workflow runs and GitLab project pipelines. GitLab projects can also include recent pipeline jobs. Use read-only tokens with Actions read access for GitHub private repositories and API/read access for GitLab projects.
+
+![](https://github.com/caglaryalcin/OmniSight/blob/main/screenshots/gifs/github.gif)
 
 ## Stack
 
