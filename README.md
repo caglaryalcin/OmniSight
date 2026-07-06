@@ -36,7 +36,7 @@ For deeper architecture, operations and troubleshooting notes, see [DOCUMENTATIO
 
 - **Firewalls** — monitor OPNsense gateways with API key/secret, including gateway availability, interface/link state, packet-filter state counts, update/reboot signals and partial-data handling when individual API endpoints are restricted. pfSense can be added when it exposes a compatible REST API surface.
 
-![](https://github.com/caglaryalcin/OmniSight/blob/main/screenshots/gifs/firewall.gif)
+![](https://raw.githubusercontent.com/caglaryalcin/OmniSight/refs/heads/main/screenshots/gifs/firewalls.gif)
 
 - **Databases** — **PostgreSQL**, **MySQL/MariaDB** and **MongoDB**: up/down, active/max connections, total size and version
 
