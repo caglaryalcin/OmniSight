@@ -254,6 +254,7 @@
       'Maintenance start':'Bakım başlangıcı',
       'Maintenance end':'Bakım bitişi',
       'Maintenance days':'Bakım günleri',
+      'Maintenance setting saved':'Bakım ayarı kaydedildi',
       'Suppress alert notifications during planned maintenance. Use start and end times, then select the days when the window should run.':'Planlı bakım sırasında alert bildirimlerini bastırır. Başlangıç ve bitiş saatlerini kullanın, ardından pencerenin çalışacağı günleri seçin.',
       'Mon':'Pzt',
       'Tue':'Sal',

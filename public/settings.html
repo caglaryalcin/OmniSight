@@ -1387,7 +1387,7 @@ html[data-theme="light"] .ci-help{color:#53657c}
         <div class="form-grid g3">
           <div class="form-group">
             <label>Maintenance</label>
-            <div class="inline-toggle"><span>Enabled</span><label class="toggle"><input type="checkbox" id="al-maint-en"><span class="toggle-t"></span></label></div>
+            <div class="inline-toggle"><span>Enabled</span><label class="toggle"><input type="checkbox" id="al-maint-en" onchange="saveConfig({ silent: true, reason: 'maintenance-toggle' })"><span class="toggle-t"></span></label></div>
           </div>
           <div class="form-group"><label>Maintenance start</label><input type="time" id="al-maint-start"></div>
           <div class="form-group"><label>Maintenance end</label><input type="time" id="al-maint-end"></div>
@@ -5516,6 +5516,7 @@ async function saveConfig(opts = {}) {
       if (!silent) toast(userResult ? 'Saved and applied!' : 'Saved and applied!', 'ok');
       else if (opts.reason === 'delete') toast('Removed and saved', 'ok');
       else if (opts.reason === 'password-reset-toggle') toast(trText('Password reset setting saved'), 'ok');
+      else if (opts.reason === 'maintenance-toggle') toast(trText('Maintenance setting saved'), 'ok');
       else if (opts.reason === 'kubeconfig-path') toast(trText('Kubernetes config path saved'), 'ok');
       refreshDots(cfgPayload);
       return;
@@ -5537,6 +5538,7 @@ async function saveConfig(opts = {}) {
     if (!silent) toast('Saved and applied!', 'ok');
     else if (opts.reason === 'delete') toast('Removed and saved', 'ok');
     else if (opts.reason === 'password-reset-toggle') toast(trText('Password reset setting saved'), 'ok');
+    else if (opts.reason === 'maintenance-toggle') toast(trText('Maintenance setting saved'), 'ok');
     else if (opts.reason === 'kubeconfig-path') toast(trText('Kubernetes config path saved'), 'ok');
     refreshDots(cfgPayload, body.data);
     try {

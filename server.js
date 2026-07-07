@@ -4216,6 +4216,7 @@ function currentMaintenanceWindow(now = Date.now()) {
     if (!w || w.enabled === false || !dayMatches(w, d)) return false;
     const start = parseClockMinutes(w.start || w.from);
     const end = parseClockMinutes(w.end || w.to);
+    if (start == null && end == null) return true;
     if (start == null || end == null) return false;
     return start <= end ? mins >= start && mins <= end : (mins >= start || mins <= end);
   }) || null;
