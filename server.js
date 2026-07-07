@@ -3760,6 +3760,10 @@ function mergePrometheusConfigured(current, cfg) {
 function extractChecks(data) {
   const m = new Map();
   const add = (key, ok, label, detail, extra = {}) => m.set(key, { ok, label, detail, ...extra });
+  const parseTimeMs = (value) => {
+    const ms = value ? new Date(value).getTime() : NaN;
+    return Number.isFinite(ms) ? ms : null;
+  };
   const durationText = (seconds) => {
     const n = Number(seconds);
     if (!Number.isFinite(n) || n < 0) return '';
@@ -3784,21 +3788,44 @@ function extractChecks(data) {
   const healthcheckInfoLines = (c = {}) => [
     c.project ? `Project: ${c.project}` : '',
     c.tags ? `Tags: ${c.tags}` : '',
+    c.schedule ? `Schedule: ${c.schedule}` : '',
     durationText(c.periodSec) ? `Period: ${durationText(c.periodSec)}` : '',
     durationText(c.graceSec) ? `Grace: ${durationText(c.graceSec)}` : '',
     Number.isFinite(Number(c.totalPings)) ? `Total Pings: ${Number(c.totalPings)}` : '',
   ].filter(Boolean);
-  const healthcheckDeadlineMs = (c = {}) => {
-    const lastPingMs = c.lastPing ? new Date(c.lastPing).getTime() : NaN;
-    const periodSec = Number(c.periodSec);
+  const healthcheckId = (c = {}) => String(c.uniqueKey || c.uuid || c.slug || c.name || '').trim();
+  const healthcheckGraceMs = (c = {}) => {
     const graceSec = Number(c.graceSec);
-    if (!Number.isFinite(lastPingMs) || !Number.isFinite(periodSec)) return null;
-    return lastPingMs + Math.max(0, periodSec + (Number.isFinite(graceSec) ? graceSec : 0)) * 1000;
+    return Math.max(0, Number.isFinite(graceSec) ? graceSec : 0) * 1000;
+  };
+  const healthcheckKnownDeadlineMs = (c = {}, nowMs = Date.now()) => {
+    const status = String(c.status || '').toLowerCase();
+    const graceMs = healthcheckGraceMs(c);
+    const nextPingMs = parseTimeMs(c.nextPing);
+    if (nextPingMs != null && (status !== 'down' || nextPingMs <= nowMs)) return nextPingMs + graceMs;
+    const lastPingMs = parseTimeMs(c.lastPing);
+    const periodSec = Number(c.periodSec);
+    if (lastPingMs == null || !Number.isFinite(periodSec)) return null;
+    return lastPingMs + Math.max(0, periodSec) * 1000 + graceMs;
+  };
+  const healthcheckDeadlineMs = (c = {}, nowMs = Date.now()) => {
+    const id = healthcheckId(c);
+    const known = healthcheckKnownDeadlineMs(c, nowMs);
+    if (known != null && id && String(c.status || '').toLowerCase() !== 'down') {
+      healthcheckGraceDeadlines.set(id, known);
+    }
+    const remembered = id ? Number(healthcheckGraceDeadlines.get(id)) : NaN;
+    return known ?? (Number.isFinite(remembered) ? remembered : null);
   };
   const healthcheckAlertOk = (c = {}, nowMs = Date.now()) => {
+    const deadline = healthcheckDeadlineMs(c, nowMs);
     if (String(c.status || '').toLowerCase() !== 'down') return true;
-    const deadline = healthcheckDeadlineMs(c);
     return deadline != null && nowMs < deadline;
+  };
+  const healthcheckAlertDelaySeconds = (c = {}, nowMs = Date.now()) => {
+    if (String(c.status || '').toLowerCase() !== 'down') return 0;
+    if (healthcheckDeadlineMs(c, nowMs) != null) return 0;
+    return secondsValue(c.graceSec, 0);
   };
   const dockerContainerLabels = (c = {}) => {
     if (c.labels && typeof c.labels === 'object' && !Array.isArray(c.labels)) return c.labels;
@@ -3944,9 +3971,10 @@ function extractChecks(data) {
   const hc = data.healthchecks;
   if (hc && Array.isArray(hc.checks)) hc.checks.forEach(c => {
     const nm = c.name || c.slug;
-    add('hc:' + nm, healthcheckAlertOk(c), 'Healthcheck ' + nm, c.status, {
+    const nowMs = Date.now();
+    add('hc:' + nm, healthcheckAlertOk(c, nowMs), 'Healthcheck ' + nm, c.status, {
       kind: 'healthchecks',
-      durationSeconds: 0,
+      durationSeconds: healthcheckAlertDelaySeconds(c, nowMs),
       infoLines: healthcheckInfoLines(c),
     });
   });
@@ -4056,6 +4084,7 @@ let prevChecks = null;
 const alertFirstSeen = new Map();
 const alertProblemSince = new Map();
 const alertActiveSeverity = new Map();
+const healthcheckGraceDeadlines = new Map();
 function pctNumber(v) {
   const n = Number(v);
   if (!Number.isFinite(n)) return null;
