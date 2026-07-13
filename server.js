@@ -1911,7 +1911,7 @@ const READ_ONLY_REDACT_TEXT_KEYS = new Set([
   'password', 'sshpassword', 'privatekey', 'sshkey', 'authpassword', 'privpassword',
   'community', 'secret', 'bottoken',
   'user', 'username', 'sshuser',
-  'host', 'hostname', 'sshhost', 'ip', 'publicip', 'url', 'baseurl', 'serverurl', 'sourceurl', 'scrapeurl',
+  'host', 'hostname', 'sshhost', 'ip', 'publicip', 'url', 'baseurl', 'serverurl', 'sourceurl', 'scrapeurl', 'webhookurl',
   'target', 'address', 'endpoint', 'socketpath', 'dsn', 'databaseurl', 'clusterip',
   'externalip', 'nodeip',
 ]);

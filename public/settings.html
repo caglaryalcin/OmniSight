@@ -1500,6 +1500,26 @@ html[data-theme="light"] .ci-help{color:#53657c}
 
     <div class="arr-item">
       <div class="arr-hdr">
+        <span class="arr-hdr-name">Mattermost</span>
+        <label class="toggle"><input type="checkbox" id="al-mm-en" onchange="toggleAlertBody('al-mm-en','al-mm-body')"><span class="toggle-t"></span></label>
+      </div>
+      <div class="arr-body hidden" id="al-mm-body">
+        <div class="form-group"><label>Incoming Webhook URL</label><input type="password" id="al-mm-url" placeholder="https://mattermost.example.com/hooks/xxxxxxxx"></div>
+        <div class="form-grid">
+          <div class="form-group"><label>Channel (optional)</label><input type="text" id="al-mm-channel" placeholder="town-square"></div>
+          <div class="form-group"><label>Bot name (optional)</label><input type="text" id="al-mm-username" placeholder="OmniSight"></div>
+        </div>
+        <div class="form-grid">
+          <div class="form-group"><label>Icon URL (optional)</label><input type="text" id="al-mm-icon" placeholder="https://example.com/icon.png"></div>
+          <div class="form-group" style="display:flex;align-items:flex-end"><label style="display:flex;gap:8px;align-items:center;font-weight:normal"><input type="checkbox" id="al-mm-insecure" style="width:auto"> Skip TLS verification</label></div>
+        </div>
+        <div style="font-size:12px;color:var(--muted);line-height:1.45">Payload is Slack-compatible; also works with Slack and Rocket.Chat incoming webhooks.</div>
+        <button class="btn-sm" type="button" onclick="sendTestAlert('mattermost')" style="margin-top:10px">Test Mattermost</button>
+      </div>
+    </div>
+
+    <div class="arr-item">
+      <div class="arr-hdr">
         <span class="arr-hdr-name">SMTP (E-mail)</span>
         <label class="toggle"><input type="checkbox" id="al-smtp-en" onchange="toggleAlertBody('al-smtp-en','al-smtp-body')"><span class="toggle-t"></span></label>
       </div>
@@ -4228,6 +4248,14 @@ function populate(cfg) {
       secVal(a.telegram.botToken, document.getElementById('al-tg-token'));
       document.getElementById('al-tg-chat').value = a.telegram.chatId || '';
     }
+    if (a.mattermost) {
+      document.getElementById('al-mm-en').checked = a.mattermost.enabled !== false;
+      secVal(a.mattermost.webhookUrl, document.getElementById('al-mm-url'));
+      document.getElementById('al-mm-channel').value = a.mattermost.channel || '';
+      document.getElementById('al-mm-username').value = a.mattermost.username || '';
+      document.getElementById('al-mm-icon').value = a.mattermost.iconUrl || '';
+      document.getElementById('al-mm-insecure').checked = a.mattermost.insecureTLS === true;
+    }
     if (a.smtp) {
       document.getElementById('al-smtp-en').checked = a.smtp.enabled !== false;
       document.getElementById('al-smtp-host').value = a.smtp.host || '';
@@ -4241,6 +4269,7 @@ function populate(cfg) {
     toggleAlertBody('al-ntfy-en', 'al-ntfy-body');
     toggleAlertBody('al-webhook-en', 'al-webhook-body');
     toggleAlertBody('al-tg-en', 'al-tg-body');
+    toggleAlertBody('al-mm-en', 'al-mm-body');
     toggleAlertBody('al-smtp-en', 'al-smtp-body');
   }
 }
@@ -4816,6 +4845,19 @@ function collect() {
         chatId: document.getElementById('al-tg-chat').value.trim(),
       };
     }
+    if (document.getElementById('al-mm-en').checked) {
+      a.mattermost = {
+        enabled: true,
+        webhookUrl: maskedVal(document.getElementById('al-mm-url')),
+      };
+      const mmChannel = document.getElementById('al-mm-channel').value.trim();
+      if (mmChannel) a.mattermost.channel = mmChannel;
+      const mmUser = document.getElementById('al-mm-username').value.trim();
+      if (mmUser) a.mattermost.username = mmUser;
+      const mmIcon = document.getElementById('al-mm-icon').value.trim();
+      if (mmIcon) a.mattermost.iconUrl = mmIcon;
+      if (document.getElementById('al-mm-insecure').checked) a.mattermost.insecureTLS = true;
+    }
     if (document.getElementById('al-smtp-en').checked) {
       a.smtp = {
         enabled: true,
@@ -4828,7 +4870,7 @@ function collect() {
         to: getTagVals('al-smtp-to'),
       };
     }
-    if (alertsOn || a.maintenanceWindows || a.webhook || a.ntfy || a.telegram || a.smtp) cfg.alerts = a;
+    if (alertsOn || a.maintenanceWindows || a.webhook || a.ntfy || a.telegram || a.mattermost || a.smtp) cfg.alerts = a;
   }
 
   if (document.getElementById('en-public').checked) cfg.publicStatus = true;

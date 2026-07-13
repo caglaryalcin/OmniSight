@@ -56,7 +56,7 @@ For deeper architecture, operations and troubleshooting notes, see [DOCUMENTATIO
 
 - **Healthchecks** — cron monitoring status with last-ping and period/grace
 - **Built-in service checks** — HTTP/HTTPS, TCP, Ping and DNS checks without requiring an external status tool, with persisted heartbeat bars and latency history
-- **Alerts** — notifications on state changes (down/up), resource thresholds and CPU/RAM anomaly detection via **ntfy**, **Telegram** and **SMTP**, with warning/critical percentages and a **per-device bell** to mute/enable notifications for individual platforms/devices
+- **Alerts** — notifications on state changes (down/up), resource thresholds and CPU/RAM anomaly detection via **ntfy**, **Telegram**, **Mattermost** (Slack-compatible webhooks) and **SMTP**, with warning/critical percentages and a **per-device bell** to mute/enable notifications for individual platforms/devices
 - **REST API / Webhook events** — external systems can POST events into OmniSight and have them appear in Event Center / alert history
 - **Mobile / PWA** — installable manifest, service worker and responsive dashboard layout for phone/tablet use
 - **Custom icons** — set any platform's icon from [dashboard-icons](https://github.com/homarr-labs/dashboard-icons) by name/URL or upload your own (see [Platform icons](#platform-icons))
@@ -393,7 +393,7 @@ The live config is `data/config.yaml` (created automatically on first save). Eas
 - `uptimekuma` — url, status page `slug`, optional apiKey, username/password and historyHours
 - `prometheus` — one or more `instances[]` with name, url, optional bearerToken and `insecureTLS`
 - `database.instances[]` — `type: postgresql | mysql | mariadb | mongodb`, name, host, port, user, password, optional `database`
-- `alerts` — `enabled`, warning/critical resource thresholds, per-kind alert rules, optional CPU/RAM anomaly detection, maintenance windows, `webhook` event ingestion and `ntfy` / `telegram` / `smtp` notification channels
+- `alerts` — `enabled`, warning/critical resource thresholds, per-kind alert rules, optional CPU/RAM anomaly detection, maintenance windows, `webhook` event ingestion and `ntfy` / `telegram` / `mattermost` / `smtp` notification channels
 - `publicStatus: true`, `publicTitle`, `publicDescription`, `publicPlatforms[]`, `publicStatusShowDetails` and `publicStatusShowHistory` — expose and customize the `/status` page publicly. Details and history are opt-in so the public page can stay minimal by default.
 - each platform also takes an optional `icon` (see below)
 

@@ -71,7 +71,23 @@ async function sendSmtp(cfg, alert) {
   return { status: 'sent' };
 }
 
-const CHANNELS = { ntfy: sendNtfy, telegram: sendTelegram, smtp: sendSmtp };
+async function sendMattermost(cfg, alert) {
+  if (!cfg || !cfg.webhookUrl) throw new Error('mattermost: webhookUrl missing');
+  const title = String(alert.title || '').trim();
+  const message = String(alert.message || '').trim();
+  const text = (title ? `**${title}**\n` : '') + message;
+  const payload = { text: text || 'OmniSight alert' };
+  if (cfg.channel) payload.channel = cfg.channel;
+  payload.username = cfg.username || 'OmniSight';
+  if (cfg.iconUrl) payload.icon_url = cfg.iconUrl;
+  return httpRequest(cfg.webhookUrl, {
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+    insecureTLS: cfg.insecureTLS === true,
+  });
+}
+
+const CHANNELS = { ntfy: sendNtfy, telegram: sendTelegram, smtp: sendSmtp, mattermost: sendMattermost };
 
 async function dispatchAlert(alertConfig, alert, only) {
   if (!alertConfig || alertConfig.enabled === false) return [];

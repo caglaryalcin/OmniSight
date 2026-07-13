@@ -281,6 +281,13 @@ alerts:
   telegram:
     botToken: "123456:ABC-your-bot-token"
     chatId: "123456789"
+  mattermost:
+    # Incoming webhook URL (Mattermost; payload is also Slack/Rocket.Chat compatible)
+    webhookUrl: "https://mattermost.example.com/hooks/xxx-generated-key-xxx"
+    # channel: "town-square"           # optional override (if the webhook allows it)
+    # username: "OmniSight"            # optional bot display name
+    # iconUrl: "https://example.com/icon.png"  # optional avatar
+    # insecureTLS: false               # true = skip TLS verification (self-signed)
   smtp:
     host: "smtp.gmail.com"
     port: 587
