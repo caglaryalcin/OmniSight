@@ -84,7 +84,7 @@ The center of the application is `server.js`. It owns the Express server, authen
 | `src/veeam.js` | Veeam Backup & Replication REST API |
 | `src/portainer.js` | Portainer instances and environments |
 | `src/database.js` | PostgreSQL, MySQL/MariaDB, MongoDB |
-| `src/alerts.js` | ntfy, Telegram, SMTP dispatch |
+| `src/alerts.js` | ntfy, Telegram, Mattermost, SMTP dispatch |
 | `src/crypto.js` | Config secret encryption/decryption |
 | `src/historyStore.js` | History map load/save and delayed flushing |
 
@@ -689,6 +689,7 @@ Alert settings can define `durationSeconds` per category. `rules.default` defaul
 
 - ntfy.
 - Telegram.
+- Mattermost (incoming webhook; payload is Slack/Rocket.Chat compatible).
 - SMTP.
 
 ### Cooldown and Duplicate Suppression
