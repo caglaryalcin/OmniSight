@@ -827,9 +827,21 @@ html[data-theme="light"] .ci-help{color:#53657c}
     <label class="toggle"><input type="checkbox" id="en-unifi" onchange="syncSnmpToggles(this.checked);toggleCard('unifi')"><span class="toggle-t"></span></label>
   </div>
   <div class="card-body hidden" id="cb-unifi">
-    <div id="unifi-section-desc" style="font-size:12px;color:var(--muted);line-height:1.35;margin-bottom:10px">UniFi devices use the SNMP collector, but appear under their own brand section.</div>
-    <div id="unifi-list"></div>
-    <button class="btn-sm" style="margin-top:4px" onclick="addSynDevice({profile:'unifi'}, 'unifi-list', 'unifi')">+ Add UniFi</button>
+    <div id="unifi-toggle-desc" style="font-size:12px;color:var(--muted);line-height:1.35;margin-bottom:10px">Controls both controller instances and SNMP-branded UniFi devices.</div>
+    <div class="section mini-section">
+      <div class="sec-head">
+        <h3 id="unifi-ctrl-title">Controllers (Network application API)</h3>
+        <button class="btn-add" type="button" onclick="addUnifiController()">+ Add Controller</button>
+      </div>
+      <div id="unifi-ctrl-desc" style="font-size:12px;color:var(--muted);line-height:1.35;margin-bottom:10px">Official Integration API (Network app 9.3+, API key from Settings &rarr; API Keys). The optional local account enables WAN latency/packet loss via the legacy API — it must be MFA-exempt and read-only.</div>
+      <div id="unifi-ctrl-list"></div>
+    </div>
+    <div class="section mini-section">
+      <div class="sec-head"><h3 id="unifi-snmp-title">SNMP devices</h3></div>
+      <div id="unifi-section-desc" style="font-size:12px;color:var(--muted);line-height:1.35;margin-bottom:10px">UniFi devices use the SNMP collector, but appear under their own brand section.</div>
+      <div id="unifi-list"></div>
+      <button class="btn-sm" style="margin-top:4px" onclick="addSynDevice({profile:'unifi'}, 'unifi-list', 'unifi')">+ Add UniFi</button>
+    </div>
   </div>
 </div>
 
@@ -1686,7 +1698,7 @@ html[data-theme="light"] .ci-help{color:#53657c}
 
 <script src="/i18n.js"></script>
 <script>
-let lCount = 0, sCount = 0, dCount = 0, dbCount = 0, dkApiCount = 0, dkSshCount = 0, pveSshCount = 0, promCount = 0, dockhandCount = 0, firewallCount = 0, trueNasCount = 0, qnapCount = 0, ugreenCount = 0, pbsCount = 0, cicdCount = 0, veeamCount = 0, portainerCount = 0, checkCount = 0;
+let lCount = 0, sCount = 0, dCount = 0, dbCount = 0, dkApiCount = 0, dkSshCount = 0, pveSshCount = 0, promCount = 0, dockhandCount = 0, firewallCount = 0, trueNasCount = 0, unifiCtrlCount = 0, qnapCount = 0, ugreenCount = 0, pbsCount = 0, cicdCount = 0, veeamCount = 0, portainerCount = 0, checkCount = 0;
 const SETTINGS_CARD_OPEN_KEY = 'os_settings_card_open';
 const SETTINGS_ACTIVE_SECTION_KEY = 'os_settings_active_section';
 const DEFAULT_SETTINGS_SECTION = 'appearance';
@@ -2108,6 +2120,16 @@ function renderLocalizedBlocks(lang = currentLang()) {
       en: 'UniFi devices use the SNMP collector, but appear under their own brand section.',
       tr: 'UniFi cihazları SNMP toplayıcısını kullanır, ancak kendi marka bölümlerinde görünür.',
     },
+    'unifi-toggle-desc': {
+      en: 'Controls both controller instances and SNMP-branded UniFi devices.',
+      tr: 'Hem controller instance’larını hem de SNMP markalı UniFi cihazlarını kontrol eder.',
+    },
+    'unifi-ctrl-title': { en: 'Controllers (Network application API)', tr: 'Controller’lar (Network uygulaması API’si)' },
+    'unifi-ctrl-desc': {
+      en: 'Official Integration API (Network app 9.3+, API key from Settings → API Keys). The optional local account enables WAN latency/packet loss via the legacy API — it must be MFA-exempt and read-only.',
+      tr: 'Resmî Integration API (Network uygulaması 9.3+, API anahtarı Settings → API Keys üzerinden). İsteğe bağlı yerel hesap, legacy API üzerinden WAN gecikmesi/paket kaybını etkinleştirir — MFA’dan muaf ve salt okunur olmalıdır.',
+    },
+    'unifi-snmp-title': { en: 'SNMP devices', tr: 'SNMP cihazları' },
     'snmp-section-desc': {
       en: 'Use this section for generic or unknown-brand SNMP devices.',
       tr: 'Bu bölümü genel veya markası bilinmeyen SNMP cihazları için kullanın.',
@@ -2215,6 +2237,7 @@ function previewConfiguredIds(cfg = {}) {
   if (en(cfg.docker) && (cfg.docker?.hosts || []).length) ids.push('docker');
   if (en(cfg.dockhand) && hasInstances(cfg.dockhand)) ids.push('dockhand');
   if (en(cfg.firewall) && hasInstances(cfg.firewall)) ids.push('firewall');
+  if (en(cfg.unifi) && hasInstances(cfg.unifi) && !ids.includes('unifi')) ids.push('unifi');
   if (en(cfg.truenas) && hasInstances(cfg.truenas)) ids.push('truenas');
   if (en(cfg.qnap) && hasInstances(cfg.qnap)) ids.push('qnap');
   if (en(cfg.ugreen) && hasInstances(cfg.ugreen)) ids.push('ugreen');
@@ -2432,7 +2455,7 @@ function configBool(value, fallback = false) {
   if (['0', 'false', 'no', 'off'].includes(text)) return false;
   return fallback;
 }
-const PLATFORM_CONFIG_KEYS = ['proxmox','linux','windows','kubernetes','snmp','healthchecks','uptimekuma','checks','prometheus','docker','dockhand','firewall','truenas','qnap','ugreen','pbs','cloudflare','cicd','veeam','portainer','database'];
+const PLATFORM_CONFIG_KEYS = ['proxmox','linux','windows','kubernetes','snmp','healthchecks','uptimekuma','checks','prometheus','docker','dockhand','firewall','truenas','unifi','qnap','ugreen','pbs','cloudflare','cicd','veeam','portainer','database'];
 function hasPlatformConfig(cfg) {
   return !!(cfg && PLATFORM_CONFIG_KEYS.some(key => Object.prototype.hasOwnProperty.call(cfg, key)));
 }
@@ -2715,6 +2738,68 @@ function addTrueNasInstance(data = {}) {
   if (data.apiKey || data.apiToken || data.token || data.bearerToken) secVal(data.apiKey || data.apiToken || data.token || data.bearerToken, item.querySelector('.tn-key'));
   if (data.password) secVal(data.password, item.querySelector('.tn-password'));
   applyLanguageFragment(item);
+}
+
+function addUnifiController(data = {}) {
+  const idx = unifiCtrlCount++;
+  const id = `unifi-ctrl-${idx}`;
+  const item = document.createElement('div');
+  item.className = 'arr-item';
+  item.innerHTML = `
+    <div class="arr-hdr" onclick="toggleArr('${id}')">
+      <span class="arr-hdr-name">${escHtml(data.name || data.url || 'UniFi Controller')}</span>
+      <button class="btn-rm" type="button" onclick="event.stopPropagation();this.closest('.arr-item').remove()">x</button>
+    </div>
+    <div class="arr-body" id="ab-${id}">
+      <div class="form-grid">
+        <div class="form-group"><label>Name</label><input type="text" class="uc-name" value="${escHtml(data.name||'')}" placeholder="main-controller" oninput="this.closest('.arr-item').querySelector('.arr-hdr-name').textContent=this.value||'UniFi Controller'"></div>
+        <div class="form-group"><label>Controller URL</label><input type="text" class="uc-url" value="${escHtml(data.url||'')}" placeholder="https://192.168.1.1"></div>
+        <div class="form-group"><label>API key</label><input type="password" class="uc-key" placeholder="Settings &rarr; API Keys on the controller"></div>
+        <div class="form-group"><label>Site (optional)</label><input type="text" class="uc-site" value="${escHtml(data.site||'')}" placeholder="auto-discovered"></div>
+        <div class="form-group"><label>TLS</label><select class="uc-insecure"><option value="true" ${data.insecureTLS!==false?'selected':''}>Allow self-signed</option><option value="false" ${data.insecureTLS===false?'selected':''}>Verify certificate</option></select></div>
+      </div>
+      <div class="form-grid" style="margin-top:6px">
+        <div class="form-group"><label>Legacy username (optional, WAN quality)</label><input type="text" class="uc-luser" value="${escHtml(data.legacy?.username||'')}" placeholder="MFA-exempt read-only local account"></div>
+        <div class="form-group"><label>Legacy password</label><input type="password" class="uc-lpass" placeholder="enables WAN latency/loss"></div>
+      </div>
+      <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
+        <button type="button" class="btn-sm" onclick="testUnifiController(this)">Test connection</button>
+        <span class="uc-test-result" style="font-size:12px;color:var(--muted)"></span>
+      </div>
+    </div>`;
+  document.getElementById('unifi-ctrl-list').appendChild(item);
+  if (data.apiKey) secVal(data.apiKey, item.querySelector('.uc-key'));
+  if (data.legacy?.password) secVal(data.legacy.password, item.querySelector('.uc-lpass'));
+  applyLanguageFragment(item);
+}
+
+async function testUnifiController(btn) {
+  const item = btn.closest('.arr-item');
+  const out = item.querySelector('.uc-test-result');
+  out.textContent = 'testing…';
+  out.style.color = 'var(--muted)';
+  try {
+    const legacyUser = item.querySelector('.uc-luser').value.trim();
+    const body = {
+      url: item.querySelector('.uc-url').value.trim(),
+      apiKey: maskedVal(item.querySelector('.uc-key')),
+      site: item.querySelector('.uc-site').value.trim() || undefined,
+      insecureTLS: item.querySelector('.uc-insecure').value === 'true',
+      legacy: legacyUser ? { username: legacyUser, password: maskedVal(item.querySelector('.uc-lpass')) } : undefined,
+    };
+    const r = await fetch('/api/unifi/test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+    const parts = [];
+    parts.push(j.api?.ok ? 'API ✓' : `API ✗ ${j.api?.error || ''}`);
+    if (j.wanQuality?.configured) parts.push(j.wanQuality.ok ? 'WAN quality ✓' : `WAN quality ✗ ${j.wanQuality.error || '(check MFA-exempt account)'}`);
+    else parts.push('WAN quality: not configured');
+    out.textContent = parts.join(' · ');
+    out.style.color = j.api?.ok && (!j.wanQuality?.configured || j.wanQuality.ok) ? 'var(--green)' : (j.api?.ok ? 'var(--yellow)' : 'var(--red)');
+  } catch (err) {
+    out.textContent = `test failed: ${err.message}`;
+    out.style.color = 'var(--red)';
+  }
 }
 
 function addQnapInstance(data = {}) {
@@ -3845,6 +3930,7 @@ const DYNAMIC_CONFIG_LIST_IDS = [
   'dockhand-list',
   'firewall-list',
   'truenas-list',
+  'unifi-ctrl-list',
   'qnap-list',
   'ugreen-list',
   'pbs-list',
@@ -3902,6 +3988,7 @@ function resetDynamicConfigLists() {
   dockhandCount = 0;
   firewallCount = 0;
   trueNasCount = 0;
+  unifiCtrlCount = 0;
   qnapCount = 0;
   ugreenCount = 0;
   pbsCount = 0;
@@ -4080,6 +4167,13 @@ function populate(cfg) {
           insecureTLS: cfg.firewall.insecureTLS,
         }] : []);
     uniqueConfigItems(instances, ['name', 'url']).forEach(addFirewallInstance);
+  }
+  if (cfg.unifi) {
+    if (cfg.unifi.enabled !== false) document.getElementById('en-unifi').checked = true;
+    if (Array.isArray(cfg.unifi.instances) && cfg.unifi.instances.length) {
+      document.getElementById('cb-unifi').classList.remove('hidden');
+      cfg.unifi.instances.forEach(inst => addUnifiController(inst));
+    }
   }
   if (cfg.truenas) {
     document.getElementById('en-truenas').checked = cfg.truenas.enabled !== false;
@@ -4554,6 +4648,35 @@ function collect() {
       enabled: on,
       instances: uniqueInstances,
       icon: document.getElementById('icon-firewall').value.trim() || undefined,
+    };
+  }
+
+  {
+    // UniFi controllers (Integration API). The en-unifi toggle gates BOTH the
+    // controller instances and the SNMP-branded devices (design 1A). Only emit
+    // config.unifi when controllers exist so SNMP-only setups keep today's
+    // exact config shape (regression requirement).
+    const on = document.getElementById('en-unifi').checked;
+    const instances = [];
+    document.querySelectorAll('#unifi-ctrl-list .arr-item').forEach(item => {
+      const url = item.querySelector('.uc-url').value.trim();
+      const name = item.querySelector('.uc-name').value.trim();
+      const apiKey = maskedVal(item.querySelector('.uc-key'));
+      const legacyUser = item.querySelector('.uc-luser').value.trim();
+      const legacyPass = maskedVal(item.querySelector('.uc-lpass'));
+      if (url || name) instances.push({
+        name: name || undefined,
+        url: url || undefined,
+        apiKey: apiKey || undefined,
+        site: item.querySelector('.uc-site').value.trim() || undefined,
+        insecureTLS: item.querySelector('.uc-insecure').value === 'true' || undefined,
+        legacy: legacyUser ? { username: legacyUser, password: legacyPass || undefined } : undefined,
+      });
+    });
+    const uniqueInstances = uniqueConfigItems(instances, ['name', 'url']);
+    if (uniqueInstances.length) cfg.unifi = {
+      enabled: on,
+      instances: uniqueInstances,
     };
   }
 

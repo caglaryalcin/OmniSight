@@ -21,6 +21,7 @@ const { getAllDatabaseData } = require('./src/database');
 const { getAllFirewallData } = require('./src/firewall');
 const { getAllTrueNasData, configuredInstances: trueNasConfigInstances } = require('./src/truenas');
 const { getAllQnapData, configuredInstances: qnapConfigInstances } = require('./src/qnap');
+const { getAllUnifiData, configuredInstances: unifiConfigInstances } = require('./src/unifi');
 const { getAllUgreenData, configuredInstances: ugreenConfigInstances } = require('./src/ugreen');
 const { getAllPbsData, configuredInstances: pbsConfigInstances } = require('./src/pbs');
 const { getAllPortainerData, configuredInstances: portainerConfigInstances, portainerLogs } = require('./src/portainer');
@@ -2463,7 +2464,7 @@ function eventsViewSignature(limit) {
   ].join('|');
 }
 
-const PLATFORM_REFRESH_KEYS = ['proxmox','linux','windows','kubernetes','snmp','healthchecks','uptimekuma','checks','prometheus','docker','dockhand','database','firewall','truenas','qnap','ugreen','pbs','cloudflare','cicd','veeam','portainer'];
+const PLATFORM_REFRESH_KEYS = ['proxmox','linux','windows','kubernetes','snmp','healthchecks','uptimekuma','checks','prometheus','docker','dockhand','database','firewall','truenas','qnap','ugreen','unifi','pbs','cloudflare','cicd','veeam','portainer'];
 const platformRefreshState = Object.fromEntries(PLATFORM_REFRESH_KEYS.map(k => [k, { inFlight: false, nextDue: 0, failures: 0, lastStarted: 0, lastFinished: 0 }]));
 const forceConnectingPlatforms = new Set();
 const CONFIG_CHANGE_CONNECTING_MS = Math.max(30000, Number(process.env.OMNISIGHT_CONFIG_CHANGE_CONNECTING_MS || 120000));
@@ -2525,6 +2526,7 @@ function platformResultLooksFailed(key, value, enabled) {
   if (key === 'truenas') return value?.instances?.length && value.instances.every(i => i.online === false || i.error || i._connecting);
   if (key === 'qnap') return value?.instances?.length && value.instances.every(i => i.online === false || i.error || i._connecting);
   if (key === 'ugreen') return value?.instances?.length && value.instances.every(i => i.online === false || i.error || i._connecting);
+  if (key === 'unifi') return value?.instances?.length && value.instances.every(i => i.online === false || i.error || i._connecting);
   if (key === 'pbs') return value?.instances?.length && value.instances.every(i => i.online === false || i.error || i._connecting);
   if (key === 'cloudflare') return value && value.online === false && (value.error || value._connecting);
   if (key === 'cicd') return value?.projects?.length && value.projects.every(i => i.online === false || i.error || i._connecting);
@@ -2898,6 +2900,7 @@ function assignStatic(base) {
     truenas: publicIconValue(config.truenas?.icon),
     qnap: publicIconValue(config.qnap?.icon),
     ugreen: publicIconValue(config.ugreen?.icon),
+    unifi: publicIconValue(config.unifi?.icon),
     pbs: publicIconValue(config.pbs?.icon),
     cloudflare: publicIconValue(config.cloudflare?.icon),
     cicd: publicIconValue(config.cicd?.icon),
@@ -3056,6 +3059,17 @@ function settingsStatusData(data = cache.data || EMPTY) {
         _connecting: !!i._connecting,
         partial: !!i.partial,
         summary: i.summary || {},
+      })),
+    } : null,
+    unifi: data.unifi ? {
+      online: !!data.unifi.online,
+      _connecting: !!data.unifi._connecting,
+      summary: data.unifi.summary || {},
+      instances: (data.unifi.instances || []).map(i => ({
+        online: !!i.online,
+        _connecting: !!i._connecting,
+        stale: !!i.stale,
+        wan: i.wan ? { state: i.wan.state } : null,
       })),
     } : null,
     ugreen: data.ugreen ? {
@@ -3221,6 +3235,17 @@ function topologyStatusData(data = cache.data || EMPTY) {
         _connecting: !!i._connecting,
         partial: !!i.partial,
         system: i.system || {},
+      })),
+    } : null,
+    unifi: data.unifi ? {
+      instances: (data.unifi.instances || []).map(i => ({
+        name: i.name,
+        url: i.url,
+        online: !!i.online,
+        _connecting: !!i._connecting,
+        stale: !!i.stale,
+        wan: i.wan ? { state: i.wan.state, latencyMs: i.wan.latencyMs, lossPct: i.wan.lossPct } : null,
+        devices: Array.isArray(i.devices) ? i.devices.map(d => ({ name: d.name, state: d.state, online: !!d.online })) : [],
       })),
     } : null,
     ugreen: data.ugreen ? {
@@ -3486,6 +3511,7 @@ function configuredList() {
   if (en(config.dockhand)     && hasDockhand(config.dockhand))           ids.push('dockhand');
   if (en(config.database)     && (config.database.instances || []).length) ids.push('database');
   if (en(config.firewall)     && hasFirewall(config.firewall))           ids.push('firewall');
+  if (en(config.unifi)        && unifiConfigInstances(config.unifi).length && !ids.includes('unifi')) ids.push('unifi');
   if (en(config.truenas)      && hasTrueNas(config.truenas))             ids.push('truenas');
   if (en(config.qnap)         && hasQnap(config.qnap))                   ids.push('qnap');
   if (en(config.ugreen)       && hasUgreen(config.ugreen))               ids.push('ugreen');
@@ -3495,6 +3521,26 @@ function configuredList() {
   if (en(config.veeam)        && hasVeeam(config.veeam))                  ids.push('veeam');
   if (en(config.portainer)    && hasPortainer(config.portainer))         ids.push('portainer');
   return ids;
+}
+
+function unifiConnectingData(conf = config.unifi) {
+  const instances = unifiConfigInstances(conf || {});
+  const rows = instances.map((inst, idx) => ({
+    name: inst.name || inst.url || `UniFi ${idx + 1}`,
+    url: inst.url || '',
+    online: false,
+    _connecting: true,
+    devices: [],
+    devicesComplete: false,
+    wan: null,
+    wanQuality: 'unconfigured',
+  }));
+  return {
+    online: false,
+    _connecting: true,
+    summary: { instances: rows.length, up: 0, down: 0, devices: 0, devicesOnline: 0, devicesOffline: 0, devicesWarn: 0, wanDown: 0 },
+    instances: rows,
+  };
 }
 
 function trueNasConnectingData(conf = config.truenas) {
@@ -3944,9 +3990,26 @@ function extractChecks(data) {
       add('k8s:' + p.namespace + '/' + p.name, ok, 'Pod ' + p.namespace + '/' + p.name, detail || p.phase);
     });
   }
+  // UniFi controller knowledge (design 5A): while a device is in a transitional
+  // state (updating/adopting/…), suppress its SNMP down-alert — the reboot is
+  // expected. SNMP remains the pager for real outages (it detects faster than
+  // the controller's heartbeat timeout).
+  const unifiTransitionalHosts = new Set();
+  const unifiCoveredHosts = new Set();
+  (data.unifi?.instances || []).forEach(i => (i.devices || []).forEach(d => {
+    const keys = [d.ip, d.name && String(d.name).toLowerCase(), d.mac].filter(Boolean);
+    for (const k of keys) {
+      unifiCoveredHosts.add(k);
+      if (d.warn) unifiTransitionalHosts.add(k);
+    }
+  }));
+  const snmpKeysOf = s => [s.host, s.name && String(s.name).toLowerCase()].filter(Boolean);
+  const snmpHostSet = new Set();
+  (data.snmp || []).forEach(s => snmpKeysOf(s).forEach(k => snmpHostSet.add(k)));
   (data.snmp || []).forEach(s => {
     const snmpOk = !!s.online && !s._stale;
-    add('snmp:' + s.name, snmpOk, 'SNMP ' + s.name, s._stale ? (s.error || 'temporary SNMP refresh failure') : 'unreachable');
+    const inUpdateWindow = snmpKeysOf(s).some(k => unifiTransitionalHosts.has(k));
+    add('snmp:' + s.name, snmpOk || inUpdateWindow, 'SNMP ' + s.name, s._stale ? (s.error || 'temporary SNMP refresh failure') : 'unreachable');
     if (s.online && !s._stale) {
       addPct('snmp:' + s.name + ':cpu', 'SNMP ' + s.name, 'CPU usage', s.cpu, thresholds.cpu);
       addPct('snmp:' + s.name + ':ram', 'SNMP ' + s.name, 'RAM usage', s.ram?.percent, thresholds.ram);
@@ -4016,6 +4079,27 @@ function extractChecks(data) {
     if (i.online && Number(i.summary?.poolsWarn || 0) > 0) add('truenas-pool:' + nm, false, 'TrueNAS pool ' + nm, `${i.summary.poolsWarn} pool(s) need attention`);
     if (i.online && Number(i.summary?.disksWarn || 0) > 0) add('truenas-disk:' + nm, false, 'TrueNAS disk ' + nm, `${i.summary.disksWarn} disk(s) need attention`);
     if (i.online && Number(i.summary?.alertsCritical || 0) > 0) add('truenas-alert:' + nm, false, 'TrueNAS alert ' + nm, `${i.summary.alertsCritical} critical alert(s)`);
+  });
+  const uf = data.unifi;
+  if (uf && Array.isArray(uf.instances)) uf.instances.forEach(i => {
+    if (i._connecting) return;
+    const nm = i.name || i.url || 'UniFi';
+    // stale (429 cooldown) is not an outage — last-good data is being served
+    add('unifi:' + nm, !!i.online || !!i.stale, 'UniFi controller ' + nm, i.error || 'unreachable');
+    if (!i.online) return;
+    if (i.wan) add('unifi-wan:' + nm, i.wan.state !== 'down', 'UniFi WAN ' + nm, 'WAN down');
+    const latTh = Number(config.alerts?.thresholds?.wanLatency);
+    if (i.wan && i.wan.latencyMs != null && Number.isFinite(latTh) && latTh > 0) {
+      add('unifi-wan-latency:' + nm, i.wan.latencyMs <= latTh, 'UniFi WAN latency ' + nm, `${i.wan.latencyMs}ms > ${latTh}ms`);
+    }
+    // Design 5A: controller OFFLINE pages only for devices without SNMP
+    // coverage — for covered devices SNMP is the (faster) pager.
+    (i.devices || []).forEach(d => {
+      const covered = [d.ip, d.name && String(d.name).toLowerCase(), d.mac].filter(Boolean)
+        .some(k => snmpHostSet.has(k));
+      if (covered) return;
+      add('unifi-dev:' + nm + ':' + d.name, !d.alertable, 'UniFi device ' + d.name, 'offline (controller-reported)');
+    });
   });
   const qnap = data.qnap;
   if (qnap && Array.isArray(qnap.instances)) qnap.instances.forEach(i => {
@@ -4179,6 +4263,7 @@ function alertRuleForCheck(key, check = {}) {
   if (check.kind === 'anomaly') return config.alerts?.anomaly?.rules?.[metric] || config.alerts?.anomaly || configuredAlertRule(rules, 'anomaly') || defaultRule;
   if (check.kind === 'threshold' && metric) return configuredAlertRule(rules, metric) || defaultRule;
   if (String(key || '').startsWith('snmp:')) return configuredAlertRule(rules, 'snmp') || DEFAULT_SNMP_ALERT_RULE;
+  if (String(key || '').startsWith('unifi-dev:') || String(key || '').startsWith('unifi-wan')) return configuredAlertRule(rules, 'unifi') || DEFAULT_SNMP_ALERT_RULE;
   if (String(key || '').startsWith('k8s:')) return configuredAlertRule(rules, 'pod') || defaultRule;
   if (String(key || '').startsWith('dk:') && String(key || '').split(':').length >= 3) return configuredAlertRule(rules, 'container') || defaultRule;
   if (String(key || '').startsWith('prom:') && !String(key || '').startsWith('prom:instance:')) return configuredAlertRule(rules, 'target') || defaultRule;
@@ -4558,7 +4643,7 @@ function preserveUptimeKumaOnTransient(next, err) {
   };
 }
 
-const OBJECT_INSTANCE_PLATFORMS = new Set(['prometheus', 'dockhand', 'firewall', 'truenas', 'qnap', 'ugreen', 'pbs', 'cloudflare', 'cicd', 'veeam', 'portainer']);
+const OBJECT_INSTANCE_PLATFORMS = new Set(['prometheus', 'dockhand', 'firewall', 'truenas', 'qnap', 'ugreen', 'unifi', 'pbs', 'cloudflare', 'cicd', 'veeam', 'portainer']);
 function objectPlatformHasUsableData(value) {
   if (!value || typeof value !== 'object') return false;
   const instances = Array.isArray(value.instances) ? value.instances : [];
@@ -4657,6 +4742,7 @@ function backgroundRefresh(opts = {}) {
     ['truenas',      enabled(config.truenas),      () => getAllTrueNasData(config.truenas),       null],
     ['qnap',         enabled(config.qnap),         () => getAllQnapData(config.qnap),             null],
     ['ugreen',       enabled(config.ugreen),       () => getAllUgreenData(config.ugreen),         null],
+    ['unifi',        enabled(config.unifi),        () => getAllUnifiData(config.unifi),           null],
     ['pbs',          enabled(config.pbs),          () => getAllPbsData(config.pbs),               null],
     ['cloudflare',   enabled(config.cloudflare),   () => getCloudflareData(config.cloudflare),    null],
     ['cicd',         enabled(config.cicd),         () => getAllCiData(config.cicd),               null],
@@ -4784,6 +4870,7 @@ const EMPTY = {
   truenas: null,
   qnap: null,
   ugreen: null,
+  unifi: null,
   pbs: null,
   cloudflare: null,
   cicd: null,
@@ -4810,6 +4897,7 @@ function runtimeEmptyFor(id) {
     truenas: null,
     qnap: null,
     ugreen: null,
+    unifi: null,
     pbs: null,
     cloudflare: null,
     cicd: null,
@@ -4915,6 +5003,9 @@ function ensureRuntimeShell(data = cache.data) {
   out.ugreen = en(config.ugreen)
     ? (out.ugreen || ugreenConnectingData(config.ugreen))
     : null;
+  out.unifi = en(config.unifi)
+    ? (out.unifi || unifiConnectingData(config.unifi))
+    : null;
   out.pbs = en(config.pbs)
     ? (out.pbs || pbsConnectingData(config.pbs))
     : null;
@@ -4949,7 +5040,7 @@ function ensureRuntimeShell(data = cache.data) {
 function pruneRuntimeSnapshot(data = {}) {
   const out = { ...EMPTY, ...(data || {}) };
   const configured = new Set(configuredList());
-  for (const id of ['proxmox','linux','windows','kubernetes','snmp','healthchecks','uptimekuma','checks','prometheus','docker','dockhand','database','firewall','truenas','qnap','ugreen','pbs','cloudflare','cicd','veeam','portainer']) {
+  for (const id of ['proxmox','linux','windows','kubernetes','snmp','healthchecks','uptimekuma','checks','prometheus','docker','dockhand','database','firewall','truenas','qnap','ugreen','unifi','pbs','cloudflare','cicd','veeam','portainer']) {
     if (!configured.has(id)) out[id] = runtimeEmptyFor(id);
   }
   out.loading = false;
@@ -6968,6 +7059,7 @@ const CONFIG_AUDIT_LABELS = {
   windows: 'Windows Server',
   kubernetes: 'Kubernetes',
   snmp: 'SNMP',
+  unifi: 'UniFi',
   healthchecks: 'Healthchecks',
   uptimekuma: 'Uptime Kuma',
   checks: 'Service checks',
@@ -7043,6 +7135,34 @@ function preservePlatformsOnPartialConfig(incoming = {}, existing = {}) {
   });
   return incoming;
 }
+
+// Settings "Test connection" for UniFi controllers. Masked secret fields
+// ('__set__') fall back to the stored (decrypted) values for the same URL.
+app.post('/api/unifi/test', async (req, res) => {
+  try {
+    const input = req.body || {};
+    const inst = {
+      url: String(input.url || '').trim(),
+      apiKey: String(input.apiKey || '').trim(),
+      site: input.site || undefined,
+      insecureTLS: input.insecureTLS === true || String(input.insecureTLS || '') === 'true',
+      legacy: input.legacy && (input.legacy.username || input.legacy.password)
+        ? { username: String(input.legacy.username || '').trim(), password: String(input.legacy.password || ''), site: input.legacy.site || undefined }
+        : undefined,
+    };
+    if (!inst.url) return res.status(400).json({ error: 'Controller URL is required' });
+    const stored = unifiConfigInstances(config.unifi || {}).find(i =>
+      String(i.url || '').trim().replace(/\/+$/, '') === inst.url.replace(/\/+$/, ''));
+    if ((!inst.apiKey || inst.apiKey === '__set__') && stored?.apiKey) inst.apiKey = stored.apiKey;
+    if (inst.legacy && (inst.legacy.password === '__set__' || !inst.legacy.password) && stored?.legacy?.password) {
+      inst.legacy.password = stored.legacy.password;
+    }
+    const { testUnifiConnection } = require('./src/unifi');
+    res.json(await testUnifiConnection(inst));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 app.post('/api/config', async (req, res) => {
   try {
@@ -7216,6 +7336,12 @@ app.post('/api/config', async (req, res) => {
           cache.data.ugreen = ugreenConnectingData(config.ugreen);
         }
       } else { cache.data.ugreen = null; }
+
+      if (en(config.unifi)) {
+        if (connectingPlatforms.has('unifi') || !cache.data.unifi) {
+          cache.data.unifi = unifiConnectingData(config.unifi);
+        }
+      } else { cache.data.unifi = null; }
 
       if (en(config.pbs)) {
         if (connectingPlatforms.has('pbs') || !cache.data.pbs) {
