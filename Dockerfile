@@ -12,7 +12,9 @@ RUN npm install --omit=dev --no-optional && npm cache clean --force
 COPY server.js demo-server.js ./
 COPY src ./src
 COPY public ./public
-COPY agent/install.sh agent/omnisight-agent.sh ./agent/
+# Keep the complete agent distribution in the application image. The server
+# exposes these files from /app/agent for Linux and Windows installations.
+COPY agent ./agent
 COPY docker-entrypoint.sh /usr/local/bin/omnisight-entrypoint
 RUN mkdir -p /app/data \
   && chown -R omnisight:omnisight /app/data \

@@ -7,8 +7,9 @@ npm-debug.log*
 config.yaml
 data
 .fuse_hidden*
+# Keep agent/Dockerfile: it is distributed with the agent scripts in the
+# application image so users can build the standalone Docker agent locally.
 Dockerfile
-**/Dockerfile
 LICENSE
 README.md
 config.example.yaml
