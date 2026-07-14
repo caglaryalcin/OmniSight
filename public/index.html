@@ -3699,7 +3699,12 @@ function buildUnifi(data){
     online: onlineCount, total: totalCount,
     cpu: (() => { const v = devices.filter(d => d.cpu != null).map(d => d.cpu); return v.length ? Math.round(v.reduce((a,b)=>a+b,0)/v.length) : null; })(),
     ram: (() => { const v = devices.filter(d => d.ram).map(d => d.ram.percent); return v.length ? Math.round(v.reduce((a,b)=>a+b,0)/v.length) : null; })(),
-    temp: null,
+    // The Integration API has no temperature sensors — aggregate from the
+    // SNMP side (matched + unmatched rows), same as the SNMP-only card.
+    temp: (() => {
+      const v = snmpRows.filter(s => s.online).map(s => hasNum(s.cpuTemp) ? Number(s.cpuTemp) : (hasNum(s.systemTemp) ? Number(s.systemTemp) : null)).filter(t => t != null);
+      return v.length ? Math.round(v.reduce((a,b)=>a+b,0)/v.length) : null;
+    })(),
   });
 
   // Row order (design F1): gateway pinned first, then OFFLINE, warn, online.
