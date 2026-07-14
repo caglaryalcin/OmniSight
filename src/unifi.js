@@ -37,8 +37,14 @@ const WARN_STATES = new Set(['UPDATING', 'ADOPTING', 'GETTING_READY', 'PENDING_A
 // within the process; deliberately not persisted.
 const runtime = new Map();
 
+// Runtime state is keyed by url+site so two instances can watch different
+// sites on the same controller without sharing siteId/stats/cooldown state.
+function rtKeyOf(inst) {
+  return inst._rtKey || `${cleanBaseUrl(inst.url)}|${String(inst.site || '').trim().toLowerCase()}`;
+}
+
 function rt(inst) {
-  const key = inst._rtKey || cleanBaseUrl(inst.url);
+  const key = rtKeyOf(inst);
   if (!runtime.has(key)) {
     runtime.set(key, {
       basePath: null,          // '/proxy/network/integration/v1' | '/v1'
@@ -385,7 +391,14 @@ function recordHistory(inst, devices, wan, statsUpdated) {
     }
   }
   if (wan) {
-    wan.history = pushHistory(`wan:${cleanBaseUrl(inst.url)}`, {
+    // Migrate series recorded under the pre-multi-site key (url only).
+    const wanKey = `wan:${rtKeyOf(inst)}`;
+    const legacyKey = `wan:${cleanBaseUrl(inst.url)}`;
+    if (!uniHistory.has(wanKey) && uniHistory.has(legacyKey)) {
+      uniHistory.set(wanKey, uniHistory.get(legacyKey));
+      uniHistory.delete(legacyKey);
+    }
+    wan.history = pushHistory(wanKey, {
       time: now,
       up: wan.state === 'down' ? 0 : 1,
       latency: wan.latencyMs,

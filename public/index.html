@@ -3742,6 +3742,26 @@ function buildUnifi(data){
         ${rxNow != null ? `<div class="chart-row"><div class="chart-hdr"><span class="nb-label">WAN ↓</span><span class="nb-pct" style="color:var(--green)">${fmtRate(w.rxBps)||'--'}</span></div>${histChart(hist,'wanRxMbps',rxNow,lim,()=>'#34D399',rateSparkMax(hist,'wanRxMbps',rxNow),' MB/s','WAN down')}</div>` : ''}
         ${txNow != null ? `<div class="chart-row"><div class="chart-hdr"><span class="nb-label">WAN ↑</span><span class="nb-pct" style="color:var(--cyan)">${fmtRate(w.txBps)||'--'}</span></div>${histChart(hist,'wanTxMbps',txNow,lim,()=>'#22D3EE',rateSparkMax(hist,'wanTxMbps',txNow),' MB/s','WAN up')}</div>` : ''}
         ${w.latencyMs != null ? `<div class="chart-row"><div class="chart-hdr"><span class="nb-label">Latency</span><span class="nb-pct">${w.latencyMs} ms</span></div>${histChart(hist,'latency',w.latencyMs,lim,()=>'#F59E0B',null,' ms','Latency')}</div>` : ''}
+        ${(() => {
+          // WAN availability strip: up/down timeline over the charted window,
+          // drawn from the 0/1 state series (design review — band successor).
+          const pts = (w.history || []).slice(-Math.max(2, lim || 240));
+          if (pts.length < 2) return '';
+          const t0 = pts[0].time, t1 = pts[pts.length - 1].time;
+          const span = Math.max(1, t1 - t0);
+          const segs = [];
+          let segStart = pts[0].time, segUp = pts[0].up !== 0;
+          for (let k = 1; k <= pts.length; k++) {
+            const cur = k < pts.length ? (pts[k].up !== 0) : null;
+            if (cur !== segUp) {
+              const end = k < pts.length ? pts[k].time : t1;
+              segs.push({ x: (segStart - t0) / span * 100, w: Math.max(0.3, (end - segStart) / span * 100), up: segUp, from: segStart, to: end });
+              segStart = end; segUp = cur;
+            }
+          }
+          const rects = segs.map(s => `<rect x="${s.x.toFixed(2)}" y="0" width="${s.w.toFixed(2)}" height="8" fill="${s.up ? 'var(--green)' : 'var(--red)'}" fill-opacity="${s.up ? '.35' : '.9'}"><title>WAN ${s.up ? 'up' : 'DOWN'} ${fmtClock(s.from)}–${fmtClock(s.to)}</title></rect>`).join('');
+          return `<div style="margin:6px 0 0"><div style="font-size:10px;color:var(--muted);letter-spacing:.4px;margin-bottom:2px">WAN AVAILABILITY</div><svg width="100%" height="8" viewBox="0 0 100 8" preserveAspectRatio="none" style="display:block;border-radius:2px">${rects}</svg></div>`;
+        })()}
         ${lastDown ? `<div style="font-size:12px;color:var(--red);margin:4px 0 0 2px"${w.downEvents?.recent?.length ? ` title="recent WAN-down: ${w.downEvents.recent.map(t=>new Date(t).toLocaleString()).join(', ')}"` : ''}>WAN down ${fmtClock(lastDown.start)}–${lastDown.end ? fmtClock(lastDown.end) : 'now'}${w.downEvents ? ` · ${w.downEvents.count} event(s)` : ''}</div>` : ''}`;
     })() : '';
     if (d.alertable) {

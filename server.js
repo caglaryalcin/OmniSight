@@ -8697,6 +8697,34 @@ function buildPublicSummary(data) {
       out.push({ id, title: titles[id], status: !rows.length && connecting ? 'connecting' : up === rows.length && !connecting ? 'ok' : up > 0 ? 'warn' : 'down', meta: !rows.length && connecting ? 'connecting...' : `${up}/${rows.length} up${connecting ? ` · ${connecting} connecting` : ''}` });
     }
   }
+  // UniFi controller platform — merges into the SNMP-derived 'unifi' row when
+  // both exist (one UniFi section everywhere; badge precedence per design).
+  const ufp = data.unifi;
+  if (ufp && Array.isArray(ufp.instances) && ufp.instances.length) {
+    const insts = ufp.instances;
+    const connecting = insts.every(i => i._connecting);
+    const devices = insts.flatMap(i => i.devices || []);
+    const offline = devices.filter(d => d.alertable).length;
+    const warn = devices.filter(d => d.warn).length;
+    const wanDown = insts.some(i => i.wan && i.wan.state === 'down');
+    const ctrlDown = insts.filter(i => !i.online && !i._connecting).length;
+    const degraded = warn > 0 || insts.some(i => i.wanQualityError || (i.wan && i.wan.state === 'degraded') || i.stale);
+    const status = connecting ? 'connecting'
+      : (wanDown || offline > 0 || ctrlDown === insts.length) ? 'down'
+      : (degraded || ctrlDown > 0) ? 'warn'
+      : 'ok';
+    const meta = connecting ? 'connecting...'
+      : wanDown ? 'WAN down'
+      : `${devices.filter(d => d.online).length}/${devices.length} up${insts.some(i => i.wan) ? ' · WAN ' + (insts.find(i => i.wan)?.wan.state || 'up') : ''}`;
+    const rank = { down: 3, warn: 2, connecting: 1, ok: 0 };
+    const existing = out.find(s => s.id === 'unifi');
+    if (existing) {
+      if ((rank[status] || 0) > (rank[existing.status] || 0)) existing.status = status;
+      existing.meta = `${meta} · SNMP ${existing.meta}`;
+    } else {
+      out.push({ id: 'unifi', title: 'UniFi', status, meta });
+    }
+  }
   const hc = data.healthchecks;
   if (hc && hc.online !== undefined) {
     const sm = hc.summary || {};

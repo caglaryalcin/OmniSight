@@ -374,6 +374,29 @@ Collected data depends on the device:
 
 Synology, UniFi, switches, routers, and generic SNMP devices are interpreted through different OID sets.
 
+### UniFi Network (controller)
+
+UniFi controllers are monitored through the official **Integration API** (UniFi Network application 9.3+), authenticated with a stateless `X-API-KEY`. Create the key on the console under **Settings → Control Plane → Integrations**. Both UniFi OS consoles (`/proxy/network/integration/v1`) and self-hosted Network applications (`/v1`) are supported — the base path is detected automatically.
+
+Collected data:
+
+- Device inventory per site with semantic states (`online`, `offline`, `updating`, `adopting`, …), model and firmware version.
+- Per-device CPU, memory and uptime (sampled every 4th refresh to keep controller load low).
+- Gateway WAN state and uplink throughput.
+- WAN latency and packet loss — **requires the optional legacy credentials** (see below).
+- WAN up/down history series, rendered as an availability strip and "WAN down HH:MM–HH:MM" annotations.
+
+WAN quality (latency/packet loss) is not exposed by the Integration API, so OmniSight can additionally query the classic API's `stat/health` endpoint. Configure a **dedicated local controller account** for this: local-only, read-only role, and **MFA-exempt** — accounts with MFA cannot log in headlessly. Without legacy credentials the platform still works; the card simply omits latency/loss. If legacy authentication starts failing, WAN quality degrades gracefully after 3 consecutive attempts and recovers automatically.
+
+Alert semantics:
+
+- Device `OFFLINE` (controller-reported) alerts only for devices that are **not** also monitored over SNMP — for SNMP-covered devices the SNMP down-alert remains the pager because it detects raw unreachability faster than the controller's heartbeat timeout (which adds 1–5 minutes).
+- While the controller reports a device as `updating`/`adopting`, its SNMP down-alert is suppressed so scheduled firmware upgrades do not page.
+- WAN Up→Down alerts with a 120-second duration rule (`alerts.rules.unifi`); an opt-in WAN latency threshold is available via `alerts.thresholds.wanLatency` (milliseconds).
+- Note: if your alert channel (Mattermost, ntfy, Telegram) is reached **over the monitored WAN**, a WAN-down alert cannot be delivered until the WAN recovers — use a LAN-local channel for WAN alerting.
+
+UniFi devices monitored over SNMP (profile `unifi`) and controller-reported devices render in **one merged UniFi card**: controller rows first (offline devices always on top), with matching SNMP detail embedded in each row's expanded view. Rate limiting (HTTP 429) is handled per controller instance with a cooldown that serves the last good data. Multiple controllers and multiple sites per controller are supported — add one instance per site.
+
 ### Healthchecks
 
 Healthchecks reads cron/job status through the Healthchecks API.

@@ -46,7 +46,15 @@ function fixtureServer(opts = {}) {
     const legacyPrefix = opts.selfHosted ? '' : '/proxy/network';
     const loginPath = opts.selfHosted ? '/api/login' : '/api/auth/login';
 
-    if (path === `${base}/sites`) return json(200, SITES);
+    if (path === `${base}/sites`) return json(200, opts.twoSites
+      ? { offset: 0, limit: 2, count: 2, totalCount: 2, data: [SITES.data[0], { id: 'site-2', internalReference: 'branch', name: 'Branch' }] }
+      : SITES);
+
+    if (opts.twoSites && path === `${base}/sites/site-2/devices`) {
+      const only = [{ id: 'd-b1', name: 'branch-ap', model: 'U6-Lite', macAddress: 'AA:BB:CC:00:00:99', ipAddress: '192.168.40.2', state: 'ONLINE', firmwareVersion: '6.6.65' }];
+      return json(200, { offset: 0, limit: 25, count: 1, totalCount: 1, data: only });
+    }
+    if (opts.twoSites && /\/sites\/site-2\/devices\/[^/]+\/statistics\/latest$/.test(path)) return json(200, {});
 
     if (path === `${base}/sites/site-1/devices`) {
       counters.deviceLists += 1;
@@ -182,6 +190,23 @@ async function run() {
     await f.close();
   }
 
+  // 6b) Multi-site: two instances, same controller URL, different sites —
+  // runtime state must not be shared (site-2 must not inherit site-1's siteId)
+  {
+    _resetRuntime();
+    const f = await fixtureServer({ twoSites: true });
+    const out = await getAllUnifiData({ enabled: true, instances: [
+      { name: 'hq', url: f.url, apiKey: 'k', site: 'default' },
+      { name: 'branch', url: f.url, apiKey: 'k', site: 'branch' },
+    ] });
+    const byName = Object.fromEntries(out.instances.map(i => [i.name, i]));
+    assert.ok(byName.hq.online && byName.branch.online, 'multisite: both instances online');
+    assert.strictEqual(byName.hq.devices.length, 4, 'multisite: hq sees site-1 devices');
+    assert.strictEqual(byName.branch.devices.length, 1, 'multisite: branch sees only site-2 devices');
+    assert.strictEqual(byName.branch.devices[0].name, 'branch-ap', 'multisite: correct device on branch site');
+    await f.close();
+  }
+
   // 7) No config / disabled: clean no-op
   {
     _resetRuntime();
@@ -201,7 +226,7 @@ async function run() {
 
   _resetRuntime();
   discardFixtureHistory();
-  console.log('smoke ok — unifi collector: 8 scenarios passed');
+  console.log('smoke ok — unifi collector: 9 scenarios passed');
 }
 
 module.exports = { run };
