@@ -59,7 +59,8 @@ function fixtureServer(opts = {}) {
     if (path === `${base}/sites/site-1/devices`) {
       counters.deviceLists += 1;
       if (opts.devices429At && counters.deviceLists === opts.devices429At) return json(429, { error: 'rate limited' });
-      const all = opts.truncate ? DEVICES.slice(0, 3) : DEVICES;
+      let all = opts.truncate ? DEVICES.slice(0, 3) : DEVICES;
+      if (opts.gatewayUpdating) all = all.map(d => d.id === 'd-gw' ? { ...d, state: 'UPDATING' } : d);
       const limit = Math.min(Number(url.searchParams.get('limit') || 25), opts.pageLimit || 2);
       const offset = Number(url.searchParams.get('offset') || 0);
       const page = all.slice(offset, offset + limit);
@@ -207,6 +208,21 @@ async function run() {
     await f.close();
   }
 
+  // 6c) Gateway in a transitional state (UniFi reprovision/firmware window):
+  // WAN must be 'unknown', never 'down' — no phantom outage, no down-edge
+  {
+    _resetRuntime();
+    const f = await fixtureServer({ gatewayUpdating: true });
+    const out = await getAllUnifiData(cfg(f.url));
+    const inst = out.instances[0];
+    assert.ok(inst.online, 'gw-updating: instance online');
+    assert.strictEqual(inst.wan.state, 'unknown', 'gw-updating: WAN unknown, not down');
+    const hist = inst.wan.history || [];
+    assert.strictEqual(hist[hist.length - 1].up, 1, 'gw-updating: no down-edge recorded');
+    assert.strictEqual(out.summary.wanDown, 0, 'gw-updating: summary counts no WAN down');
+    await f.close();
+  }
+
   // 7) No config / disabled: clean no-op
   {
     _resetRuntime();
@@ -226,7 +242,7 @@ async function run() {
 
   _resetRuntime();
   discardFixtureHistory();
-  console.log('smoke ok — unifi collector: 9 scenarios passed');
+  console.log('smoke ok — unifi collector: 10 scenarios passed');
 }
 
 module.exports = { run };

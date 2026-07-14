@@ -488,7 +488,11 @@ async function getUnifiInstance(inst, idx) {
     let wan = null;
     if (gateway) {
       wan = {
-        state: gateway.online ? 'up' : 'down',
+        // Transitional gateway states (updating/adopting/provisioning — e.g.
+        // during a UniFi reprovision) are NOT WAN outages: map to 'unknown'
+        // so no down-edge is recorded and no alert fires. Only a genuinely
+        // OFFLINE gateway (or legacy-reported error) marks the WAN down.
+        state: gateway.alertable ? 'down' : gateway.online ? 'up' : 'unknown',
         rxBps: gateway.uplink?.rxBps ?? null,
         txBps: gateway.uplink?.txBps ?? null,
         latencyMs: quality.quality === 'ok' ? quality.latencyMs : null,
