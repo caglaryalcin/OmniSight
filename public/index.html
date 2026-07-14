@@ -3710,20 +3710,50 @@ function buildUnifi(data){
   const dotCls = d => d.alertable ? 'md-red' : d.warn ? 'md-yellow' : d.online ? 'md-green' : 'md-gray';
   const fmtClock = t => { const dt = new Date(t); return `${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`; };
 
-  let embedIdx = 0;
   const rows = sorted.map((d, i) => {
     const skey = 'uf' + i;
     const stateKey = 'unifi:' + String(d.mac || d.name || i);
     const isOpen = panelOpenState(stateKey, snmpOpen[stateKey]);
     snmpOpen[stateKey] = isOpen;
+    const matched = matchOf(d);
+    // SNMP supplement (design 6A, flattened): render what the controller API
+    // cannot provide — temperatures, fans, bandwidth, disk I/O — directly in
+    // this row's body as ordinary chart rows. No nested collapsible row.
+    const snmpDetail = matched ? (() => {
+      const sd = matched;
+      const lim = historyLimitFor('unifi:' + skey);
+      const cpuTemp = hasNum(sd.cpuTemp) ? Number(sd.cpuTemp)
+        : (/cpu|processor/i.test(sd.systemTempLabel || '') && hasNum(sd.systemTemp) ? Number(sd.systemTemp) : null);
+      const sysTemp = hasNum(sd.systemTemperature) ? Number(sd.systemTemperature)
+        : (sd.systemTempLabel && !/cpu|processor/i.test(sd.systemTempLabel) && hasNum(sd.systemTemp) ? Number(sd.systemTemp) : null);
+      const fans = Array.isArray(sd.fanSpeeds) ? sd.fanSpeeds : (Array.isArray(sd.sensors?.fanSpeeds) ? sd.sensors.fanSpeeds : []);
+      const nvme = Array.isArray(sd.nvmeTemps) ? sd.nvmeTemps : [];
+      const bwRate = metricRateSum(sd.metrics?.bandwidth, 'rxBps', 'txBps');
+      const bwMbps = rateToMBps(bwRate);
+      const bwHist = rateHistoryMBps(sd.history, 'bandwidth', 'bandwidthMbps');
+      const bwNow = bwMbps != null ? bwMbps : latestHistoryValue(bwHist, 'bandwidthMbps');
+      const ioRate = metricRateSum(sd.metrics?.diskIO, 'readBps', 'writeBps');
+      const ioMbps = rateToMBps(ioRate);
+      const ioHist = rateHistoryMBps(sd.history, 'diskIO', 'diskIOMbps');
+      const ioNow = ioMbps != null ? ioMbps : latestHistoryValue(ioHist, 'diskIOMbps');
+      const tempLine = (label, v) => v == null ? '' : `<div style="display:flex;align-items:center;gap:10px;padding:5px 0 5px 44px;font-size:14px"><span style="width:150px;flex-shrink:0;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(label)}</span><span style="color:${pveTempColor(v)};font-weight:800">${v}°C</span></div>`;
+      const parts = [
+        cpuTemp != null ? `<div class="chart-row"><div class="chart-hdr"><span class="nb-label">CPU temperature</span><span class="nb-pct" style="color:${pveTempColor(cpuTemp)}">${cpuTemp}°C</span></div>${histChart(sd.history,'temp',cpuTemp,lim,pveTempHex,100,'°C','Temperature')}</div>` : '',
+        bwNow != null ? `<div class="chart-row"><div class="chart-hdr"><span class="nb-label">Bandwidth (interfaces)</span><span class="nb-pct" style="color:var(--green)">${fmtRate(bwRate) || '--'}</span></div>${histChart(bwHist,'bandwidthMbps',bwNow,lim,()=>'#34D399',rateSparkMax(bwHist,'bandwidthMbps',bwNow),' MB/s','Bandwidth')}</div>` : '',
+        ioNow != null ? `<div class="chart-row"><div class="chart-hdr"><span class="nb-label">Disk I/O</span><span class="nb-pct" style="color:var(--cyan)">${fmtRate(ioRate) || '--'}</span></div>${histChart(ioHist,'diskIOMbps',ioNow,lim,rateColor,rateSparkMax(ioHist,'diskIOMbps',ioNow),' MB/s','Disk I/O')}</div>` : '',
+        tempLine(sd.systemTemperatureLabel || 'System temp', sysTemp),
+        ...nvme.map((t, k) => tempLine(t.label || t.name || `NVMe ${k + 1}`, hasNum(t.value) ? Number(t.value) : null)),
+        ...fans.map(f => `<div style="display:flex;align-items:center;gap:10px;padding:5px 0 5px 44px;font-size:14px"><span style="width:150px;flex-shrink:0;color:var(--muted)">${escHtml(snmpFanLabel(f))}</span><span style="font-weight:800">${escHtml(String(f.value))} RPM</span></div>`).slice(0, 4),
+      ].filter(Boolean);
+      return parts.length ? { html: parts.join(''), cpuTemp } : null;
+    })() : null;
     const stats = [
       d.cpu != null ? pveHeadStat('CPU', `${d.cpu}%`, bc(d.cpu), miniSparkline(d.history, 'cpu', d.cpu)) : '',
       d.ram ? pveHeadStat('RAM', `${d.ram.percent}%`, bc(d.ram.percent), miniSparkline(d.history, 'ram', d.ram.percent)) : '',
+      snmpDetail?.cpuTemp != null ? pveHeadStat('CPU temp', `${snmpDetail.cpuTemp}°C`, pveTempColor(snmpDetail.cpuTemp), miniSparkline(matched.history, 'temp', snmpDetail.cpuTemp, pveTempHex, 100, '°C', 'CPU temp')) : '',
       d.uptimeSeconds != null ? pveHeadStat('Uptime', fmtUptime(d.uptimeSeconds)) : '',
       d.isGateway && d._inst.wan && (d._inst.wan.rxBps != null) ? pveHeadStat('WAN', `↓${fmtRate(d._inst.wan.rxBps)||'--'} ↑${fmtRate(d._inst.wan.txBps)||'--'}`, 'var(--green)') : '',
     ].join('');
-    const matched = matchOf(d);
-    const matchedEmbed = matched ? buildSynology([matched], { ...meta, keyPrefix: `ufsnmp${embedIdx++}-` }) : null;
     const wanBody = d.isGateway && d._inst.wan ? (() => {
       const w = d._inst.wan;
       const hist = Array.isArray(w.history) ? w.history.map(p => ({ time: p.time, wanRxMbps: p.rxBps != null ? p.rxBps/1048576 : null, wanTxMbps: p.txBps != null ? p.txBps/1048576 : null, latency: p.latency })) : [];
@@ -3788,7 +3818,7 @@ function buildUnifi(data){
         ${wanBody}
         ${(() => { const lim = historyLimitFor('unifi:' + skey); return d.cpu != null ? `<div class="chart-row"><div class="chart-hdr"><span class="nb-label">CPU</span><span class="nb-pct" style="color:${bc(d.cpu)}">${d.cpu}%</span></div>${histChart(d.history,'cpu',d.cpu,lim)}</div>` : ''; })()}
         ${(() => { const lim = historyLimitFor('unifi:' + skey); return d.ram ? `<div class="chart-row"><div class="chart-hdr"><span class="nb-label">RAM</span><span class="nb-pct" style="color:${bc(d.ram.percent)}">${d.ram.percent}%</span></div>${histChart(d.history,'ram',d.ram.percent,lim)}</div>` : ''; })()}
-        ${matchedEmbed ? `<div class="syn-section" style="margin-top:6px">SNMP detail</div>${matchedEmbed.body}` : ''}
+        ${snmpDetail ? `<div class="syn-section" style="margin-top:6px">SNMP detail</div>${snmpDetail.html}` : ''}
       </div>`;
   }).join('');
 
