@@ -8807,6 +8807,45 @@ function ensureDashboardContent(reason = ''){
   }
   return true;
 }
+/* Compact refresh payloads trim every history series to ~120 points while the
+   charts render a wider window (e.g. 240 slots for 1h) and left-pad missing
+   slots — so the first refresh after a detailed initial load blanked the left
+   half of every chart. Merge: keep previously-known points that are older than
+   the new payload's first sample. Object arrays (instances/devices/nodes/…)
+   are aligned by identity so histories survive reordering. */
+const HISTORY_MERGE_MAX = 1500;
+function historyItemKey(item){
+  if(!item || typeof item !== 'object') return null;
+  return item.id ?? item.mac ?? item.host ?? item.url ?? item.name ?? null;
+}
+function mergeCompactHistories(next, prev, depth = 0){
+  if(!next || !prev || typeof next !== 'object' || typeof prev !== 'object' || depth > 8) return next;
+  for(const k of Object.keys(next)){
+    const nv = next[k], pv = prev[k];
+    if(nv == null || pv == null) continue;
+    if(Array.isArray(nv) && Array.isArray(pv)){
+      const isSeries = k === 'history' && nv.length && typeof nv[0] === 'object' && nv[0] && 'time' in nv[0];
+      if(isSeries){
+        const firstT = Number(nv[0].time);
+        if(Number.isFinite(firstT) && pv.length && Number(pv[pv.length-1]?.time) >= 0){
+          const older = pv.filter(pt => pt && Number(pt.time) < firstT);
+          if(older.length) next[k] = [...older, ...nv].slice(-HISTORY_MERGE_MAX);
+        }
+      } else if(nv.length && typeof nv[0] === 'object'){
+        const prevByKey = new Map();
+        pv.forEach(item => { const key = historyItemKey(item); if(key != null) prevByKey.set(key, item); });
+        nv.forEach((item, i) => {
+          const key = historyItemKey(item);
+          const prevItem = key != null && prevByKey.has(key) ? prevByKey.get(key) : pv[i];
+          if(item && prevItem && typeof item === 'object') mergeCompactHistories(item, prevItem, depth + 1);
+        });
+      }
+    } else if(typeof nv === 'object' && typeof pv === 'object' && !Array.isArray(nv) && !Array.isArray(pv)){
+      mergeCompactHistories(nv, pv, depth + 1);
+    }
+  }
+  return next;
+}
 async function fetchStatus(opts = {}){
   const ctrl = new AbortController();
   trackStatusController(ctrl);
@@ -8820,6 +8859,7 @@ async function fetchStatus(opts = {}){
     const ct = r.headers.get('content-type') || '';
     if(!ct.toLowerCase().includes('application/json')) throw new Error(`Expected JSON from ${url}, got ${ct || 'unknown content type'}`);
     const data = statusCachedFallback(await r.json());
+    if(!(opts.detail || opts.full)) mergeCompactHistories(data, window._lastData || readStatusCache());
     writeStatusCache(data);
     return data;
   }finally{
