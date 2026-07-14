@@ -116,6 +116,7 @@ async function run() {
     assert.ok(byId['d-ap2'].warn && !byId['d-ap2'].alertable, 'happy: UPDATING is warn, not alertable');
     assert.strictEqual(byId['d-gw'].cpu, 22, 'happy: gateway stats applied');
     assert.ok(byId['d-gw'].isGateway, 'happy: gateway detected');
+    assert.ok((byId['d-gw'].aliases || []).includes('127.0.0.1'), 'happy: gateway aliased to controller URL host for SNMP dedupe');
     assert.strictEqual(inst.wan.state, 'up', 'happy: WAN up');
     assert.strictEqual(inst.wan.latencyMs, 11, 'happy: legacy latency present');
     assert.strictEqual(inst.wanQuality, 'ok', 'happy: wanQuality ok');

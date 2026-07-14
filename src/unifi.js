@@ -484,6 +484,16 @@ async function getUnifiInstance(inst, idx) {
     }
 
     const gateway = devices.find(d => d.isGateway) || null;
+    if (gateway) {
+      // The controller URL host is one of the gateway's own IPs (often a
+      // different interface than the one the controller reports, which can be
+      // the WAN address). Expose it as a match alias so SNMP/API dedupe works
+      // for the gateway too.
+      try {
+        const urlHost = new URL(cleanBaseUrl(inst.url)).hostname;
+        if (urlHost && urlHost !== gateway.ip) gateway.aliases = [urlHost];
+      } catch {}
+    }
     const quality = await fetchWanQuality(inst);
     let wan = null;
     if (gateway) {

@@ -3997,7 +3997,7 @@ function extractChecks(data) {
   const unifiTransitionalHosts = new Set();
   const unifiCoveredHosts = new Set();
   (data.unifi?.instances || []).forEach(i => (i.devices || []).forEach(d => {
-    const keys = [d.ip, d.name && String(d.name).toLowerCase(), d.mac].filter(Boolean);
+    const keys = [d.ip, ...(d.aliases || []), d.name && String(d.name).toLowerCase(), d.mac].filter(Boolean);
     for (const k of keys) {
       unifiCoveredHosts.add(k);
       if (d.warn) unifiTransitionalHosts.add(k);
@@ -4095,7 +4095,7 @@ function extractChecks(data) {
     // Design 5A: controller OFFLINE pages only for devices without SNMP
     // coverage — for covered devices SNMP is the (faster) pager.
     (i.devices || []).forEach(d => {
-      const covered = [d.ip, d.name && String(d.name).toLowerCase(), d.mac].filter(Boolean)
+      const covered = [d.ip, ...(d.aliases || []), d.name && String(d.name).toLowerCase(), d.mac].filter(Boolean)
         .some(k => snmpHostSet.has(k));
       if (covered) return;
       add('unifi-dev:' + nm + ':' + d.name, !d.alertable, 'UniFi device ' + d.name, 'offline (controller-reported)');

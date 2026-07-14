@@ -3656,8 +3656,9 @@ function buildUnifi(data){
   // Same-device dedupe (design 6A): controller row wins; matched SNMP rows are
   // embedded inside the controller row's expand body so no detail is lost.
   const ctrlKeys = new Set();
-  devices.forEach(d => [d.ip, d.name && String(d.name).toLowerCase()].filter(Boolean).forEach(k => ctrlKeys.add(k)));
-  const matchOf = d => snmpRows.find(s => (s.host && (s.host === d.ip)) || (s.name && d.name && String(s.name).toLowerCase() === String(d.name).toLowerCase()));
+  const devKeys = d => [d.ip, ...(d.aliases || []), d.name && String(d.name).toLowerCase()].filter(Boolean);
+  devices.forEach(d => devKeys(d).forEach(k => ctrlKeys.add(k)));
+  const matchOf = d => snmpRows.find(s => (s.host && (s.host === d.ip || (d.aliases || []).includes(s.host))) || (s.name && d.name && String(s.name).toLowerCase() === String(d.name).toLowerCase()));
   const unmatchedSnmp = snmpRows.filter(s => !ctrlKeys.has(s.host) && !ctrlKeys.has(String(s.name || '').toLowerCase()));
 
   // Badge precedence law (design spec 1): WAN DOWN > N OFFLINE > DEGRADED > ok.
