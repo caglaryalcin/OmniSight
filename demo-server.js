@@ -842,7 +842,8 @@ function demoStatus() {
   const hNasNow = hNas[hNas.length - 1] || {};
   data.snmp = [
     { name: 'core-switch', host: '192.0.2.2', online: true, profile: 'mikrotik', vendor: 'MikroTik', model: 'CRS', cpu: hSwitchNow.cpu || 9, ram: { percent: hSwitchNow.mem || 28, used: 0.3, total: 1 }, systemTemp: hSwitchNow.tempSystem || 42, metrics: { bandwidth: { rxBps: hSwitchNow.bandwidthRxBps || 3_200_000, txBps: hSwitchNow.bandwidthTxBps || 2_000_000 }, diskIO: { readBps: hSwitchNow.diskReadBps || 0, writeBps: hSwitchNow.diskWriteBps || 0 } }, history: hSwitch },
-    { name: 'demo-ap', host: '192.0.2.3', online: true, profile: 'unifi', vendor: 'Ubiquiti', model: 'UniFi U6 Pro', cpu: hUnifiNow.cpu || 13, ram: { percent: hUnifiNow.mem || 41, used: 0.42, total: 1 }, systemTemp: hUnifiNow.tempSystem || 39, fanSpeeds: [], metrics: { bandwidth: { rxBps: hUnifiNow.bandwidthRxBps || 2_400_000, txBps: hUnifiNow.bandwidthTxBps || 1_300_000 }, diskIO: { readBps: hUnifiNow.diskReadBps || 0, writeBps: hUnifiNow.diskWriteBps || 0 } }, history: hUnifi },
+    { name: 'demo-ap', host: '192.0.2.5', online: true, profile: 'unifi', vendor: 'Ubiquiti', model: 'UniFi U6 Pro', cpu: hUnifiNow.cpu || 13, ram: { percent: hUnifiNow.mem || 41, used: 0.42, total: 1 }, systemTemp: hUnifiNow.tempSystem || 39, fanSpeeds: [], metrics: { bandwidth: { rxBps: hUnifiNow.bandwidthRxBps || 2_400_000, txBps: hUnifiNow.bandwidthTxBps || 1_300_000 }, diskIO: { readBps: hUnifiNow.diskReadBps || 0, writeBps: hUnifiNow.diskWriteBps || 0 } }, history: hUnifi },
+    { name: 'demo-ap-legacy', host: '192.0.2.9', online: true, profile: 'unifi', vendor: 'Ubiquiti', model: 'UniFi U6 Pro', cpu: hUnifiNow.cpu || 13, ram: { percent: hUnifiNow.mem || 41, used: 0.42, total: 1 }, systemTemp: hUnifiNow.tempSystem || 39, fanSpeeds: [], metrics: { bandwidth: { rxBps: hUnifiNow.bandwidthRxBps || 2_400_000, txBps: hUnifiNow.bandwidthTxBps || 1_300_000 }, diskIO: { readBps: hUnifiNow.diskReadBps || 0, writeBps: hUnifiNow.diskWriteBps || 0 } }, history: hUnifi },
     { name: 'demo-nas', host: '192.0.2.20', online: true, profile: 'synology', vendor: 'Synology', model: 'DS Demo', cpu: hNasNow.cpu || 17, ram: { percent: hNasNow.mem || 36, used: 5.8, total: 16 }, systemTemp: hNasNow.tempSystem || 45, metrics: { bandwidth: { rxBps: hNasNow.bandwidthRxBps || 4_200_000, txBps: hNasNow.bandwidthTxBps || 2_600_000 }, diskIO: { readBps: hNasNow.diskReadBps || 1_600_000, writeBps: hNasNow.diskWriteBps || 840_000 } }, history: hNas },
   ];
 
@@ -953,6 +954,64 @@ function demoStatus() {
       ],
     }],
   };
+
+  // UniFi controller (Integration API collector shape from src/unifi.js).
+  // Complements the SNMP-branded 'demo-ap' above — the dashboard merges both
+  // into one UniFi card (controller rows first, SNMP rows below).
+  data.unifi = (() => {
+    const devHist = seed => history(96, seed, 5).map(p => ({ time: p.time, cpu: p.cpu, ram: p.mem }));
+    const gwHist = devHist(21);
+    const now = Date.now();
+    const wanHistory = Array.from({ length: 96 }, (_, i) => {
+      const time = now - (95 - i) * 15 * 60 * 1000 / 4;
+      const down = i >= 60 && i < 63; // one short outage window in the demo story
+      return { time, up: down ? 0 : 1, latency: down ? null : 9 + (i % 7), loss: down ? null : (i % 11 === 0 ? 0.2 : 0), rxBps: down ? 0 : 6_800_000 + (i % 9) * 400_000, txBps: down ? 0 : 1_900_000 + (i % 5) * 180_000 };
+    });
+    const downEdges = wanHistory.filter((p, i) => i > 0 && wanHistory[i - 1].up === 1 && p.up === 0).map(p => p.time);
+    const dev = (id, name, model, ip, state, fw, extra = {}) => {
+      const st = String(state).toUpperCase();
+      const online = st === 'ONLINE';
+      const warn = ['UPDATING', 'ADOPTING', 'GETTING_READY', 'PENDING_ADOPTION'].includes(st);
+      return {
+        id, name, model, mac: `28:70:4e:00:00:${id.slice(-2)}`, ip,
+        state: online ? 'online' : (warn ? st.toLowerCase().replace(/_/g, ' ') : 'offline'),
+        stateRaw: st, alertable: st === 'OFFLINE', warn, online,
+        firmware: fw, firmwareUpdatable: false, isGateway: false,
+        cpu: online ? null : null, ram: null, uptimeSeconds: online ? 41 * 86400 : null,
+        history: [], ...extra,
+      };
+    };
+    const devices = [
+      dev('d-01', 'demo-gateway', 'UDM Pro', '192.0.2.1', 'ONLINE', '4.3.6', { isGateway: true, cpu: 22, ram: { percent: 61 }, history: gwHist, uplink: { rxBps: 7_200_000, txBps: 2_100_000 } }),
+      dev('d-02', 'demo-switch', 'USW Pro 24', '192.0.2.2', 'ONLINE', '7.4.1', { cpu: 14, ram: { percent: 38 }, history: devHist(12) }),
+      dev('d-03', 'demo-ap-warehouse', 'U6 Pro', '192.0.2.4', 'OFFLINE', '6.6.65'),
+      dev('d-04', 'demo-ap-lobby', 'U6 Lite', '192.0.2.5', 'UPDATING', '6.6.65', { cpu: 48, ram: { percent: 52 }, history: devHist(33) }),
+    ];
+    const summary = {
+      instances: 1, up: 1, down: 0,
+      devices: devices.length,
+      devicesOnline: devices.filter(d => d.online).length,
+      devicesOffline: devices.filter(d => d.alertable).length,
+      devicesWarn: devices.filter(d => d.warn).length,
+      wanDown: 0,
+    };
+    return {
+      online: true,
+      summary,
+      instances: [{
+        online: true,
+        name: 'unifi-demo',
+        url: 'https://unifi.example.invalid',
+        site: 'default',
+        unifiOs: true,
+        devices,
+        devicesComplete: true,
+        wan: { state: 'up', rxBps: 7_200_000, txBps: 2_100_000, latencyMs: 11, lossPct: 0, history: wanHistory, downEvents: { count: downEdges.length, recent: downEdges.slice(-5) } },
+        wanQuality: 'ok',
+        stale: false,
+      }],
+    };
+  })();
 
   data.truenas = {
     online: true,

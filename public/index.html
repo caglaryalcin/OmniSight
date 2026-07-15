@@ -3500,7 +3500,7 @@ function buildSynology(syn, opts = {}){
       </div>${sub?`<div style="font-size:10px;color:var(--muted);margin:-4px 0 4px 44px">${sub}</div>`:''}`;
     };
 
-    const skey = 'd'+i;
+    const skey = (opts.keyPrefix || '') + 'd' + i;
     const stateKey = 'snmp:' + String(dev.id || dev.name || dev.host || skey);
     const diskRate = metricRateSum(dev.metrics?.diskIO, 'readBps', 'writeBps');
     const bandwidthRate = metricRateSum(dev.metrics?.bandwidth, 'rxBps', 'txBps');
@@ -3636,6 +3636,220 @@ function buildSynology(syn, opts = {}){
     sbSummary: sbSummaryHtml,
     summary: summaryHtml,
     body,
+  };
+}
+
+/* ── UniFi (controller API + SNMP-branded devices, one card — design 1A) ── */
+function buildUnifi(data){
+  const snmpRows = snmpRowsForPanel(data.snmp, 'unifi');
+  const uf = data.unifi;
+  const meta = { id:'unifi', ...PLATFORM_META.unifi };
+  // No controller configured: exact pre-controller behavior (regression case).
+  if (!uf || !Array.isArray(uf.instances) || !uf.instances.length) {
+    return buildSynology(snmpRows, meta);
+  }
+
+  const instances = uf.instances;
+  const connecting = instances.every(i => i._connecting);
+  const devices = instances.flatMap(i => (i.devices || []).map(d => ({ ...d, _inst: i })));
+
+  // Same-device dedupe (design 6A): controller row wins; matched SNMP rows are
+  // embedded inside the controller row's expand body so no detail is lost.
+  const ctrlKeys = new Set();
+  const devKeys = d => [d.ip, ...(d.aliases || []), d.name && String(d.name).toLowerCase()].filter(Boolean);
+  devices.forEach(d => devKeys(d).forEach(k => ctrlKeys.add(k)));
+  const matchOf = d => snmpRows.find(s => (s.host && (s.host === d.ip || (d.aliases || []).includes(s.host))) || (s.name && d.name && String(s.name).toLowerCase() === String(d.name).toLowerCase()));
+  const unmatchedSnmp = snmpRows.filter(s => !ctrlKeys.has(s.host) && !ctrlKeys.has(String(s.name || '').toLowerCase()));
+
+  // Badge precedence law (design spec 1): WAN DOWN > N OFFLINE > DEGRADED > ok.
+  const wanDown = instances.some(i => i.wan && i.wan.state === 'down');
+  const offlineDevs = devices.filter(d => d.alertable);
+  const warnDevs = devices.filter(d => d.warn);
+  const ctrlDown = instances.filter(i => !i.online && !i._connecting);
+  const degraded = warnDevs.length || instances.some(i => i.wanQualityError || (i.wan && i.wan.state === 'degraded') || i.stale) || unmatchedSnmp.some(s => !s.online && !s._connecting);
+  const badge = connecting ? bdg('gray','connecting…')
+    : wanDown ? bdg('red','WAN DOWN')
+    : (offlineDevs.length || ctrlDown.length === instances.length && instances.length) ? bdg('red', offlineDevs.length ? `${offlineDevs.length} DEVICE${offlineDevs.length>1?'S':''} OFFLINE` : 'controller unreachable')
+    : degraded ? bdg('yellow','degraded')
+    : bdg('green','healthy');
+
+  // Summary strip: device counts + conditional WAN items (specs 3-4).
+  const inst0 = instances[0];
+  const wan = instances.map(i => i.wan).find(Boolean) || null;
+  const onlineCount = devices.filter(d => d.online).length + unmatchedSnmp.filter(s => s.online).length;
+  const totalCount = devices.length + unmatchedSnmp.length;
+  const wanQuality = instances.map(i => i.wanQuality).find(q => q === 'ok') || inst0.wanQuality;
+  const wanQualityError = instances.map(i => i.wanQualityError).find(Boolean);
+  const csumCell = (val, lbl, color) => `<div class="csum-item"><div class="csum-val"${color?` style="color:${color}"`:''}>${val}</div><div class="csum-lbl">${lbl}</div></div>`;
+  const latencyCell = wanQuality === 'unconfigured' ? ''
+    : (wan && wan.latencyMs != null) ? csumCell(`${wan.latencyMs} ms`, 'Latency', wan.latencyMs > 100 ? 'var(--yellow)' : undefined)
+    : csumCell('—', 'Latency', 'var(--muted)');
+  const lossCell = wanQuality === 'unconfigured' ? ''
+    : (wan && wan.lossPct != null) ? csumCell(`${wan.lossPct}%`, 'Loss', wan.lossPct > 0 ? 'var(--yellow)' : undefined)
+    : csumCell('—', 'Loss', 'var(--muted)');
+  const summaryHtml = `<div class="csum">
+    ${csumCell(`${onlineCount}/${totalCount}`, 'Devices')}
+    ${wan ? csumCell(wan.state === 'down' ? 'Down' : (wan.state === 'degraded' ? 'Degraded' : 'Up'), 'WAN', wan.state === 'down' ? 'var(--red)' : wan.state === 'degraded' ? 'var(--yellow)' : 'var(--green)') : ''}
+    ${wan ? latencyCell : ''}${wan ? lossCell : ''}
+    ${wan && (wan.rxBps != null || wan.txBps != null) ? csumCell(`↓${fmtRate(wan.rxBps)||'--'} ↑${fmtRate(wan.txBps)||'--'}`, 'Throughput') : ''}
+    ${wan?.downEvents ? csumCell(String(wan.downEvents.count), `ISP events`, wan.downEvents.count ? 'var(--yellow)' : undefined) : ''}
+  </div>${wanQualityError ? `<div style="font-size:11px;color:var(--yellow);margin:-4px 0 8px 2px">⚠ WAN quality unavailable — ${escHtml(wanQualityError)}</div>` : ''}`;
+
+  const sbSummaryHtml = nasSummaryMetricHtml({
+    online: onlineCount, total: totalCount,
+    cpu: (() => { const v = devices.filter(d => d.cpu != null).map(d => d.cpu); return v.length ? Math.round(v.reduce((a,b)=>a+b,0)/v.length) : null; })(),
+    ram: (() => { const v = devices.filter(d => d.ram).map(d => d.ram.percent); return v.length ? Math.round(v.reduce((a,b)=>a+b,0)/v.length) : null; })(),
+    // The Integration API has no temperature sensors — aggregate from the
+    // SNMP side (matched + unmatched rows), same as the SNMP-only card.
+    temp: (() => {
+      const v = snmpRows.filter(s => s.online).map(s => hasNum(s.cpuTemp) ? Number(s.cpuTemp) : (hasNum(s.systemTemp) ? Number(s.systemTemp) : null)).filter(t => t != null);
+      return v.length ? Math.round(v.reduce((a,b)=>a+b,0)/v.length) : null;
+    })(),
+  });
+
+  // Row order (design F1): gateway pinned first, then OFFLINE, warn, online.
+  const sorted = [...devices].sort((a, b) =>
+    (b.isGateway - a.isGateway) || (b.alertable - a.alertable) || (b.warn - a.warn) || String(a.name).localeCompare(String(b.name)));
+
+  const stateBadge = d => d.alertable ? bdg('red', 'OFFLINE') : d.warn ? bdg('yellow', escHtml(d.state)) : d.online ? bdg('green', 'online') : bdg('gray', escHtml(d.state || 'unknown'));
+  const dotCls = d => d.alertable ? 'md-red' : d.warn ? 'md-yellow' : d.online ? 'md-green' : 'md-gray';
+  const fmtClock = t => { const dt = new Date(t); return `${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`; };
+
+  const rows = sorted.map((d, i) => {
+    const skey = 'uf' + i;
+    const stateKey = 'unifi:' + String(d.mac || d.name || i);
+    const isOpen = panelOpenState(stateKey, snmpOpen[stateKey]);
+    snmpOpen[stateKey] = isOpen;
+    const matched = matchOf(d);
+    // SNMP supplement (design 6A, flattened): render what the controller API
+    // cannot provide — temperatures, fans, bandwidth, disk I/O — directly in
+    // this row's body as ordinary chart rows. No nested collapsible row.
+    const snmpDetail = matched ? (() => {
+      const sd = matched;
+      const lim = historyLimitFor('unifi:' + skey);
+      const cpuTemp = hasNum(sd.cpuTemp) ? Number(sd.cpuTemp)
+        : (/cpu|processor/i.test(sd.systemTempLabel || '') && hasNum(sd.systemTemp) ? Number(sd.systemTemp) : null);
+      const sysTemp = hasNum(sd.systemTemperature) ? Number(sd.systemTemperature)
+        : (sd.systemTempLabel && !/cpu|processor/i.test(sd.systemTempLabel) && hasNum(sd.systemTemp) ? Number(sd.systemTemp) : null);
+      const fans = Array.isArray(sd.fanSpeeds) ? sd.fanSpeeds : (Array.isArray(sd.sensors?.fanSpeeds) ? sd.sensors.fanSpeeds : []);
+      const nvme = Array.isArray(sd.nvmeTemps) ? sd.nvmeTemps : [];
+      const bwRate = metricRateSum(sd.metrics?.bandwidth, 'rxBps', 'txBps');
+      const bwMbps = rateToMBps(bwRate);
+      const bwHist = rateHistoryMBps(sd.history, 'bandwidth', 'bandwidthMbps');
+      const bwNow = bwMbps != null ? bwMbps : latestHistoryValue(bwHist, 'bandwidthMbps');
+      const ioRate = metricRateSum(sd.metrics?.diskIO, 'readBps', 'writeBps');
+      const ioMbps = rateToMBps(ioRate);
+      const ioHist = rateHistoryMBps(sd.history, 'diskIO', 'diskIOMbps');
+      const ioNow = ioMbps != null ? ioMbps : latestHistoryValue(ioHist, 'diskIOMbps');
+      const tempLine = (label, v) => v == null ? '' : `<div style="display:flex;align-items:center;gap:10px;padding:5px 0 5px 44px;font-size:14px"><span style="width:150px;flex-shrink:0;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(label)}</span><span style="color:${pveTempColor(v)};font-weight:800">${v}°C</span></div>`;
+      const parts = [
+        cpuTemp != null ? `<div class="chart-row"><div class="chart-hdr"><span class="nb-label">CPU temperature</span><span class="nb-pct" style="color:${pveTempColor(cpuTemp)}">${cpuTemp}°C</span></div>${histChart(sd.history,'temp',cpuTemp,lim,pveTempHex,100,'°C','Temperature')}</div>` : '',
+        bwNow != null ? `<div class="chart-row"><div class="chart-hdr"><span class="nb-label">Bandwidth (interfaces)</span><span class="nb-pct" style="color:var(--green)">${fmtRate(bwRate) || '--'}</span></div>${histChart(bwHist,'bandwidthMbps',bwNow,lim,()=>'#34D399',rateSparkMax(bwHist,'bandwidthMbps',bwNow),' MB/s','Bandwidth')}</div>` : '',
+        ioNow != null ? `<div class="chart-row"><div class="chart-hdr"><span class="nb-label">Disk I/O</span><span class="nb-pct" style="color:var(--cyan)">${fmtRate(ioRate) || '--'}</span></div>${histChart(ioHist,'diskIOMbps',ioNow,lim,rateColor,rateSparkMax(ioHist,'diskIOMbps',ioNow),' MB/s','Disk I/O')}</div>` : '',
+        tempLine(sd.systemTemperatureLabel || 'System temp', sysTemp),
+        ...nvme.map((t, k) => tempLine(t.label || t.name || `NVMe ${k + 1}`, hasNum(t.value) ? Number(t.value) : null)),
+        ...fans.map(f => `<div style="display:flex;align-items:center;gap:10px;padding:5px 0 5px 44px;font-size:14px"><span style="width:150px;flex-shrink:0;color:var(--muted)">${escHtml(snmpFanLabel(f))}</span><span style="font-weight:800">${escHtml(String(f.value))} RPM</span></div>`).slice(0, 4),
+      ].filter(Boolean);
+      return parts.length ? { html: parts.join(''), cpuTemp } : null;
+    })() : null;
+    const stats = [
+      d.cpu != null ? pveHeadStat('CPU', `${d.cpu}%`, bc(d.cpu), miniSparkline(d.history, 'cpu', d.cpu)) : '',
+      d.ram ? pveHeadStat('RAM', `${d.ram.percent}%`, bc(d.ram.percent), miniSparkline(d.history, 'ram', d.ram.percent)) : '',
+      snmpDetail?.cpuTemp != null ? pveHeadStat('CPU temp', `${snmpDetail.cpuTemp}°C`, pveTempColor(snmpDetail.cpuTemp), miniSparkline(matched.history, 'temp', snmpDetail.cpuTemp, pveTempHex, 100, '°C', 'CPU temp')) : '',
+      d.uptimeSeconds != null ? pveHeadStat('Uptime', fmtUptime(d.uptimeSeconds)) : '',
+      d.isGateway && d._inst.wan && (d._inst.wan.rxBps != null) ? pveHeadStat('WAN', `↓${fmtRate(d._inst.wan.rxBps)||'--'} ↑${fmtRate(d._inst.wan.txBps)||'--'}`, 'var(--green)') : '',
+    ].join('');
+    const wanBody = d.isGateway && d._inst.wan ? (() => {
+      const w = d._inst.wan;
+      const hist = Array.isArray(w.history) ? w.history.map(p => ({ time: p.time, wanRxMbps: p.rxBps != null ? p.rxBps/1048576 : null, wanTxMbps: p.txBps != null ? p.txBps/1048576 : null, latency: p.latency })) : [];
+      const lim = historyLimitFor('unifi:' + skey);
+      const rxNow = w.rxBps != null ? w.rxBps/1048576 : null;
+      const txNow = w.txBps != null ? w.txBps/1048576 : null;
+      const lastDown = (() => {
+        const h = w.history || [];
+        let end = null;
+        for (let k = h.length - 1; k > 0; k--) {
+          if (h[k].up === 1 && h[k-1].up === 0) end = h[k].time;
+          if (h[k].up === 0 && h[k-1].up === 1) return { start: h[k].time, end };
+        }
+        return null;
+      })();
+      return `
+        ${rxNow != null ? `<div class="chart-row"><div class="chart-hdr"><span class="nb-label">WAN ↓</span><span class="nb-pct" style="color:var(--green)">${fmtRate(w.rxBps)||'--'}</span></div>${histChart(hist,'wanRxMbps',rxNow,lim,()=>'#34D399',rateSparkMax(hist,'wanRxMbps',rxNow),' MB/s','WAN down')}</div>` : ''}
+        ${txNow != null ? `<div class="chart-row"><div class="chart-hdr"><span class="nb-label">WAN ↑</span><span class="nb-pct" style="color:var(--cyan)">${fmtRate(w.txBps)||'--'}</span></div>${histChart(hist,'wanTxMbps',txNow,lim,()=>'#22D3EE',rateSparkMax(hist,'wanTxMbps',txNow),' MB/s','WAN up')}</div>` : ''}
+        ${w.latencyMs != null ? `<div class="chart-row"><div class="chart-hdr"><span class="nb-label">Latency</span><span class="nb-pct">${w.latencyMs} ms</span></div>${histChart(hist,'latency',w.latencyMs,lim,()=>'#F59E0B',null,' ms','Latency')}</div>` : ''}
+        ${(() => {
+          // WAN availability strip: up/down timeline over the charted window,
+          // drawn from the 0/1 state series (design review — band successor).
+          const pts = (w.history || []).slice(-Math.max(2, lim || 240));
+          if (pts.length < 2) return '';
+          const t0 = pts[0].time, t1 = pts[pts.length - 1].time;
+          const span = Math.max(1, t1 - t0);
+          const segs = [];
+          let segStart = pts[0].time, segUp = pts[0].up !== 0;
+          for (let k = 1; k <= pts.length; k++) {
+            const cur = k < pts.length ? (pts[k].up !== 0) : null;
+            if (cur !== segUp) {
+              const end = k < pts.length ? pts[k].time : t1;
+              segs.push({ x: (segStart - t0) / span * 100, w: Math.max(0.3, (end - segStart) / span * 100), up: segUp, from: segStart, to: end });
+              segStart = end; segUp = cur;
+            }
+          }
+          const rects = segs.map(s => `<rect x="${s.x.toFixed(2)}" y="0" width="${s.w.toFixed(2)}" height="8" fill="${s.up ? 'var(--green)' : 'var(--red)'}" fill-opacity="${s.up ? '.35' : '.9'}"><title>WAN ${s.up ? 'up' : 'DOWN'} ${fmtClock(s.from)}–${fmtClock(s.to)}</title></rect>`).join('');
+          return `<div style="margin:6px 0 0"><div style="font-size:10px;color:var(--muted);letter-spacing:.4px;margin-bottom:2px">WAN AVAILABILITY</div><svg width="100%" height="8" viewBox="0 0 100 8" preserveAspectRatio="none" style="display:block;border-radius:2px">${rects}</svg></div>`;
+        })()}
+        ${lastDown ? `<div style="font-size:12px;color:var(--red);margin:4px 0 0 2px"${w.downEvents?.recent?.length ? ` title="recent WAN-down: ${w.downEvents.recent.map(t=>new Date(t).toLocaleString()).join(', ')}"` : ''}>WAN down ${fmtClock(lastDown.start)}–${lastDown.end ? fmtClock(lastDown.end) : 'now'}${w.downEvents ? ` · ${w.downEvents.count} event(s)` : ''}</div>` : ''}`;
+    })() : '';
+    if (d.alertable) {
+      return `<div class="offline-row">
+        <div class="mon-dot md-red"></div>
+        <div>${escHtml(d.name)} — OFFLINE (controller-reported)<div class="offline-err">${escHtml(d.model || '')}${d.firmware ? ' · ' + escHtml(d.firmware) : ''}</div></div>
+      </div>`;
+    }
+    return `
+      <div class="node-hdr pve-node-hdr" onclick="toggleSnmp(${jsStr(skey)},${jsStr(stateKey)})">
+        <div class="mon-dot ${dotCls(d)}"></div>
+        <div class="pve-head-main snmp-head-main">
+          <div class="pve-head-title">
+            <div class="node-name">${escHtml(d.name)}</div>
+            <div class="pve-head-sub">${escHtml([d.model, d.firmware].filter(Boolean).join(' · '))}</div>
+          </div>
+          ${stats}
+        </div>
+        ${stateBadge(d)}
+        ${notifyBell('unifi:' + d.name)}
+      </div>
+      <div class="node-body ${isOpen ? 'open' : ''}" id="snmp-${skey}">
+        ${wanBody}
+        ${(() => { const lim = historyLimitFor('unifi:' + skey); return d.cpu != null ? `<div class="chart-row"><div class="chart-hdr"><span class="nb-label">CPU</span><span class="nb-pct" style="color:${bc(d.cpu)}">${d.cpu}%</span></div>${histChart(d.history,'cpu',d.cpu,lim)}</div>` : ''; })()}
+        ${(() => { const lim = historyLimitFor('unifi:' + skey); return d.ram ? `<div class="chart-row"><div class="chart-hdr"><span class="nb-label">RAM</span><span class="nb-pct" style="color:${bc(d.ram.percent)}">${d.ram.percent}%</span></div>${histChart(d.history,'ram',d.ram.percent,lim)}</div>` : ''; })()}
+        ${snmpDetail ? `<div class="syn-section" style="margin-top:6px">SNMP detail</div>${snmpDetail.html}` : ''}
+      </div>`;
+  }).join('');
+
+  // Instance-level states (state matrix): connecting / error / stale rows.
+  const instanceRows = instances.map(i => {
+    if (i._connecting) return `<div class="node-hdr" style="cursor:default"><div class="mon-dot md-gray"></div><div class="node-name">${escHtml(i.name)}</div><div class="node-info">${escHtml(i.url || '')}</div>${bdg('gray','connecting…')}</div>`;
+    if (!i.online) return `<div class="offline-row"><div class="mon-dot md-red"></div><div>${escHtml(i.name)} — controller unreachable<div class="offline-err">${escHtml(i.error || '')}</div></div></div>`;
+    if (i.stale) return `<div style="font-size:11px;color:var(--muted);padding:2px 0 4px 2px">${escHtml(i.name)}: stale · ${escHtml(i.staleReason || 'retrying')}</div>`;
+    if (!i.devicesComplete && (i.devices || []).length) return `<div style="font-size:11px;color:var(--yellow);padding:2px 0 4px 2px">⚠ ${escHtml(i.name)}: device list incomplete — removal detection paused</div>`;
+    if (!(i.devices || []).length) return `<div style="font-size:12px;color:var(--muted);padding:4px 0 6px 2px">${escHtml(i.name)}: connected — no devices adopted yet</div>`;
+    return '';
+  }).join('');
+
+  // Unmatched SNMP-branded devices keep rendering exactly as before, below.
+  const snmpPanel = buildSynology(unmatchedSnmp, { ...meta, keyPrefix: 'ufx-' });
+
+  return {
+    id: 'unifi',
+    title: meta.title || 'UniFi',
+    iconKey: meta.iconKey || 'unifi',
+    color: meta.color,
+    meta: `${onlineCount}/${totalCount} online`,
+    badge,
+    sbSummary: sbSummaryHtml,
+    summary: summaryHtml,
+    body: instanceRows + rows + (snmpPanel ? `<div class="syn-section" style="margin-top:8px">SNMP devices</div>${snmpPanel.body}` : ''),
   };
 }
 
@@ -6916,7 +7130,7 @@ function buildPanels(data){
     windows:      () => buildWindows(data.windows),
     synology:     () => buildSynology(snmpRowsForPanel(data.snmp, 'synology'), { id:'synology', ...PLATFORM_META.synology }),
     mikrotik:     () => buildSynology(snmpRowsForPanel(data.snmp, 'mikrotik'), { id:'mikrotik', ...PLATFORM_META.mikrotik }),
-    unifi:        () => buildSynology(snmpRowsForPanel(data.snmp, 'unifi'), { id:'unifi', ...PLATFORM_META.unifi }),
+    unifi:        () => buildUnifi(data),
     snmp:         () => buildSynology(snmpRowsForPanel(data.snmp, 'snmp'), { id:'snmp', ...PLATFORM_META.snmp }),
     healthchecks: () => buildHealthchecks(data.healthchecks),
     uptimekuma:   () => buildUptimeKuma(data.uptimekuma),
@@ -7407,7 +7621,7 @@ function render(data, opts = {}){
   setFavicon(anyOff);
   setLogoDot(anyOff);
 
-  const dataHas={ proxmox:!!(data.proxmox?.nodes?.length), linux:!!((data.linux||[]).length), windows:!!((data.windows||[]).length), kubernetes:!!data.kubernetes, synology:!!snmpRowsForPanel(data.snmp,'synology').length, mikrotik:!!snmpRowsForPanel(data.snmp,'mikrotik').length, unifi:!!snmpRowsForPanel(data.snmp,'unifi').length, snmp:!!snmpRowsForPanel(data.snmp,'snmp').length, healthchecks:!!data.healthchecks, uptimekuma:!!data.uptimekuma, checks:!!data.checks, prometheus:!!data.prometheus, docker:!!((data.docker||[]).length), dockhand:!!data.dockhand, firewall:!!data.firewall, truenas:!!data.truenas, qnap:!!data.qnap, ugreen:!!data.ugreen, pbs:!!data.pbs, cloudflare:!!data.cloudflare, cicd:!!data.cicd, veeam:!!data.veeam, portainer:!!data.portainer, database:!!((data.database||[]).length) };
+  const dataHas={ proxmox:!!(data.proxmox?.nodes?.length), linux:!!((data.linux||[]).length), windows:!!((data.windows||[]).length), kubernetes:!!data.kubernetes, synology:!!snmpRowsForPanel(data.snmp,'synology').length, mikrotik:!!snmpRowsForPanel(data.snmp,'mikrotik').length, unifi:!!snmpRowsForPanel(data.snmp,'unifi').length||!!((data.unifi?.instances)||[]).length, snmp:!!snmpRowsForPanel(data.snmp,'snmp').length, healthchecks:!!data.healthchecks, uptimekuma:!!data.uptimekuma, checks:!!data.checks, prometheus:!!data.prometheus, docker:!!((data.docker||[]).length), dockhand:!!data.dockhand, firewall:!!data.firewall, truenas:!!data.truenas, qnap:!!data.qnap, ugreen:!!data.ugreen, pbs:!!data.pbs, cloudflare:!!data.cloudflare, cicd:!!data.cicd, veeam:!!data.veeam, portainer:!!data.portainer, database:!!((data.database||[]).length) };
   const connectingCount=platformConnectingCount + configuredIds.filter(id=>id!=='linux'&&!dataHas[id]).length;
   window._connecting = connectingCount;
 
@@ -8593,6 +8807,45 @@ function ensureDashboardContent(reason = ''){
   }
   return true;
 }
+/* Compact refresh payloads trim every history series to ~120 points while the
+   charts render a wider window (e.g. 240 slots for 1h) and left-pad missing
+   slots — so the first refresh after a detailed initial load blanked the left
+   half of every chart. Merge: keep previously-known points that are older than
+   the new payload's first sample. Object arrays (instances/devices/nodes/…)
+   are aligned by identity so histories survive reordering. */
+const HISTORY_MERGE_MAX = 1500;
+function historyItemKey(item){
+  if(!item || typeof item !== 'object') return null;
+  return item.id ?? item.mac ?? item.host ?? item.url ?? item.name ?? null;
+}
+function mergeCompactHistories(next, prev, depth = 0){
+  if(!next || !prev || typeof next !== 'object' || typeof prev !== 'object' || depth > 8) return next;
+  for(const k of Object.keys(next)){
+    const nv = next[k], pv = prev[k];
+    if(nv == null || pv == null) continue;
+    if(Array.isArray(nv) && Array.isArray(pv)){
+      const isSeries = k === 'history' && nv.length && typeof nv[0] === 'object' && nv[0] && 'time' in nv[0];
+      if(isSeries){
+        const firstT = Number(nv[0].time);
+        if(Number.isFinite(firstT) && pv.length && Number(pv[pv.length-1]?.time) >= 0){
+          const older = pv.filter(pt => pt && Number(pt.time) < firstT);
+          if(older.length) next[k] = [...older, ...nv].slice(-HISTORY_MERGE_MAX);
+        }
+      } else if(nv.length && typeof nv[0] === 'object'){
+        const prevByKey = new Map();
+        pv.forEach(item => { const key = historyItemKey(item); if(key != null) prevByKey.set(key, item); });
+        nv.forEach((item, i) => {
+          const key = historyItemKey(item);
+          const prevItem = key != null && prevByKey.has(key) ? prevByKey.get(key) : pv[i];
+          if(item && prevItem && typeof item === 'object') mergeCompactHistories(item, prevItem, depth + 1);
+        });
+      }
+    } else if(typeof nv === 'object' && typeof pv === 'object' && !Array.isArray(nv) && !Array.isArray(pv)){
+      mergeCompactHistories(nv, pv, depth + 1);
+    }
+  }
+  return next;
+}
 async function fetchStatus(opts = {}){
   const ctrl = new AbortController();
   trackStatusController(ctrl);
@@ -8606,6 +8859,7 @@ async function fetchStatus(opts = {}){
     const ct = r.headers.get('content-type') || '';
     if(!ct.toLowerCase().includes('application/json')) throw new Error(`Expected JSON from ${url}, got ${ct || 'unknown content type'}`);
     const data = statusCachedFallback(await r.json());
+    if(!(opts.detail || opts.full)) mergeCompactHistories(data, window._lastData || readStatusCache());
     writeStatusCache(data);
     return data;
   }finally{

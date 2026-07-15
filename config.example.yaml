@@ -116,6 +116,24 @@ firewall:
   #     apiSecret: "${OPNSENSE_API_SECRET:-}"
   #     insecureTLS: false
 
+unifi:
+  enabled: false
+  # UniFi Network controller via the official Integration API (Network app 9.3+).
+  # API key: UniFi OS console -> Settings -> Control Plane -> Integrations.
+  # The optional legacy block enables WAN latency/packet loss via the classic
+  # API — use a dedicated LOCAL, read-only, MFA-exempt account.
+  # UniFi devices can additionally be monitored over SNMP (snmp: section,
+  # profile: unifi); both render in the same UniFi dashboard card.
+  # instances:
+  #   - name: Controller
+  #     url: "https://192.168.1.1"       # UniFi OS console or self-hosted Network app
+  #     apiKey: "${UNIFI_API_KEY:-}"
+  #     site: default                    # optional; auto-discovered when omitted
+  #     insecureTLS: true                # self-signed controller certs are the norm
+  #     legacy:
+  #       username: "omnisight-ro"
+  #       password: "${UNIFI_LEGACY_PASSWORD:-}"
+
 truenas:
   enabled: false
   # TrueNAS 25.04+ uses WebSocket JSON-RPC; older CORE/SCALE REST v2.0 can be used

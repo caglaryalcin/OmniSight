@@ -132,6 +132,11 @@ function diskTempNum(value) {
 function normalizeTemperature(value) {
   let n = snmpNumber(value);
   if (!Number.isFinite(n)) return null;
+  // An exact 0 is an unpopulated sensor slot, not a reading — UniFi gateways
+  // expose stub rows (e.g. "Board Temp" = 0) for sensors the hardware lacks.
+  // Real lm-sensors values arrive in milli/deci-degrees, so a true 0.000° is
+  // not observed in practice.
+  if (n === 0) return null;
   if (Math.abs(n) > 1000) n /= 1000;
   else if (Math.abs(n) > 200) n /= 10;
   if (n <= -50 || n >= 200) return null;
