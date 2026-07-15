@@ -375,6 +375,7 @@ html[data-theme="light"] .ci-help{color:#53657c}
     <button class="settings-nav-btn" type="button" data-nav-parent="backup" data-target="pbs" onclick="showSettingsSection('pbs')"><span class="settings-nav-dot" data-nav-dot="pbs"></span><span>Proxmox Backup</span></button>
     <button class="settings-nav-btn" type="button" data-nav-parent="backup" data-target="veeam" onclick="showSettingsSection('veeam')"><span class="settings-nav-dot" data-nav-dot="veeam"></span><span>Veeam</span></button>
     <div class="settings-nav-group" data-nav-group="nas"><span>NAS</span></div>
+    <button class="settings-nav-btn" type="button" data-nav-parent="nas" data-target="linstor" onclick="showSettingsSection('linstor')"><span class="settings-nav-dot" data-nav-dot="linstor"></span><span>LINSTOR</span></button>
     <button class="settings-nav-btn" type="button" data-nav-parent="nas" data-target="truenas" onclick="showSettingsSection('truenas')"><span class="settings-nav-dot" data-nav-dot="truenas"></span><span>TrueNAS</span></button>
     <button class="settings-nav-btn" type="button" data-nav-parent="nas" data-target="synology" onclick="showSettingsSection('synology')"><span class="settings-nav-dot" data-nav-dot="synology"></span><span>Synology</span></button>
     <button class="settings-nav-btn" type="button" data-nav-parent="nas" data-target="ugreen" onclick="showSettingsSection('ugreen')"><span class="settings-nav-dot" data-nav-dot="ugreen"></span><span>Ugreen</span></button>
@@ -630,6 +631,7 @@ html[data-theme="light"] .ci-help{color:#53657c}
         <label class="check-chip"><input type="checkbox" value="docker" checked> Docker</label>
         <label class="check-chip"><input type="checkbox" value="dockhand" checked> Dockhand</label>
         <label class="check-chip"><input type="checkbox" value="firewall" checked> Firewalls</label>
+        <label class="check-chip"><input type="checkbox" value="linstor" checked> LINSTOR</label>
         <label class="check-chip"><input type="checkbox" value="truenas" checked> TrueNAS</label>
         <label class="check-chip"><input type="checkbox" value="qnap" checked> QNAP</label>
         <label class="check-chip"><input type="checkbox" value="ugreen" checked> Ugreen</label>
@@ -1107,6 +1109,34 @@ html[data-theme="light"] .ci-help{color:#53657c}
 </div>
 
 <!-- TrueNAS -->
+<!-- LINSTOR -->
+<div class="card" data-settings-section="linstor">
+  <div class="card-hdr">
+    <div class="card-left">
+      <div class="card-icon" id="dot-linstor" style="background:var(--muted)"></div>
+      <span class="card-title">LINSTOR</span>
+    </div>
+    <label class="toggle"><input type="checkbox" id="en-linstor" onchange="toggleCard('linstor')"><span class="toggle-t"></span></label>
+  </div>
+  <div class="card-body hidden" id="cb-linstor">
+    <div class="form-group"><label>Icon (optional)</label>
+      <div class="path-row">
+        <input type="text" id="icon-linstor" placeholder="e.g. linstor - from dashboard-icons">
+        <button type="button" class="btn-sm" onclick="document.getElementById('icon-linstor-f').click()">Browse...</button>
+        <input type="file" id="icon-linstor-f" accept="image/*,.svg" style="display:none" onchange="uploadIcon(this,'icon-linstor')">
+      </div>
+    </div>
+    <div class="section mini-section">
+      <div class="sec-head">
+        <h3 id="linstor-section-title">Controllers</h3>
+        <button class="btn-add" type="button" onclick="addLinstorController()">+ Add Controller</button>
+      </div>
+      <div id="linstor-section-desc" style="font-size:12px;color:var(--muted);line-height:1.35;margin-bottom:10px">Polls the LINSTOR controller REST API (default port 3370, or 3371 with TLS) for replication health. Read-only. Bearer token requires LINSTOR 1.34+; a client certificate enables mutual TLS. Secrets encrypt at rest.</div>
+      <div id="linstor-list"></div>
+    </div>
+  </div>
+</div>
+
 <div class="card" data-settings-section="truenas">
   <div class="card-hdr">
     <div class="card-left">
@@ -1708,7 +1738,7 @@ html[data-theme="light"] .ci-help{color:#53657c}
 
 <script src="/i18n.js"></script>
 <script>
-let lCount = 0, sCount = 0, dCount = 0, dbCount = 0, dkApiCount = 0, dkSshCount = 0, pveSshCount = 0, promCount = 0, dockhandCount = 0, firewallCount = 0, trueNasCount = 0, unifiCtrlCount = 0, qnapCount = 0, ugreenCount = 0, pbsCount = 0, cicdCount = 0, veeamCount = 0, portainerCount = 0, checkCount = 0;
+let lCount = 0, sCount = 0, dCount = 0, dbCount = 0, dkApiCount = 0, dkSshCount = 0, pveSshCount = 0, promCount = 0, dockhandCount = 0, firewallCount = 0, trueNasCount = 0, unifiCtrlCount = 0, linstorCtrlCount = 0, qnapCount = 0, ugreenCount = 0, pbsCount = 0, cicdCount = 0, veeamCount = 0, portainerCount = 0, checkCount = 0;
 const SETTINGS_CARD_OPEN_KEY = 'os_settings_card_open';
 const SETTINGS_ACTIVE_SECTION_KEY = 'os_settings_active_section';
 const DEFAULT_SETTINGS_SECTION = 'appearance';
@@ -2248,6 +2278,7 @@ function previewConfiguredIds(cfg = {}) {
   if (en(cfg.dockhand) && hasInstances(cfg.dockhand)) ids.push('dockhand');
   if (en(cfg.firewall) && hasInstances(cfg.firewall)) ids.push('firewall');
   if (en(cfg.unifi) && hasInstances(cfg.unifi) && !ids.includes('unifi')) ids.push('unifi');
+  if (en(cfg.linstor) && hasInstances(cfg.linstor)) ids.push('linstor');
   if (en(cfg.truenas) && hasInstances(cfg.truenas)) ids.push('truenas');
   if (en(cfg.qnap) && hasInstances(cfg.qnap)) ids.push('qnap');
   if (en(cfg.ugreen) && hasInstances(cfg.ugreen)) ids.push('ugreen');
@@ -2465,7 +2496,7 @@ function configBool(value, fallback = false) {
   if (['0', 'false', 'no', 'off'].includes(text)) return false;
   return fallback;
 }
-const PLATFORM_CONFIG_KEYS = ['proxmox','linux','windows','kubernetes','snmp','healthchecks','uptimekuma','checks','prometheus','docker','dockhand','firewall','truenas','unifi','qnap','ugreen','pbs','cloudflare','cicd','veeam','portainer','database'];
+const PLATFORM_CONFIG_KEYS = ['proxmox','linux','windows','kubernetes','snmp','healthchecks','uptimekuma','checks','prometheus','docker','dockhand','firewall','truenas','unifi','linstor','qnap','ugreen','pbs','cloudflare','cicd','veeam','portainer','database'];
 function hasPlatformConfig(cfg) {
   return !!(cfg && PLATFORM_CONFIG_KEYS.some(key => Object.prototype.hasOwnProperty.call(cfg, key)));
 }
@@ -2806,6 +2837,79 @@ async function testUnifiController(btn) {
     else parts.push('WAN quality: not configured');
     out.textContent = parts.join(' · ');
     out.style.color = j.api?.ok && (!j.wanQuality?.configured || j.wanQuality.ok) ? 'var(--green)' : (j.api?.ok ? 'var(--yellow)' : 'var(--red)');
+  } catch (err) {
+    out.textContent = `test failed: ${err.message}`;
+    out.style.color = 'var(--red)';
+  }
+}
+
+function addLinstorController(data = {}) {
+  const idx = linstorCtrlCount++;
+  const id = `linstor-${idx}`;
+  const tls = data.tls || {};
+  const skip = !!(tls.skipVerify || data.insecureTLS);
+  const item = document.createElement('div');
+  item.className = 'arr-item';
+  item.innerHTML = `
+    <div class="arr-hdr" onclick="toggleArr('${id}')">
+      <span class="arr-hdr-name">${escHtml(data.name || data.url || 'LINSTOR Controller')}</span>
+      <button class="btn-rm" type="button" onclick="event.stopPropagation();this.closest('.arr-item').remove()">x</button>
+    </div>
+    <div class="arr-body" id="ab-${id}">
+      <div class="form-grid">
+        <div class="form-group"><label>Name</label><input type="text" class="li-name" value="${escHtml(data.name||'')}" placeholder="linstor" oninput="this.closest('.arr-item').querySelector('.arr-hdr-name').textContent=this.value||'LINSTOR Controller'"></div>
+        <div class="form-group"><label>Controller URL</label><input type="text" class="li-url" value="${escHtml(data.url||'')}" placeholder="http://linstor.yourdomain.com:3370"></div>
+        <div class="form-group"><label>Bearer token (LINSTOR 1.34+, optional)</label><input type="password" class="li-token" placeholder="leave blank to keep current"></div>
+        <div class="form-group"><label>Pool warn %</label><input type="number" class="li-warn" min="1" max="100" value="${Number(data.poolWarn||85)}"></div>
+        <div class="form-group"><label>Pool page %</label><input type="number" class="li-page" min="1" max="100" value="${Number(data.poolPage||92)}"></div>
+        <div class="form-group"><label>TLS certificate</label><select class="li-skip"><option value="false" ${!skip?'selected':''}>Verify certificate</option><option value="true" ${skip?'selected':''}>Allow self-signed (token / self-signed mTLS)</option></select></div>
+        <div class="form-group"><label>Client certificate (PEM, optional — mutual TLS)</label><textarea class="li-cert" rows="2" placeholder="-----BEGIN CERTIFICATE-----">${escHtml(tls.cert||'')}</textarea></div>
+        <div class="form-group"><label>Client private key (PEM, optional)</label><input type="password" class="li-key" placeholder="leave blank to keep current"></div>
+        <div class="form-group"><label>Client key password (optional)</label><input type="password" class="li-keypass" placeholder="leave blank to keep current"></div>
+        <div class="form-group"><label>CA certificate (PEM, optional)</label><textarea class="li-ca" rows="2" placeholder="-----BEGIN CERTIFICATE-----">${escHtml(tls.caCert||'')}</textarea></div>
+      </div>
+      <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
+        <button type="button" class="btn-sm" onclick="testLinstorController(this)">Test connection</button>
+        <span class="li-test-result" style="font-size:12px;color:var(--muted)"></span>
+      </div>
+    </div>`;
+  document.getElementById('linstor-list').appendChild(item);
+  if (data.bearerToken || data.token) secVal(data.bearerToken || data.token, item.querySelector('.li-token'));
+  if (tls.privateKey) secVal(tls.privateKey, item.querySelector('.li-key'));
+  if (tls.password) secVal(tls.password, item.querySelector('.li-keypass'));
+  applyLanguageFragment(item);
+}
+
+async function testLinstorController(btn) {
+  const item = btn.closest('.arr-item');
+  const out = item.querySelector('.li-test-result');
+  out.textContent = 'testing…';
+  out.style.color = 'var(--muted)';
+  try {
+    const cert = item.querySelector('.li-cert').value.trim();
+    const caCert = item.querySelector('.li-ca').value.trim();
+    const body = {
+      url: item.querySelector('.li-url').value.trim(),
+      bearerToken: maskedVal(item.querySelector('.li-token')) || undefined,
+      tls: {
+        cert: cert || undefined,
+        privateKey: maskedVal(item.querySelector('.li-key')) || undefined,
+        password: maskedVal(item.querySelector('.li-keypass')) || undefined,
+        caCert: caCert || undefined,
+        skipVerify: item.querySelector('.li-skip').value === 'true',
+      },
+    };
+    if (!body.url) { out.textContent = 'enter a controller URL first'; out.style.color = 'var(--yellow)'; return; }
+    const r = await fetch('/api/linstor/test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+    if (j.ok) {
+      out.textContent = `✓ LINSTOR ${j.version || ''}${j.restApiVersion ? ` (API ${j.restApiVersion})` : ''} · ${j.nodes} node(s)`;
+      out.style.color = 'var(--green)';
+    } else {
+      out.textContent = `✗ ${j.error || 'connection failed'}`;
+      out.style.color = 'var(--red)';
+    }
   } catch (err) {
     out.textContent = `test failed: ${err.message}`;
     out.style.color = 'var(--red)';
@@ -3940,6 +4044,7 @@ const DYNAMIC_CONFIG_LIST_IDS = [
   'dockhand-list',
   'firewall-list',
   'truenas-list',
+  'linstor-list',
   'unifi-ctrl-list',
   'qnap-list',
   'ugreen-list',
@@ -3999,6 +4104,7 @@ function resetDynamicConfigLists() {
   firewallCount = 0;
   trueNasCount = 0;
   unifiCtrlCount = 0;
+  linstorCtrlCount = 0;
   qnapCount = 0;
   ugreenCount = 0;
   pbsCount = 0;
@@ -4202,6 +4308,15 @@ function populate(cfg) {
           insecureTLS: cfg.truenas.insecureTLS,
         }] : []);
     uniqueConfigItems(instances, ['name', 'url']).forEach(addTrueNasInstance);
+  }
+  if (cfg.linstor) {
+    document.getElementById('en-linstor').checked = cfg.linstor.enabled !== false;
+    document.getElementById('cb-linstor').classList.remove('hidden');
+    document.getElementById('icon-linstor').value = cfg.linstor.icon || '';
+    const instances = Array.isArray(cfg.linstor.instances) && cfg.linstor.instances.length
+      ? cfg.linstor.instances
+      : (cfg.linstor.url ? [{ name: cfg.linstor.name || 'LINSTOR', url: cfg.linstor.url, bearerToken: cfg.linstor.bearerToken, tls: cfg.linstor.tls, poolWarn: cfg.linstor.poolWarn, poolPage: cfg.linstor.poolPage }] : []);
+    uniqueConfigItems(instances, ['name', 'url']).forEach(addLinstorController);
   }
   if (cfg.qnap) {
     document.getElementById('en-qnap').checked = cfg.qnap.enabled !== false;
@@ -4716,6 +4831,41 @@ function collect() {
       enabled: on,
       instances: uniqueInstances,
       icon: document.getElementById('icon-truenas').value.trim() || undefined,
+    };
+  }
+
+  {
+    const on = document.getElementById('en-linstor').checked;
+    const instances = [];
+    document.querySelectorAll('#linstor-list .arr-item').forEach(item => {
+      const url = item.querySelector('.li-url').value.trim();
+      const name = item.querySelector('.li-name').value.trim();
+      const bearerToken = maskedVal(item.querySelector('.li-token'));
+      const cert = item.querySelector('.li-cert').value.trim();
+      const privateKey = maskedVal(item.querySelector('.li-key'));
+      const keyPass = maskedVal(item.querySelector('.li-keypass'));
+      const caCert = item.querySelector('.li-ca').value.trim();
+      const skipVerify = item.querySelector('.li-skip').value === 'true';
+      const tls = {};
+      if (cert) tls.cert = cert;
+      if (privateKey) tls.privateKey = privateKey;
+      if (keyPass) tls.password = keyPass;      // SENSITIVE_KEYS name — encrypts at rest
+      if (caCert) tls.caCert = caCert;
+      if (skipVerify) tls.skipVerify = true;
+      if (url || name) instances.push({
+        name: name || undefined,
+        url: url || undefined,
+        bearerToken: bearerToken || undefined,  // SENSITIVE_KEYS name — encrypts at rest
+        tls: Object.keys(tls).length ? tls : undefined,
+        poolWarn: Number(item.querySelector('.li-warn').value) || undefined,
+        poolPage: Number(item.querySelector('.li-page').value) || undefined,
+      });
+    });
+    const uniqueInstances = uniqueConfigItems(instances, ['name', 'url']);
+    if (on || uniqueInstances.length) cfg.linstor = {
+      enabled: on,
+      instances: uniqueInstances,
+      icon: document.getElementById('icon-linstor').value.trim() || undefined,
     };
   }
 
@@ -5954,6 +6104,12 @@ async function refreshDots(cfg, newData){
     || (en(cfg.truenas) && tnTotal > 0 && tnInstances.length < tnTotal)
     || (en(cfg.truenas) && tnTotal > 0 && tnOnline === 0 && (d.loading || d.refreshing));
   setDot('dot-truenas', platformDot(en(cfg.truenas), tnTotal, tnOnline || (d.truenas?.online ? 1 : 0), tnConnecting));
+  const linInstances = d.linstor?.instances || [];
+  const linTotal = Math.max(linInstances.length, cfg.linstor?.instances?.length || (cfg.linstor?.url ? 1 : 0));
+  const linOnline = linInstances.filter(i => i.online || i.stale).length;
+  const linConnecting = !!d.linstor?._connecting || linInstances.some(i => i._connecting)
+    || (en(cfg.linstor) && linTotal > 0 && linInstances.length < linTotal);
+  setDot('dot-linstor', platformDot(en(cfg.linstor), linTotal, linOnline || (d.linstor?.online ? 1 : 0), linConnecting));
   const qnapInstances = d.qnap?.instances || [];
   const qnapTotal = Math.max(qnapInstances.length, cfg.qnap?.instances?.length || (cfg.qnap?.url ? 1 : 0));
   const qnapOnline = qnapInstances.filter(i=>i.online).length;
