@@ -5847,12 +5847,16 @@ app.post('/api/logout', (req, res) => {
 app.get('/api/auth-status', (req, res) => {
   const required = authConfigured();
   const session = required ? validSession(req) : null;
-  const auth = req._authUser || (session?.session?.username ? findAuthUser(session.session.username) : (loadUsers()[0] || null));
+  // Only expose an identity to an authenticated caller. Without a valid
+  // session this endpoint is public (authPublicPaths), so falling back to the
+  // first user in users.yaml leaked that user's name/role/2FA state to any
+  // unauthenticated client on the LAN.
+  const auth = session ? (req._authUser || findAuthUser(session.session?.username)) : null;
   res.json({
     required,
     authenticated: !!session,
     username: auth?.username || null,
-    role: normalizeRole(auth?.role, 'admin'),
+    role: auth ? normalizeRole(auth.role, 'admin') : null,
     twoFactorEnabled: totpEnabled(auth),
     mustChangePassword: userMustChangePassword(auth),
     passwordResetEnabled: passwordResetEnabled(),
