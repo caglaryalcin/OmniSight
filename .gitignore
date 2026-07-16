@@ -14,6 +14,7 @@ public/assets/*
 !public/assets/omnisight-logo.png
 !public/assets/omnisight-wordmark.svg
 !public/assets/omnisight-wordmark.png
+!public/assets/linstor.png
 
 .env
 .env.local
@@ -22,3 +23,4 @@ public/assets/*
 npm-debug.log*
 
 .fuse_hidden*
+.gstack/

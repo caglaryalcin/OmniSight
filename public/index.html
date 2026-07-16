@@ -1113,7 +1113,7 @@ const windowsOpen = {};
 const hcOpen = {};
 const snmpOpen = {};
 const k8sGrpOpen = {};
-const defaultOverviewGroupOpen = { pods:true, deps:false, svcs:false, synologyDevices:true, mikrotikDevices:true, unifiDevices:true, snmpDevices:true, snmpServers:true, dockerHosts:true, dockerContainers:true, checksServices:true, prometheusServers:true, prometheusTargets:true, firewallGateways:true, firewallLinks:true, truenasSystems:true, truenasPools:true, qnapSystems:true, ugreenSystems:true, pbsServers:true, pbsDatastores:true, pbsTasks:true, cloudflareZones:true, cloudflareTunnels:true, cloudflareDomains:true, cicdProjects:true, cicdPipelines:true, veeamServers:true, veeamSessions:true, veeamRepositories:true, portainerServers:true, portainerEnvironments:true, portainerContainers:true, databaseServers:true };
+const defaultOverviewGroupOpen = { pods:true, deps:false, svcs:false, synologyDevices:true, mikrotikDevices:true, unifiDevices:true, linstorNodes:true, linstorDegraded:true, snmpDevices:true, snmpServers:true, dockerHosts:true, dockerContainers:true, checksServices:true, prometheusServers:true, prometheusTargets:true, firewallGateways:true, firewallLinks:true, truenasSystems:true, truenasPools:true, qnapSystems:true, ugreenSystems:true, pbsServers:true, pbsDatastores:true, pbsTasks:true, cloudflareZones:true, cloudflareTunnels:true, cloudflareDomains:true, cicdProjects:true, cicdPipelines:true, veeamServers:true, veeamSessions:true, veeamRepositories:true, portainerServers:true, portainerEnvironments:true, portainerContainers:true, databaseServers:true };
 let overviewK8sOpen = { ...defaultOverviewGroupOpen };
 try { overviewK8sOpen = { ...overviewK8sOpen, ...JSON.parse(localStorage.getItem('os_overview_group_open') || '{}') }; } catch {}
 function saveOverviewGroupOpen(){
@@ -1746,7 +1746,7 @@ let activePanel = null;
 
 const SNMP_PANEL_IDS = ['synology','mikrotik','unifi','snmp'];
 const SNMP_BRAND_PANEL_IDS = ['synology','mikrotik','unifi'];
-const ALL_IDS = ['proxmox','kubernetes','linux','windows','synology','mikrotik','unifi','snmp','healthchecks','uptimekuma','checks','prometheus','docker','dockhand','firewall','truenas','qnap','ugreen','pbs','cloudflare','cicd','veeam','portainer','database'];
+const ALL_IDS = ['proxmox','kubernetes','linux','windows','synology','mikrotik','unifi','linstor','snmp','healthchecks','uptimekuma','checks','prometheus','docker','dockhand','firewall','truenas','qnap','ugreen','pbs','cloudflare','cicd','veeam','portainer','database'];
 const CONFIGURED_CACHE_KEY = 'os_configured_ids_v1';
 function platformTitle(id, title){
   return String(title || id || '');
@@ -1791,6 +1791,7 @@ const SEC_ICONS = {
   synology:    (c) => SEC_ICONS.snmp(c),
   mikrotik:    (c) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="${c}" aria-hidden="true"><path d="M4 6.5h3.2l2.1 5.2 2.1-5.2h3.2v11h-2.5v-6.4l-1.9 4.6H8.4l-1.9-4.6v6.4H4v-11Z"/><path d="M15.6 6.5H21v2.3h-2.9v8.7h-2.5v-11Z"/></svg>`,
   unifi:       (c) => SEC_ICONS.snmp(c),
+  linstor:     () => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><defs><clipPath id="lnstrHex"><path d="M6.5 1H17.5L23 11 17.5 21H6.5L1 11Z"/></clipPath></defs><path d="M6.5 1H17.5L23 11 17.5 21H6.5L1 11Z" fill="#F5821F"/><g clip-path="url(#lnstrHex)" fill="none" stroke="#fff" stroke-width="1.6"><path d="M10.5 -1 3 11"/><path d="M13.5 -1 6 11"/><path d="M16.5 -1 9 11"/><path d="M-1 13H25"/><path d="M-1 16H25"/><path d="M-1 19H25"/></g></svg>`,
   healthchecks:(c) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>`,
   uptimekuma:  (c) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12c2.8-4.7 5.8-7 9-7s6.2 2.3 9 7c-2.8 4.7-5.8 7-9 7s-6.2-2.3-9-7Z"/><path d="M8 12h2l1.5-3 2.5 6 1.5-3H16"/></svg>`,
   checks:      (c) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7"/><path d="M12 4v3"/><path d="M12 17v3"/><path d="M4 12h3"/><path d="M17 12h3"/><path d="m9 12.5 2 2 4-4.5"/></svg>`,
@@ -1863,6 +1864,7 @@ const PLATFORM_META = {
   synology:    { title:'Synology',      iconKey:'synology',    color:'var(--blue)' },
   mikrotik:    { title:'MikroTik',      iconKey:'mikrotik',    color:'var(--yellow)' },
   unifi:       { title:'UniFi',         iconKey:'unifi',       color:'var(--green)' },
+  linstor:     { title:'LINSTOR',       iconKey:'linstor',     color:'var(--blue)' },
   snmp:        { title:'SNMP',          iconKey:'snmp',        color:'var(--yellow)' },
   healthchecks:{ title:'Healthchecks',  iconKey:'healthchecks',color:'var(--green)' },
   uptimekuma:  { title:'Uptime Kuma',   iconKey:'uptimekuma',  color:'var(--green)' },
@@ -3636,6 +3638,159 @@ function buildSynology(syn, opts = {}){
     sbSummary: sbSummaryHtml,
     summary: summaryHtml,
     body,
+  };
+}
+
+/* ── LINSTOR (replication health — controller-only poll; pager-first card) ── */
+function buildLinstor(data){
+  const lin = data.linstor;
+  if (!lin || !Array.isArray(lin.instances) || !lin.instances.length) return null;
+  const meta = { id:'linstor', ...PLATFORM_META.linstor };
+  const instances = lin.instances;
+  const connecting = instances.every(i => i._connecting);
+  const sm = lin.summary || {};
+  const PAGE_TH = 92, WARN_TH = 85;               // display thresholds (server owns paging)
+  const poolCls = p => p>=PAGE_TH ? 'red' : p>=WARN_TH ? 'yellow' : 'green';
+  const poolVar = p => p>=PAGE_TH ? 'var(--red)' : p>=WARN_TH ? 'var(--yellow)' : 'var(--green)';
+  const fmtSince = t => { if(!t) return ''; const m=Math.max(0,Math.round((Date.now()-t)/60000)); return m<60?`${m}m`:`${Math.floor(m/60)}h${m%60?(m%60)+'m':''}`; };
+  const fmtTiB = v => v==null?'—':(v>=10?Math.round(v):v.toFixed(1))+' TiB';
+
+  // ---- badge law: CTRL UNREACHABLE > NODE OFFLINE > N DEGRADED > POOL≥page >
+  //      SYNCING(yellow) > N IN MAINTENANCE(gray) > green ----
+  const ctrlUnreachable = instances.some(i => i.ctrlPaging || (!i.online && !i.stale && !i._connecting));
+  const nodesOffline = sm.nodesOffline||0, degraded = sm.degraded||0, syncing = sm.syncing||0, maint = sm.nodesMaintenance||0;
+  const worstPool = sm.worstPoolPct, poolPage = worstPool!=null && worstPool>=PAGE_TH;
+  const badge = connecting ? bdg('gray','connecting…')
+    : ctrlUnreachable ? bdg('red','CONTROLLER UNREACHABLE')
+    : nodesOffline ? bdg('red', `${nodesOffline} NODE${nodesOffline>1?'S':''} OFFLINE`)
+    : degraded ? bdg('red', `${degraded} DEGRADED`)
+    : poolPage ? bdg('red', `POOL ${Math.round(worstPool)}%${sm.worstPoolMeta?' META':''}`)
+    : syncing ? bdg('yellow', `SYNCING ${syncing}`)
+    : maint ? bdg('gray', `${maint} IN MAINTENANCE`)
+    : bdg('green','healthy');
+
+  // ---- csum strip ----
+  // ---- warn-chip strip (maintenance-forgotten, replica-count, error-spike) ----
+  const chips = [];
+  instances.forEach(i => (i.warns||[]).forEach(w => chips.push(w.msg || w.type)));
+  const chipStrip = chips.length ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px 2px">${chips.map(c=>`<span class="badge bg-yellow" style="font-weight:600">⚠ ${escHtml(c)}</span>`).join('')}</div>` : '';
+
+  // ---- per-instance sections (stacked when >1) ----
+  const multi = instances.length > 1;
+  const body = instances.map((i, ii) => {
+    if (i._connecting) return `<div class="node-hdr" style="cursor:default"><div class="mon-dot md-gray"></div><div class="node-name">${escHtml(i.name)}</div><div class="node-info">${escHtml(i.url||'')}</div>${bdg('gray','connecting…')}</div>`;
+    if (!i.online && !i.stale) return `<div class="offline-row"><div class="mon-dot md-red"></div><div>${escHtml(i.name)} — controller unreachable<div class="offline-err">${escHtml(i.error||'')}</div></div></div>`;
+    const dim = i.stale ? ' style="opacity:.55"' : '';
+    const header = multi ? `<div class="syn-section" style="margin-top:8px">${escHtml(i.name)}${i.version?` · ${escHtml(i.version)}`:''}${i.resourceGroup?` · ${escHtml(i.resourceGroup)}`:i.groupCount>1?` · ${i.groupCount} groups`:''}</div>` : '';
+    const staleNote = i.stale ? `<div style="font-size:11px;color:var(--yellow);padding:2px 0 4px 2px">stale ${fmtSince(i._lastGoodAt)||''} · ${escHtml(i.staleReason||'serving last-known')}</div>` : '';
+
+    // node rows
+    const nodeRows = (i.nodes||[]).map((n, ni) => {
+      const key = `lin${ii}n${ni}`, stateKey = `linstor:${i.name}:${n.name}`;
+      const isOpen = panelOpenState(stateKey, snmpOpen[stateKey]); snmpOpen[stateKey] = isOpen;
+      const p = n.pool;
+      const worst = p ? p.worstPct : null;
+      const dot = n.alertableOffline ? 'md-red' : n.maintenance ? 'md-gray' : (worst!=null && worst>=PAGE_TH) ? 'md-red' : (worst!=null && worst>=WARN_TH) ? 'md-yellow' : 'md-green';
+      const pill = n.alertableOffline ? bdg('red', escHtml(n.connectionStatus||'OFFLINE'))
+        : n.maintenance ? bdg('gray','maintenance')
+        : bdg('green','online');
+      const barPct = worst!=null ? Math.min(100, Math.max(0, worst)) : 0;
+      const barHtml = p ? `<span title="${p.metaDrives?`metadata ${Math.round(p.tmetaPct)}%`:`data ${Math.round(p.dataPct||0)}%`}" style="display:inline-block;width:90px;height:9px;border:1px solid var(--border,#444);border-radius:2px;vertical-align:middle;position:relative;overflow:hidden"><i style="position:absolute;left:0;top:0;bottom:0;width:${barPct}%;background:${poolVar(worst||0)}"></i></span>` : '';
+      const poolMeta = p ? `<span style="color:${poolVar(worst||0)};font-weight:700">${Math.round(worst)}%${p.metaDrives?' meta':''}</span> <span style="color:var(--muted)">${fmtTiB(p.freeTiB)} free</span>` : `<span style="color:var(--muted)">no pool</span>`;
+      const lim = historyLimitFor(stateKey);
+      const chart = p && Array.isArray(p.history) && p.history.length>1 ? `
+        <div class="chart-row"><div class="chart-hdr"><span class="nb-label">Pool data %</span><span class="nb-pct" style="color:${poolVar(p.dataPct||0)}">${Math.round(p.dataPct||0)}%</span></div>${histChart(p.history,'dataPct',p.dataPct||0,lim)}</div>
+        ${p.tmetaPct!=null?`<div class="chart-row"><div class="chart-hdr"><span class="nb-label">Metadata %</span><span class="nb-pct" style="color:${poolVar(p.tmetaPct)}">${Math.round(p.tmetaPct)}%</span></div>${histChart(p.history,'tmetaPct',p.tmetaPct,lim)}</div>`:''}` : '';
+      return `
+        <div class="node-hdr pve-node-hdr" onclick="toggleSnmp(${jsStr(key)},${jsStr(stateKey)})">
+          <div class="mon-dot ${dot}"></div>
+          <div class="pve-head-main snmp-head-main">
+            <div class="pve-head-title">
+              <div class="node-name">${escHtml(n.name)}</div>
+              <div class="pve-head-sub">${escHtml((n.role||'satellite').toLowerCase())} · ${n.resourceCount||0} resources</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;margin-left:auto">${barHtml} ${poolMeta}</div>
+          </div>
+          ${pill}
+          ${notifyBell('linstor:node:'+n.name)}
+        </div>
+        <div class="node-body ${isOpen?'open':''}" id="snmp-${key}">
+          ${p ? `<div style="font-size:12px;color:var(--muted);margin:2px 0 4px">${escHtml(p.name||'pool')} · ${escHtml(p.kind||'')} · used ${fmtTiB(p.usedTiB)} / ${fmtTiB(p.totalTiB)}</div>` : ''}
+          ${chart ? chartHeader(stateKey, lim) : ''}
+          ${chart || '<div style="font-size:12px;color:var(--muted)">no pool history yet</div>'}
+        </div>`;
+    }).join('');
+
+    // degraded section — cause-grouped; ≥5 sharing a cause collapse to a summary
+    const deg = i.degraded || [];
+    let degHtml = '';
+    if (deg.length) {
+      const byCause = {};
+      deg.forEach(r => { (byCause[r.cause||'degraded'] = byCause[r.cause||'degraded'] || []).push(r); });
+      const gloss = { Inconsistent:'replica out of sync — needs resync', Outdated:'replica has stale data — reconnect to a current peer', Failed:'backing disk failed — check the storage device', DUnknown:'disk state unknown — peer unreachable', Disconnected:'DRBD peer link is down', Offline:'the node holding this replica is offline' };
+      const rowHtml = r => {
+        const copies = r.copies ? `${r.copies.have}/${r.copies.want} copies` : '';
+        const copyCls = r.copies && r.copies.have<=1 ? 'red' : 'yellow';
+        const vm = r.vmid ? `VM ${escHtml(String(r.vmid))} · ` : '';
+        const st = r.worstState || 'degraded';
+        const pill = `<span class="badge bg-${copyCls}"${gloss[st]?` title="${escHtml(gloss[st])}"`:''}>${escHtml(st)}</span>`;
+        return `<div class="offline-row"${r.copies&&r.copies.have<=1?'':' style="background:transparent"'}>
+          <div class="mon-dot md-${copyCls}"></div>
+          <div style="flex:1"><b>${escHtml(r.name)}</b> <span style="color:var(--muted)">${vm}${escHtml(r.placement||'')}</span>
+            <div class="offline-err">${pill} <span style="color:var(--muted)">${copies}${r.since?` · since ${fmtSince(r.since)}`:''}</span></div></div>
+        </div>`;
+      };
+      const groups = Object.entries(byCause).map(([cause, rows]) => {
+        if (rows.length >= 5) {
+          const gkey = `lin${ii}g${cause.replace(/\W+/g,'')}`;
+          const worst1 = rows[0];
+          return `<div class="node-hdr" style="cursor:pointer" onclick="toggleSnmp(${jsStr(gkey)},${jsStr('linstor:g:'+i.name+':'+cause)})">
+              <div class="mon-dot md-red"></div>
+              <div style="flex:1"><b>${rows.length} degraded</b> <span style="color:var(--muted)">— all explained by ${escHtml(cause)}${worst1.copies?` · ${worst1.copies.have}/${worst1.copies.want} copies`:''}</span></div>
+              ${bdg('gray', 'expand')}
+            </div>
+            <div class="node-body ${panelOpenState('linstor:g:'+i.name+':'+cause, snmpOpen['linstor:g:'+i.name+':'+cause])?'open':''}" id="snmp-${gkey}">${rows.map(rowHtml).join('')}</div>`;
+        }
+        return rows.map(rowHtml).join('');
+      }).join('');
+      degHtml = `<div class="syn-section" style="margin-top:8px">Degraded resources${deg.length<(i.degradedTotal||0)?` · showing ${deg.length} of ${i.degradedTotal}`:''}</div>${groups}`;
+    }
+
+    // syncing section (info)
+    const syn = i.syncing || [];
+    const synHtml = syn.length ? `<div class="syn-section" style="margin-top:8px">Syncing</div>${syn.map(r=>`<div class="node-hdr" style="cursor:default"><div class="mon-dot md-yellow"></div><div style="flex:1"><b>${escHtml(r.name)}</b> <span style="color:var(--muted)">${r.vmid?`VM ${escHtml(String(r.vmid))} · `:''}${escHtml(r.placement||'')}</span></div>${bdg('yellow', r.syncPct!=null?`SyncTarget ${r.syncPct}%`:'syncing')}</div>`).join('')}` : '';
+
+    const zero = !(i.nodes||[]).length ? `<div style="font-size:12px;color:var(--muted);padding:4px 0">${escHtml(i.name)}: connected — no nodes reported</div>` : '';
+    return `${header}${staleNote}<div${dim}>${nodeRows}${degHtml}${synHtml}${zero}</div>`;
+  }).join('');
+
+  // ---- summary strip (the rendered KPI row: sbSummary). Degraded is GREEN at
+  // zero — no degraded is good. "Fullest pool" = highest pool usage across
+  // nodes, data% or metadata% whichever is greater. ----
+  const sbCell = (v,l,c,title) => `<div class="sb-csum-item"${title?` title="${escHtml(title)}"`:''}><div class="sb-csum-val"${c?` style="color:${c}"`:''}>${v}</div><div class="sb-csum-lbl">${l}</div></div>`;
+  const nodesSb = `${sm.nodesOnline||0}/${sm.nodes||0}${maint?` <span style="color:var(--muted);font-size:.7em">+${maint} maint</span>`:''}`;
+  const sbSummaryHtml = connecting ? `<div class="sb-csum"><div class="sb-csum-item"><div class="sb-csum-val" style="color:var(--muted)">…</div><div class="sb-csum-lbl">Connecting</div></div></div>` : `<div class="sb-csum">
+    ${sbCell(nodesSb,'Nodes')}
+    ${sbCell(String(sm.resources||0),'Resources')}
+    ${sbCell(String(degraded),'Degraded',degraded?'var(--red)':'var(--green)')}
+    ${sbCell(worstPool!=null?`${Math.round(worstPool)}%${sm.worstPoolMeta?' meta':''}`:'—','Fullest pool',worstPool!=null?poolVar(worstPool):'var(--muted)','Highest pool usage across nodes — data % or metadata %, whichever is greater')}
+    ${(sm.atOneCopy||0)>0?sbCell(String(sm.atOneCopy),'At 1 copy','var(--red)'):''}
+    ${sbCell(String(syncing),'Syncing',syncing?'var(--yellow)':'var(--muted)')}
+  </div>`;
+
+  // Resource group + resource count surfaced in the header meta line.
+  const rgLabel = instances.length===1 ? (instances[0].resourceGroup || (instances[0].groupCount>1 ? `${instances[0].groupCount} groups` : '')) : '';
+
+  return {
+    id: 'linstor',
+    title: meta.title || 'LINSTOR',
+    iconKey: meta.iconKey || 'linstor',
+    color: meta.color,
+    meta: connecting ? 'connecting…' : `${sm.resources||0} resources · ${sm.nodesOnline||0}/${sm.nodes||0} nodes${rgLabel?` · ${escHtml(rgLabel)}`:''}`,
+    badge,
+    sbSummary: sbSummaryHtml,
+    summary: '',
+    body: chipStrip + body,
   };
 }
 
@@ -5970,7 +6125,7 @@ function iconFallback(img, iconKey, color){
   span.innerHTML = html;
   img.replaceWith(span);
 }
-const DEFAULT_ICON = { proxmox:'proxmox', kubernetes:'kubernetes', synology:'synology', mikrotik:'mikrotik', unifi:'unifi', healthchecks:'healthchecks', uptimekuma:'uptime-kuma', checks:'', prometheus:'prometheus', docker:'docker', dockhand:'https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/dockhand.png', firewall:'opnsense', truenas:'truenas', qnap:'qnap', ugreen:'ugreen', pbs:'proxmox', cloudflare:'cloudflare', cicd:'github', veeam:'veeam', portainer:'portainer' };
+const DEFAULT_ICON = { proxmox:'proxmox', kubernetes:'kubernetes', synology:'synology', mikrotik:'mikrotik', unifi:'unifi', linstor:'/assets/linstor.png', healthchecks:'healthchecks', uptimekuma:'uptime-kuma', checks:'', prometheus:'prometheus', docker:'docker', dockhand:'https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/dockhand.png', firewall:'opnsense', truenas:'truenas', qnap:'qnap', ugreen:'ugreen', pbs:'proxmox', cloudflare:'cloudflare', cicd:'github', veeam:'veeam', portainer:'portainer' };
 function useInlineThemedIcon(panel, name){
   const normalized = String(name || '').trim().toLowerCase();
   if (panel?.id === 'cicd') {
@@ -7131,6 +7286,7 @@ function buildPanels(data){
     synology:     () => buildSynology(snmpRowsForPanel(data.snmp, 'synology'), { id:'synology', ...PLATFORM_META.synology }),
     mikrotik:     () => buildSynology(snmpRowsForPanel(data.snmp, 'mikrotik'), { id:'mikrotik', ...PLATFORM_META.mikrotik }),
     unifi:        () => buildUnifi(data),
+    linstor:      () => buildLinstor(data),
     snmp:         () => buildSynology(snmpRowsForPanel(data.snmp, 'snmp'), { id:'snmp', ...PLATFORM_META.snmp }),
     healthchecks: () => buildHealthchecks(data.healthchecks),
     uptimekuma:   () => buildUptimeKuma(data.uptimekuma),
@@ -7621,7 +7777,7 @@ function render(data, opts = {}){
   setFavicon(anyOff);
   setLogoDot(anyOff);
 
-  const dataHas={ proxmox:!!(data.proxmox?.nodes?.length), linux:!!((data.linux||[]).length), windows:!!((data.windows||[]).length), kubernetes:!!data.kubernetes, synology:!!snmpRowsForPanel(data.snmp,'synology').length, mikrotik:!!snmpRowsForPanel(data.snmp,'mikrotik').length, unifi:!!snmpRowsForPanel(data.snmp,'unifi').length||!!((data.unifi?.instances)||[]).length, snmp:!!snmpRowsForPanel(data.snmp,'snmp').length, healthchecks:!!data.healthchecks, uptimekuma:!!data.uptimekuma, checks:!!data.checks, prometheus:!!data.prometheus, docker:!!((data.docker||[]).length), dockhand:!!data.dockhand, firewall:!!data.firewall, truenas:!!data.truenas, qnap:!!data.qnap, ugreen:!!data.ugreen, pbs:!!data.pbs, cloudflare:!!data.cloudflare, cicd:!!data.cicd, veeam:!!data.veeam, portainer:!!data.portainer, database:!!((data.database||[]).length) };
+  const dataHas={ proxmox:!!(data.proxmox?.nodes?.length), linux:!!((data.linux||[]).length), windows:!!((data.windows||[]).length), kubernetes:!!data.kubernetes, synology:!!snmpRowsForPanel(data.snmp,'synology').length, mikrotik:!!snmpRowsForPanel(data.snmp,'mikrotik').length, unifi:!!snmpRowsForPanel(data.snmp,'unifi').length||!!((data.unifi?.instances)||[]).length, linstor:!!((data.linstor?.instances)||[]).length, snmp:!!snmpRowsForPanel(data.snmp,'snmp').length, healthchecks:!!data.healthchecks, uptimekuma:!!data.uptimekuma, checks:!!data.checks, prometheus:!!data.prometheus, docker:!!((data.docker||[]).length), dockhand:!!data.dockhand, firewall:!!data.firewall, truenas:!!data.truenas, qnap:!!data.qnap, ugreen:!!data.ugreen, pbs:!!data.pbs, cloudflare:!!data.cloudflare, cicd:!!data.cicd, veeam:!!data.veeam, portainer:!!data.portainer, database:!!((data.database||[]).length) };
   const connectingCount=platformConnectingCount + configuredIds.filter(id=>id!=='linux'&&!dataHas[id]).length;
   window._connecting = connectingCount;
 

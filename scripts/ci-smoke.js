@@ -47,6 +47,9 @@ async function main() {
 
   // 4) UniFi collector against fixture controllers (no network, no config)
   await require('./ci-smoke-unifi').run();
+
+  // 5) LINSTOR collector against fixture controllers (no network, no config)
+  await require('./ci-smoke-linstor').run();
 }
 
 main().catch(err => { console.error(err); process.exit(1); });

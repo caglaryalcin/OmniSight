@@ -22,6 +22,7 @@ const { getAllFirewallData } = require('./src/firewall');
 const { getAllTrueNasData, configuredInstances: trueNasConfigInstances } = require('./src/truenas');
 const { getAllQnapData, configuredInstances: qnapConfigInstances } = require('./src/qnap');
 const { getAllUnifiData, configuredInstances: unifiConfigInstances } = require('./src/unifi');
+const { getAllLinstorData, configuredInstances: linstorConfigInstances } = require('./src/linstor');
 const { getAllUgreenData, configuredInstances: ugreenConfigInstances } = require('./src/ugreen');
 const { getAllPbsData, configuredInstances: pbsConfigInstances } = require('./src/pbs');
 const { getAllPortainerData, configuredInstances: portainerConfigInstances, portainerLogs } = require('./src/portainer');
@@ -2008,8 +2009,8 @@ function stripDeprecatedConfig(obj) {
   return obj;
 }
 
-const UI_PLATFORM_IDS = new Set(['proxmox','kubernetes','linux','windows','synology','mikrotik','unifi','snmp','healthchecks','uptimekuma','checks','prometheus','docker','dockhand','database','firewall','truenas','qnap','ugreen','pbs','cloudflare','cicd','veeam','portainer']);
-const UI_GROUP_KEYS = new Set(['pods','deps','svcs','synologyDevices','mikrotikDevices','unifiDevices','snmpDevices','snmpServers','dockerHosts','dockerContainers','checksServices','prometheusServers','prometheusTargets','firewallGateways','firewallLinks','truenasSystems','truenasPools','qnapSystems','ugreenSystems','pbsServers','pbsDatastores','pbsTasks','cloudflareZones','cloudflareTunnels','cloudflareDomains','cicdProjects','cicdPipelines','veeamServers','veeamSessions','veeamRepositories','portainerServers','portainerEnvironments','portainerContainers','databaseServers']);
+const UI_PLATFORM_IDS = new Set(['proxmox','kubernetes','linux','windows','synology','mikrotik','unifi','linstor','snmp','healthchecks','uptimekuma','checks','prometheus','docker','dockhand','database','firewall','truenas','qnap','ugreen','pbs','cloudflare','cicd','veeam','portainer']);
+const UI_GROUP_KEYS = new Set(['pods','deps','svcs','synologyDevices','mikrotikDevices','unifiDevices','linstorNodes','linstorDegraded','snmpDevices','snmpServers','dockerHosts','dockerContainers','checksServices','prometheusServers','prometheusTargets','firewallGateways','firewallLinks','truenasSystems','truenasPools','qnapSystems','ugreenSystems','pbsServers','pbsDatastores','pbsTasks','cloudflareZones','cloudflareTunnels','cloudflareDomains','cicdProjects','cicdPipelines','veeamServers','veeamSessions','veeamRepositories','portainerServers','portainerEnvironments','portainerContainers','databaseServers']);
 const UI_SORT_KEYS = new Set(['state','name','cpu','memory','disk','network','status','restarts']);
 const UI_KPI_KEYS = new Set(['cpu','memory','disk','bandwidth']);
 
@@ -2464,7 +2465,7 @@ function eventsViewSignature(limit) {
   ].join('|');
 }
 
-const PLATFORM_REFRESH_KEYS = ['proxmox','linux','windows','kubernetes','snmp','healthchecks','uptimekuma','checks','prometheus','docker','dockhand','database','firewall','truenas','qnap','ugreen','unifi','pbs','cloudflare','cicd','veeam','portainer'];
+const PLATFORM_REFRESH_KEYS = ['proxmox','linux','windows','kubernetes','snmp','healthchecks','uptimekuma','checks','prometheus','docker','dockhand','database','firewall','truenas','qnap','ugreen','unifi','linstor','pbs','cloudflare','cicd','veeam','portainer'];
 const platformRefreshState = Object.fromEntries(PLATFORM_REFRESH_KEYS.map(k => [k, { inFlight: false, nextDue: 0, failures: 0, lastStarted: 0, lastFinished: 0 }]));
 const forceConnectingPlatforms = new Set();
 const CONFIG_CHANGE_CONNECTING_MS = Math.max(30000, Number(process.env.OMNISIGHT_CONFIG_CHANGE_CONNECTING_MS || 120000));
@@ -2527,6 +2528,7 @@ function platformResultLooksFailed(key, value, enabled) {
   if (key === 'qnap') return value?.instances?.length && value.instances.every(i => i.online === false || i.error || i._connecting);
   if (key === 'ugreen') return value?.instances?.length && value.instances.every(i => i.online === false || i.error || i._connecting);
   if (key === 'unifi') return value?.instances?.length && value.instances.every(i => i.online === false || i.error || i._connecting);
+  if (key === 'linstor') return value?.instances?.length && value.instances.every(i => (i.online === false && !i.stale) || i.error || i._connecting);
   if (key === 'pbs') return value?.instances?.length && value.instances.every(i => i.online === false || i.error || i._connecting);
   if (key === 'cloudflare') return value && value.online === false && (value.error || value._connecting);
   if (key === 'cicd') return value?.projects?.length && value.projects.every(i => i.online === false || i.error || i._connecting);
@@ -2901,6 +2903,7 @@ function assignStatic(base) {
     qnap: publicIconValue(config.qnap?.icon),
     ugreen: publicIconValue(config.ugreen?.icon),
     unifi: publicIconValue(config.unifi?.icon),
+    linstor: publicIconValue(config.linstor?.icon),
     pbs: publicIconValue(config.pbs?.icon),
     cloudflare: publicIconValue(config.cloudflare?.icon),
     cicd: publicIconValue(config.cicd?.icon),
@@ -3070,6 +3073,16 @@ function settingsStatusData(data = cache.data || EMPTY) {
         _connecting: !!i._connecting,
         stale: !!i.stale,
         wan: i.wan ? { state: i.wan.state } : null,
+      })),
+    } : null,
+    linstor: data.linstor ? {
+      online: !!data.linstor.online,
+      _connecting: !!data.linstor._connecting,
+      summary: data.linstor.summary || {},
+      instances: (data.linstor.instances || []).map(i => ({
+        online: !!i.online,
+        _connecting: !!i._connecting,
+        stale: !!i.stale,
       })),
     } : null,
     ugreen: data.ugreen ? {
@@ -3512,6 +3525,7 @@ function configuredList() {
   if (en(config.database)     && (config.database.instances || []).length) ids.push('database');
   if (en(config.firewall)     && hasFirewall(config.firewall))           ids.push('firewall');
   if (en(config.unifi)        && unifiConfigInstances(config.unifi).length && !ids.includes('unifi')) ids.push('unifi');
+  if (en(config.linstor)      && linstorConfigInstances(config.linstor).length) ids.push('linstor');
   if (en(config.truenas)      && hasTrueNas(config.truenas))             ids.push('truenas');
   if (en(config.qnap)         && hasQnap(config.qnap))                   ids.push('qnap');
   if (en(config.ugreen)       && hasUgreen(config.ugreen))               ids.push('ugreen');
@@ -3521,6 +3535,38 @@ function configuredList() {
   if (en(config.veeam)        && hasVeeam(config.veeam))                  ids.push('veeam');
   if (en(config.portainer)    && hasPortainer(config.portainer))         ids.push('portainer');
   return ids;
+}
+
+function linstorConnectingData(conf = config.linstor) {
+  const instances = linstorConfigInstances(conf || {});
+  const rows = instances.map((inst, idx) => ({
+    name: inst.name || inst.url || `LINSTOR ${idx + 1}`,
+    url: inst.url || '',
+    online: false,
+    _connecting: true,
+    version: null,
+    resourceGroup: null,
+    groupCount: 0,
+    nodes: [],
+    degraded: [],
+    syncing: [],
+    degradedTotal: 0,
+    syncingTotal: 0,
+    offlineNodeImpact: [],
+    warns: [],
+    errors24h: 0,
+    errors1h: 0,
+    ctrlPaging: false,
+    unreachableStreak: 0,
+    stale: false,
+    summary: {},
+  }));
+  return {
+    online: false,
+    _connecting: true,
+    summary: { instances: rows.length, up: 0, down: 0, nodes: 0, nodesOnline: 0, nodesOffline: 0, nodesMaintenance: 0, resources: 0, degraded: 0, syncing: 0, atOneCopy: 0, worstPoolPct: null, freeTiB: 0, errors24h: 0 },
+    instances: rows,
+  };
 }
 
 function unifiConnectingData(conf = config.unifi) {
@@ -4101,6 +4147,63 @@ function extractChecks(data) {
       add('unifi-dev:' + nm + ':' + d.name, !d.alertable, 'UniFi device ' + d.name, 'offline (controller-reported)');
     });
   });
+  const lin = data.linstor;
+  if (lin && Array.isArray(lin.instances)) {
+    const sh = s => String(s || '').trim().toLowerCase().split('.')[0];
+    // 1A cross-platform dedupe (D11 guards): only a FRESH (non-connecting,
+    // non-stale) Proxmox node that is itself offline can suppress a LINSTOR
+    // node-offline page — Proxmox already pages px:<name> for that box.
+    const pxOffline = new Set();
+    (data.proxmox?.nodes || []).forEach(n => {
+      if (n._connecting || n._stale) return;
+      if (n.node && n.node.online === false) pxOffline.add(sh(n.node.name || n.name));
+    });
+    const linThresh = name => {
+      const c = (config.linstor?.instances || []).find(x => (x.name || x.url) === name) || {};
+      return { page: Number(c.poolPage ?? config.linstor?.poolPage ?? 92), warn: Number(c.poolWarn ?? config.linstor?.poolWarn ?? 85) };
+    };
+    lin.instances.forEach(i => {
+      if (i._connecting) return;
+      const nm = i.name || i.url || 'LINSTOR';
+      // Controller reachability (rule e): the collector only sets ctrlPaging
+      // after 3 consecutive failed polls; the 120s debounce then applies on top.
+      add('linstor:ctrl:' + nm, !i.ctrlPaging, 'LINSTOR controller ' + nm,
+        i.error || `controller unreachable for ${i.unreachableStreak || 3} polls — storage state UNKNOWN, Proxmox provisioning likely failing`);
+      // While serving last-good (stale) data, do NOT re-evaluate node/pool/
+      // degraded off stale values — the controller check above owns this state.
+      if (i.stale || !i.online) return;
+      // Node unexpectedly offline (rule a) — maintenance excluded by the
+      // collector (alertableOffline=false); Proxmox-covered nodes suppressed.
+      (i.nodes || []).forEach(n => {
+        if (!n.alertableOffline) return;
+        if (pxOffline.has(sh(n.name))) return;
+        const impact = (i.offlineNodeImpact || []).find(x => x.node === n.name)?.resources || 0;
+        add('linstor:node:' + n.name, false, 'LINSTOR node ' + n.name,
+          `${n.name} ${n.connectionStatus} — ${impact} resource(s) degraded${i.summary?.atOneCopy ? `, ${i.summary.atOneCopy} at 1 copy` : ''}`);
+      });
+      // Aggregate degraded (D8) — one key; only paging degradations (live-node
+      // causes not folded into an already-paged node/maintenance).
+      const paging = (i.degraded || []).filter(r => r.paging);
+      if (paging.length > 0) {
+        const worst = paging.slice(0, 3)
+          .map(r => `${r.name}${r.vmid ? ` (VM ${r.vmid})` : ''} ${r.copies.have}/${r.copies.want} copies`).join(', ');
+        const total = i.summary?.degraded || paging.length;
+        const more = total > 3 ? ` +${total - 3} more` : '';
+        add('linstor:degraded', false, 'LINSTOR degraded resources',
+          `${total} resource(s) degraded (cause: ${paging[0].cause}) — worst: ${worst}${more}`);
+      }
+      // Pool thresholds (rule d) — severity = max(data%, tmeta%) (D12); label
+      // marks when metadata is the driver so the page matches the card.
+      const th = linThresh(nm);
+      (i.nodes || []).forEach(n => {
+        if (!n.pool || n.pool.worstPct == null) return;
+        const pct = Math.round(n.pool.worstPct);
+        const label = n.pool.metaDrives ? `${pct}% (metadata)` : `${pct}%`;
+        add('linstor:pool:' + n.name, n.pool.worstPct < th.page,
+          'LINSTOR pool ' + (n.pool.name || 'pool') + ' on ' + n.name, `${label} — page threshold ${th.page}`);
+      });
+    });
+  }
   const qnap = data.qnap;
   if (qnap && Array.isArray(qnap.instances)) qnap.instances.forEach(i => {
     if (i._connecting) return;
@@ -4264,6 +4367,7 @@ function alertRuleForCheck(key, check = {}) {
   if (check.kind === 'threshold' && metric) return configuredAlertRule(rules, metric) || defaultRule;
   if (String(key || '').startsWith('snmp:')) return configuredAlertRule(rules, 'snmp') || DEFAULT_SNMP_ALERT_RULE;
   if (String(key || '').startsWith('unifi-dev:') || String(key || '').startsWith('unifi-wan')) return configuredAlertRule(rules, 'unifi') || DEFAULT_SNMP_ALERT_RULE;
+  if (String(key || '').startsWith('linstor:')) return configuredAlertRule(rules, 'linstor') || DEFAULT_SNMP_ALERT_RULE;
   if (String(key || '').startsWith('k8s:')) return configuredAlertRule(rules, 'pod') || defaultRule;
   if (String(key || '').startsWith('dk:') && String(key || '').split(':').length >= 3) return configuredAlertRule(rules, 'container') || defaultRule;
   if (String(key || '').startsWith('prom:') && !String(key || '').startsWith('prom:instance:')) return configuredAlertRule(rules, 'target') || defaultRule;
@@ -4643,7 +4747,7 @@ function preserveUptimeKumaOnTransient(next, err) {
   };
 }
 
-const OBJECT_INSTANCE_PLATFORMS = new Set(['prometheus', 'dockhand', 'firewall', 'truenas', 'qnap', 'ugreen', 'unifi', 'pbs', 'cloudflare', 'cicd', 'veeam', 'portainer']);
+const OBJECT_INSTANCE_PLATFORMS = new Set(['prometheus', 'dockhand', 'firewall', 'truenas', 'qnap', 'ugreen', 'unifi', 'linstor', 'pbs', 'cloudflare', 'cicd', 'veeam', 'portainer']);
 function objectPlatformHasUsableData(value) {
   if (!value || typeof value !== 'object') return false;
   const instances = Array.isArray(value.instances) ? value.instances : [];
@@ -4743,6 +4847,7 @@ function backgroundRefresh(opts = {}) {
     ['qnap',         enabled(config.qnap),         () => getAllQnapData(config.qnap),             null],
     ['ugreen',       enabled(config.ugreen),       () => getAllUgreenData(config.ugreen),         null],
     ['unifi',        enabled(config.unifi),        () => getAllUnifiData(config.unifi),           null],
+    ['linstor',      enabled(config.linstor),      () => getAllLinstorData(config.linstor),       null],
     ['pbs',          enabled(config.pbs),          () => getAllPbsData(config.pbs),               null],
     ['cloudflare',   enabled(config.cloudflare),   () => getCloudflareData(config.cloudflare),    null],
     ['cicd',         enabled(config.cicd),         () => getAllCiData(config.cicd),               null],
@@ -4871,6 +4976,7 @@ const EMPTY = {
   qnap: null,
   ugreen: null,
   unifi: null,
+  linstor: null,
   pbs: null,
   cloudflare: null,
   cicd: null,
@@ -5006,6 +5112,9 @@ function ensureRuntimeShell(data = cache.data) {
   out.unifi = en(config.unifi)
     ? (out.unifi || unifiConnectingData(config.unifi))
     : null;
+  out.linstor = en(config.linstor)
+    ? (out.linstor || linstorConnectingData(config.linstor))
+    : null;
   out.pbs = en(config.pbs)
     ? (out.pbs || pbsConnectingData(config.pbs))
     : null;
@@ -5040,7 +5149,7 @@ function ensureRuntimeShell(data = cache.data) {
 function pruneRuntimeSnapshot(data = {}) {
   const out = { ...EMPTY, ...(data || {}) };
   const configured = new Set(configuredList());
-  for (const id of ['proxmox','linux','windows','kubernetes','snmp','healthchecks','uptimekuma','checks','prometheus','docker','dockhand','database','firewall','truenas','qnap','ugreen','unifi','pbs','cloudflare','cicd','veeam','portainer']) {
+  for (const id of ['proxmox','linux','windows','kubernetes','snmp','healthchecks','uptimekuma','checks','prometheus','docker','dockhand','database','firewall','truenas','qnap','ugreen','unifi','linstor','pbs','cloudflare','cicd','veeam','portainer']) {
     if (!configured.has(id)) out[id] = runtimeEmptyFor(id);
   }
   out.loading = false;
@@ -7060,6 +7169,7 @@ const CONFIG_AUDIT_LABELS = {
   kubernetes: 'Kubernetes',
   snmp: 'SNMP',
   unifi: 'UniFi',
+  linstor: 'LINSTOR',
   healthchecks: 'Healthchecks',
   uptimekuma: 'Uptime Kuma',
   checks: 'Service checks',
@@ -7159,6 +7269,37 @@ app.post('/api/unifi/test', async (req, res) => {
     }
     const { testUnifiConnection } = require('./src/unifi');
     res.json(await testUnifiConnection(inst));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Settings "Test connection" for LINSTOR controllers. Masked secret fields
+// ('__set__') fall back to the stored (decrypted) values for the same URL.
+app.post('/api/linstor/test', async (req, res) => {
+  try {
+    const input = req.body || {};
+    const inst = {
+      url: String(input.url || '').trim(),
+      bearerToken: String(input.bearerToken || '').trim() || undefined,
+      tls: input.tls && typeof input.tls === 'object' ? {
+        cert: input.tls.cert || undefined,
+        privateKey: String(input.tls.privateKey || '').trim() || undefined,
+        password: input.tls.password || undefined,
+        caCert: input.tls.caCert || undefined,
+        skipVerify: input.tls.skipVerify === true || String(input.tls.skipVerify || '') === 'true',
+      } : undefined,
+      insecureTLS: input.insecureTLS === true || String(input.insecureTLS || '') === 'true',
+      _nonce: String(Date.now()),
+    };
+    if (!inst.url) return res.status(400).json({ error: 'Controller URL is required' });
+    const stored = linstorConfigInstances(config.linstor || {}).find(i =>
+      String(i.url || '').trim().replace(/\/+$/, '') === inst.url.replace(/\/+$/, ''));
+    if ((!inst.bearerToken || inst.bearerToken === '__set__') && stored?.bearerToken) inst.bearerToken = stored.bearerToken;
+    if (inst.tls && (inst.tls.privateKey === '__set__' || !inst.tls.privateKey) && stored?.tls?.privateKey) inst.tls.privateKey = stored.tls.privateKey;
+    if (inst.tls && (inst.tls.password === '__set__' || !inst.tls.password) && stored?.tls?.password) inst.tls.password = stored.tls.password;
+    const { testLinstorConnection } = require('./src/linstor');
+    res.json(await testLinstorConnection(inst));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -7342,6 +7483,12 @@ app.post('/api/config', async (req, res) => {
           cache.data.unifi = unifiConnectingData(config.unifi);
         }
       } else { cache.data.unifi = null; }
+
+      if (en(config.linstor)) {
+        if (connectingPlatforms.has('linstor') || !cache.data.linstor) {
+          cache.data.linstor = linstorConnectingData(config.linstor);
+        }
+      } else { cache.data.linstor = null; }
 
       if (en(config.pbs)) {
         if (connectingPlatforms.has('pbs') || !cache.data.pbs) {
@@ -8725,6 +8872,29 @@ function buildPublicSummary(data) {
       out.push({ id: 'unifi', title: 'UniFi', status, meta });
     }
   }
+  const linp = data.linstor;
+  if (linp && Array.isArray(linp.instances) && linp.instances.length) {
+    const insts = linp.instances;
+    const sm = linp.summary || {};
+    const connecting = insts.every(i => i._connecting);
+    const ctrlDown = insts.some(i => i.ctrlPaging || (!i.online && !i.stale && !i._connecting));
+    const pageTh = Number(config.linstor?.poolPage ?? 92);
+    const warnTh = Number(config.linstor?.poolWarn ?? 85);
+    const poolPage = sm.worstPoolPct != null && sm.worstPoolPct >= pageTh;
+    const poolWarn = sm.worstPoolPct != null && sm.worstPoolPct >= warnTh;
+    const down = ctrlDown || (sm.nodesOffline || 0) > 0 || (sm.degraded || 0) > 0 || poolPage;
+    const warn = (sm.syncing || 0) > 0 || (sm.nodesMaintenance || 0) > 0 || poolWarn;
+    const status = connecting ? 'connecting' : down ? 'down' : warn ? 'warn' : 'ok';
+    // Public page: badge-law status + counts only — no resource names or
+    // topology (secret/topology hygiene).
+    const meta = connecting ? 'connecting...'
+      : ctrlDown ? 'controller unreachable'
+      : (sm.nodesOffline || 0) > 0 ? `${sm.nodesOffline} node(s) offline`
+      : (sm.degraded || 0) > 0 ? `${sm.degraded} resource(s) degraded`
+      : poolPage ? `pool ${Math.round(sm.worstPoolPct)}%`
+      : `${sm.nodesOnline || 0}/${sm.nodes || 0} nodes${sm.nodesMaintenance ? ` · ${sm.nodesMaintenance} maint` : ''}`;
+    out.push({ id: 'linstor', title: 'LINSTOR', status, meta });
+  }
   const hc = data.healthchecks;
   if (hc && hc.online !== undefined) {
     const sm = hc.summary || {};
@@ -8908,7 +9078,7 @@ app.get('/api/public/status', (req, res) => {
     : null;
   const services = buildPublicSummary(data).filter(s => !visible || visible.has(s.id));
   const present = new Set(services.map(s => s.id));
-  const titles = { proxmox: 'Proxmox', linux: 'Linux Server', windows: 'Windows Server', kubernetes: 'Kubernetes', synology: 'Synology', mikrotik: 'MikroTik', unifi: 'UniFi', snmp: 'SNMP', healthchecks: 'Healthchecks', uptimekuma: 'Uptime Kuma', checks: 'Service checks', prometheus: 'Prometheus', docker: 'Docker', dockhand: 'Dockhand', database: 'Databases', firewall: 'Firewalls', truenas: 'TrueNAS', qnap: 'QNAP', ugreen: 'Ugreen', pbs: 'Proxmox Backup', cloudflare: 'Cloudflare', cicd: 'GitHub/GitLab CI', veeam: 'Veeam', portainer: 'Portainer' };
+  const titles = { proxmox: 'Proxmox', linux: 'Linux Server', windows: 'Windows Server', kubernetes: 'Kubernetes', synology: 'Synology', mikrotik: 'MikroTik', unifi: 'UniFi', linstor: 'LINSTOR', snmp: 'SNMP', healthchecks: 'Healthchecks', uptimekuma: 'Uptime Kuma', checks: 'Service checks', prometheus: 'Prometheus', docker: 'Docker', dockhand: 'Dockhand', database: 'Databases', firewall: 'Firewalls', truenas: 'TrueNAS', qnap: 'QNAP', ugreen: 'Ugreen', pbs: 'Proxmox Backup', cloudflare: 'Cloudflare', cicd: 'GitHub/GitLab CI', veeam: 'Veeam', portainer: 'Portainer' };
   configuredList().forEach(id => {
     if (visible && !visible.has(id)) return;
     if (!present.has(id)) services.push({ id, title: titles[id] || id, status: 'connecting', meta: 'connecting…' });

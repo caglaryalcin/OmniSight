@@ -166,7 +166,7 @@ const demoUser = {
   twoFactorEnabled: false,
 };
 const demoSessions = new Map();
-const DEMO_PLATFORM_IDS = ['proxmox', 'kubernetes', 'linux', 'windows', 'synology', 'mikrotik', 'unifi', 'healthchecks', 'uptimekuma', 'checks', 'prometheus', 'docker', 'dockhand', 'firewall', 'truenas', 'qnap', 'ugreen', 'pbs', 'cloudflare', 'cicd', 'veeam', 'portainer', 'database'];
+const DEMO_PLATFORM_IDS = ['proxmox', 'kubernetes', 'linux', 'windows', 'synology', 'mikrotik', 'unifi', 'linstor', 'healthchecks', 'uptimekuma', 'checks', 'prometheus', 'docker', 'dockhand', 'firewall', 'truenas', 'qnap', 'ugreen', 'pbs', 'cloudflare', 'cicd', 'veeam', 'portainer', 'database'];
 const DEMO_OVERVIEW_COLLAPSED = Object.fromEntries(DEMO_PLATFORM_IDS.map(id => [id, true]));
 
 let demoTopology = {
@@ -582,7 +582,7 @@ function demoStatus() {
     loading: false,
     refreshing: false,
     publicStatus: cfg.publicStatus !== false,
-    configured: ['proxmox', 'linux', 'windows', 'kubernetes', 'synology', 'mikrotik', 'unifi', 'healthchecks', 'uptimekuma', 'checks', 'prometheus', 'docker', 'dockhand', 'firewall', 'truenas', 'qnap', 'ugreen', 'pbs', 'cloudflare', 'cicd', 'veeam', 'portainer', 'database'],
+    configured: ['proxmox', 'linux', 'windows', 'kubernetes', 'synology', 'mikrotik', 'unifi', 'linstor', 'healthchecks', 'uptimekuma', 'checks', 'prometheus', 'docker', 'dockhand', 'firewall', 'truenas', 'qnap', 'ugreen', 'pbs', 'cloudflare', 'cicd', 'veeam', 'portainer', 'database'],
     preferredLanguage: cfg.preferredLanguage || 'en',
     timeFormat: '24h',
     defaultTimePeriodHours: 1,
@@ -1009,6 +1009,48 @@ function demoStatus() {
         wan: { state: 'up', rxBps: 7_200_000, txBps: 2_100_000, latencyMs: 11, lossPct: 0, history: wanHistory, downEvents: { count: downEdges.length, recent: downEdges.slice(-5) } },
         wanQuality: 'ok',
         stale: false,
+      }],
+    };
+  })();
+
+  // LINSTOR (replication health — collector shape from src/linstor.js). Demo
+  // story: 4 nodes (node-d in maintenance), 2 degraded resources (one
+  // Inconsistent, one peer-disconnect), one actively syncing, and node-c's thin
+  // pool driven red by METADATA (91%) while its data% is only 88 — exercising
+  // the max(data%, tmeta%) coherence rule.
+  data.linstor = (() => {
+    const now = Date.now();
+    const poolHist = (base, meta) => Array.from({ length: 168 }, (_, i) => {
+      const time = now - (167 - i) * 60 * 60 * 1000;               // hourly, 7 days
+      const dataPct = Math.max(2, base + i * 0.03 + (i % 5) * 0.2);
+      const tmetaPct = meta == null ? null : Math.max(2, meta + i * 0.05 + (i % 4) * 0.1);
+      return { time, dataPct: Math.round(dataPct * 10) / 10, tmetaPct: tmetaPct == null ? null : Math.round(tmetaPct * 10) / 10, worstPct: Math.max(dataPct, tmetaPct || 0) };
+    });
+    const pool = (dataPct, freeTiB, tmetaPct) => ({
+      name: 'thin-pool', kind: 'LVM_THIN', dataPct, tmetaPct,
+      worstPct: Math.max(dataPct, tmetaPct || 0), metaDrives: tmetaPct != null && tmetaPct > dataPct,
+      usedTiB: Math.round(7.5 * dataPct) / 100 * 10, totalTiB: 7.5, freeTiB, history: poolHist(dataPct - 3, tmetaPct == null ? null : tmetaPct - 4),
+    });
+    const nodes = [
+      { name: 'node-a', role: 'combined', online: true, maintenance: false, maintenanceOnline: false, alertableOffline: false, connectionStatus: 'ONLINE', resourceCount: 42, pool: pool(52, 3.6, 25) },
+      { name: 'node-b', role: 'satellite', online: true, maintenance: false, maintenanceOnline: false, alertableOffline: false, connectionStatus: 'ONLINE', resourceCount: 42, pool: pool(40, 4.5, 22) },
+      { name: 'node-c', role: 'satellite', online: true, maintenance: false, maintenanceOnline: false, alertableOffline: false, connectionStatus: 'ONLINE', resourceCount: 42, pool: pool(88, 0.9, 91) },
+      { name: 'node-d', role: 'satellite', online: false, maintenance: true, maintenanceOnline: false, alertableOffline: false, connectionStatus: 'OFFLINE', resourceCount: 0, pool: null },
+    ];
+    const degraded = [
+      { name: 'vm-214-disk-1', vmid: 214, group: 'drbd-rg', placement: 'node-a ↔ node-c', nodes: ['node-a', 'node-c'], worstState: 'Inconsistent', cause: 'Inconsistent on node-c', explainedByDownNode: false, copies: { have: 1, want: 2 }, since: now - 23 * 60 * 1000, paging: true },
+      { name: 'vm-161-disk-0', vmid: 161, group: 'drbd-rg', placement: 'node-a ↔ node-b', nodes: ['node-a', 'node-b'], worstState: 'Disconnected', cause: 'peer disconnect node-a↔node-b', explainedByDownNode: false, copies: { have: 1, want: 2 }, since: now - 8 * 60 * 1000, paging: true },
+    ];
+    const syncing = [{ name: 'vm-187-disk-0', vmid: 187, placement: 'node-b → node-c', syncPct: 43, copies: { have: 1, want: 2 } }];
+    const iSummary = { nodes: 4, nodesOnline: 3, nodesOffline: 0, nodesMaintenance: 1, resources: 42, degraded: 2, syncing: 1, atOneCopy: 2, worstPoolPct: 91, worstPoolNode: 'node-c', worstPoolMeta: true, freeTiB: 9.0, errors24h: 14 };
+    return {
+      online: true,
+      summary: { instances: 1, up: 1, down: 0, ...iSummary },
+      instances: [{
+        online: true, name: 'linstor-demo', url: 'http://linstor.example.invalid:3370', version: '1.34.0',
+        resourceGroup: 'drbd-rg', groupCount: 1, nodes, degraded, syncing, degradedTotal: 2, syncingTotal: 1,
+        offlineNodeImpact: [], warns: [], errors24h: 14, errors1h: 1, ctrlPaging: false, unreachableStreak: 0, stale: false,
+        summary: iSummary,
       }],
     };
   })();

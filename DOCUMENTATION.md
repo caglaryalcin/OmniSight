@@ -81,6 +81,7 @@ The center of the application is `server.js`. It owns the Express server, authen
 | `src/qnap.js` | QNAP QTS systems using official HTTP auth and File Station SID checks |
 | `src/ugreen.js` | UGREEN UGOS Pro web endpoint reachability checks |
 | `src/pbs.js` | Proxmox Backup Server management API |
+| `src/linstor.js` | LINSTOR/DRBD replication health via the controller REST API |
 | `src/veeam.js` | Veeam Backup & Replication REST API |
 | `src/portainer.js` | Portainer instances and environments |
 | `src/database.js` | PostgreSQL, MySQL/MariaDB, MongoDB |
@@ -396,6 +397,52 @@ Alert semantics:
 - Note: if your alert channel (Mattermost, ntfy, Telegram) is reached **over the monitored WAN**, a WAN-down alert cannot be delivered until the WAN recovers — use a LAN-local channel for WAN alerting.
 
 UniFi devices monitored over SNMP (profile `unifi`) and controller-reported devices render in **one merged UniFi card**: controller rows first (offline devices always on top), with matching SNMP detail embedded in each row's expanded view. Rate limiting (HTTP 429) is handled per controller instance with a cooldown that serves the last good data. Multiple controllers and multiple sites per controller are supported — add one instance per site.
+
+### LINSTOR (DRBD replication)
+
+LINSTOR/DRBD storage-replication health is monitored through the LINSTOR **controller REST API** — controller-only, with no agents on the storage nodes. Every refresh the collector performs three GETs as an all-or-nothing cycle (`/v1/nodes`, `/v1/view/resources`, `/v1/view/storage-pools`); any failure discards the cycle, serves the last-known data dimmed, and advances an unreachable counter. Error reports (`/v1/error-reports`) are polled every fourth cycle for a warn-only 24h/1h count (never paged).
+
+**Security.** The REST API ships **unauthenticated** and its `/v1/view/resources` response contains cleartext DRBD shared secrets. OmniSight strips every `secret` key at ingest so no secret ever reaches a status payload or the history file. Protect the controller port (3370) with a firewall allowlist. The API can also be secured natively, and the collector speaks both mechanisms (auto-selecting `https://…:3371` when either is set):
+
+- **Bearer token** (`bearerToken`) — LINSTOR **1.34+**, via `linstor controller auth init`. Auto-enables HTTPS with a self-signed cert; set **TLS → Allow self-signed** so strict CA verification does not reject it.
+- **Mutual TLS** (`tls.cert` + `tls.privateKey`, optional `tls.caCert`) — client-certificate auth. `bearerToken`, `tls.privateKey`, and `tls.password` are encrypted at rest.
+
+Enabling either is a **cluster-wide** change: every client (the Proxmox `linstor` storage plugin on each node, the `linstor` CLI, linstor-gateway, and OmniSight) must then present credentials. The Proxmox plugin supports both — TLS since v5.2.0 (`apica`/`apicrt`/`apikey` in `storage.cfg`) and bearer token since v8.3.0 — so distribute the token/cert to every client in a maintenance window.
+
+**Maintenance nodes.** A node is treated as expected-offline (never pages; gray "maintenance" pill; excluded from the offline-node badge math) when its LINSTOR property `Aux/maintenance` equals the string `"true"` (value-based — `"false"` is not maintenance):
+
+```
+linstor node set-property <node> Aux/maintenance true    # enter maintenance
+linstor node set-property <node> Aux/maintenance false   # or delete the property
+```
+
+A node that is ONLINE while still flagged for maintenance raises a yellow "forgot to clear?" card chip (never a page).
+
+**Thin-pool usage.** Pool used % is `(total_capacity − free_capacity) / total_capacity` on each `/v1/view/storage-pools` entry (DISKLESS pools and the int64-max sentinel excluded). Pool **severity is `max(data %, metadata %)`** — LVM-thin metadata exhaustion (`StorDriver/internal/lvmthin/thinPoolMetadataPercent`) fills a pool just as fatally as data, so the badge, the "Worst pool" tile, and the bar all reflect whichever is higher, labelled "meta" when metadata drives it. Defaults: warn 85 %, page 92 % (per-instance `poolWarn`/`poolPage`).
+
+**Free / provisionable.** The "Free" tile shows raw aggregate pool free space. Usable *provisionable* capacity is lower — divide raw free by the replica count (e.g. with 2 diskful copies per resource, ≈ half of raw free is provisionable).
+
+**Alerts** (120 s debounce family, aggregated by cause so one incident is not a page storm):
+
+| Key | Fires when |
+|---|---|
+| `linstor:ctrl:<instance>` | controller unreachable ≥ 3 consecutive polls (≈ 3 × 15 s + 120 s) |
+| `linstor:node:<node>` | a non-maintenance node is unexpectedly OFFLINE — **suppressed** when Proxmox already reports the same host offline (Proxmox pages `px:<node>`) |
+| `linstor:degraded` | one aggregate page for all live-node degradations (Inconsistent/Outdated/Failed with no active sync, or a peer link down between two live nodes); message lists the worst offenders |
+| `linstor:pool:<node>` | pool `max(data %, meta %)` ≥ page threshold |
+
+Actively-syncing resources (SyncTarget/SyncSource) show a yellow **SYNCING** state and never page; a `Diskless` tiebreaker replica is healthy and never counts as degraded.
+
+**Runbook — state → action:**
+
+| Disk state | Meaning | Action |
+|---|---|---|
+| `Inconsistent` | replica out of sync | resync will start automatically once peers connect; check the peer link |
+| `Outdated` | replica holds stale data | reconnect it to an UpToDate peer to trigger resync |
+| `Failed` | backing disk failed | inspect the storage device on that node |
+| `DUnknown` | disk state unknown | the peer is unreachable — check the node/DRBD connection |
+| `Disconnected` | DRBD peer link down | check network between the two nodes (`drbdadm status`) |
+| `EVICTED` | node evicted from the cluster | `linstor node restore <node>` once healthy |
 
 ### Healthchecks
 
