@@ -3716,6 +3716,7 @@ function buildLinstor(data){
         </div>
         <div class="node-body ${isOpen?'open':''}" id="snmp-${key}">
           ${p ? `<div style="font-size:12px;color:var(--muted);margin:2px 0 4px">${escHtml(p.name||'pool')} · ${escHtml(p.kind||'')} · used ${fmtTiB(p.usedTiB)} / ${fmtTiB(p.totalTiB)}</div>` : ''}
+          ${chart ? chartHeader(stateKey, lim) : ''}
           ${chart || '<div style="font-size:12px;color:var(--muted)">no pool history yet</div>'}
         </div>`;
     }).join('');
