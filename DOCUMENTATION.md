@@ -803,6 +803,47 @@ Default ports:
 - Production dashboard: `3000`.
 - Demo listener: `4000` when enabled.
 
+### Native (LXC / bare metal, systemd)
+
+Run OmniSight directly under `systemd` with no Docker. Two scripts in `scripts/` cover this, and both default to the upstream repository — every environment-specific value is an environment-variable override, so the same scripts work unchanged across installations.
+
+**Inside any Debian/Ubuntu container, VM, or bare-metal host** — `scripts/install-lxc.sh` (run as root) installs Node.js (NodeSource, major 22 by default), clones the repo to `/opt/omnisight`, runs `npm ci --omit=dev`, creates the unprivileged `omnisight` system user, and installs + starts a hardened systemd unit:
+
+```bash
+bash scripts/install-lxc.sh                          # fresh install
+bash /opt/omnisight/scripts/install-lxc.sh --update  # update in place, later
+```
+
+Or one-liner from a running dashboard host:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/caglaryalcin/OmniSight/main/scripts/install-lxc.sh | sudo bash
+```
+
+**On a Proxmox VE 8/9 host** — `scripts/proxmox-lxc.sh` (run as root on the host) additionally *creates* an unprivileged Ubuntu 24.04 LXC (nesting enabled), waits for network, then runs `install-lxc.sh` inside it. Interactive by default; set the env vars to run unattended.
+
+```bash
+bash scripts/proxmox-lxc.sh
+CTID=150 CT_HOSTNAME=mon STORAGE=tank BRIDGE=vmbr1 bash scripts/proxmox-lxc.sh   # unattended
+```
+
+**Environment overrides:**
+
+| Variable | Used by | Default | Purpose |
+|---|---|---|---|
+| `OMNISIGHT_REPO` | both | `https://github.com/caglaryalcin/OmniSight.git` | Source git repo (fork or mirror). Private repos: embed a token, or use `OMNISIGHT_TOKEN`/`OMNISIGHT_TOKEN_USER` on the Proxmox wrapper |
+| `OMNISIGHT_BRANCH` | both | `main` | Branch or tag to check out |
+| `OMNISIGHT_DIR` | install | `/opt/omnisight` | Install directory |
+| `OMNISIGHT_PORT` | both | `3000` | Listen port |
+| `NODE_MAJOR` | install | `22` | Node.js major version (NodeSource) |
+| `CTID` `CT_HOSTNAME` `STORAGE` `TEMPLATE_STORAGE` `DISK_GB` `MEMORY_MB` `CORES` `BRIDGE` `NET_CONF` | proxmox | next free ID, `omnisight`, `local-lvm`, `local`, 6, 1024, 2, `vmbr0`, DHCP | LXC shape and placement (stock Proxmox conventions) |
+
+**`--update` semantics.** `install-lxc.sh --update` runs `git fetch --all` then `git reset --hard origin/$OMNISIGHT_BRANCH`, reinstalls production deps, `chown`s to `omnisight`, and restarts the service. The hard reset **discards any local edits** in the install directory — carry local patches on a branch/fork and point `OMNISIGHT_BRANCH`/the checkout's `origin` at it rather than editing in place.
+
+**Systemd unit.** Runs as `User=omnisight`, `ExecStart=node --openssl-legacy-provider server.js` (the legacy OpenSSL provider flag is required), `Restart=on-failure`. Hardened with `NoNewPrivileges`, `PrivateTmp`, `ProtectSystem=strict`, `ProtectHome`, and `ReadWritePaths=$APP_DIR/data` — so at runtime the process can only write to `data/` (the only state that must survive redeploys). Manage with `systemctl status|restart omnisight` and `journalctl -u omnisight`.
+
+**Supported scope.** The installer targets Debian/Ubuntu (`apt` + NodeSource) and requires Node 20+. On other distributions do the equivalent by hand: install Node ≥ 20, `git clone` the repo, `npm ci --omit=dev`, then create a `systemd` unit mirroring the one above (same `ExecStart`, `NODE_ENV=production`, and `ReadWritePaths` for `data/`).
+
 ### Docker
 
 ```bash
