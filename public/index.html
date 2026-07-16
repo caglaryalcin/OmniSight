@@ -3726,7 +3726,7 @@ function buildUnifi(data){
     // this row's body as ordinary chart rows. No nested collapsible row.
     const snmpDetail = matched ? (() => {
       const sd = matched;
-      const lim = historyLimitFor('unifi:' + skey);
+      const lim = historyLimitFor(stateKey);
       const cpuTemp = hasNum(sd.cpuTemp) ? Number(sd.cpuTemp)
         : (/cpu|processor/i.test(sd.systemTempLabel || '') && hasNum(sd.systemTemp) ? Number(sd.systemTemp) : null);
       const sysTemp = hasNum(sd.systemTemperature) ? Number(sd.systemTemperature)
@@ -3762,7 +3762,7 @@ function buildUnifi(data){
     const wanBody = d.isGateway && d._inst.wan ? (() => {
       const w = d._inst.wan;
       const hist = Array.isArray(w.history) ? w.history.map(p => ({ time: p.time, wanRxMbps: p.rxBps != null ? p.rxBps/1048576 : null, wanTxMbps: p.txBps != null ? p.txBps/1048576 : null, latency: p.latency })) : [];
-      const lim = historyLimitFor('unifi:' + skey);
+      const lim = historyLimitFor(stateKey);
       const rxNow = w.rxBps != null ? w.rxBps/1048576 : null;
       const txNow = w.txBps != null ? w.txBps/1048576 : null;
       const lastDown = (() => {
@@ -3820,9 +3820,10 @@ function buildUnifi(data){
         ${notifyBell('unifi:' + d.name)}
       </div>
       <div class="node-body ${isOpen ? 'open' : ''}" id="snmp-${skey}">
+        ${(wanBody || d.cpu != null || d.ram || snmpDetail) ? chartHeader(stateKey) : ''}
         ${wanBody}
-        ${(() => { const lim = historyLimitFor('unifi:' + skey); return d.cpu != null ? `<div class="chart-row"><div class="chart-hdr"><span class="nb-label">CPU</span><span class="nb-pct" style="color:${bc(d.cpu)}">${d.cpu}%</span></div>${histChart(d.history,'cpu',d.cpu,lim)}</div>` : ''; })()}
-        ${(() => { const lim = historyLimitFor('unifi:' + skey); return d.ram ? `<div class="chart-row"><div class="chart-hdr"><span class="nb-label">RAM</span><span class="nb-pct" style="color:${bc(d.ram.percent)}">${d.ram.percent}%</span></div>${histChart(d.history,'ram',d.ram.percent,lim)}</div>` : ''; })()}
+        ${(() => { const lim = historyLimitFor(stateKey); return d.cpu != null ? `<div class="chart-row"><div class="chart-hdr"><span class="nb-label">CPU</span><span class="nb-pct" style="color:${bc(d.cpu)}">${d.cpu}%</span></div>${histChart(d.history,'cpu',d.cpu,lim)}</div>` : ''; })()}
+        ${(() => { const lim = historyLimitFor(stateKey); return d.ram ? `<div class="chart-row"><div class="chart-hdr"><span class="nb-label">RAM</span><span class="nb-pct" style="color:${bc(d.ram.percent)}">${d.ram.percent}%</span></div>${histChart(d.history,'ram',d.ram.percent,lim)}</div>` : ''; })()}
         ${snmpDetail ? `<div class="syn-section" style="margin-top:6px">SNMP detail</div>${snmpDetail.html}` : ''}
       </div>`;
   }).join('');
