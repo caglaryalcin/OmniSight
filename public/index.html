@@ -1831,6 +1831,7 @@ function fmtPct(v){
   if(n === null) return '--';
   return `${Number.isInteger(n) ? n : n.toFixed(1)}%`;
 }
+/* ci-extract:begin fmtChartValue */
 // Chart tooltips follow the card-header rounding rule (see fmtPct): one decimal
 // at most, trailing .0 dropped, so a header reading "32%" and its tooltip never
 // disagree. fmtPct itself can't be reused: it clamps to 0-100, and these charts
@@ -1849,6 +1850,7 @@ function fmtChartValue(v){
   // Integer/10 always stringifies shortest-round-trip: no 2.9000000000000004.
   return String(Math.round(n * 10) / 10);
 }
+/* ci-extract:end fmtChartValue */
 function fmtRate(v){ return hasNum(v) ? `${fmtBytes(Number(v))}/s` : ''; }
 function metricRateSum(o, readKey, writeKey) {
   if (!o) return null;
