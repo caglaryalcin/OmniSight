@@ -47,6 +47,9 @@ async function main() {
 
   // 4) UniFi collector against fixture controllers (no network, no config)
   await require('./ci-smoke-unifi').run();
+
+  // 5) Pure helpers extracted from public/index.html (no browser)
+  require('./ci-smoke-client').run();
 }
 
 main().catch(err => { console.error(err); process.exit(1); });
