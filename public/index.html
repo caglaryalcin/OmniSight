@@ -1831,6 +1831,24 @@ function fmtPct(v){
   if(n === null) return '--';
   return `${Number.isInteger(n) ? n : n.toFixed(1)}%`;
 }
+// Chart tooltips follow the card-header rounding rule (see fmtPct): one decimal
+// at most, trailing .0 dropped, so a header reading "32%" and its tooltip never
+// disagree. fmtPct itself can't be reused: it clamps to 0-100, and these charts
+// also carry °C, MB/s and ms. Collectors can emit float-noisy values (a pool
+// reporting 31.950000779339398) — data-pts keeps them raw; only display rounds.
+function fmtChartValue(v){
+  const n = Number(v);
+  if(v === null || v === undefined || v === '' || !Number.isFinite(n)) return '--';
+  // Sub-0.1 readings (idle bandwidth, sub-ms latency) collapse to "0" at one
+  // decimal, which reads as "nothing happening"; keep two significant digits.
+  // Below 0.001 that stops being worth a tooltip and JS starts stringifying in
+  // exponential notation ("1e-12"), so floor it at a plain zero.
+  if(n !== 0 && Math.abs(n) < 0.1){
+    return Math.abs(n) < 0.001 ? '0' : String(Number(n.toPrecision(2)));
+  }
+  // Integer/10 always stringifies shortest-round-trip: no 2.9000000000000004.
+  return String(Math.round(n * 10) / 10);
+}
 function fmtRate(v){ return hasNum(v) ? `${fmtBytes(Number(v))}/s` : ''; }
 function metricRateSum(o, readKey, writeKey) {
   if (!o) return null;
@@ -2112,7 +2130,7 @@ function showChartTooltip(e, el, clr) {
                       <div style="width:10px;height:10px;border-radius:2px;background:${clr}"></div>
                       <span>${escHtml(label)}</span>
                     </div>
-                    <span class="tt-val" style="color:${clr}">${pt.v}${escHtml(unit)}</span>
+                    <span class="tt-val" style="color:${clr}">${fmtChartValue(pt.v)}${escHtml(unit)}</span>
                   </div>`;
   
   let tx = e.clientX + 15;
