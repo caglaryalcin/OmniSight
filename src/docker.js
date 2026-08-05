@@ -56,14 +56,46 @@ function fmtBytes(n) {
 function cpuPercent(stats) {
   const cpuDelta = (stats.cpu_stats?.cpu_usage?.total_usage || 0) - (stats.precpu_stats?.cpu_usage?.total_usage || 0);
   const sysDelta = (stats.cpu_stats?.system_cpu_usage || 0) - (stats.precpu_stats?.system_cpu_usage || 0);
-  const cpus = stats.cpu_stats?.online_cpus || stats.cpu_stats?.cpu_usage?.percpu_usage?.length || 1;
-  return sysDelta > 0 && cpuDelta > 0 ? Math.round((cpuDelta / sysDelta) * cpus * 1000) / 10 : 0;
+  return sysDelta > 0 && cpuDelta > 0 ? Math.min(100, Math.round((cpuDelta / sysDelta) * 1000) / 10) : 0;
 }
 
-function memPercent(stats) {
-  const usage = Number(stats.memory_stats?.usage) || 0;
+function memoryUsage(stats) {
+  const rawUsage = Number(stats.memory_stats?.usage) || 0;
+  const cache = Number(stats.memory_stats?.stats?.total_inactive_file ?? stats.memory_stats?.stats?.inactive_file) || 0;
+  const usage = Math.max(0, rawUsage - cache);
   const limit = Number(stats.memory_stats?.limit) || 0;
-  return limit ? Math.round((usage / limit) * 1000) / 10 : 0;
+  return { usage, limit, percent: limit ? Math.min(100, Math.round((usage / limit) * 1000) / 10) : 0 };
+}
+
+function parseDockerBytes(value) {
+  const match = String(value || '').trim().match(/^([0-9.]+)\s*([kmgtpe]?i?b)?$/i);
+  if (!match) return null;
+  const units = { b: 1, kb: 1e3, mb: 1e6, gb: 1e9, tb: 1e12, pb: 1e15, kib: 1024, mib: 1024 ** 2, gib: 1024 ** 3, tib: 1024 ** 4, pib: 1024 ** 5 };
+  const multiplier = units[String(match[2] || 'b').toLowerCase()];
+  return multiplier ? Number(match[1]) * multiplier : null;
+}
+
+function memoryFromCli(value) {
+  const [usedRaw, limitRaw] = String(value || '').split('/').map(part => part.trim());
+  const usage = parseDockerBytes(usedRaw);
+  const limit = parseDockerBytes(limitRaw);
+  return {
+    usage,
+    limit,
+    percent: usage != null && limit ? Math.min(100, Math.round((usage / limit) * 1000) / 10) : null,
+  };
+}
+
+function resourceSummary(containers = []) {
+  const cpu = Math.min(100, containers.reduce((sum, container) => sum + Number(container.cpu || 0), 0));
+  const memoryRows = containers.filter(container => Number.isFinite(Number(container.memUsageBytes)) && Number.isFinite(Number(container.memLimitBytes)) && Number(container.memLimitBytes) > 0);
+  const totalUsage = memoryRows.reduce((sum, container) => sum + Number(container.memUsageBytes), 0);
+  const hostLimit = memoryRows.reduce((max, container) => Math.max(max, Number(container.memLimitBytes)), 0);
+  const fallback = containers.filter(container => Number.isFinite(Number(container.memPercent))).map(container => Number(container.memPercent));
+  const memPercent = hostLimit
+    ? Math.min(100, Math.round((totalUsage / hostLimit) * 1000) / 10)
+    : fallback.length ? Math.min(100, Math.round((fallback.reduce((sum, value) => sum + value, 0) / fallback.length) * 10) / 10) : 0;
+  return { cpu: Math.round(cpu * 10) / 10, memPercent };
 }
 
 function netIO(stats) {
@@ -328,11 +360,13 @@ async function getDockerSshHost(host) {
         warnThrottled(`docker-images:${name}`, `[Docker ${name}] unused image check failed: ${err.message}`);
         return '';
       });
+    const hostCpus = Math.max(1, Number(String(await execDockerCli(host, "info --format '{{.NCPU}}'").catch(() => '1')).trim()) || 1);
     const stats = new Map(parseJsonLines(statsTxt).map(s => [String(s.ID || '').slice(0, 12), s]));
     const containers = parseJsonLines(psTxt).slice(0, 200).map(c => {
       const id = String(c.ID || '').slice(0, 12);
       const st = stats.get(id) || {};
       const state = String(c.State || '').toLowerCase();
+      const memory = memoryFromCli(st.MemUsage);
       return {
         id,
         name: String(c.Names || id).split(',')[0].slice(0, 200),
@@ -342,8 +376,10 @@ async function getDockerSshHost(host) {
         status: String(c.Status || ''),
         ports: parsePortsText(c.Ports),
         color: state === 'running' ? 'green' : (state === 'exited' || state === 'dead') ? 'red' : 'yellow',
-        cpu: pct(st.CPUPerc),
-        memPercent: pct(st.MemPerc),
+        cpu: pct(st.CPUPerc) == null ? null : Math.min(100, Math.round((pct(st.CPUPerc) / hostCpus) * 10) / 10),
+        memPercent: memory.percent ?? pct(st.MemPerc),
+        memUsageBytes: memory.usage,
+        memLimitBytes: memory.limit,
         netIO: String(st.NetIO || ''),
         blockIO: String(st.BlockIO || ''),
       };
@@ -374,8 +410,7 @@ async function getDockerSshHost(host) {
     const running = containers.filter(c => c.state === 'running').length;
     const stopped = containers.filter(c => c.state === 'exited' || c.state === 'dead').length;
     const updates = containers.filter(c => c.imageUpdate?.status === 'update').length;
-    const cpuVals = containers.filter(c => c.cpu != null).map(c => c.cpu);
-    const memVals = containers.filter(c => c.memPercent != null).map(c => c.memPercent);
+    const resources = resourceSummary(containers);
     return {
       source: 'configured',
       name,
@@ -387,8 +422,8 @@ async function getDockerSshHost(host) {
         stopped,
         unused: Number(unusedImages) || 0,
         updates,
-        cpu: cpuVals.length ? Math.round(cpuVals.reduce((a, b) => a + b, 0) * 10) / 10 : 0,
-        memPercent: memVals.length ? Math.round((memVals.reduce((a, b) => a + b, 0) / memVals.length) * 10) / 10 : 0,
+        cpu: resources.cpu,
+        memPercent: resources.memPercent,
       },
       containers,
     };
@@ -413,6 +448,7 @@ async function getDockerHost(host) {
       const id = String(c.Id || '').slice(0, 12);
       const stats = c.State === 'running' ? await reqJson(host, `/containers/${id}/stats?stream=false`).catch(() => null) : null;
       const image = c.Image || '';
+      const memory = stats ? memoryUsage(stats) : null;
       return {
         id,
         name: String((c.Names?.[0] || '').replace(/^\//, '') || id),
@@ -425,7 +461,9 @@ async function getDockerHost(host) {
         ports: ports(c.Ports),
         color: c.State === 'running' ? 'green' : (c.State === 'exited' || c.State === 'dead') ? 'red' : 'yellow',
         cpu: stats ? cpuPercent(stats) : null,
-        memPercent: stats ? memPercent(stats) : null,
+        memPercent: memory?.percent ?? null,
+        memUsageBytes: memory?.usage ?? null,
+        memLimitBytes: memory?.limit ?? null,
         netIO: stats ? netIO(stats) : '',
         blockIO: stats ? blockIO(stats) : '',
       };
@@ -440,8 +478,7 @@ async function getDockerHost(host) {
     const running = detailed.filter(c => c.state === 'running').length;
     const stopped = detailed.filter(c => c.state === 'exited' || c.state === 'dead').length;
     const updates = detailed.filter(c => c.imageUpdate?.status === 'update').length;
-    const cpuVals = detailed.filter(c => c.cpu != null).map(c => c.cpu);
-    const memVals = detailed.filter(c => c.memPercent != null).map(c => c.memPercent);
+    const resources = resourceSummary(detailed);
     return {
       source: 'configured',
       name,
@@ -453,8 +490,8 @@ async function getDockerHost(host) {
         stopped,
         unused: unusedImageCount(images, containers, apiImageRefs),
         updates,
-        cpu: cpuVals.length ? Math.round(cpuVals.reduce((a, b) => a + b, 0) * 10) / 10 : 0,
-        memPercent: memVals.length ? Math.round((memVals.reduce((a, b) => a + b, 0) / memVals.length) * 10) / 10 : 0,
+        cpu: resources.cpu,
+        memPercent: resources.memPercent,
       },
       containers: detailed,
     };
@@ -488,4 +525,4 @@ async function dockerPrune(cfg = {}, hostName) {
   return reqJson(host, `/images/prune?filters=${filters}`, { method: 'POST' });
 }
 
-module.exports = { getDockerApiData, dockerLogs, dockerPrune };
+module.exports = { getDockerApiData, dockerLogs, dockerPrune, cpuPercent, memoryUsage, memoryFromCli, resourceSummary };

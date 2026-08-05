@@ -789,7 +789,7 @@ html[data-theme="light"] body.rail-collapsed .shell .sb-card.active{background:#
 .overview-side-msg{min-width:0;overflow:hidden;text-overflow:ellipsis}
 .overview-log-list{max-height:320px;overflow-y:auto}
 .overview-log-time{color:var(--muted);font-size:11px;white-space:nowrap;margin-top:1px;flex-shrink:0}
-.overview-card{position:relative;width:100%;background:var(--panel);border:1px solid var(--border);border-radius:8px;overflow:hidden;min-width:0;box-shadow:var(--shadow);cursor:grab;transition:opacity .16s ease,border-color .16s ease,box-shadow .16s ease}
+.overview-card{position:relative;width:100%;background:var(--panel);border:1px solid var(--border);border-radius:8px;overflow:hidden;min-width:0;box-shadow:var(--shadow);cursor:grab;transition:opacity .16s ease,border-color .16s ease,box-shadow .16s ease;container-type:inline-size}
 .overview-card.dragging{opacity:.88;border:1px dashed var(--blue);z-index:9000;pointer-events:none;box-shadow:0 18px 48px rgba(0,0,0,.32);transition:none;will-change:transform}
 .overview-card:active{cursor:grabbing}
 .overview-placeholder{border:1px dashed var(--blue);border-radius:8px;background:rgba(96,165,250,.08);min-height:76px}
@@ -797,7 +797,7 @@ html[data-theme="light"] body.rail-collapsed .shell .sb-card.active{background:#
 .overview-card-h:hover{background:rgba(255,255,255,.025)}
 .overview-icon{width:28px;height:28px;display:grid;place-items:center;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:5px;flex-shrink:0}
 .overview-head-main{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;min-width:0}
-.overview-title{font-size:15px;font-weight:750;letter-spacing:0;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.overview-title{font-size:15px;font-weight:750;letter-spacing:0;line-height:1.15;min-width:0;max-width:100%;overflow:hidden;text-overflow:clip;white-space:normal;overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2}
 .overview-meta{font-size:12px;color:var(--muted);min-width:0;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.25}
 .overview-card-toggle{width:18px;height:18px;display:grid;place-items:center;color:var(--muted);transition:transform .16s ease,color .16s ease;flex-shrink:0}
 .overview-card-h:hover .overview-card-toggle{color:var(--text)}
@@ -857,6 +857,14 @@ html[data-theme="light"] .overview-card .sb-csum-item{background:transparent!imp
 .overview-nested-title:first-child{border-top:0}
 .overview-nested-title .mon-dot{width:7px;height:7px;margin:0}
 .overview-nested-title span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@container (max-width:300px){
+  .overview-card-h{grid-template-columns:28px minmax(0,1fr) 18px 24px;grid-template-rows:auto auto;column-gap:8px}
+  .overview-card-h>.overview-icon{grid-column:1;grid-row:1 / span 2}
+  .overview-card-h>.overview-head-main{grid-column:2;grid-row:1}
+  .overview-card-h>.badge{grid-column:2;grid-row:2;justify-self:start;max-width:100%}
+  .overview-card-h>.overview-card-toggle{grid-column:3;grid-row:1 / span 2}
+  .overview-card-h>.overview-card-hide{grid-column:4;grid-row:1 / span 2}
+}
 .cmdk-backdrop{position:fixed;inset:0;z-index:3200;background:rgba(0,0,0,.42);backdrop-filter:blur(7px);display:none;align-items:flex-start;justify-content:center;padding:82px 18px 18px}
 .cmdk-backdrop.open{display:flex}
 .cmdk{width:min(720px,calc(100vw - 36px));max-height:min(650px,calc(100vh - 116px));background:var(--panel);border:1px solid var(--border2);border-radius:14px;box-shadow:0 28px 90px rgba(0,0,0,.48);overflow:hidden;display:flex;flex-direction:column}
@@ -1366,10 +1374,16 @@ function syncDefaultPeriodOverride(data) {
   }
   lastDefaultPeriodHours = current;
 }
-window.setTimeLimit = function(id, val) {
+window.setTimeLimit = async function(id, val) {
   timeLimits[id] = Number(val);
   scheduleUiPreferencesSave();
   if (window._lastData) render(window._lastData);
+  try {
+    await fetchExpandedHistory(Number(val));
+    if (window._lastData) render(window._lastData);
+  } catch (err) {
+    console.warn('History range fetch failed:', err.message || err);
+  }
 };
 
 window.setUptimeKumaHistoryHours = async function(hours) {
@@ -2094,23 +2108,19 @@ function showChartTooltip(e, el, clr) {
   const raw = el.getAttribute('data-pts');
   if (!raw) return;
   const pts = JSON.parse(raw);
-  const targetIdx = Math.round(pct * (pts.length - 1));
-  let idx = targetIdx;
-  if (!pts[idx]) {
-    let best = -1, bestDist = Infinity;
-    pts.forEach((p, i) => {
-      if (!p) return;
-      const dist = Math.abs(i - targetIdx);
-      if (dist < bestDist) { best = i; bestDist = dist; }
-    });
-    idx = best;
-  }
+  let idx = -1, bestDist = Infinity;
+  pts.forEach((point, pointIndex) => {
+    if (!point) return;
+    const pointX = hasNum(point.x) ? Number(point.x) : (pts.length > 1 ? pointIndex / (pts.length - 1) : 1);
+    const dist = Math.abs(pointX - pct);
+    if (dist < bestDist) { idx = pointIndex; bestDist = dist; }
+  });
   if (idx < 0 || !pts[idx]) { hideChartTooltip(); return; }
   const pt = pts[idx];
   const unit = el.dataset.unit || '%';
   const label = el.dataset.label || 'Usage';
   
-  const dotX = rect.left + (idx / (pts.length - 1)) * rect.width;
+  const dotX = rect.left + (hasNum(pt.x) ? Number(pt.x) : (pts.length > 1 ? idx / (pts.length - 1) : 1)) * rect.width;
   const chartH = Number(el.dataset.chartH || 50) || 50;
   const dotY = rect.top + (pt.y / chartH) * rect.height;
   
@@ -2166,17 +2176,13 @@ function showSplitRateTooltip(e, el) {
   const x = e.clientX - rect.left;
   const pct = Math.max(0, Math.min(1, x / rect.width));
   const pts = JSON.parse(el.getAttribute('data-pts') || '[]');
-  const targetIdx = Math.round(pct * (pts.length - 1));
-  let idx = targetIdx;
-  if (!pts[idx]) {
-    let best = -1, bestDist = Infinity;
-    pts.forEach((p, i) => {
-      if (!p) return;
-      const dist = Math.abs(i - targetIdx);
-      if (dist < bestDist) { best = i; bestDist = dist; }
-    });
-    idx = best;
-  }
+  let idx = -1, bestDist = Infinity;
+  pts.forEach((point, pointIndex) => {
+    if (!point) return;
+    const pointX = hasNum(point.x) ? Number(point.x) : (pts.length > 1 ? pointIndex / (pts.length - 1) : 1);
+    const dist = Math.abs(pointX - pct);
+    if (dist < bestDist) { idx = pointIndex; bestDist = dist; }
+  });
   if (idx < 0 || !pts[idx]) { hideChartTooltip(); return; }
   const pt = pts[idx];
   const readColor = el.dataset.readColor || '#22D3EE';
@@ -2189,7 +2195,7 @@ function showSplitRateTooltip(e, el) {
   const dotColor = activeSeries === 'write' ? writeColor : readColor;
   if (hDot) {
     hDot.style.background = dotColor;
-    hDot.style.left = (rect.left + (idx / (pts.length - 1)) * rect.width) + 'px';
+    hDot.style.left = (rect.left + (hasNum(pt.x) ? Number(pt.x) : (pts.length > 1 ? idx / (pts.length - 1) : 1)) * rect.width) + 'px';
     hDot.style.top = (rect.top + (y / chartH) * rect.height) + 'px';
     hDot.style.opacity = 1;
   }
@@ -2247,19 +2253,13 @@ function showUptimeTooltip(e, el) {
 function histChart(data, key, pct, limit = 80, colorFn = bchex, maxScale = 100, unit = '%', label = 'Usage') {
   const W = 300, H = 50, clr = colorFn(pct);
   const now = Date.now();
-  
+  const duration = Math.max(15000, (limit - 1) * 15000);
+  const startTs = now - duration;
   const is12h = !!(window._lastData && window._lastData.timeFormat === '12h');
   const fmtTime = (ts) => {
     try { return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: is12h }); }
     catch (err) { return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
   };
-
-  const startTs = now - (limit - 1) * 15000;
-  const midTs = now - Math.floor((limit - 1) / 2) * 15000;
-  const endTs = now;
-  
-  const duration = (limit - 1) * 15000;
-  
   const axisHtml = `<div style="display:flex; justify-content:space-between; font-size:10px; color:var(--muted); margin-top:4px; padding:0 2px;">
       <span>${fmtTime(now - duration)}</span>
       <span>${fmtTime(now - duration * 0.75)}</span>
@@ -2270,15 +2270,28 @@ function histChart(data, key, pct, limit = 80, colorFn = bchex, maxScale = 100, 
 
   const emptySvg = `<svg class="hist-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><rect width="${W}" height="${H}" class="hist-bg" rx="3"/><line x1="0" y1="${H}" x2="${W}" y2="${H}" stroke="${clr}" stroke-width="1.5" stroke-opacity=".3"/></svg>`;
   const empty = `<div>${emptySvg}${axisHtml.replace(/<span/g, '<span style="opacity:0.3"')}</div>`;
-  
-  let ptsRaw = Array.isArray(data) ? data.slice(-limit) : [];
-  if (!ptsRaw.length && hasNum(pct)) ptsRaw = [{ time: now, [key]: pct }];
-  let rawVals = ptsRaw.map(d => hasNum(d?.[key]) ? Math.min(maxScale, Math.max(0, Number(d[key]))) : null);
-  const vals = rawVals.filter(v => v !== null);
-  if (!vals.length) return empty;
 
-  const actualVals = rawVals.length < limit ? [...Array(limit - rawVals.length).fill(null), ...rawVals] : rawVals;
-  const actualPtsRaw = ptsRaw.length < limit ? [...Array(limit - ptsRaw.length).fill(null), ...ptsRaw] : ptsRaw;
+  const source = Array.isArray(data) ? data : [];
+  let rows = source.map((point, index) => {
+    const rawTime = Number(point?.time);
+    const time = Number.isFinite(rawTime) ? (rawTime > 1e11 ? rawTime : rawTime * 1000) : now - (source.length - 1 - index) * 15000;
+    const value = hasNum(point?.[key]) ? Math.min(maxScale, Math.max(0, Number(point[key]))) : null;
+    return { point, time, value };
+  }).filter(row => row.time >= startTs && row.time <= now + 15000).sort((a,b)=>a.time-b.time);
+  if (!rows.length && hasNum(pct)) rows = [{ point: { time: now, [key]: pct }, time: now, value: Number(pct) }];
+  if (rows.length > 600) {
+    const bucketSize = Math.ceil(rows.length / 300);
+    const reduced = [];
+    for (let offset = 0; offset < rows.length; offset += bucketSize) {
+      const bucket = rows.slice(offset, offset + bucketSize);
+      const numeric = bucket.filter(row => row.value !== null);
+      const picked = [bucket[0], bucket.find(row => row.value === null), numeric.reduce((best,row)=>!best||row.value<best.value?row:best,null), numeric.reduce((best,row)=>!best||row.value>best.value?row:best,null), bucket[bucket.length-1]].filter(Boolean);
+      picked.sort((a,b)=>a.time-b.time).forEach(row => { if (reduced[reduced.length-1] !== row) reduced.push(row); });
+    }
+    rows = reduced;
+  }
+  const vals = rows.map(row => row.value).filter(value => value !== null);
+  if (!vals.length) return empty;
 
   let minV = Math.min(...vals);
   let maxV = Math.max(...vals);
@@ -2291,29 +2304,35 @@ function histChart(data, key, pct, limit = 80, colorFn = bchex, maxScale = 100, 
     maxV = Math.min(maxScale, maxV + pad);
   }
   const range = maxV - minV || 1;
-  
-  const n = actualVals.length;
-  const xStep = W / (n - 1);
-  
-  const linePts = actualVals.map((v, i) => v === null ? null : [i * xStep, H - ((v - minV) / range) * H]);
 
-  const pts = actualPtsRaw.map((d, i) => {
-    if (actualVals[i] === null) return null;
-    if (!d || !hasNum(d?.[key])) return null;
-    let t = d?.time ? (d.time > 1e11 ? d.time : d.time * 1000) : (now - (n - 1 - i) * 15000);
-    return { t, v: actualVals[i], y: linePts[i][1].toFixed(2) };
+  const intervals = rows.slice(1).map((row,index)=>row.time-rows[index].time).filter(value=>value>0).sort((a,b)=>a-b);
+  const medianInterval = intervals.length ? intervals[Math.floor(intervals.length / 2)] : 15000;
+  const gapThreshold = Math.max(60000, medianInterval * 3);
+  const segments = [];
+  let segment = [];
+  rows.forEach((row, index) => {
+    const gap = index > 0 && row.time - rows[index - 1].time > gapThreshold;
+    if (row.value === null || gap) {
+      if (segment.length) segments.push(segment);
+      segment = [];
+    }
+    if (row.value !== null) {
+      const x = Math.max(0, Math.min(W, ((row.time - startTs) / duration) * W));
+      const y = H - ((row.value - minV) / range) * H;
+      segment.push({ x, y, time: row.time, value: row.value });
+    }
   });
+  if (segment.length) segments.push(segment);
+  const pts = segments.flat().map(point => ({ t: point.time, v: point.value, y: Number(point.y.toFixed(2)), x: Number((point.x / W).toFixed(5)) }));
   const ptsJson = JSON.stringify(pts).replace(/'/g, "&#39;");
-  
-  const validLinePts = linePts.filter(p => p !== null);
-  if (validLinePts.length < 2) return empty;
-
-  const line = validLinePts.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(2)},${p[1].toFixed(2)}`).join('');
-  const firstX = validLinePts[0][0].toFixed(2);
-  const lastX = validLinePts[validLinePts.length - 1][0].toFixed(2);
-  const area = `${line}L${lastX},${H}L${firstX},${H}Z`;
+  const drawableSegments = segments.filter(points => points.length > 1);
+  if (!drawableSegments.length) return empty;
+  const line = drawableSegments.map(points => points.map((point,index)=>`${index?'L':'M'}${point.x.toFixed(2)},${point.y.toFixed(2)}`).join('')).join(' ');
+  const areas = drawableSegments.map(points => {
+    const path = points.map((point,index)=>`${index?'L':'M'}${point.x.toFixed(2)},${point.y.toFixed(2)}`).join('');
+    return `${path}L${points[points.length-1].x.toFixed(2)},${H}L${points[0].x.toFixed(2)},${H}Z`;
+  });
   const gid = 'hg' + Math.random().toString(36).slice(2, 7);
-  
   let gridPath = '';
   for (let i = 1; i < 4; i++) gridPath += `M0,${i * 12.5} L${W},${i * 12.5} `;
   for (let i = 1; i < 10; i++) gridPath += `M${i * 30},0 L${i * 30},${H} `;
@@ -2329,7 +2348,7 @@ function histChart(data, key, pct, limit = 80, colorFn = bchex, maxScale = 100, 
     </defs>
     <rect width="${W}" height="${H}" class="hist-bg" rx="3"/>
     <path d="${gridPath}" stroke="var(--text)" stroke-width="1" opacity="0.07" vector-effect="non-scaling-stroke" />
-    <path d="${area}" fill="url(#${gid})"/>
+    ${areas.map(area => `<path d="${area}" fill="url(#${gid})"/>`).join('')}
     <path d="${line}" fill="none" stroke="${clr}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
   </svg>`;
 
@@ -2346,7 +2365,8 @@ function splitRateChart(data, readKey, writeKey, currentReadBps, currentWriteBps
     try { return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: is12h }); }
     catch { return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
   };
-  const duration = (limit - 1) * 15000;
+  const duration = Math.max(15000, (limit - 1) * 15000);
+  const startTs = now - duration;
   const axisHtml = `<div style="display:flex; justify-content:space-between; font-size:10px; color:var(--muted); margin-top:4px; padding:0 2px;">
       <span>${fmtTime(now - duration)}</span>
       <span>${fmtTime(now - duration * 0.75)}</span>
@@ -2356,45 +2376,58 @@ function splitRateChart(data, readKey, writeKey, currentReadBps, currentWriteBps
     </div>`;
   const emptySvg = `<svg class="hist-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><rect width="${W}" height="${H}" class="hist-bg" rx="3"/><line x1="0" y1="${H}" x2="${W}" y2="${H}" stroke="${readColor}" stroke-width="1.5" stroke-opacity=".3"/></svg>`;
   const empty = `<div>${emptySvg}${axisHtml.replace(/<span/g, '<span style="opacity:0.3"')}</div>`;
-  let ptsRaw = Array.isArray(data) ? data.slice(-limit) : [];
-  if (!ptsRaw.length && (hasNum(currentReadBps) || hasNum(currentWriteBps))) {
-    ptsRaw = [{ time: now, [readKey]: rateToMBps(currentReadBps || 0), [writeKey]: rateToMBps(currentWriteBps || 0) }];
+  const source = Array.isArray(data) ? data : [];
+  let rows = source.map((point,index) => {
+    const rawTime = Number(point?.time);
+    const time = Number.isFinite(rawTime) ? (rawTime > 1e11 ? rawTime : rawTime * 1000) : now - (source.length - 1 - index) * 15000;
+    return {
+      time,
+      read: hasNum(point?.[readKey]) ? Math.max(0, Number(point[readKey])) : null,
+      write: hasNum(point?.[writeKey]) ? Math.max(0, Number(point[writeKey])) : null,
+    };
+  }).filter(row => row.time >= startTs && row.time <= now + 15000).sort((a,b)=>a.time-b.time);
+  if (!rows.length && (hasNum(currentReadBps) || hasNum(currentWriteBps))) {
+    rows = [{ time: now, read: rateToMBps(currentReadBps || 0), write: rateToMBps(currentWriteBps || 0) }];
   }
-  if (!ptsRaw.length) return empty;
-  const readValsRaw = ptsRaw.map(d => hasNum(d?.[readKey]) ? Math.max(0, Number(d[readKey])) : null);
-  const writeValsRaw = ptsRaw.map(d => hasNum(d?.[writeKey]) ? Math.max(0, Number(d[writeKey])) : null);
-  const vals = [...readValsRaw, ...writeValsRaw].filter(v => v !== null);
+  if (!rows.length) return empty;
+  if (rows.length > 600) {
+    const step = Math.ceil(rows.length / 600);
+    rows = rows.filter((row,index)=>index===0 || index===rows.length-1 || index % step === 0);
+  }
+  const vals = rows.flatMap(row => [row.read, row.write]).filter(value => value !== null);
   if (!vals.length) return empty;
-  const pad = limit - ptsRaw.length;
-  const readVals = pad > 0 ? [...Array(pad).fill(null), ...readValsRaw] : readValsRaw;
-  const writeVals = pad > 0 ? [...Array(pad).fill(null), ...writeValsRaw] : writeValsRaw;
-  const actualPtsRaw = pad > 0 ? [...Array(pad).fill(null), ...ptsRaw] : ptsRaw;
   const maxV = Math.max(0.01, ...vals) * 1.18;
-  const n = readVals.length;
-  const xStep = W / (n - 1 || 1);
   const yFor = v => H - (Math.min(maxV, Math.max(0, Number(v))) / maxV) * H;
-  const lineFor = valsArr => valsArr
-    .map((v, i) => v === null ? null : [i * xStep, yFor(v)])
-    .filter(Boolean)
-    .map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(2)},${p[1].toFixed(2)}`)
-    .join('');
-  const readLine = lineFor(readVals);
-  const writeLine = lineFor(writeVals);
+  const intervals = rows.slice(1).map((row,index)=>row.time-rows[index].time).filter(value=>value>0).sort((a,b)=>a-b);
+  const gapThreshold = Math.max(60000, (intervals.length ? intervals[Math.floor(intervals.length/2)] : 15000) * 3);
+  const lineFor = field => {
+    let line = '';
+    let drawing = false;
+    rows.forEach((row,index) => {
+      const gap = index > 0 && row.time - rows[index-1].time > gapThreshold;
+      const value = row[field];
+      if (value === null) { drawing = false; return; }
+      const x = Math.max(0, Math.min(W, ((row.time - startTs) / duration) * W));
+      line += `${drawing && !gap ? 'L' : 'M'}${x.toFixed(2)},${yFor(value).toFixed(2)} `;
+      drawing = true;
+    });
+    return line.trim();
+  };
+  const readLine = lineFor('read');
+  const writeLine = lineFor('write');
   if (!readLine && !writeLine) return empty;
   let gridPath = '';
   for (let i = 1; i < 4; i++) gridPath += `M0,${i * 12.5} L${W},${i * 12.5} `;
   for (let i = 1; i < 10; i++) gridPath += `M${i * 30},0 L${i * 30},${H} `;
-  const pts = actualPtsRaw.map((d, i) => {
-    const read = readVals[i];
-    const write = writeVals[i];
-    if (read === null && write === null) return null;
-    const t = d?.time ? (d.time > 1e11 ? d.time : d.time * 1000) : (now - (n - 1 - i) * 15000);
+  const pts = rows.map(row => {
+    if (row.read === null && row.write === null) return null;
     return {
-      t,
-      read,
-      write,
-      readY: read === null ? null : Number(yFor(read).toFixed(2)),
-      writeY: write === null ? null : Number(yFor(write).toFixed(2)),
+      t: row.time,
+      x: Number(Math.max(0, Math.min(1, (row.time - startTs) / duration)).toFixed(5)),
+      read: row.read,
+      write: row.write,
+      readY: row.read === null ? null : Number(yFor(row.read).toFixed(2)),
+      writeY: row.write === null ? null : Number(yFor(row.write).toFixed(2)),
     };
   });
   const ptsJson = JSON.stringify(pts).replace(/'/g, "&#39;");
@@ -2711,7 +2744,8 @@ function buildProxmox(px){
     </div>`;
   }
 
-  const nodesHtml = px.nodes.map(({node,services=[],vms,history,host,backup,storage=[],metrics,metricsError,_connecting})=>{
+  const nodesHtml = px.nodes.map(({node,services=[],vms,history,host,backup,storage=[],metrics,metricsError,_connecting,clusterName})=>{
+    const nodeKey = clusterName ? `${clusterName}:${node.name}` : node.name;
     if(_connecting) return `
     <div class="node-hdr" style="cursor:default">
       <div class="mon-dot md-gray"></div>
@@ -2731,8 +2765,8 @@ function buildProxmox(px){
     const bandwidthHistory = rateHistoryMBps(history, 'bandwidth', 'bandwidthMbps');
     const svcFailed = services.filter(s=>!s.active && !s.excluded).length;
     const hasIssue = !node.online || svcFailed>0;
-    const isOpen = userOverride['node:'+node.name] !== undefined
-      ? userOverride['node:'+node.name]
+    const isOpen = userOverride['node:'+nodeKey] !== undefined
+      ? userOverride['node:'+nodeKey]
       : false;
     const nodeVms = vms || [];
     const tempList = pveTempRows(node.temps, node.temp, node.tempLabel);
@@ -2764,22 +2798,22 @@ function buildProxmox(px){
     const lxc = sortedVms.filter(v => v.type === 'lxc');
 
     return `
-    <div class="node-hdr pve-node-hdr" onclick="toggleNode(${jsStr(node.name)})">
+    <div class="node-hdr pve-node-hdr" onclick="toggleNode(${jsStr(nodeKey)})">
       <div class="mon-dot ${dc(node.online)}"></div>
       <div class="pve-head-main">
         <div class="pve-head-title">
           <div class="node-name">${escHtml(node.name)}</div>
-          <div class="pve-head-sub">${node.online ? 'online' : 'offline'}</div>
+          <div class="pve-head-sub">${escHtml([clusterName, node.online ? 'online' : 'offline'].filter(Boolean).join(' · '))}</div>
         </div>
         ${pveStats}
       </div>
       ${bdg(node.online?'green':'red', node.online?'online':'offline')}
-      ${notifyBell('px:'+node.name)}
+      ${notifyBell('px:'+nodeKey)}
     </div>
-    <div class="node-body ${isOpen?'open':''}" id="nd-${node.name}">
+    <div class="node-body ${isOpen?'open':''}" id="nd-${escAttr(nodeKey)}">
       ${node.online ? `
         ${metricsError ? `<div class="offline-err" style="margin:0 0 8px">SSH metrics fallback: ${escHtml(metricsError)}</div>` : ''}
-        ${(()=>{ const lim=historyLimitFor('px:'+node.name); return `${chartHeader('px:'+node.name, lim)}<div class="chart-row">
+        ${(()=>{ const lim=historyLimitFor('px:'+nodeKey); return `${chartHeader('px:'+nodeKey, lim)}<div class="chart-row">
           <div class="chart-hdr"><span class="nb-label">CPU</span><span class="nb-pct" style="color:${bc(cpuPct)}">${fmtPct(cpuPct)}</span></div>
           ${histChart(history,'cpu',cpuPct,lim)}
         </div>
@@ -2791,17 +2825,17 @@ function buildProxmox(px){
           ${histChart(history,'mem',ramPct,lim)}
           ${node.ram?.usedGB?`<div class="chart-foot">${node.ram.usedGB}/${node.ram.totalGB} GB</div>`:''}
         </div>` })()}
-        ${(()=>{ const lim=historyLimitFor('px:'+node.name); return diskIOMbps!=null?`
+        ${(()=>{ const lim=historyLimitFor('px:'+nodeKey); return diskIOMbps!=null?`
         <div class="chart-row">
           <div class="chart-hdr"><span class="nb-label">Disk I/O</span><span class="nb-pct" style="color:var(--cyan)">${diskIOTxt}</span></div>
           ${histChart(diskIOHistory,'diskIOMbps',diskIOMbps,lim,rateColor,rateSparkMax(diskIOHistory,'diskIOMbps',diskIOMbps),' MB/s','Disk I/O')}
         </div>` : '' })()}
-        ${(()=>{ const lim=historyLimitFor('px:'+node.name); return bandwidthMbps!=null?`
+        ${(()=>{ const lim=historyLimitFor('px:'+nodeKey); return bandwidthMbps!=null?`
         <div class="chart-row">
           <div class="chart-hdr"><span class="nb-label">Bandwidth</span><span class="nb-pct" style="color:var(--green)">${bandwidthTxt}</span></div>
           ${histChart(bandwidthHistory,'bandwidthMbps',bandwidthMbps,lim,()=>'#34D399',rateSparkMax(bandwidthHistory,'bandwidthMbps',bandwidthMbps),' MB/s','Bandwidth')}
         </div>` : '' })()}
-        ${(()=>{ const lim=historyLimitFor('px:'+node.name); return tempList.map((t, idx) => {
+        ${(()=>{ const lim=historyLimitFor('px:'+nodeKey); return tempList.map((t, idx) => {
           const label = t.label || 'Temperature';
           const value = t.value ?? t.temp;
           if (value == null) return '';
@@ -2900,7 +2934,10 @@ function buildLinux(linux){
   if(!linux?.length) return null;
   const connecting = linux.filter(s=>s._connecting).length;
   const realLinux = linux.filter(s=>!s._connecting);
-  const allOk = realLinux.length > 0 && realLinux.every(s=>s.online && s.services?.every(sv=>sv.active || sv.excluded));
+  const updateCount = linux.reduce((sum,s)=>sum+(s.online ? Number(s.updates?.count || 0) : 0),0);
+  const rebootCount = linux.filter(s=>s.online && s.updates?.rebootRequired).length;
+  const updateAttention = updateCount > 0 || rebootCount > 0;
+  const allOk = realLinux.length > 0 && realLinux.every(s=>s.online && s.services?.every(sv=>sv.active || sv.excluded) && !Number(s.updates?.count || 0) && !s.updates?.rebootRequired);
   const failed = linux.flatMap(s=>s.services||[]).filter(s=>!s.active&&s.state!=='unknown'&&!s.excluded).length;
   const totalSvcs = linux.flatMap(s=>s.services||[]).length;
   const upSvcs   = linux.flatMap(s=>s.services||[]).filter(s=>s.active).length;
@@ -2920,11 +2957,13 @@ function buildLinux(linux){
     ${cpuM?`<div class="sb-csum-item"><div class="sb-csum-val" style="color:${cpuM.color}">${cpuM.val}</div><div class="sb-csum-lbl">CPU usage</div></div>`:''}
     ${ramM?`<div class="sb-csum-item"><div class="sb-csum-val" style="color:${ramM.color}">${ramM.val}</div><div class="sb-csum-lbl">RAM usage</div></div>`:''}
     <div class="sb-csum-item"><div class="sb-csum-val">${upSvcs}/${totalSvcs}</div><div class="sb-csum-lbl">Services up</div></div>
+    ${updateAttention?`<div class="sb-csum-item"><div class="sb-csum-val" style="color:var(--yellow)">${updateCount}</div><div class="sb-csum-lbl">Updates</div></div>`:''}
   </div>`;
 
   const summaryHtml = `<div class="csum">
     <div class="csum-item"><div class="csum-val">${reachable}/${linux.length}</div><div class="csum-lbl">Servers</div></div>
     <div class="csum-item"><div class="csum-val">${upSvcs}/${totalSvcs}</div><div class="csum-lbl">Services up</div></div>
+    ${updateAttention?`<div class="csum-item"><div class="csum-val" style="color:var(--yellow)">${updateCount}</div><div class="csum-lbl">Updates${rebootCount?` · ${rebootCount} reboot`:''}</div></div>`:''}
   </div>`;
 
   const body = linux.map(srv=>{
@@ -2978,6 +3017,9 @@ function buildLinux(linux){
     const ptag = srv.platform && srv.platform!=='linux' ? ` <span class="badge bg-blue" style="font-size:10px;padding:1px 7px">${srv.platform}</span>` : '';
     const srvSvcTotal = (srv.services || []).filter(s => !s.excluded).length;
     const srvSvcUp = (srv.services || []).filter(s => s.active && !s.excluded).length;
+    const srvUpdates = Number(srv.updates?.count || 0);
+    const srvReboot = !!srv.updates?.rebootRequired;
+    const srvAttention = srvUpdates > 0 || srvReboot;
     const isOpen = panelOpenState('linux:'+lkey, linuxOpen[lkey]);
     linuxOpen[lkey] = isOpen;
     const linuxStats = [
@@ -2988,19 +3030,21 @@ function buildLinux(linux){
       pveHeadStat('Disk I/O', diskIOTxt || '--', diskIOTxt ? 'var(--cyan)' : 'var(--muted)', diskIOMbps != null ? miniSparkline(diskIOHistory, 'diskIOMbps', diskIOMbps, rateColor, rateSparkMax(diskIOHistory, 'diskIOMbps', diskIOMbps), ' MB/s', 'Disk I/O') : ''),
       srv.temp != null ? pveHeadStat('Temp', `${srv.temp}°C`, tempColor(srv.temp), miniSparkline(srv.history, 'temp', srv.temp, tempHex, 100, '°C', 'Temperature')) : '',
       srvSvcTotal ? pveHeadStat('Services', `${srvSvcUp}/${srvSvcTotal}`) : '',
+      srv.updates ? pveHeadStat('Updates', srvUpdates, srvUpdates ? 'var(--yellow)' : 'var(--green)') : '',
+      srvReboot ? pveHeadStat('Reboot', 'required', 'var(--yellow)') : '',
       srv.uptime ? pveHeadStat('Uptime', fmtUptime(srv.uptime)) : '',
     ].filter(Boolean).join('');
     return `
       <div class="node-hdr pve-node-hdr" onclick="toggleLinux('${lkey}')">
-        <div class="mon-dot ${svcFailed?'md-yellow':'md-green'}"></div>
+        <div class="mon-dot ${svcFailed||srvAttention?'md-yellow':'md-green'}"></div>
         <div class="pve-head-main">
           <div class="pve-head-title">
             <div class="node-name">${escHtml(srv.name)}${ptag}</div>
-            <div class="pve-head-sub">${svcFailed ? `${svcFailed} failed` : 'online'}</div>
+            <div class="pve-head-sub">${svcFailed ? `${svcFailed} failed` : srvReboot ? 'reboot required' : srvUpdates ? `${srvUpdates} updates` : 'online'}</div>
           </div>
           ${linuxStats}
         </div>
-        ${bdg(svcFailed?'red':'green', svcFailed?`${svcFailed} failed`:'all ok')}
+        ${bdg(svcFailed?'red':srvAttention?'yellow':'green', svcFailed?`${svcFailed} failed`:srvReboot?'reboot required':srvUpdates?`${srvUpdates} updates`:'all ok')}
         ${notifyBell('lx:'+srv.name)}
         <span class="chevron ${isOpen?'open':''}" style="margin-left:4px">▼</span>
       </div>
@@ -3083,7 +3127,7 @@ function buildLinux(linux){
     meta: `${reachable}/${linux.length} reachable`,
     badge: bdg(
       connecting && !realLinux.length ? 'gray' : allOk && !connecting ? 'green' : (failed || reachable === 0) ? 'red' : 'yellow',
-      connecting ? 'connecting…' : allOk ? 'healthy' : failed ? `${failed} services failed` : reachable === 0 ? 'offline' : `${reachable}/${linux.length} reachable`
+      connecting ? 'connecting…' : allOk ? 'healthy' : failed ? `${failed} services failed` : reachable === 0 ? 'offline' : rebootCount ? `${rebootCount} reboot required` : updateCount ? `${updateCount} updates` : `${reachable}/${linux.length} reachable`
     ),
     sbSummary: sbSummaryHtml,
     summary: summaryHtml,
@@ -3099,7 +3143,10 @@ function buildWindows(windows){
   const failed = windows.flatMap(s=>s.services||[]).filter(s=>!s.active&&s.state!=='unknown'&&!s.excluded).length;
   const totalSvcs = windows.flatMap(s=>s.services||[]).length;
   const upSvcs = windows.flatMap(s=>s.services||[]).filter(s=>s.active).length;
-  const allOk = real.length > 0 && real.every(s=>s.online && s.services?.every(sv=>sv.active || sv.excluded));
+  const updateCount = windows.reduce((sum,s)=>sum+(s.online ? Number(s.updates?.count || 0) : 0),0);
+  const rebootCount = windows.filter(s=>s.online && s.updates?.rebootRequired).length;
+  const updateAttention = updateCount > 0 || rebootCount > 0;
+  const allOk = real.length > 0 && real.every(s=>s.online && s.services?.every(sv=>sv.active || sv.excluded) && !Number(s.updates?.count || 0) && !s.updates?.rebootRequired);
   const cpuVals = windows.filter(s=>s.online&&s.cpu!=null).map(s=>s.cpu);
   const ramVals = windows.filter(s=>s.online&&s.ram).map(s=>s.ram.percent);
   const metric = (vals, limit) => {
@@ -3114,10 +3161,12 @@ function buildWindows(windows){
     ${cpuM?`<div class="sb-csum-item"><div class="sb-csum-val" style="color:${cpuM.color}">${cpuM.val}</div><div class="sb-csum-lbl">CPU usage</div></div>`:''}
     ${ramM?`<div class="sb-csum-item"><div class="sb-csum-val" style="color:${ramM.color}">${ramM.val}</div><div class="sb-csum-lbl">RAM usage</div></div>`:''}
     <div class="sb-csum-item"><div class="sb-csum-val">${upSvcs}/${totalSvcs}</div><div class="sb-csum-lbl">Services up</div></div>
+    ${updateAttention?`<div class="sb-csum-item"><div class="sb-csum-val" style="color:var(--yellow)">${updateCount}</div><div class="sb-csum-lbl">Updates</div></div>`:''}
   </div>`;
   const summaryHtml = `<div class="csum">
     <div class="csum-item"><div class="csum-val">${reachable}/${windows.length}</div><div class="csum-lbl">Servers</div></div>
     <div class="csum-item"><div class="csum-val">${upSvcs}/${totalSvcs}</div><div class="csum-lbl">Services up</div></div>
+    ${updateAttention?`<div class="csum-item"><div class="csum-val" style="color:var(--yellow)">${updateCount}</div><div class="csum-lbl">Updates${rebootCount?` · ${rebootCount} reboot`:''}</div></div>`:''}
   </div>`;
   const body = windows.map(srv=>{
     if(srv._connecting) return `
@@ -3163,6 +3212,9 @@ function buildWindows(windows){
     }) : [];
     const svcTotal = (srv.services || []).filter(s => !s.excluded).length;
     const svcUp = (srv.services || []).filter(s => s.active && !s.excluded).length;
+    const srvUpdates = Number(srv.updates?.count || 0);
+    const srvReboot = !!srv.updates?.rebootRequired;
+    const srvAttention = srvUpdates > 0 || srvReboot;
     const isOpen = panelOpenState('windows:'+key, windowsOpen[key]);
     windowsOpen[key] = isOpen;
     const stats = [
@@ -3173,19 +3225,21 @@ function buildWindows(windows){
       diskTotal != null ? pveHeadStat('Disk I/O', fmtRate(diskTotal), 'var(--cyan)', diskIOMbps != null ? miniSparkline(diskHistory.map(h=>({ time:h.time, diskIOMbps:(h.diskReadMBps||0)+(h.diskWriteMBps||0) })), 'diskIOMbps', diskIOMbps, rateColor, rateSparkMax(diskHistory, 'diskReadMBps', diskIOMbps), ' MB/s', 'Disk I/O') : '') : '',
       bwTotal != null ? pveHeadStat('BW', fmtRate(bwTotal), 'var(--green)', bwMbps != null ? miniSparkline(bwHistory, 'bandwidthMbps', bwMbps, ()=>'#34D399', rateSparkMax(bwHistory, 'bandwidthMbps', bwMbps), ' MB/s', 'Bandwidth') : '') : '',
       svcTotal ? pveHeadStat('Services', `${svcUp}/${svcTotal}`) : '',
+      srv.updates ? pveHeadStat('Updates', srvUpdates, srvUpdates ? 'var(--yellow)' : 'var(--green)') : '',
+      srvReboot ? pveHeadStat('Reboot', 'required', 'var(--yellow)') : '',
       srv.uptime ? pveHeadStat('Uptime', fmtUptime(srv.uptime)) : '',
     ].filter(Boolean).join('');
     return `
       <div class="node-hdr pve-node-hdr" onclick="toggleWindows(${jsStr(key)})">
-        <div class="mon-dot ${svcFailed?'md-yellow':'md-green'}"></div>
+        <div class="mon-dot ${svcFailed||srvAttention?'md-yellow':'md-green'}"></div>
         <div class="pve-head-main">
           <div class="pve-head-title">
             <div class="node-name">${escHtml(srv.name)}</div>
-            <div class="pve-head-sub">${svcFailed ? `${svcFailed} failed` : 'online'}</div>
+            <div class="pve-head-sub">${svcFailed ? `${svcFailed} failed` : srvReboot ? 'reboot required' : srvUpdates ? `${srvUpdates} updates` : 'online'}</div>
           </div>
           ${stats}
         </div>
-        ${bdg(svcFailed?'red':'green', svcFailed?`${svcFailed} failed`:'all ok')}
+        ${bdg(svcFailed?'red':srvAttention?'yellow':'green', svcFailed?`${svcFailed} failed`:srvReboot?'reboot required':srvUpdates?`${srvUpdates} updates`:'all ok')}
         ${notifyBell('win:'+srv.name)}
         <span class="chevron ${isOpen?'open':''}" style="margin-left:4px">▼</span>
       </div>
@@ -3217,7 +3271,7 @@ function buildWindows(windows){
     iconKey: 'windows',
     color: 'var(--blue)',
     meta: `${reachable}/${windows.length} reachable`,
-    badge: bdg(connecting && !real.length ? 'gray' : allOk && !connecting ? 'green' : (failed || reachable === 0) ? 'red' : 'yellow', connecting ? 'connecting...' : allOk ? 'healthy' : failed ? `${failed} services failed` : reachable === 0 ? 'offline' : `${reachable}/${windows.length} reachable`),
+    badge: bdg(connecting && !real.length ? 'gray' : allOk && !connecting ? 'green' : (failed || reachable === 0) ? 'red' : 'yellow', connecting ? 'connecting...' : allOk ? 'healthy' : failed ? `${failed} services failed` : reachable === 0 ? 'offline' : rebootCount ? `${rebootCount} reboot required` : updateCount ? `${updateCount} updates` : `${reachable}/${windows.length} reachable`),
     sbSummary: sbSummaryHtml,
     summary: summaryHtml,
     body,
@@ -5076,7 +5130,9 @@ function buildPbs(pbs){
         </div>
         ${storeRows(inst) || '<div class="empty">No datastore details available</div>'}
         ${failedTaskRows(inst) ? `<div class="overview-nested-title" style="margin-top:10px"><span>Failed tasks</span></div>${failedTaskRows(inst)}` : ''}
-        ${inst.partial && inst.errors?.length ? `<div class="offline-err" style="margin-top:10px">Partial API data: ${escHtml(inst.errors.join(' - '))}</div>` : ''}` : `<div class="offline-row"><div class="mon-dot ${inst._connecting?'md-gray':'md-red'}"></div><div>${inst._connecting?'Connecting to Proxmox Backup...':'Proxmox Backup unreachable'}<div class="offline-err">${escHtml(inst._connecting ? (inst.url||'') : (inst.error||inst.url||''))}</div></div></div>`}
+        ${inst.partial && inst.errors?.length ? `<div class="offline-err" style="margin-top:10px">Required PBS data unavailable: ${escHtml(inst.errors.join(' - '))}</div>` : ''}
+        ${inst.permissionHint ? `<div class="offline-err" style="margin-top:6px">Permission hint: ${escHtml(inst.permissionHint)}</div>` : ''}
+        ${inst.warnings?.length ? `<div style="margin-top:6px;color:var(--muted);font-size:11px">Optional API warnings: ${escHtml(inst.warnings.join(' - '))}</div>` : ''}` : `<div class="offline-row"><div class="mon-dot ${inst._connecting?'md-gray':'md-red'}"></div><div>${inst._connecting?'Connecting to Proxmox Backup...':'Proxmox Backup unreachable'}<div class="offline-err">${escHtml(inst._connecting ? (inst.url||'') : (inst.error||inst.url||''))}</div></div></div>`}
       </div>
     </section>`;
   }).join('') : `<div class="offline-row"><div class="mon-dot md-gray"></div><div>Connecting to Proxmox Backup...</div></div>`;
@@ -8834,10 +8890,13 @@ function ensureDashboardContent(reason = ''){
    half of every chart. Merge: keep previously-known points that are older than
    the new payload's first sample. Object arrays (instances/devices/nodes/…)
    are aligned by identity so histories survive reordering. */
-const HISTORY_MERGE_MAX = 1500;
+const HISTORY_MERGE_MAX = 5760;
 function historyItemKey(item){
   if(!item || typeof item !== 'object') return null;
-  return item.id ?? item.mac ?? item.host ?? item.url ?? item.name ?? null;
+  if(item.node?.name) return `${item.clusterName || item.clusterUrl || ''}|node:${item.node.name}`;
+  const base = item.id ?? item.mac ?? item.host ?? item.url ?? item.name ?? null;
+  if(base == null) return null;
+  return `${item.source || ''}|${item.environmentId || item.endpointId || ''}|${base}`;
 }
 function mergeCompactHistories(next, prev, depth = 0){
   if(!next || !prev || typeof next !== 'object' || typeof prev !== 'object' || depth > 8) return next;
@@ -8867,6 +8926,58 @@ function mergeCompactHistories(next, prev, depth = 0){
   }
   return next;
 }
+function mergeHistoryPayload(target, payload, depth = 0){
+  if(!target || !payload || typeof target !== 'object' || typeof payload !== 'object' || depth > 10) return target;
+  for(const [key, value] of Object.entries(payload)){
+    if(key === 'history' && Array.isArray(value)){
+      const byTime = new Map();
+      [...(Array.isArray(target[key]) ? target[key] : []), ...value].forEach(point => {
+        const time = Number(point?.time);
+        if(Number.isFinite(time)) byTime.set(time, point);
+      });
+      target[key] = [...byTime.values()].sort((a,b)=>Number(a.time)-Number(b.time)).slice(-HISTORY_MERGE_MAX);
+      continue;
+    }
+    if(Array.isArray(value)){
+      if(!Array.isArray(target[key])) target[key] = [];
+      const targetByKey = new Map(target[key].map(item => [historyItemKey(item), item]).filter(([itemKey]) => itemKey != null));
+      value.forEach((item, index) => {
+        const itemKey = historyItemKey(item);
+        const current = itemKey != null ? targetByKey.get(itemKey) : target[key][index];
+        if(current && item && typeof item === 'object') mergeHistoryPayload(current, item, depth + 1);
+      });
+      continue;
+    }
+    if(value && typeof value === 'object'){
+      if(!target[key] || typeof target[key] !== 'object') target[key] = {};
+      mergeHistoryPayload(target[key], value, depth + 1);
+    }
+  }
+  return target;
+}
+let historyFetchPromise = null;
+let historyFetchedPoints = 0;
+let historyFetchBackoffUntil = 0;
+async function fetchExpandedHistory(points){
+  points = Math.max(30, Math.min(5760, Number(points) || 80));
+  if(!window._lastData || points <= Math.max(historyFetchedPoints, Number(window._lastData._viewHistoryLimit || 0))) return;
+  if(historyFetchPromise) return historyFetchPromise;
+  if(Date.now() < historyFetchBackoffUntil) return;
+  historyFetchPromise = (async()=>{
+    const r = await fetch(`/api/status/history?points=${encodeURIComponent(points)}`, { headers:{...authHeaders(), 'Cache-Control':'no-store'}, cache:'no-store' });
+    handleUnauth(r);
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    const body = await r.json();
+    mergeHistoryPayload(window._lastData, body.data || {});
+    historyFetchedPoints = Math.max(historyFetchedPoints, Number(body._historyPoints || points));
+    window._lastData._viewHistoryLimit = Math.max(Number(window._lastData._viewHistoryLimit || 0), historyFetchedPoints);
+    writeStatusCache(window._lastData);
+  })().catch(err => {
+    historyFetchBackoffUntil = Date.now() + 15000;
+    throw err;
+  }).finally(()=>{ historyFetchPromise = null; });
+  return historyFetchPromise;
+}
 async function fetchStatus(opts = {}){
   const ctrl = new AbortController();
   trackStatusController(ctrl);
@@ -8880,7 +8991,11 @@ async function fetchStatus(opts = {}){
     const ct = r.headers.get('content-type') || '';
     if(!ct.toLowerCase().includes('application/json')) throw new Error(`Expected JSON from ${url}, got ${ct || 'unknown content type'}`);
     const data = statusCachedFallback(await r.json());
-    if(!(opts.detail || opts.full)) mergeCompactHistories(data, window._lastData || readStatusCache());
+    if(!(opts.detail || opts.full)) {
+      const previous = window._lastData || readStatusCache();
+      mergeCompactHistories(data, previous);
+      data._viewHistoryLimit = Math.max(Number(data._viewHistoryLimit || 0), Number(previous?._viewHistoryLimit || 0));
+    }
     writeStatusCache(data);
     return data;
   }finally{

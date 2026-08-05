@@ -1,7 +1,7 @@
 Set-StrictMode -Version 2.0
 $ErrorActionPreference = "SilentlyContinue"
 
-$Version = "1.2.4"
+$Version = "1.3.0"
 $Url = [string]$env:OMNISIGHT_URL
 $Url = $Url.TrimEnd("/")
 $Token = $env:OMNISIGHT_TOKEN
@@ -12,6 +12,10 @@ if (-not $Role) { $Role = "windows" }
 if ($Interval -lt 5) { $Interval = 5 }
 if ($Interval -gt 300) { $Interval = 300 }
 $Insecure = "$env:OMNISIGHT_INSECURE_TLS" -match "^(1|true|yes)$"
+
+try {
+  [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor [System.Net.SecurityProtocolType]::Tls12
+} catch {}
 
 if (-not $Url -or -not $Token) {
   Write-Error "OMNISIGHT_URL and OMNISIGHT_TOKEN are required"
@@ -40,6 +44,8 @@ function Get-AgentId {
 
 $AgentId = Get-AgentId
 $RestartAfterCommand = $false
+$UpdateStatus = $null
+$UpdateCheckedAt = [datetime]::MinValue
 
 function Invoke-OmniSight {
   param([string]$Method, [string]$Path, $Body = $null, [int]$TimeoutSec = 20)
@@ -67,46 +73,92 @@ function NumberOrNull($value) {
   return $null
 }
 
-function Get-CounterValue {
-  param([string[]]$Counter)
-  try {
-    $sample = Get-Counter -Counter $Counter -SampleInterval 1 -MaxSamples 1
-    return $sample.CounterSamples
-  } catch {
-    return @()
-  }
-}
-
 function Get-DiskIo {
-  $samples = Get-CounterValue @("\PhysicalDisk(_Total)\Disk Read Bytes/sec", "\PhysicalDisk(_Total)\Disk Write Bytes/sec")
-  $read = ($samples | Where-Object { $_.Path -like "*Disk Read Bytes/sec" } | Select-Object -First 1).CookedValue
-  $write = ($samples | Where-Object { $_.Path -like "*Disk Write Bytes/sec" } | Select-Object -First 1).CookedValue
-  if ($null -eq $read -and $null -eq $write) { return $null }
-  $readValue = 0
-  $writeValue = 0
-  if ($null -ne $read) { $readValue = [double]$read }
-  if ($null -ne $write) { $writeValue = [double]$write }
-  return @{
-    readBps = [math]::Max(0, [math]::Round($readValue))
-    writeBps = [math]::Max(0, [math]::Round($writeValue))
+  try {
+    $rows = @(Get-CimInstance -ClassName Win32_PerfFormattedData_PerfDisk_PhysicalDisk -ErrorAction Stop)
+    $disks = @($rows | Where-Object { $_.Name -ne "_Total" })
+    if (-not $disks.Count) { $disks = $rows }
+    $read = 0.0
+    $write = 0.0
+    foreach ($disk in $disks) {
+      if ($null -ne $disk.DiskReadBytesPerSec) { $read += [double]$disk.DiskReadBytesPerSec }
+      if ($null -ne $disk.DiskWriteBytesPerSec) { $write += [double]$disk.DiskWriteBytesPerSec }
+    }
+    return @{
+      readBps = [math]::Max(0, [math]::Round($read))
+      writeBps = [math]::Max(0, [math]::Round($write))
+    }
+  } catch {
+    return $null
   }
 }
 
 function Get-Bandwidth {
-  $samples = Get-CounterValue @("\Network Interface(*)\Bytes Received/sec", "\Network Interface(*)\Bytes Sent/sec")
-  if (-not $samples.Count) { return $null }
-  $rx = 0.0
-  $tx = 0.0
-  foreach ($s in $samples) {
-    $path = [string]$s.Path
-    if ($path -match "loopback|isatap|teredo|bluetooth|tunnel|pseudo") { continue }
-    if ($path -like "*Bytes Received/sec") { $rx += [double]$s.CookedValue }
-    if ($path -like "*Bytes Sent/sec") { $tx += [double]$s.CookedValue }
+  try {
+    $rows = @(Get-CimInstance -ClassName Win32_PerfFormattedData_Tcpip_NetworkInterface -ErrorAction Stop)
+    if (-not $rows.Count) { return $null }
+    $rx = 0.0
+    $tx = 0.0
+    foreach ($row in $rows) {
+      $name = "$($row.Name) $($row.InterfaceDescription)"
+      if ($name -match "loopback|isatap|teredo|bluetooth|tunnel|pseudo") { continue }
+      if ($null -ne $row.BytesReceivedPerSec) { $rx += [double]$row.BytesReceivedPerSec }
+      if ($null -ne $row.BytesSentPerSec) { $tx += [double]$row.BytesSentPerSec }
+    }
+    return @{
+      rxBps = [math]::Max(0, [math]::Round($rx))
+      txBps = [math]::Max(0, [math]::Round($tx))
+    }
+  } catch {
+    return $null
   }
-  return @{
-    rxBps = [math]::Max(0, [math]::Round($rx))
-    txBps = [math]::Max(0, [math]::Round($tx))
+}
+
+function Get-UpdateStatus {
+  $now = Get-Date
+  if ($null -ne $script:UpdateStatus -and ($now - $script:UpdateCheckedAt).TotalMinutes -lt 30) {
+    return $script:UpdateStatus
   }
+
+  $count = $null
+  $source = "windows-update"
+  try {
+    $session = New-Object -ComObject Microsoft.Update.Session
+    $searcher = $session.CreateUpdateSearcher()
+    $result = $searcher.Search("IsInstalled=0 and IsHidden=0")
+    $count = [int]$result.Updates.Count
+  } catch {
+    $source = "unavailable"
+  }
+
+  $rebootRequired = $false
+  try {
+    $systemInfo = New-Object -ComObject Microsoft.Update.SystemInfo
+    $rebootRequired = [bool]$systemInfo.RebootRequired
+  } catch {}
+  if (-not $rebootRequired) {
+    $rebootPaths = @(
+      "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending",
+      "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired"
+    )
+    $rebootRequired = @($rebootPaths | Where-Object { Test-Path $_ }).Count -gt 0
+    if (-not $rebootRequired) {
+      try {
+        $pendingRename = (Get-ItemProperty "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager" -Name PendingFileRenameOperations -ErrorAction Stop).PendingFileRenameOperations
+        $rebootRequired = $null -ne $pendingRename
+      } catch {}
+    }
+  }
+
+  $checkedAt = [int64][math]::Floor(($now.ToUniversalTime() - [datetime]"1970-01-01").TotalSeconds)
+  $script:UpdateStatus = @{
+    count = $count
+    rebootRequired = $rebootRequired
+    source = $source
+    checkedAt = $checkedAt
+  }
+  $script:UpdateCheckedAt = $now
+  return $script:UpdateStatus
 }
 
 function Get-ServicesPayload {
@@ -166,6 +218,7 @@ function Get-Payload {
       diskIO = Get-DiskIo
       bandwidth = Get-Bandwidth
     }
+    updates = Get-UpdateStatus
     services = @(Get-ServicesPayload)
   }
 }

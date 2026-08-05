@@ -26,7 +26,7 @@ security:
   allowedPublicIps: []
 
 # Linux servers, Windows hosts, Proxmox nodes and Docker hosts are all monitored by the
-# OmniSight agent (push). Use Settings -> "+ Add System / Windows Host / Node / Host" to get
+# OmniSight agent (push). Use Settings -> "+ Add System / Windows Host / Install Agent / Host" to get
 # a copy-paste install command (Binary/systemd, PowerShell or Docker) with the token
 # pre-filled. Agents self-register; no per-server config is needed here.
 #   Binary:  curl -fsSL http://<host>:3000/agent/install.sh | \
@@ -42,10 +42,22 @@ linux:
 windows:
   enabled: true
 
-# Proxmox data (VM/LXC, storage, backups, Ceph) is collected by the agent via
-# pvesh on each node - no API token needed. Just install the agent on the node.
+# Proxmox can use one or more saved API clusters, agents, or both. A cluster API
+# endpoint discovers every node in that cluster. The old single url/token fields
+# remain backward compatible. Agent mode uses pvesh locally and needs no API token.
 proxmox:
   enabled: true
+  # instances:
+  #   - name: Datacenter A
+  #     url: "https://pve-a.example.com:8006"
+  #     tokenId: "root@pam!omnisight"
+  #     tokenSecret: "${PVE_A_TOKEN_SECRET:-}"
+  #     insecureTLS: false
+  #   - name: Standalone B
+  #     url: "https://pve-b.example.com:8006"
+  #     tokenId: "root@pam!omnisight"
+  #     tokenSecret: "${PVE_B_TOKEN_SECRET:-}"
+  #     insecureTLS: false
 
 kubernetes:
   kubeconfig: './data/kube.bin'   # put your kubeconfig in data/
@@ -169,6 +181,8 @@ ugreen:
 pbs:
   enabled: false
   # Proxmox Backup Server management API. Default PBS HTTPS port is 8007.
+  # Required ACLs for both token and owning user: Audit on / and DatastoreAudit
+  # on /datastore with propagate enabled.
   # instances:
   #   - name: PBS
   #     url: "https://pbs.example.com:8007"

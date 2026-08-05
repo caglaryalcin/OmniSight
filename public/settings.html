@@ -661,11 +661,13 @@ html[data-theme="light"] .ci-help{color:#53657c}
         <input type="file" id="icon-proxmox-f" accept="image/*,.svg" style="display:none" onchange="uploadIcon(this,'icon-proxmox')">
       </div>
     </div>
-    <div class="form-grid">
-      <div class="form-group"><label>API URL</label><input type="text" id="px-url" placeholder="https://pve.example.local:8006"></div>
-      <div class="form-group"><label>Token ID</label><input type="text" id="px-tokenid" placeholder="root@pam!omnisight"></div>
-      <div class="form-group"><label>Token Secret</label><input type="password" id="px-tokensecret" placeholder=""><div style="font-size:12px;color:var(--muted);line-height:1.35;overflow-wrap:anywhere">💡 API token covers Proxmox inventory, CPU, RAM, VM/LXC, services, storage and API-exposed network metrics. CPU/System/NVMe temperatures and some host Disk I/O counters are not always exposed by the Proxmox API; add SSH metrics fallback for those values.</div></div>
-      <div class="form-group"><label>API TLS</label><select id="px-insecure"><option value="false">Verify certificate</option><option value="true">Allow self-signed</option></select></div>
+    <div class="section mini-section">
+      <div class="sec-head">
+        <h3>API clusters</h3>
+        <button class="btn-add" type="button" onclick="addPveApiInstance()">+ Add API Cluster</button>
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Add each independent Proxmox server or cluster here. These entries are saved permanently. One cluster API endpoint automatically discovers all nodes in that cluster.</div>
+      <div id="px-api-list"></div>
     </div>
     <div class="form-group">
       <div class="sys-hdr">
@@ -677,10 +679,11 @@ html[data-theme="light"] .ci-help{color:#53657c}
     </div>
     <div class="form-group" style="margin-bottom:0">
       <div class="sys-hdr">
-        <label style="margin:0">Nodes</label>
-        <button class="btn-add" type="button" onclick="openAddModal('proxmox')">+ Add Node</button>
+        <label style="margin:0">Connected Proxmox agents</label>
+        <button class="btn-add" type="button" onclick="openAddModal('proxmox')">+ Install Agent</button>
       </div>
-      <div class="sys-list" id="px-agents"><div class="sys-empty">No nodes yet — click “+ Add Node”, run the command on a Proxmox node and it appears here automatically.</div></div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px">This is live agent inventory, not API configuration. Installed agents remain listed offline when they stop reporting.</div>
+      <div class="sys-list" id="px-agents"><div class="sys-empty">No agents yet — click “+ Install Agent”, run the command on a Proxmox node and it appears here automatically.</div></div>
     </div>
   </div>
 </div>
@@ -1708,7 +1711,7 @@ html[data-theme="light"] .ci-help{color:#53657c}
 
 <script src="/i18n.js"></script>
 <script>
-let lCount = 0, sCount = 0, dCount = 0, dbCount = 0, dkApiCount = 0, dkSshCount = 0, pveSshCount = 0, promCount = 0, dockhandCount = 0, firewallCount = 0, trueNasCount = 0, unifiCtrlCount = 0, qnapCount = 0, ugreenCount = 0, pbsCount = 0, cicdCount = 0, veeamCount = 0, portainerCount = 0, checkCount = 0;
+let lCount = 0, sCount = 0, dCount = 0, dbCount = 0, dkApiCount = 0, dkSshCount = 0, pveApiCount = 0, pveSshCount = 0, promCount = 0, dockhandCount = 0, firewallCount = 0, trueNasCount = 0, unifiCtrlCount = 0, qnapCount = 0, ugreenCount = 0, pbsCount = 0, cicdCount = 0, veeamCount = 0, portainerCount = 0, checkCount = 0;
 const SETTINGS_CARD_OPEN_KEY = 'os_settings_card_open';
 const SETTINGS_ACTIVE_SECTION_KEY = 'os_settings_active_section';
 const DEFAULT_SETTINGS_SECTION = 'appearance';
@@ -2235,7 +2238,7 @@ function previewConfiguredIds(cfg = {}) {
   const en = c => !!(c && c.enabled !== false);
   const hasInstances = c => !!(c && (c.url || (Array.isArray(c.instances) && c.instances.length)));
   const ids = [];
-  if (en(cfg.proxmox) && (cfg.proxmox?.url || cfg.proxmox?.tokenId || cfg.proxmox?.tokenSecret || (cfg.proxmox?.nodes || []).length)) ids.push('proxmox');
+  if (en(cfg.proxmox) && (cfg.proxmox?.url || (cfg.proxmox?.instances || []).length || (cfg.proxmox?.nodes || []).length)) ids.push('proxmox');
   if (en(cfg.kubernetes) && cfg.kubernetes?.kubeconfig) ids.push('kubernetes');
   if (en(cfg.linux) && cfg.linux?.agentToken) ids.push('linux');
   if (en(cfg.windows) && cfg.linux?.agentToken) ids.push('windows');
@@ -2616,6 +2619,31 @@ function addDockerSshHost(data = {}) {
     </div>`;
   document.getElementById('docker-ssh-list').appendChild(item);
   if (data.sshPassword) secVal(data.sshPassword, item.querySelector('.dkssh-password'));
+  applyLanguageFragment(item);
+}
+
+function addPveApiInstance(data = {}) {
+  const idx = pveApiCount++;
+  const id = `pveapi-${idx}`;
+  const item = document.createElement('div');
+  item.className = 'arr-item';
+  item.innerHTML = `
+    <div class="arr-hdr" onclick="toggleArr('${id}')">
+      <span class="arr-hdr-name">${escHtml(data.name || data.url || 'Proxmox Cluster')}</span>
+      <button class="btn-rm" type="button" onclick="event.stopPropagation();this.closest('.arr-item').remove()">✕</button>
+    </div>
+    <div class="arr-body" id="ab-${id}">
+      <div class="form-grid">
+        <div class="form-group"><label>Name</label><input type="text" class="pveapi-name" value="${escHtml(data.name||'')}" placeholder="datacenter-a" oninput="this.closest('.arr-item').querySelector('.arr-hdr-name').textContent=this.value||'Proxmox Cluster'"></div>
+        <div class="form-group"><label>API URL</label><input type="text" class="pveapi-url" value="${escHtml(data.url||'')}" placeholder="https://pve.example.local:8006"></div>
+        <div class="form-group"><label>Token ID</label><input type="text" class="pveapi-token-id" value="${escHtml(data.tokenId||'')}" placeholder="root@pam!omnisight"></div>
+        <div class="form-group"><label>Token Secret</label><input type="password" class="pveapi-token-secret" placeholder="leave blank to keep current secret"></div>
+        <div class="form-group"><label>API TLS</label><select class="pveapi-insecure"><option value="false" ${!data.insecureTLS?'selected':''}>Verify certificate</option><option value="true" ${data.insecureTLS?'selected':''}>Allow self-signed</option></select></div>
+      </div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.35;overflow-wrap:anywhere">API token covers inventory, CPU, RAM, VM/LXC, services, storage and API-exposed network metrics. Add SSH metrics below for temperatures and host Disk I/O when needed.</div>
+    </div>`;
+  document.getElementById('px-api-list').appendChild(item);
+  if (data.tokenSecret) secVal(data.tokenSecret, item.querySelector('.pveapi-token-secret'));
   applyLanguageFragment(item);
 }
 
@@ -3628,7 +3656,7 @@ function applySettingsAgents(all) {
   window._agentData = visible;
   renderAgentList('lx-agents', visible.filter(a => a.kind === 'linux'), 'No systems yet — click “+ Add System”, run the command on a server and it appears here automatically.');
   renderAgentList('win-agents', visible.filter(a => a.kind === 'windows'), 'No hosts yet - click "+ Add Windows Host", run the PowerShell command and it appears here automatically.');
-  renderAgentList('px-agents', visible.filter(a => a.kind === 'proxmox'), 'No nodes yet — click “+ Add Node”, run the command on a Proxmox node and it appears here automatically.');
+  renderAgentList('px-agents', visible.filter(a => a.kind === 'proxmox'), 'No agents yet — click “+ Install Agent”, run the command on a Proxmox node and it appears here automatically.');
   renderAgentList('dk-agents', visible.filter(a => a.kind === 'docker'), 'No hosts yet — click “+ Add Host”, run the command on a Docker host and it appears here automatically.');
 }
 
@@ -3928,6 +3956,7 @@ function closeConfirmModal(ok) {
 }
 
 const DYNAMIC_CONFIG_LIST_IDS = [
+  'px-api-list',
   'px-ssh-list',
   'syn-list',
   'mikrotik-list',
@@ -3993,6 +4022,7 @@ function resetDynamicConfigLists() {
   dbCount = 0;
   dkApiCount = 0;
   dkSshCount = 0;
+  pveApiCount = 0;
   pveSshCount = 0;
   promCount = 0;
   dockhandCount = 0;
@@ -4067,10 +4097,16 @@ function populate(cfg) {
     document.getElementById('en-proxmox').checked = cfg.proxmox.enabled !== false;
     document.getElementById('cb-proxmox').classList.remove('hidden');
     document.getElementById('icon-proxmox').value = cfg.proxmox.icon || '';
-    document.getElementById('px-url').value = cfg.proxmox.url || '';
-    document.getElementById('px-tokenid').value = cfg.proxmox.tokenId || '';
-    secVal(cfg.proxmox.tokenSecret, document.getElementById('px-tokensecret'));
-    document.getElementById('px-insecure').value = cfg.proxmox.insecureTLS ? 'true' : 'false';
+    const instances = Array.isArray(cfg.proxmox.instances) && cfg.proxmox.instances.length
+      ? cfg.proxmox.instances
+      : (cfg.proxmox.url ? [{
+          name: cfg.proxmox.name || 'Proxmox',
+          url: cfg.proxmox.url,
+          tokenId: cfg.proxmox.tokenId,
+          tokenSecret: cfg.proxmox.tokenSecret,
+          insecureTLS: cfg.proxmox.insecureTLS,
+        }] : []);
+    uniqueConfigItems(instances, ['name', 'url']).forEach(addPveApiInstance);
     uniqueConfigItems(cfg.proxmox.sshMetrics || [], ['node', 'name', 'sshHost']).forEach(addPveSshMetricHost);
   }
   if (cfg.linux) {
@@ -4415,9 +4451,20 @@ function collect() {
 
   {
     const on = document.getElementById('en-proxmox').checked;
-    const url = document.getElementById('px-url').value.trim();
-    const tokenId = document.getElementById('px-tokenid').value.trim();
-    const tokenSecret = maskedVal(document.getElementById('px-tokensecret'));
+    const instances = [];
+    document.querySelectorAll('#px-api-list .arr-item').forEach(item => {
+      const url = item.querySelector('.pveapi-url').value.trim();
+      const name = item.querySelector('.pveapi-name').value.trim();
+      const tokenId = item.querySelector('.pveapi-token-id').value.trim();
+      const tokenSecret = maskedVal(item.querySelector('.pveapi-token-secret'));
+      if (url || name) instances.push({
+        name: name || undefined,
+        url: url || undefined,
+        tokenId: tokenId || undefined,
+        tokenSecret: tokenSecret || undefined,
+        insecureTLS: item.querySelector('.pveapi-insecure').value === 'true' || undefined,
+      });
+    });
     const sshMetrics = [];
     document.querySelectorAll('#px-ssh-list .arr-item').forEach(item => {
       const sshHost = item.querySelector('.pvessh-host').value.trim();
@@ -4434,13 +4481,11 @@ function collect() {
       if (h.node && h.sshHost) sshMetrics.push(h);
     });
     const uniqueSshMetrics = uniqueConfigItems(sshMetrics, ['node', 'sshHost']);
-    if (on) cfg.proxmox = {
+    const uniqueInstances = uniqueConfigItems(instances, ['name', 'url']);
+    if (on || uniqueInstances.length) cfg.proxmox = {
       enabled: on,
       icon: document.getElementById('icon-proxmox').value.trim() || undefined,
-      url: url || undefined,
-      tokenId: tokenId || undefined,
-      tokenSecret: tokenSecret || undefined,
-      insecureTLS: document.getElementById('px-insecure').value === 'true' || undefined,
+      instances: uniqueInstances.length ? uniqueInstances : undefined,
       sshMetrics: uniqueSshMetrics.length ? uniqueSshMetrics : undefined,
     };
   }

@@ -325,6 +325,13 @@ function handleReport(r) {
   const bandwidth = rateObj(r.metrics?.bandwidth);
   const temps = metricTemps(r.metrics?.temps);
   const smart = metricSmart(r.metrics?.smart);
+  const updateCount = num(r.updates?.count, 1e6);
+  const updates = r.updates && typeof r.updates === 'object' ? {
+    count: updateCount,
+    rebootRequired: !!r.updates.rebootRequired,
+    source: String(r.updates.source || '').slice(0, 32),
+    checkedAt: num(r.updates.checkedAt),
+  } : null;
 
   let docker = null;
   if (r.docker && typeof r.docker === 'object') {
@@ -340,6 +347,7 @@ function handleReport(r) {
         labelsText: String(c.labelsText || '').slice(0, 4000),
         cpu: num(c.cpu, 1e6),
         memPercent: num(c.memPercent, 1e6),
+        memUsage: String(c.memUsage || '').slice(0, 80),
         netIO: String(c.netIO || '').slice(0, 80),
         blockIO: String(c.blockIO || '').slice(0, 80),
       })).filter(c => c.id),
@@ -380,6 +388,7 @@ function handleReport(r) {
       smart,
     },
     services,
+    updates,
     docker,
     pve,
     cores: num(r.cores, 4096),
@@ -485,6 +494,7 @@ function getAllAgentData(config) {
       uptime: online ? a.uptime : null,
       lastSeen: a.lastSeen || null,
       services: online ? services : [],
+      updates: online ? a.updates : null,
       history: agentHistoryForUi(a.id),
     };
   });
@@ -547,6 +557,7 @@ function getWindowsData(config) {
       uptime: online ? a.uptime : null,
       lastSeen: a.lastSeen || null,
       services: online ? services : [],
+      updates: online ? a.updates : null,
       history: agentHistoryForUi(a.id),
     };
   });
@@ -590,6 +601,19 @@ function parsePorts(raw) {
   return out;
 }
 
+function parseDockerBytes(value) {
+  const match = String(value || '').trim().match(/^([0-9.]+)\s*([kmgtpe]?i?b)?$/i);
+  if (!match) return null;
+  const units = { b: 1, kb: 1e3, mb: 1e6, gb: 1e9, tb: 1e12, pb: 1e15, kib: 1024, mib: 1024 ** 2, gib: 1024 ** 3, tib: 1024 ** 4, pib: 1024 ** 5 };
+  const multiplier = units[String(match[2] || 'b').toLowerCase()];
+  return multiplier ? Number(match[1]) * multiplier : null;
+}
+
+function dockerMemoryUsage(value) {
+  const [usedRaw, limitRaw] = String(value || '').split('/').map(part => part.trim());
+  return { usage: parseDockerBytes(usedRaw), limit: parseDockerBytes(limitRaw) };
+}
+
 function getDockerData() {
   const now = Date.now();
   const rows = [...agents.values()].filter(a => a.role === 'docker').map(a => {
@@ -597,7 +621,9 @@ function getDockerData() {
     const connecting = isConnecting(a, now);
     if (!online && connecting) return { source: 'agent', id: a.id, name: a.hostname, host: a.ip || '', online: false, _connecting: true, error: 'waiting for first report after restart', containers: [], summary: { total: 0, running: 0, stopped: 0, other: 0, unused: null } };
     if (!online) return { source: 'agent', id: a.id, name: a.hostname, host: a.ip || '', online: false, error: 'agent offline', containers: [], summary: { total: 0, running: 0, stopped: 0, other: 0, unused: null } };
-    const containers = (a.docker.containers || []).map(c => ({
+    const containers = (a.docker.containers || []).map(c => {
+      const memory = dockerMemoryUsage(c.memUsage);
+      return {
       id: c.id,
       name: c.name,
       image: c.image,
@@ -610,16 +636,25 @@ function getDockerData() {
       color: stateColor(c.state),
       cpu: c.cpu ?? null,
       memPercent: c.memPercent ?? null,
+      memUsageBytes: memory.usage,
+      memLimitBytes: memory.limit,
       netIO: c.netIO || '',
       blockIO: c.blockIO || '',
-    })).sort((x, y) => {
+      };
+    }).sort((x, y) => {
       const order = { running: 0, restarting: 1, paused: 2, exited: 3, dead: 4 };
       return (order[x.state] ?? 5) - (order[y.state] ?? 5);
     });
     const running = containers.filter(c => c.state === 'running').length;
     const stopped = containers.filter(c => c.state === 'exited' || c.state === 'dead').length;
-    const cpu = Math.round(containers.reduce((s, c) => s + (c.cpu || 0), 0) * 10) / 10;
-    const memPercent = Math.round(containers.reduce((s, c) => s + (c.memPercent || 0), 0) * 10) / 10;
+    const cpu = Math.min(100, Math.round(containers.reduce((s, c) => s + (c.cpu || 0), 0) * 10) / 10);
+    const memoryRows = containers.filter(c => c.memUsageBytes != null && c.memLimitBytes > 0);
+    const memoryUsed = memoryRows.reduce((sum, c) => sum + Number(c.memUsageBytes), 0);
+    const memoryLimit = memoryRows.reduce((max, c) => Math.max(max, Number(c.memLimitBytes)), 0);
+    const memVals = containers.filter(c => c.memPercent != null).map(c => Number(c.memPercent));
+    const memPercent = memoryLimit
+      ? Math.min(100, Math.round((memoryUsed / memoryLimit) * 1000) / 10)
+      : memVals.length ? Math.min(100, Math.round((memVals.reduce((sum, value) => sum + value, 0) / memVals.length) * 10) / 10) : 0;
     return {
       source: 'agent', id: a.id, name: a.hostname, host: a.ip || '', online: true, containers,
       metrics: { bandwidth: a.metrics?.bandwidth || null },

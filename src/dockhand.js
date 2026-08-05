@@ -433,13 +433,13 @@ async function getDockhandInstance(instance) {
   const envContainers = environments.length
     ? (await mapLimit(environments, 3, env => getDockhandContainersForEnv(instance, env))).flat()
     : [];
-  const containers = uniqueBy([...baseContainers, ...envContainers], c => c.id || `${c.sourceUrl}:${c.environmentId}:${c.name}`);
+  const containers = uniqueBy([...(envContainers.length ? envContainers : []), ...baseContainers], c => `${c.sourceUrl}:${c.id || c.name}`);
   const refsInUse = usedImageRefs(containers);
   const baseImages = await getDockhandImages(instance, null, refsInUse);
   const envImages = environments.length
     ? (await mapLimit(environments, 3, env => getDockhandImages(instance, env, refsInUse))).flat()
     : [];
-  const images = uniqueBy([...baseImages, ...envImages], i => i.id || `${i.sourceUrl}:${i.environmentId}:${i.name}`);
+  const images = uniqueBy([...(envImages.length ? envImages : []), ...baseImages], i => `${i.sourceUrl}:${i.id || i.name}`);
   await attachImageUpdates(containers, images);
   const summary = summarize(containers, [{ ...instance, online: true }], images);
   return {
@@ -578,4 +578,46 @@ async function dockhandLogs(cfg = {}, instanceName, id, env = '') {
   throw lastErr || new Error('Dockhand logs endpoint not found');
 }
 
-module.exports = { getAllDockhand, dockhandLogs, configInstances };
+function enrichDockhandWithDocker(dockhand, dockerHosts = []) {
+  if (!dockhand || !Array.isArray(dockerHosts)) return dockhand;
+  const byId = new Map();
+  const byNameImage = new Map();
+  const addUnique = (map, key, value) => {
+    if (!key) return;
+    map.set(key, map.has(key) ? null : value);
+  };
+  const imageKey = value => shortImage(value).toLowerCase();
+  dockerHosts.flatMap(host => host?.containers || []).forEach(container => {
+    const id = str(container.id).toLowerCase();
+    if (id) addUnique(byId, id.slice(0, 12), container);
+    const name = str(container.name).toLowerCase();
+    if (name) addUnique(byNameImage, `${name}|${imageKey(container.image)}`, container);
+  });
+  const enrich = container => {
+    const id = str(container.id).toLowerCase().slice(0, 12);
+    const nameImage = `${str(container.name).toLowerCase()}|${imageKey(container.image)}`;
+    const metric = (id && byId.get(id)) || byNameImage.get(nameImage);
+    if (!metric) return container;
+    const dockhandUpdate = normalizeImageUpdateValue(container.imageUpdate);
+    const dockerUpdate = normalizeImageUpdateValue(metric.imageUpdate);
+    return {
+      ...container,
+      cpu: metric.cpu ?? container.cpu,
+      memPercent: metric.memPercent ?? container.memPercent,
+      netIO: metric.netIO || container.netIO,
+      blockIO: metric.blockIO || container.blockIO,
+      imageUpdate: dockerUpdate?.status && dockerUpdate.status !== 'unknown' ? dockerUpdate : dockhandUpdate || container.imageUpdate,
+      metricsSource: 'docker',
+    };
+  };
+  return {
+    ...dockhand,
+    containers: (dockhand.containers || []).map(enrich),
+    instances: (dockhand.instances || []).map(instance => ({
+      ...instance,
+      containers: (instance.containers || []).map(enrich),
+    })),
+  };
+}
+
+module.exports = { getAllDockhand, dockhandLogs, configInstances, enrichDockhandWithDocker };

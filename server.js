@@ -16,7 +16,7 @@ const { getAllHealthchecks } = require('./src/healthchecks');
 const { getAllUptimeKuma, debugUptimeKuma } = require('./src/uptimekuma');
 const { getPrometheusData } = require('./src/prometheus');
 const { getAllChecks } = require('./src/checks');
-const { getAllDockhand, dockhandLogs, configInstances: dockhandConfigInstances } = require('./src/dockhand');
+const { getAllDockhand, dockhandLogs, configInstances: dockhandConfigInstances, enrichDockhandWithDocker } = require('./src/dockhand');
 const { getAllDatabaseData } = require('./src/database');
 const { getAllFirewallData } = require('./src/firewall');
 const { getAllTrueNasData, configuredInstances: trueNasConfigInstances } = require('./src/truenas');
@@ -28,7 +28,7 @@ const { getAllPortainerData, configuredInstances: portainerConfigInstances, port
 const { getCloudflareData } = require('./src/cloudflare');
 const { getAllCiData, configuredProjects: ciConfigProjects } = require('./src/cicd');
 const { getAllVeeamData, configuredInstances: veeamConfigInstances } = require('./src/veeam');
-const { getProxmoxApiData } = require('./src/proxmox');
+const { getAllProxmoxApiData, configuredInstances: proxmoxConfigInstances } = require('./src/proxmox');
 const { getDockerApiData, dockerLogs: dockerApiLogs, dockerPrune: dockerApiPrune } = require('./src/docker');
 const { dispatchAlert } = require('./src/alerts');
 const { decryptConfig, encryptConfigValue, isEncrypted, SENSITIVE_KEYS, encryptionEnabled } = require('./src/crypto');
@@ -2626,7 +2626,7 @@ function reloadRuntimeHistoryMaps() {
 }
 
 function hasProxmoxApi() {
-  return !!(config.proxmox && config.proxmox.url && config.proxmox.tokenId && config.proxmox.tokenSecret);
+  return proxmoxConfigInstances(config.proxmox || {}).length > 0;
 }
 
 function hasDockerApi() {
@@ -2767,7 +2767,7 @@ function mergeDockerHistory(nextRows) {
 }
 
 async function getProxmoxData() {
-  if (hasProxmoxApi()) return getProxmoxApiData({ ...config.proxmox, excludedServices: config.excludedServices });
+  if (hasProxmoxApi()) return getAllProxmoxApiData({ ...config.proxmox, excludedServices: config.excludedServices });
   return agents.getProxmoxData({ excludedServices: config.excludedServices });
 }
 
@@ -3312,7 +3312,11 @@ function dashboardHistoryPointLimit() {
   try { periods.push(Number(checksConfig()?.historyHours || 1)); } catch {}
   const hours = Math.max(1, ...periods.filter(n => Number.isFinite(Number(n)) && Number(n) > 0).map(Number));
   const points = Math.ceil(hours * 60 * 4);
-  return Math.max(120, Math.min(historyRetentionMaxPoints(), points, Number(process.env.OMNISIGHT_VIEW_HISTORY_POINTS || 1440)));
+  const configuredCap = Number(process.env.OMNISIGHT_VIEW_HISTORY_POINTS);
+  const cap = Number.isFinite(configuredCap) && configuredCap > 0
+    ? Math.round(configuredCap)
+    : historyRetentionMaxPoints();
+  return Math.max(120, Math.min(historyRetentionMaxPoints(), points, cap));
 }
 
 function compactDashboardHistoryPointLimit() {
@@ -3335,6 +3339,44 @@ function cloneDashboardValue(value, key = '', limit = dashboardHistoryPointLimit
     out[childKey] = cloneDashboardValue(childValue, childKey, limit);
   }
   return out;
+}
+
+const HISTORY_IDENTITY_KEYS = new Set(['id', 'name', 'host', 'url', 'mac', 'node', 'clusterName', 'source', 'environmentId', 'endpointId']);
+
+function cloneDashboardHistories(value, key = '', limit = dashboardHistoryPointLimit()) {
+  if (Array.isArray(value)) {
+    if (key === 'history') return value.slice(-limit).map(point => cloneDashboardValue(point, '', limit));
+    return value
+      .map(item => cloneDashboardHistories(item, '', limit))
+      .filter(item => item && (typeof item !== 'object' || Object.keys(item).length));
+  }
+  if (!value || typeof value !== 'object') return undefined;
+  const out = {};
+  for (const [childKey, childValue] of Object.entries(value)) {
+    if (HISTORY_IDENTITY_KEYS.has(childKey) && (typeof childValue !== 'object' || childValue === null)) {
+      out[childKey] = childValue;
+      continue;
+    }
+    const cloned = cloneDashboardHistories(childValue, childKey, limit);
+    const hasValue = cloned !== undefined && (
+      Array.isArray(cloned) ? cloned.length > 0
+        : cloned && typeof cloned === 'object' ? Object.keys(cloned).length > 0
+          : true
+    );
+    if (hasValue) {
+      out[childKey] = cloned;
+    }
+  }
+  return out;
+}
+
+function requestedHistoryPointLimit(value) {
+  const options = [80, 240, 720, 1440, 2880, 5760];
+  const requested = Number(value);
+  const selected = options.find(points => points >= requested) || options[options.length - 1];
+  const configuredCap = Number(process.env.OMNISIGHT_VIEW_HISTORY_POINTS);
+  const cap = Number.isFinite(configuredCap) && configuredCap > 0 ? Math.round(configuredCap) : historyRetentionMaxPoints();
+  return Math.max(30, Math.min(selected, historyRetentionMaxPoints(), cap));
 }
 
 function dashboardStatusData(data = cache.data || EMPTY, opts = {}) {
@@ -3495,7 +3537,7 @@ function configuredList() {
     const p = String(device?.profile || device?.preset || '').trim().toLowerCase();
     return ['synology', 'mikrotik', 'unifi'].includes(p) ? p : 'snmp';
   };
-  if (en(config.proxmox)      && (agents.hasPve() || hasCachedRows('proxmox') || (config.proxmox.url && config.proxmox.tokenId && config.proxmox.tokenSecret))) ids.push('proxmox');
+  if (en(config.proxmox)      && (agents.hasPve() || hasCachedRows('proxmox') || hasProxmoxApi())) ids.push('proxmox');
   if (en(config.kubernetes)   && config.kubernetes.kubeconfig)          ids.push('kubernetes');
   if (en(config.linux)        && config.linux.agentToken && (agents.hasLinux?.() || hasCachedRows('linux'))) ids.push('linux');
   if (en(config.windows)      && config.linux?.agentToken && (agents.hasWindows?.() || hasCachedRows('windows'))) ids.push('windows');
@@ -4813,6 +4855,7 @@ function backgroundRefresh(opts = {}) {
   const finalize = () => {
     if (generation !== refreshGeneration) return;
     base.linux = filterLinuxProxmoxRows(base.linux, base.proxmox);
+    base.dockhand = enrichDockhandWithDocker(base.dockhand, base.docker);
     base.loading = false;
     base.timestamp = new Date().toISOString();
     runAlertChecks(base);
@@ -4991,6 +5034,7 @@ function ensureRuntimeShell(data = cache.data) {
   out.prometheus = en(config.prometheus) ? mergePrometheusConfigured(out.prometheus, config.prometheus) : null;
   out.docker = en(config.docker) ? mergeDockerHistory(mergeDockerConfiguredRows(Array.isArray(out.docker) ? out.docker : [], agents.getDockerData())) : [];
   out.dockhand = en(config.dockhand) ? mergeDockhandConfigured(out.dockhand, config.dockhand) : null;
+  out.dockhand = enrichDockhandWithDocker(out.dockhand, out.docker);
   out.firewall = en(config.firewall)
     ? (out.firewall || { _connecting: true, online: false, summary: { instances: 0, up: 0, down: 0, interfaces: 0, interfacesUp: 0, interfacesDown: 0, updates: 0, rebootRequired: 0 }, instances: [] })
     : null;
@@ -5338,6 +5382,7 @@ if (startupSnapshot) {
   }
   if (enabled(config.docker)) {
     cache.data.docker = mergeDockerHistory(mergeDockerConfiguredRows(cache.data.docker, agents.getDockerData()));
+    cache.data.dockhand = enrichDockhandWithDocker(cache.data.dockhand, cache.data.docker);
   }
   assignStatic(cache.data);
   console.log(`Loaded runtime snapshot from ${path.relative(__dirname, RUNTIME_SNAPSHOT_PATH)}`);
@@ -6401,6 +6446,23 @@ app.get('/api/status/dashboard', async (req, res) => {
     const role = sessionRole(req);
     const uiKey = uiPreferenceKeyFromRequest(req) || 'global';
     sendCachedJson(req, res, `status:dashboard:${role}:${uiKey}:${detailed ? 'full' : 'compact'}:${historyLimit}`, sig, () => redactForRole(req, view), {
+      cacheControl: 'no-store',
+    });
+  } catch (err) { sendServerError(res, err); }
+});
+
+app.get('/api/status/history', async (req, res) => {
+  try {
+    const data = await getCachedData();
+    const points = requestedHistoryPointLimit(req.query.points || dashboardHistoryPointLimit());
+    const sig = runtimeDataViewSignature(data);
+    const view = cachedView(`status:history:${points}`, sig, () => ({
+      timestamp: data.timestamp || new Date().toISOString(),
+      _historyPoints: points,
+      data: cloneDashboardHistories(data, '', points),
+    }));
+    const role = sessionRole(req);
+    sendCachedJson(req, res, `status:history:${role}:${points}`, sig, () => redactForRole(req, view), {
       cacheControl: 'no-store',
     });
   } catch (err) { sendServerError(res, err); }

@@ -461,6 +461,8 @@ function svcName(s) {
 
 async function nodeData(cfg, node, excluded, resource = null) {
   const name = node.node || node.name;
+  const clusterName = String(cfg.name || cfg.label || cfg.url || 'Proxmox');
+  const historyKey = `${cfg.instanceKey || normBase(cfg.url)}:${name}`;
   try {
     const [status, qemu, lxc, storage, services, rrdHour, sensors] = await Promise.all([
       pveFetch(cfg, `/api2/json/nodes/${encodeURIComponent(name)}/status`).catch(() => ({})),
@@ -501,17 +503,19 @@ async function nodeData(cfg, node, excluded, resource = null) {
     const apiTempInfo = apiTempInfos[0] || null;
     const tempInfo = tempInfos[0] ?? (sshMetrics?.error ? null : apiTempInfo);
     const temp = tempInfo?.value ?? null;
-    const hist = pveHistory.get(name) || [];
+    const hist = pveHistory.get(historyKey) || [];
     const tempHistory = {};
     for (const t of tempInfos) {
       tempHistory[tempHistoryKey(t.label)] = t.value;
     }
     hist.push({ time: Date.now(), cpu, mem: mem.percent || 0, temp, ...tempHistory, diskIO: finalDiskIOTotal, bandwidth: bandwidthTotal });
     if (hist.length > PVE_HISTORY_MAX) hist.splice(0, hist.length - PVE_HISTORY_MAX);
-    pveHistory.set(name, hist);
+    pveHistory.set(historyKey, hist);
     scheduleSaveHistoryMap('proxmox-history', pveHistory, PVE_HISTORY_MAX);
-    const exList = excluded[name] || [];
+    const exList = excluded[`${clusterName}:${name}`] || excluded[name] || [];
     return {
+      clusterName,
+      clusterUrl: cfg.url,
       node: {
         name,
         online: node.status !== 'offline',
@@ -567,7 +571,7 @@ async function nodeData(cfg, node, excluded, resource = null) {
       backup: null,
     };
   } catch (err) {
-    return { node: { name, online: false, cpuCores: 0, cpuRaw: 0, ram: { used: 0, total: 0 } }, host: cfg.url, services: [], vms: [], history: [...(pveHistory.get(name) || [])], backup: null, storage: [], error: err.message };
+    return { clusterName, clusterUrl: cfg.url, node: { name, online: false, cpuCores: 0, cpuRaw: 0, ram: { used: 0, total: 0 } }, host: cfg.url, services: [], vms: [], history: [...(pveHistory.get(historyKey) || [])], backup: null, storage: [], error: err.message };
   }
 }
 
@@ -664,4 +668,62 @@ async function getProxmoxApiData(cfg = {}) {
   return { clusterSummary, nodes, ceph: normalizeCephStatus(cephRaw, cephDfRaw) };
 }
 
-module.exports = { getProxmoxApiData };
+function configuredInstances(config = {}) {
+  const rows = Array.isArray(config.instances) && config.instances.length
+    ? config.instances
+    : (config.url ? [config] : []);
+  return rows
+    .filter(row => row && row.url && row.tokenId && row.tokenSecret)
+    .map((row, idx) => ({
+      ...row,
+      name: String(row.name || row.label || row.url || `Proxmox ${idx + 1}`),
+      sshMetrics: Array.isArray(row.sshMetrics) ? row.sshMetrics : config.sshMetrics,
+      instanceKey: `${idx}:${normBase(row.url)}`,
+    }));
+}
+
+async function getAllProxmoxApiData(config = {}) {
+  const instances = configuredInstances(config);
+  if (!instances.length) return { clusterSummary: null, nodes: [], ceph: null, clusters: [] };
+  const clusters = await mapLimit(instances, Number(config.concurrency || config.collectorConcurrency || 3), async cfg => {
+    try {
+      const data = await getProxmoxApiData(cfg);
+      return { name: cfg.name, url: cfg.url, online: true, ...data };
+    } catch (err) {
+      return { name: cfg.name, url: cfg.url, online: false, error: err.message, clusterSummary: null, nodes: [], ceph: null };
+    }
+  });
+  const nodes = clusters.flatMap(cluster => (cluster.nodes || []).map(node => ({
+    ...node,
+    clusterName: node.clusterName || cluster.name,
+    clusterUrl: node.clusterUrl || cluster.url,
+  })));
+  const onlineNodes = nodes.filter(node => node.node?.online);
+  const clusterSummary = {
+    clustersOnline: clusters.filter(cluster => cluster.online).length,
+    totalClusters: clusters.length,
+    nodesOnline: onlineNodes.length,
+    totalNodes: nodes.length,
+    totalCores: nodes.reduce((sum, node) => sum + Number(node.node?.cpuCores || 0), 0),
+    usedCores: onlineNodes.reduce((sum, node) => sum + Number(node.node?.cpuRaw || 0) * Number(node.node?.cpuCores || 0), 0),
+    totalRAM: nodes.reduce((sum, node) => sum + Number(node.node?.ram?.total || 0), 0),
+    usedRAM: onlineNodes.reduce((sum, node) => sum + Number(node.node?.ram?.used || 0), 0),
+  };
+  const cephClusters = clusters.filter(cluster => cluster.ceph).map(cluster => ({ name: cluster.name, ...cluster.ceph }));
+  return {
+    clusterSummary,
+    nodes,
+    ceph: cephClusters.length === 1 ? cephClusters[0] : null,
+    cephClusters,
+    clusters: clusters.map(cluster => ({
+      name: cluster.name,
+      url: cluster.url,
+      online: cluster.online,
+      error: cluster.error || '',
+      clusterSummary: cluster.clusterSummary,
+    })),
+    error: clusters.find(cluster => !cluster.online)?.error || '',
+  };
+}
+
+module.exports = { getProxmoxApiData, getAllProxmoxApiData, configuredInstances };

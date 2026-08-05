@@ -9,7 +9,7 @@ URL="${URL%/}"
 TOKEN="${OMNISIGHT_TOKEN:?OMNISIGHT_TOKEN required}"
 INTERVAL="${OMNISIGHT_INTERVAL:-15}"
 AGENT_ROLE="${OMNISIGHT_AGENT_ROLE:-auto}"
-VERSION="1.2.4"
+VERSION="1.3.0"
 HOST_ROOT="${OMNISIGHT_HOST_ROOT:-/}"
 INSECURE_TLS="${OMNISIGHT_INSECURE_TLS:-}"
 CURL_TLS_ARGS=""
@@ -26,6 +26,53 @@ if [ -z "$AGENT_ID" ]; then
 fi
 
 json_escape() { printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' | tr -d '\n\r\t'; }
+
+UPDATES_JSON_CACHE=""
+UPDATES_CHECKED_AT=0
+
+updates_json() {
+  local now count source reboot rc
+  now=$(date +%s 2>/dev/null || echo 0)
+  if [ -n "$UPDATES_JSON_CACHE" ] && [ $((now-UPDATES_CHECKED_AT)) -lt 1800 ]; then
+    printf '"updates":%s,' "$UPDATES_JSON_CACHE"
+    return
+  fi
+
+  count=null
+  source=unavailable
+  if command -v apt-get >/dev/null 2>&1; then
+    count=$(apt-get -s -o Debug::NoLocking=1 upgrade 2>/dev/null | awk '/^Inst /{c++} END{print c+0}')
+    source=apt
+  elif command -v dnf >/dev/null 2>&1; then
+    count=$(dnf -q check-update --cacheonly 2>/dev/null | awk '/^[[:alnum:]_.+:-]+[[:space:]]+[[:alnum:]_.:-]+[[:space:]]+[[:alnum:]_.:+~-]+/{c++} END{print c+0}')
+    source=dnf
+  elif command -v yum >/dev/null 2>&1; then
+    count=$(yum -q check-update --cacheonly 2>/dev/null | awk '/^[[:alnum:]_.+:-]+[[:space:]]+[[:alnum:]_.:-]+[[:space:]]+[[:alnum:]_.:+~-]+/{c++} END{print c+0}')
+    source=yum
+  elif command -v zypper >/dev/null 2>&1; then
+    count=$(zypper --non-interactive --no-refresh list-updates 2>/dev/null | awk -F'|' '$1 ~ /^[[:space:]]*v[[:space:]]*$/ {c++} END{print c+0}')
+    source=zypper
+  elif command -v apk >/dev/null 2>&1; then
+    count=$(apk version -l '<' 2>/dev/null | awk 'END{print NR+0}')
+    source=apk
+  elif command -v pacman >/dev/null 2>&1; then
+    count=$(pacman -Qu 2>/dev/null | awk 'END{print NR+0}')
+    source=pacman
+  fi
+
+  reboot=false
+  if [ -e /var/run/reboot-required ]; then
+    reboot=true
+  elif command -v needs-restarting >/dev/null 2>&1; then
+    needs-restarting -r >/dev/null 2>&1
+    rc=$?
+    [ "$rc" -eq 1 ] && reboot=true
+  fi
+
+  UPDATES_JSON_CACHE="{\"count\":${count:-null},\"rebootRequired\":$reboot,\"source\":\"$(json_escape "$source")\",\"checkedAt\":${now:-0}}"
+  UPDATES_CHECKED_AT=$now
+  printf '"updates":%s,' "$UPDATES_JSON_CACHE"
+}
 
 docker_cmd() {
   if docker "$@" 2>/dev/null; then return 0; fi
@@ -280,19 +327,22 @@ docker_unused_count() {
 docker_json() {
   command -v docker >/dev/null 2>&1 || return 0
   docker_cmd info >/dev/null 2>&1 || return 0
-  local unused rows statsf
+  local unused rows statsf ncpus
   unused=$(docker_unused_count)
+  ncpus=$(docker_cmd info --format '{{.NCPU}}' 2>/dev/null || echo 1)
+  case "$ncpus" in ''|*[!0-9]*) ncpus=1;; esac
+  [ "$ncpus" -lt 1 ] && ncpus=1
   statsf=$(mktemp)
-  docker_cmd stats --no-stream --no-trunc --format '{{.ID}}|{{.CPUPerc}}|{{.MemPerc}}|{{.NetIO}}|{{.BlockIO}}' > "$statsf" 2>/dev/null || true
+  docker_cmd stats --no-stream --no-trunc --format '{{.ID}}|{{.CPUPerc}}|{{.MemPerc}}|{{.MemUsage}}|{{.NetIO}}|{{.BlockIO}}' > "$statsf" 2>/dev/null || true
   rows=$(docker_cmd ps -a --no-trunc --format '{{.ID}}|{{.Names}}|{{.Image}}|{{.State}}|{{.Status}}|{{.Ports}}|{{.Labels}}' 2>/dev/null)
   printf '"docker":{"unused":%s,"containers":[' "${unused:-0}"
-  [ -n "$rows" ] && printf '%s\n' "$rows" | awk -F'|' -v statsf="$statsf" '
+  [ -n "$rows" ] && printf '%s\n' "$rows" | awk -F'|' -v statsf="$statsf" -v ncpus="$ncpus" '
   BEGIN {
     while ((getline line < statsf) > 0) {
       split(line, s, "|")
       id=s[1]
       gsub(/%/,"",s[2]); gsub(/%/,"",s[3])
-      cpu[id]=s[2]; mem[id]=s[3]; net[id]=s[4]; block[id]=s[5]
+      cpu[id]=s[2]/ncpus; mem[id]=s[3]; memusage[id]=s[4]; net[id]=s[5]; block[id]=s[6]
     }
     close(statsf)
   }
@@ -304,6 +354,7 @@ docker_json() {
     if ($7 != "") printf ",\"labelsText\":\"%s\"", $7
     if (cpu[full] != "") printf ",\"cpu\":%s", cpu[full]
     if (mem[full] != "") printf ",\"memPercent\":%s", mem[full]
+    if (memusage[full] != "") printf ",\"memUsage\":\"%s\"", memusage[full]
     if (net[full] != "") printf ",\"netIO\":\"%s\"", net[full]
     if (block[full] != "") printf ",\"blockIO\":\"%s\"", block[full]
     printf "}"
@@ -388,6 +439,7 @@ EOF
       *) docker_json; pve_json ;;
     esac
     [ -n "$temp" ] && printf '"temp":%s,' "$temp"
+    updates_json
     printf '"services":[%s]}' "$(services_json)"
   } > "$tmp"
   curl -fsSL $CURL_POST_REDIRECT_ARGS $CURL_TLS_ARGS -m 20 -X POST -H "X-Agent-Token: $TOKEN" -H "Content-Type: application/json" \

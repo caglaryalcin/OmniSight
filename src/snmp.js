@@ -547,8 +547,10 @@ async function getSystemInfo(session, deviceKey) {
     '1.3.6.1.4.1.6574.1.1.2.0',
     '1.3.6.1.4.1.6574.1.2.0',
   ]);
-  let cpuUser   = synVals['1.3.6.1.4.1.6574.1.4.1.0'];
-  let cpuSystem = synVals['1.3.6.1.4.1.6574.1.4.2.0'];
+  const synologyCpuUser = synVals['1.3.6.1.4.1.6574.1.4.1.0'];
+  const synologyCpuSystem = synVals['1.3.6.1.4.1.6574.1.4.2.0'];
+  let cpuUser = null;
+  let cpuSystem = null;
   let memTotalKB = synVals['1.3.6.1.4.1.6574.1.1.1.0'];
   let memFreeKB  = synVals['1.3.6.1.4.1.6574.1.1.2.0'];
   let memSource = memTotalKB != null ? 'synology' : null;
@@ -567,10 +569,8 @@ async function getSystemInfo(session, deviceKey) {
   const uptimeSeconds = await getUptimeSeconds(session).catch(() => null);
 
 
-  if (cpuUser == null) {
-    const raw = await ucdRawCpu(session, deviceKey);
-    if (raw != null) { cpuUser = raw; cpuSystem = 0; }
-  }
+  const raw = await ucdRawCpu(session, deviceKey);
+  if (raw != null) { cpuUser = raw; cpuSystem = 0; }
 
   if (cpuUser == null) {
     try {
@@ -588,6 +588,11 @@ async function getSystemInfo(session, deviceKey) {
         if (nums.length) { cpuUser = Math.round(nums.reduce((a, b) => a + b, 0) / nums.length); cpuSystem = 0; }
       }
     } catch (e) { console.error('[SNMP sysInfo hrCPU]', e.message); }
+  }
+
+  if (cpuUser == null && synologyCpuUser != null) {
+    cpuUser = synologyCpuUser;
+    cpuSystem = synologyCpuSystem;
   }
 
   let ucdMem = null;
@@ -654,7 +659,7 @@ async function getSystemInfo(session, deviceKey) {
   }
 
   return {
-    cpu: cpuUser != null ? cpuUser + (cpuSystem || 0) : null,
+    cpu: cpuUser != null ? clampPercent(Number(cpuUser) + Number(cpuSystem || 0)) : null,
     cpuTemp: cpuTemp?.value ?? null,
     cpuTempLabel: cpuTemp?.label ?? null,
     systemTemperature: systemTemperature?.value ?? null,

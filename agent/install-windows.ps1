@@ -41,6 +41,10 @@ $Interval = if ($env:OMNISIGHT_INTERVAL) { [int]$env:OMNISIGHT_INTERVAL } else {
 $Role = if ($env:OMNISIGHT_AGENT_ROLE) { $env:OMNISIGHT_AGENT_ROLE } else { "windows" }
 $Insecure = "$env:OMNISIGHT_INSECURE_TLS" -match "^(1|true|yes)$"
 
+try {
+  [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor [System.Net.SecurityProtocolType]::Tls12
+} catch {}
+
 if (-not $Url) { throw "OMNISIGHT_URL is required" }
 if (-not $Token) { throw "OMNISIGHT_TOKEN is required" }
 if ($Token -in @("__set__", "__encrypted__", "<token>")) { throw "OMNISIGHT_TOKEN must be the real agent token, not a masked placeholder" }

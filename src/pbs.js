@@ -265,10 +265,20 @@ async function getPbsInstance(config = {}, idx = 0) {
   });
   const tasks = await optionalCall(inst, [`nodes/${encodeURIComponent(selectedNodes[0])}/tasks?limit=20`], session);
   if (!version.ok && !storesRes.ok && !nodes.ok) throw new Error(version.error || storesRes.error || nodes.error || 'PBS API unavailable');
-  const errors = [version, nodes, storesRes, tasks]
-    .filter(r => !r.ok)
-    .map(r => r.error)
-    .filter(Boolean);
+  const datastoreErrors = statuses.map(d => d.error).filter(Boolean);
+  const errors = [
+    ...(!storesRes.ok ? [`Datastore inventory: ${storesRes.error}`] : []),
+    ...datastoreErrors.map(error => `Datastore status: ${error}`),
+  ];
+  const warnings = [
+    ...(!version.ok ? [`Version endpoint unavailable: ${version.error}`] : []),
+    ...(!nodes.ok ? [`Node inventory unavailable: ${nodes.error}`] : []),
+    ...nodeStatuses.filter(node => node.error).map(node => `Node ${node.name}: ${node.error}`),
+    ...(!tasks.ok ? [`Recent tasks unavailable: ${tasks.error}`] : []),
+  ];
+  const permissionHint = errors.some(error => /HTTP (401|403)|permission|privilege/i.test(error))
+    ? 'Grant Audit on / and DatastoreAudit on /datastore (propagate enabled) to both the API token and its user.'
+    : '';
   const row = {
     online: true,
     name: inst.name,
@@ -277,8 +287,11 @@ async function getPbsInstance(config = {}, idx = 0) {
     nodes: nodeStatuses,
     datastores: statuses.filter(Boolean),
     tasks: tasks.ok ? normalizeTasks(tasks.data) : [],
-    partial: errors.length > 0 || statuses.some(d => d.error),
-    errors: [...errors, ...statuses.map(d => d.error).filter(Boolean)].slice(0, 5),
+    partial: errors.length > 0,
+    error: errors[0] || '',
+    errors: errors.slice(0, 5),
+    warnings: warnings.slice(0, 8),
+    permissionHint,
   };
   row.summary = summarize([row]);
   return row;

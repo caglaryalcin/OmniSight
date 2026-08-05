@@ -136,7 +136,7 @@ Linux servers, and optionally Proxmox nodes and Docker hosts, are monitored by t
 
 **Setup :**
 
-1. Open **Settings** and click **+ Add System** (Linux Server), **+ Add Windows Host** (Windows Server), **+ Add Node** (Proxmox) or **+ Add Host** (Docker). The shared agent token is generated automatically.
+1. Open **Settings** and click **+ Add System** (Linux Server), **+ Add Windows Host** (Windows Server), **+ Install Agent** (Proxmox) or **+ Add Host** (Docker). The shared agent token is generated automatically.
 2. Pick an install method in the dialog and copy the pre-filled command:
 
 **Binary (systemd):**
@@ -199,7 +199,7 @@ $env:OMNISIGHT_URL="http://<omnisight-host>:3000"; $env:OMNISIGHT_TOKEN="<token>
 
 **What one agent covers, automatically:**
 
-- **System** — hostname, IP, OS, kernel/build, CPU %, load where available, RAM, swap where available, root disk, disk I/O, bandwidth, temperature where available, uptime and services → *Linux Server* / *Windows Server* cards
+- **System** — hostname, IP, OS, kernel/build, CPU %, load where available, RAM, swap where available, root disk, disk I/O, bandwidth, temperature where available, pending OS updates/reboot state, uptime and services → *Linux Server* / *Windows Server* cards
 - **Docker** (when `docker` is present, or the socket is mounted) — containers, states, ports, CPU/memory, network I/O, block I/O, unused-image count → *Docker* card; `logs` and `Prune` run locally on the host and stream back over the command channel
 - **Proxmox** (when `pvesh` is present) — VM/LXC list, node storage, last vzdump backup, Ceph health → *Proxmox* card; the node moves from *Linux Server* to *Proxmox* automatically
 
@@ -395,14 +395,14 @@ In Kubernetes you can also mount the CA from a Secret or ConfigMap and set `NODE
 The live config is `data/config.yaml` (created automatically on first save). Easiest is to configure everything from the Settings UI; to hand-edit, copy the template — `cp config.example.yaml data/config.yaml` — and edit it. All sections are optional; include only what you use. See `config.example.yaml`.
 
 - `linux` — `enabled` + `agentToken` (auto-generated from the Settings UI). Systems self-register via the [agent](#the-agent); no per-server entries needed. Services are auto-discovered and Exclude/Include is managed from the UI
-- `proxmox` — `enabled`, optional `url` / `tokenId` / `tokenSecret` / `insecureTLS` for API mode, optional `sshMetrics[]` (`node`, `sshHost`, `sshUser`, `sshPassword`/`sshKey`, `sshPort`, `sudo`) to fill host CPU temperature and host Disk I/O when the API does not expose them, plus optional `icon`. Without API settings, data can come from agents running on the nodes (`pvesh`)
+- `proxmox` — `enabled`, optional API `instances[]` (`name`, `url`, `tokenId`, `tokenSecret`, `insecureTLS`) for one or more independent Proxmox servers/clusters, optional `sshMetrics[]` (`node`, `sshHost`, `sshUser`, `sshPassword`/`sshKey`, `sshPort`, `sudo`) to fill host CPU temperature and host Disk I/O when the API does not expose them, plus optional `icon`. The old single `url` / token fields remain backward compatible. Without API settings, data can come from agents running on the nodes (`pvesh`)
 - `docker` — `enabled`, optional `hosts[]` for Docker API or SSH hosts (`sshHost`, `sshUser`, `sshPassword`/`sshKey`, `sshMode`, `sudo`, `insecureTLS`), plus optional `icon`. Agent-reported Docker hosts also appear automatically
 - `dockhand` — one or more API `instances[]` with name, url, bearer token and optional `insecureTLS`
 - `firewall` — one or more gateway `instances[]` with name, type (`opnsense` or `pfsense` compatible API), url, API key/secret or username/password and optional `insecureTLS`
 - `truenas` — one or more storage `instances[]` with name, url, `apiMode: auto | websocket | rest`, username, API key/password and optional `insecureTLS`
 - `qnap` — one or more QNAP QTS `instances[]` with name, url, username/password or optional SID, and optional `insecureTLS`
 - `ugreen` — one or more UGREEN UGOS Pro web endpoints with name, url and optional `insecureTLS`; OmniSight checks endpoint reachability because UGREEN does not publish a stable public monitoring API
-- `pbs` — one or more Proxmox Backup Server `instances[]` with name, url, tokenId/tokenSecret and optional `insecureTLS`
+- `pbs` — one or more Proxmox Backup Server `instances[]` with name, url, tokenId/tokenSecret and optional `insecureTLS`. Grant `Audit` on `/` and `DatastoreAudit` on `/datastore` (propagate enabled) to both the API token and its owning user. Version, node and recent-task endpoints are optional and produce a warning instead of a false partial-data state
 - `veeam` — one or more Veeam Backup & Replication `instances[]` with name, url, username/password or access token, API revision and optional `insecureTLS`
 - `portainer` — one or more Portainer `instances[]` with name, url, API access token and optional `insecureTLS`
 - `kubernetes` — kubeconfig, namespaces[] (the Settings UI has a **Browse…** button that uploads a kubeconfig from your machine into `data/` and fills in the container path automatically). Pod CPU/RAM sorting uses the Kubernetes metrics API when it is available to the configured account

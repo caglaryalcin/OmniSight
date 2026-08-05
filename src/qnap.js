@@ -73,21 +73,31 @@ function jsonOrXmlValue(text, key) {
   return xmlValue(text, key);
 }
 
+function qnapLoginInfo(body = '') {
+  const value = (...keys) => keys.map(key => jsonOrXmlValue(body, key)).find(Boolean) || '';
+  return {
+    hostname: value('hostname', 'hostName', 'serverName', 'server_name'),
+    model: value('displayModelName', 'modelName', 'internalModelName'),
+    firmware: value('firmwareVersion', 'version'),
+    firmwareBuild: value('firmwareBuild', 'build'),
+  };
+}
+
 async function login(inst = {}) {
   const sid = inst.sid || inst.qsid || inst.token || '';
-  if (sid) return String(sid);
+  if (sid) return { sid: String(sid), info: {} };
   if (!inst.username && !inst.user) throw new Error('QNAP username is required');
   if (!inst.password) throw new Error('QNAP password is required');
   const params = new URLSearchParams({
     user: inst.username || inst.user || '',
-    pwd: inst.password || '',
-    service: inst.service || '1',
+    pwd: Buffer.from(String(inst.password), 'utf8').toString('base64'),
+    serviceKey: String(inst.serviceKey || inst.service || '1'),
   });
   const body = await httpText(`${cleanBaseUrl(inst.url)}/cgi-bin/authLogin.cgi?${params}`, inst, { accept: 'text/xml, application/json, */*' });
   const authPassed = jsonOrXmlValue(body, 'authPassed');
   const sidValue = jsonOrXmlValue(body, 'authSid') || jsonOrXmlValue(body, 'sid');
-  if (String(authPassed) === '1' && sidValue) return String(sidValue);
-  if (sidValue) return String(sidValue);
+  if (String(authPassed) === '1' && sidValue) return { sid: String(sidValue), info: qnapLoginInfo(body) };
+  if (sidValue) return { sid: String(sidValue), info: qnapLoginInfo(body) };
   throw new Error(jsonOrXmlValue(body, 'errorValue') ? `QNAP login failed (${jsonOrXmlValue(body, 'errorValue')})` : 'QNAP login failed');
 }
 
@@ -115,14 +125,20 @@ function summarize(instances = []) {
 async function getQnapInstance(config = {}, idx = 0) {
   const inst = { ...config, name: instanceName(config, idx) };
   if (!inst.url) throw new Error('QNAP URL is required');
-  const sid = await login(inst);
-  const checked = await checkSid(inst, sid);
+  const auth = await login(inst);
+  const checked = await checkSid(inst, auth.sid);
   if (!checked.ok) throw new Error('QNAP session check failed');
+  const firmware = [auth.info.firmware, auth.info.firmwareBuild].filter(Boolean).join(' build ');
   return {
     online: true,
     name: inst.name,
     url: inst.url,
-    system: { hostname: checked.serverName || inst.name },
+    method: 'QTS API',
+    system: {
+      hostname: checked.serverName || auth.info.hostname || inst.name,
+      model: auth.info.model,
+      firmware,
+    },
     summary: summarize([{ online: true }]),
     partial: false,
   };
@@ -142,4 +158,4 @@ async function getAllQnapData(config = {}) {
   return { online: summary.up > 0, error: rows.find(r => !r.online)?.error || '', summary, instances: rows };
 }
 
-module.exports = { getAllQnapData, configuredInstances };
+module.exports = { getAllQnapData, configuredInstances, qnapLoginInfo };
