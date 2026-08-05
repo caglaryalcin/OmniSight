@@ -11,7 +11,7 @@ data
 # application image so users can build the standalone Docker agent locally.
 Dockerfile
 LICENSE
-README.md
+**/*.md
 config.example.yaml
 docker-compose.yml
 docker-stack.yml
