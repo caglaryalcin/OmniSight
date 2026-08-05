@@ -1,0 +1,28 @@
+name: CI
+
+# Runs the syntax and smoke checks on every push and pull request. Upstream's
+# only workflow (deploy.yml) builds a Docker image and runs `npm audit`; nothing
+# actually exercises the code, and it does not run on pull_request at all, so a
+# broken PR shows green. This closes that gap. To make it a merge gate, enable it
+# as a required status check under Settings -> Branches -> Branch protection.
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install production dependencies
+        run: npm ci --omit=dev
+      - name: Syntax check (node --check)
+        run: |
+          node --check server.js
+          for f in src/*.js scripts/*.js; do node --check "$f"; done
+      - name: Smoke test
+        run: node scripts/ci-smoke.js
