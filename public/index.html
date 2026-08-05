@@ -552,8 +552,8 @@ html[data-theme="light"] .topbar{background:rgba(255,255,255,.78)}
 .pve-head-stat.is-host{flex:0 1 auto;width:max-content;max-width:min(230px,22vw)}
 .pve-head-stat.is-vms,.pve-head-stat.is-uptime{flex:0 0 auto;width:max-content}
 .pve-head-stat.is-version-wrap{flex:1.35 1 150px}
-.pve-head-stat.has-spark{flex:1.55 1 150px;display:grid;grid-template-columns:minmax(52px,auto) minmax(70px,1fr);align-items:center;column-gap:10px}
-.pve-head-stat.is-temp.has-spark{flex:1.28 1 136px}
+.pve-head-stat.has-spark{flex:1.55 1 150px;min-width:140px;display:grid;grid-template-columns:minmax(72px,max-content) minmax(32px,1fr);align-items:center;column-gap:8px}
+.pve-head-stat.is-temp.has-spark{flex:1.28 1 136px;min-width:120px;grid-template-columns:minmax(48px,max-content) minmax(32px,1fr);column-gap:7px}
 .pve-node-hdr .badge + .nbell{margin-left:-3px}
 .pve-head-text{min-width:0}
 .pve-head-title .node-name{width:auto;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -2586,7 +2586,7 @@ function miniSparkline(data, key, current, colorFn = bchex, maxScale = 100, unit
 function pveHeadStat(label, value, color = 'var(--text)', spark = '', extraClass = '') {
   if (value === null || value === undefined || value === '') return '';
   const cls = [extraClass, spark ? 'has-spark' : ''].filter(Boolean).join(' ');
-  return `<div class="pve-head-stat ${cls}">
+  return `<div class="pve-head-stat ${cls}" title="${escAttr(`${label}: ${value}`)}">
     <div class="pve-head-text"><div class="pve-head-val" style="color:${color}">${escHtml(value)}</div><div class="pve-head-lbl">${escHtml(label)}</div></div>
     ${spark}
   </div>`;
@@ -2785,7 +2785,7 @@ function buildProxmox(px){
       pveHeadStat('CPU', fmtPct(cpuPct), bc(cpuPct), miniSparkline(history, 'cpu', cpuPct)),
       pveHeadStat('RAM', fmtPct(ramPct), bc(ramPct), miniSparkline(history, 'mem', ramPct)),
       pveHeadStat('Disk I/O', diskIOTxt || '--', diskIOTxt ? 'var(--cyan)' : 'var(--muted)', diskIOMbps != null ? miniSparkline(diskIOHistory, 'diskIOMbps', diskIOMbps, rateColor, rateSparkMax(diskIOHistory, 'diskIOMbps', diskIOMbps), ' MB/s', 'Disk I/O') : ''),
-      pveHeadStat('BW', bandwidthTxt || '--', bandwidthTxt ? 'var(--green)' : 'var(--muted)', bandwidthMbps != null ? miniSparkline(bandwidthHistory, 'bandwidthMbps', bandwidthMbps, () => '#34D399', rateSparkMax(bandwidthHistory, 'bandwidthMbps', bandwidthMbps), ' MB/s', 'Bandwidth') : ''),
+      pveHeadStat('Bandwidth', bandwidthTxt || '--', bandwidthTxt ? 'var(--green)' : 'var(--muted)', bandwidthMbps != null ? miniSparkline(bandwidthHistory, 'bandwidthMbps', bandwidthMbps, () => '#34D399', rateSparkMax(bandwidthHistory, 'bandwidthMbps', bandwidthMbps), ' MB/s', 'Bandwidth') : ''),
       ...tempStats,
       pveHeadStat('VMs', `${nodeVms.filter(v=>v.running).length}/${nodeVms.length}`, 'var(--text)', '', 'is-vms'),
       node.uptime ? pveHeadStat('Uptime', fmtUptime(node.uptime), 'var(--text)', '', 'is-uptime') : '',

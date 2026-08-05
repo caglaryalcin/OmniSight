@@ -127,6 +127,9 @@ function testStaticRegressions() {
   assert.ok(server.includes("synology: 'Synology'"), 'public status title must say Synology');
   assert.ok(dashboard.includes('/api/status/history?points='));
   assert.ok(dashboard.includes("const clusterLabel = /^https?:\\/\\//i"), 'Proxmox node subtitle must hide a URL-shaped cluster fallback');
+  assert.ok(dashboard.includes('min-width:140px;display:grid;grid-template-columns:minmax(72px,max-content)'), 'Proxmox metric values must keep enough visible width');
+  assert.ok(dashboard.includes("pveHeadStat('Bandwidth'"), 'Proxmox bandwidth label must not use an unclear abbreviation');
+  assert.ok(dashboard.includes('title="${escAttr(`${label}: ${value}`)}"'), 'header metrics must expose their complete value as a tooltip');
   assert.ok(dashboard.includes("os_app_update_footer_v3") && dashboard.includes("cache:'no-store'"), 'app update check must bypass stale browser responses');
   assert.ok(!dashboard.includes("cachedUpdate || fetch('/api/update-check'"), 'cached app version must not replace the GitHub update request');
   assert.ok(dashboard.includes('@container (max-width:300px)') && dashboard.includes('-webkit-line-clamp:2'), 'overview titles must adapt to narrow cards');
