@@ -220,16 +220,13 @@ $env:OMNISIGHT_URL="http://<omnisight-host>:3000"; $env:OMNISIGHT_TOKEN="<token>
 
 ## Quick start (Proxmox LXC / bare metal, no Docker)
 
-Run OmniSight natively under systemd — no Docker required. On a **Proxmox VE 8/9 host**, this creates an unprivileged Debian 13 LXC and installs everything inside it:
+Run OmniSight natively under systemd — no Docker required. On a **Proxmox VE 8/9 host**, this launches the same Community Scripts interface used by AdGuard, creates an unprivileged Debian 13 LXC and installs everything inside it:
 
 ```bash
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/caglaryalcin/OmniSight/main/scripts/proxmox-lxc.sh)"
-# defaults: next free CTID, local-lvm, DHCP on vmbr0, 2 cores / 1 GB RAM / 6 GB disk
-# override via env: CTID=150 CT_HOSTNAME=mon STORAGE=tank BRIDGE=vmbr1 bash -c "$(curl -fsSL https://raw.githubusercontent.com/caglaryalcin/OmniSight/main/scripts/proxmox-lxc.sh)"
-# optional Ubuntu 24.04: DISTRO=ubuntu DISTRO_VERSION=24.04 bash -c "$(curl -fsSL https://raw.githubusercontent.com/caglaryalcin/OmniSight/main/scripts/proxmox-lxc.sh)"
 ```
 
-The standard interactive installer asks only for the container ID, hostname and verbose mode. It uses the public OmniSight repository and `main` branch automatically. Verbose output defaults to **No**. At the final `[Y/n]` confirmation, pressing Enter accepts the default and starts the installation. Invalid hostnames are requested again instead of terminating the installer.
+Choose **Default Install** for the recommended 2 CPU, 1 GB RAM and 6 GB disk configuration. Choose **Advanced Install** to configure the container type, password, CTID, hostname, disk size, CPU, RAM, storage, network bridge, IP, DNS, VLAN, SSH, nesting and verbose mode. When multiple compatible Proxmox storage pools exist, the Community Scripts framework opens a storage selection screen.
 
 Or inside any existing Debian/Ubuntu LXC, VM or bare-metal server:
 
@@ -238,7 +235,7 @@ bash scripts/install-lxc.sh                 # installs Node 22, clones to /opt/o
 bash /opt/omnisight/scripts/install-lxc.sh --update   # update later
 ```
 
-State lives in `/opt/omnisight/data`, and the service runs as the unprivileged `omnisight` user (`systemctl status omnisight`). The Proxmox wrapper validates its inputs, leaves LXC nesting disabled by default, and removes only the newly-created container if installation fails (`KEEP_FAILED_CT=1` keeps it for diagnosis). Private-repository tokens are passed through a temporary root-only file instead of being embedded in the Git remote URL.
+State lives in `/opt/omnisight/data`, and the service runs as the unprivileged `omnisight` user (`systemctl status omnisight`). Container creation, storage selection, validation and failed-install cleanup are handled by the official Community Scripts framework.
 
 ## Quick start (Docker)
 

@@ -824,43 +824,37 @@ less install-lxc.sh
 sudo bash install-lxc.sh
 ```
 
-**On a Proxmox VE 8/9 host** — `scripts/proxmox-lxc.sh` (run as root on the host) additionally creates an unprivileged Debian 13 LXC, waits for network, then runs `install-lxc.sh` inside it. When launched from the remote command below, the companion installer is downloaded automatically over HTTPS. LXC nesting is disabled by default because a native OmniSight installation does not require it. Standard interactive runs ask only for the container ID, hostname and verbose mode; the public upstream repository and `main` branch are selected automatically. Invalid hostnames are requested again. Verbose output defaults to No, and the final confirmation uses `[Y/n]`, so pressing Enter starts the installation. Repository, branch and private-token environment variables remain available for advanced unattended installations but are never prompted.
+**On a Proxmox VE 8/9 host** — `scripts/proxmox-lxc.sh` (run as root on the host) launches the official Community Scripts interface used by applications such as AdGuard. It creates an unprivileged Debian 13 LXC and installs the latest stable OmniSight release inside it.
 
 ```bash
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/caglaryalcin/OmniSight/main/scripts/proxmox-lxc.sh)"
-CTID=150 CT_HOSTNAME=mon STORAGE=tank BRIDGE=vmbr1 bash -c "$(curl -fsSL https://raw.githubusercontent.com/caglaryalcin/OmniSight/main/scripts/proxmox-lxc.sh)"
-DISTRO=ubuntu DISTRO_VERSION=24.04 bash -c "$(curl -fsSL https://raw.githubusercontent.com/caglaryalcin/OmniSight/main/scripts/proxmox-lxc.sh)"
 ```
 
-**Environment overrides:**
+Choose **Default Install** for the recommended 2 CPU, 1 GB RAM and 6 GB disk configuration. Choose **Advanced Install** to configure container type, root password, CTID, hostname, disk size, CPU, RAM, network bridge, IPv4/IPv6, DNS, MAC address, VLAN, SSH, FUSE, TUN/TAP, nesting, GPU passthrough, APT cache, timezone, protection and verbose mode. Template and container storage are selected through the Community Scripts storage-pool dialog whenever multiple compatible pools are available. The framework also handles validation, template download, container creation and failed-install cleanup.
+
+The following variables apply to the standalone `scripts/install-lxc.sh` installer used inside an existing Debian/Ubuntu system; they are not Community Scripts LXC creation options:
 
 | Variable | Used by | Default | Purpose |
 |---|---|---|---|
-| `OMNISIGHT_REPO` | both | `https://github.com/caglaryalcin/OmniSight.git` | HTTPS source git repo (fork or mirror); embedded credentials are rejected |
-| `OMNISIGHT_BRANCH` | both | `main` | Branch to check out |
+| `OMNISIGHT_REPO` | install | `https://github.com/caglaryalcin/OmniSight.git` | HTTPS source git repo (fork or mirror); embedded credentials are rejected |
+| `OMNISIGHT_BRANCH` | install | `main` | Branch to check out |
 | `OMNISIGHT_DIR` | install | `/opt/omnisight` | Install directory |
-| `OMNISIGHT_PORT` | both | `3000` | Listen port |
+| `OMNISIGHT_PORT` | install | `3000` | Listen port |
 | `NODE_MAJOR` | install | `22` | Node.js major version (NodeSource) |
-| `OMNISIGHT_TOKEN_FILE` | both | empty | Root-readable file containing a private-repository token; never stored in the Git remote URL |
-| `OMNISIGHT_TOKEN_USER` | both | `oauth2` | Username paired with the private-repository token |
-| `DISTRO` `DISTRO_VERSION` | proxmox | `debian`, `13` | LXC template family/version; `ubuntu` and `24.04` are also supported |
-| `NESTING` | proxmox | `0` | Set to `1` only when another workload inside the LXC requires nesting |
-| `KEEP_FAILED_CT` | proxmox | `0` | Keep a newly-created LXC after a failed install for diagnosis instead of removing it |
-| `CONFIRM` | proxmox | `0` | Set to `1` to skip the interactive final confirmation |
-| `VERBOSE` | proxmox | `0` | Set to `1` to show full command output; quiet mode shows progress messages and reveals the last command output only after a failure |
-| `CTID` `CT_HOSTNAME` `STORAGE` `TEMPLATE_STORAGE` `DISK_GB` `MEMORY_MB` `CORES` `BRIDGE` `NET_CONF` | proxmox | next free ID, `omnisight`, `local-lvm`, `local`, 6, 1024, 2, `vmbr0`, DHCP | LXC shape and placement (stock Proxmox conventions) |
+| `OMNISIGHT_TOKEN_FILE` | install | empty | Root-readable file containing a private-repository token; never stored in the Git remote URL |
+| `OMNISIGHT_TOKEN_USER` | install | `oauth2` | Username paired with the private-repository token |
 
 For a private repository, create a root-only token file instead of putting credentials in the repository URL:
 
 ```bash
 install -m 0600 /dev/null /root/omnisight-repo.token
 printf '%s' '<read-only-token>' > /root/omnisight-repo.token
-OMNISIGHT_TOKEN_FILE=/root/omnisight-repo.token bash -c "$(curl -fsSL https://raw.githubusercontent.com/caglaryalcin/OmniSight/main/scripts/proxmox-lxc.sh)"
+OMNISIGHT_TOKEN_FILE=/root/omnisight-repo.token sudo bash install-lxc.sh
 ```
 
-The wrapper copies the token to a temporary root-only file inside the new LXC. The installer supplies it to Git through a temporary `GIT_ASKPASS` helper, keeps the configured `origin` URL credential-free, and removes the copied token after use.
+The standalone installer supplies the token to Git through a temporary `GIT_ASKPASS` helper, keeps the configured `origin` URL credential-free, and never embeds it in the remote URL.
 
-**Failure cleanup.** Before creation, the wrapper rejects an existing CTID and validates the template, storage, network, resource, repository, branch, and port inputs. If a later installation step fails, it stops and removes only the LXC created by that run. Use `KEEP_FAILED_CT=1` when the failed container should remain available for diagnosis.
+**Failure cleanup.** Community Scripts validates the selected template, storage, network and resources. Its standard recovery screen controls whether a failed LXC is removed or kept for diagnosis.
 
 **`--update` semantics.** `install-lxc.sh --update` refuses to continue when tracked files contain local edits. It then fetches the selected branch, checks out the fetched commit, reinstalls production dependencies, restores ownership, and restarts the service. It does not silently discard tracked local changes.
 
