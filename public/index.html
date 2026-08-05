@@ -1313,13 +1313,19 @@ function drawTimeSelect(id, currentLimit) {
     { v: 5760, l: '24 Hours' },
   ];
   const curLbl = opts.find(o => o.v === currentLimit)?.l || '20 Mins';
-  const optsHtml = opts.map(o => `<div class="os-sel-opt ${currentLimit === o.v ? 'active' : ''}" onclick="setTimeLimit('${id}', ${o.v})">${o.l}</div>`).join('');
+  const optsHtml = opts.map(o => `<div class="os-sel-opt ${currentLimit === o.v ? 'active' : ''}" onclick="setTimeLimit(${escAttr(jsStr(id))}, ${o.v})">${o.l}</div>`).join('');
   return `<div class="os-sel" onclick="event.stopPropagation()">
     <div class="os-sel-btn" onclick="openOsSel(this)">
       ${curLbl} <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
     </div>
     <div class="os-sel-menu">${optsHtml}</div>
   </div>`;
+}
+// Standard per-chart view-window header. Every panel that renders histChart
+// rows emits this once at the top of its chart block; lim defaults to the
+// same key so the dropdown can never disagree with the charts it drives.
+function chartHeader(key, lim = historyLimitFor(key)) {
+  return `<div style="display:flex; justify-content:flex-end; margin-bottom:4px;">${drawTimeSelect(key, lim)}</div>`;
 }
 
 const HISTORY_PERIOD_OPTIONS = [
@@ -2753,9 +2759,7 @@ function buildProxmox(px){
     <div class="node-body ${isOpen?'open':''}" id="nd-${node.name}">
       ${node.online ? `
         ${metricsError ? `<div class="offline-err" style="margin:0 0 8px">SSH metrics fallback: ${escHtml(metricsError)}</div>` : ''}
-        ${(()=>{ const lim=historyLimitFor('px:'+node.name); return `<div style="display:flex; justify-content:flex-end; margin-bottom:4px;">
-          ${drawTimeSelect('px:'+node.name, lim)}
-        </div><div class="chart-row">
+        ${(()=>{ const lim=historyLimitFor('px:'+node.name); return `${chartHeader('px:'+node.name, lim)}<div class="chart-row">
           <div class="chart-hdr"><span class="nb-label">CPU</span><span class="nb-pct" style="color:${bc(cpuPct)}">${fmtPct(cpuPct)}</span></div>
           ${histChart(history,'cpu',cpuPct,lim)}
         </div>
@@ -2981,9 +2985,7 @@ function buildLinux(linux){
         <span class="chevron ${isOpen?'open':''}" style="margin-left:4px">▼</span>
       </div>
       <div class="node-body ${isOpen?'open':''}" id="lx-${lkey}">
-        ${(()=>{ const lim=historyLimitFor('lx:'+lkey); return (cpuPct!=null||srv.ram!=null||srv.disk!=null||srv.temp!=null||bwMbps!=null)?`<div style="display:flex; justify-content:flex-end; margin-bottom:4px;">
-          ${drawTimeSelect('lx:'+lkey, lim)}
-        </div>`:'' })()}
+        ${(()=>{ const lim=historyLimitFor('lx:'+lkey); return (cpuPct!=null||srv.ram!=null||srv.disk!=null||srv.temp!=null||bwMbps!=null)?chartHeader('lx:'+lkey, lim):'' })()}
         ${(()=>{ const lim=historyLimitFor('lx:'+lkey); return cpuPct!=null?`
           <div class="chart-row">
             <div class="chart-hdr"><span class="nb-label">CPU</span><span class="nb-pct" style="color:${bc(cpuPct)}">${cpuPct}%</span></div>
@@ -3168,7 +3170,7 @@ function buildWindows(windows){
         <span class="chevron ${isOpen?'open':''}" style="margin-left:4px">▼</span>
       </div>
       <div class="node-body ${isOpen?'open':''}" id="win-${key}">
-        ${(()=>{ const lim=historyLimitFor('win:'+key); return (cpuPct!=null||srv.ram!=null||srv.disk!=null||bwMbps!=null)?`<div style="display:flex; justify-content:flex-end; margin-bottom:4px;">${drawTimeSelect('win:'+key, lim)}</div>`:'' })()}
+        ${(()=>{ const lim=historyLimitFor('win:'+key); return (cpuPct!=null||srv.ram!=null||srv.disk!=null||bwMbps!=null)?chartHeader('win:'+key, lim):'' })()}
         ${(()=>{ const lim=historyLimitFor('win:'+key); return cpuPct!=null?`<div class="chart-row"><div class="chart-hdr"><span class="nb-label">CPU</span><span class="nb-pct" style="color:${bc(cpuPct)}">${cpuPct}%</span></div>${histChart(srv.history,'cpu',cpuPct,lim)}</div>`:'' })()}
         ${(()=>{ const lim=historyLimitFor('win:'+key); return srv.ram?`<div class="chart-row"><div class="chart-hdr"><span class="nb-label">RAM</span><span class="nb-pct" style="color:${bc(ramPct)}">${ramPct}%</span></div>${histChart(srv.history,'ram',ramPct,lim)}<div class="chart-foot">${srv.ram.usedGB}/${srv.ram.totalGB} GB</div></div>`:'' })()}
         ${(()=>{ const lim=historyLimitFor('win:'+key); const diskPct=srv.disk?.percent ?? null; return srv.disk?`<div class="chart-row"><div class="chart-hdr"><span class="nb-label">Disk</span><span class="nb-pct" style="color:${bc(diskPct)}">${diskPct}%</span></div>${histChart(srv.history,'disk',diskPct,lim)}<div class="chart-foot">${srv.disk.usedGB}/${srv.disk.totalGB} GB</div></div>`:'' })()}
@@ -3557,9 +3559,7 @@ function buildSynology(syn, opts = {}){
         ${notifyBell('snmp:'+dev.name)}
       </div>
       <div class="node-body ${isOpen?'open':''}" id="snmp-${skey}">
-        ${(()=>{ const lim=historyLimitFor('snmp:'+skey); return (dev.cpu!=null||dev.ram!=null||cpuTemp!=null||systemTemperature!=null||diskIOMbps!=null||bandwidthMbps!=null)?`<div style="display:flex; justify-content:flex-end; margin-bottom:4px;">
-          ${drawTimeSelect('snmp:'+skey, lim)}
-        </div>`:'' })()}
+        ${(()=>{ const lim=historyLimitFor('snmp:'+skey); return (dev.cpu!=null||dev.ram!=null||cpuTemp!=null||systemTemperature!=null||diskIOMbps!=null||bandwidthMbps!=null)?chartHeader('snmp:'+skey, lim):'' })()}
         ${(()=>{ const lim=historyLimitFor('snmp:'+skey); return dev.cpu!=null ? `<div class="chart-row">
           <div class="chart-hdr"><span class="nb-label">CPU</span><span class="nb-pct" style="color:${bc(dev.cpu)}">${dev.cpu}%</span></div>
           ${histChart(dev.history,'cpu',dev.cpu,lim)}
@@ -3726,7 +3726,7 @@ function buildUnifi(data){
     // this row's body as ordinary chart rows. No nested collapsible row.
     const snmpDetail = matched ? (() => {
       const sd = matched;
-      const lim = historyLimitFor('unifi:' + skey);
+      const lim = historyLimitFor(stateKey);
       const cpuTemp = hasNum(sd.cpuTemp) ? Number(sd.cpuTemp)
         : (/cpu|processor/i.test(sd.systemTempLabel || '') && hasNum(sd.systemTemp) ? Number(sd.systemTemp) : null);
       const sysTemp = hasNum(sd.systemTemperature) ? Number(sd.systemTemperature)
@@ -3762,7 +3762,7 @@ function buildUnifi(data){
     const wanBody = d.isGateway && d._inst.wan ? (() => {
       const w = d._inst.wan;
       const hist = Array.isArray(w.history) ? w.history.map(p => ({ time: p.time, wanRxMbps: p.rxBps != null ? p.rxBps/1048576 : null, wanTxMbps: p.txBps != null ? p.txBps/1048576 : null, latency: p.latency })) : [];
-      const lim = historyLimitFor('unifi:' + skey);
+      const lim = historyLimitFor(stateKey);
       const rxNow = w.rxBps != null ? w.rxBps/1048576 : null;
       const txNow = w.txBps != null ? w.txBps/1048576 : null;
       const lastDown = (() => {
@@ -3820,9 +3820,10 @@ function buildUnifi(data){
         ${notifyBell('unifi:' + d.name)}
       </div>
       <div class="node-body ${isOpen ? 'open' : ''}" id="snmp-${skey}">
+        ${(wanBody || d.cpu != null || d.ram || snmpDetail) ? chartHeader(stateKey) : ''}
         ${wanBody}
-        ${(() => { const lim = historyLimitFor('unifi:' + skey); return d.cpu != null ? `<div class="chart-row"><div class="chart-hdr"><span class="nb-label">CPU</span><span class="nb-pct" style="color:${bc(d.cpu)}">${d.cpu}%</span></div>${histChart(d.history,'cpu',d.cpu,lim)}</div>` : ''; })()}
-        ${(() => { const lim = historyLimitFor('unifi:' + skey); return d.ram ? `<div class="chart-row"><div class="chart-hdr"><span class="nb-label">RAM</span><span class="nb-pct" style="color:${bc(d.ram.percent)}">${d.ram.percent}%</span></div>${histChart(d.history,'ram',d.ram.percent,lim)}</div>` : ''; })()}
+        ${(() => { const lim = historyLimitFor(stateKey); return d.cpu != null ? `<div class="chart-row"><div class="chart-hdr"><span class="nb-label">CPU</span><span class="nb-pct" style="color:${bc(d.cpu)}">${d.cpu}%</span></div>${histChart(d.history,'cpu',d.cpu,lim)}</div>` : ''; })()}
+        ${(() => { const lim = historyLimitFor(stateKey); return d.ram ? `<div class="chart-row"><div class="chart-hdr"><span class="nb-label">RAM</span><span class="nb-pct" style="color:${bc(d.ram.percent)}">${d.ram.percent}%</span></div>${histChart(d.history,'ram',d.ram.percent,lim)}</div>` : ''; })()}
         ${snmpDetail ? `<div class="syn-section" style="margin-top:6px">SNMP detail</div>${snmpDetail.html}` : ''}
       </div>`;
   }).join('');
@@ -4366,7 +4367,7 @@ function dockerHostCharts(host, key) {
   const hkey = dockerHistoryKey(key || host.name);
   const lim = historyLimitFor(hkey);
   return `<div class="docker-host-history">
-    <div style="display:flex; justify-content:flex-end; margin-bottom:4px;">${drawTimeSelect(hkey, lim)}</div>
+    ${chartHeader(hkey, lim)}
     ${hasCpu ? `<div class="chart-row">
       <div class="chart-hdr"><span class="nb-label">CPU</span><span class="nb-pct" style="color:${bc(host.summary.cpu)}">${host.summary.cpu}%</span></div>
       ${histChart(host.history, 'cpu', host.summary.cpu, lim)}
