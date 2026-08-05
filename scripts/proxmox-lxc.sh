@@ -1,0 +1,215 @@
+#!/usr/bin/env bash
+# Creates an unprivileged Debian 13 LXC on Proxmox VE and installs OmniSight
+# natively inside it (no Docker). Run on the Proxmox host as root:
+#   bash proxmox-lxc.sh
+#
+# Environment overrides:
+#   DISTRO / DISTRO_VERSION     template family/version     (default: debian/13)
+#   CTID / CT_HOSTNAME         container identity          (default: next ID/omnisight)
+#   STORAGE / TEMPLATE_STORAGE rootfs/template storage     (default: local-lvm/local)
+#   DISK_GB / MEMORY_MB / CORES                         (default: 6/1024/2)
+#   BRIDGE / NET_CONF          network bridge/config       (default: vmbr0/DHCP)
+#   NESTING                    enable LXC nesting           (default: 0)
+#   KEEP_FAILED_CT             keep a failed new container (default: 0)
+#   CONFIRM                    skip interactive confirmation with 1
+#   OMNISIGHT_REPO / OMNISIGHT_BRANCH / OMNISIGHT_PORT
+#   OMNISIGHT_TOKEN_FILE       optional private-repo token file
+#   OMNISIGHT_TOKEN_USER       token username              (default: oauth2)
+set -Eeuo pipefail
+
+msg()  { echo -e "\033[1;32m[omnisight-lxc]\033[0m $*"; }
+warn() { echo -e "\033[1;33m[omnisight-lxc]\033[0m $*" >&2; }
+fail() { echo -e "\033[1;31m[omnisight-lxc]\033[0m $*" >&2; exit 1; }
+
+is_uint() { [[ "$1" =~ ^[0-9]+$ ]]; }
+
+CREATED_CT=0
+INSTALL_OK=0
+HOST_TOKEN_FILE=""
+
+cleanup() {
+  local exit_code=$?
+  trap - EXIT
+  if [ -n "$HOST_TOKEN_FILE" ]; then rm -f -- "$HOST_TOKEN_FILE"; fi
+  if [ "$CREATED_CT" = "1" ] && [ "$INSTALL_OK" != "1" ]; then
+    if [ "$KEEP_FAILED_CT" = "1" ]; then
+      warn "installation failed; keeping newly-created LXC $CTID for diagnosis"
+    else
+      warn "installation failed; removing newly-created LXC $CTID"
+      pct stop "$CTID" --skiplock 1 >/dev/null 2>&1 || true
+      pct destroy "$CTID" --purge 1 >/dev/null 2>&1 || warn "could not remove LXC $CTID automatically"
+    fi
+  fi
+  exit "$exit_code"
+}
+trap cleanup EXIT
+
+command -v pct >/dev/null || fail "run this on a Proxmox VE host"
+command -v pvesh >/dev/null || fail "pvesh is required"
+command -v pveam >/dev/null || fail "pveam is required"
+[ "$(id -u)" -eq 0 ] || fail "run as root"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+INSTALLER="$SCRIPT_DIR/install-lxc.sh"
+[ -f "$INSTALLER" ] || fail "install-lxc.sh must be in the same directory as proxmox-lxc.sh"
+
+NEXT_ID=$(pvesh get /cluster/nextid)
+DEFAULT_REPO="https://github.com/caglaryalcin/OmniSight.git"
+REPO="${OMNISIGHT_REPO:-}"
+BRANCH="${OMNISIGHT_BRANCH:-}"
+TOKEN_SOURCE="${OMNISIGHT_TOKEN_FILE:-}"
+TOKEN_USER="${OMNISIGHT_TOKEN_USER:-oauth2}"
+TOKEN_VALUE="${OMNISIGHT_TOKEN:-}"
+
+if [ -t 0 ]; then
+  if [ -z "${CTID:-}" ]; then
+    read -r -p "Container ID [$NEXT_ID]: " CTID
+    CTID="${CTID:-$NEXT_ID}"
+  fi
+  if [ -z "${CT_HOSTNAME:-}" ]; then
+    read -r -p "Hostname [omnisight]: " CT_HOSTNAME
+    CT_HOSTNAME="${CT_HOSTNAME:-omnisight}"
+  fi
+  if [ -z "$REPO" ]; then
+    read -r -p "Repo URL [$DEFAULT_REPO]: " REPO
+    REPO="${REPO:-$DEFAULT_REPO}"
+  fi
+  if [ -z "$BRANCH" ]; then
+    read -r -p "Branch [main]: " BRANCH
+    BRANCH="${BRANCH:-main}"
+  fi
+  if [ -z "$TOKEN_SOURCE" ] && [ -z "$TOKEN_VALUE" ]; then
+    read -r -s -p "Private-repo token (empty for public repo): " TOKEN_VALUE
+    echo
+  fi
+else
+  CTID="${CTID:-$NEXT_ID}"
+  CT_HOSTNAME="${CT_HOSTNAME:-omnisight}"
+fi
+
+REPO="${REPO:-$DEFAULT_REPO}"
+BRANCH="${BRANCH:-main}"
+DISTRO="${DISTRO:-debian}"
+case "$DISTRO" in
+  debian)
+    DISTRO_VERSION="${DISTRO_VERSION:-13}"
+    NETWORK_HOST="deb.debian.org"
+    ;;
+  ubuntu)
+    DISTRO_VERSION="${DISTRO_VERSION:-24.04}"
+    NETWORK_HOST="archive.ubuntu.com"
+    ;;
+  *) fail "DISTRO must be debian or ubuntu" ;;
+esac
+
+STORAGE="${STORAGE:-local-lvm}"
+TEMPLATE_STORAGE="${TEMPLATE_STORAGE:-local}"
+DISK_GB="${DISK_GB:-6}"
+MEMORY_MB="${MEMORY_MB:-1024}"
+CORES="${CORES:-2}"
+BRIDGE="${BRIDGE:-vmbr0}"
+NET_CONF="${NET_CONF:-name=eth0,bridge=$BRIDGE,ip=dhcp}"
+NESTING="${NESTING:-0}"
+KEEP_FAILED_CT="${KEEP_FAILED_CT:-0}"
+CONFIRM="${CONFIRM:-0}"
+PORT="${OMNISIGHT_PORT:-3000}"
+
+[[ "$CTID" =~ ^[1-9][0-9]{2,8}$ ]] || fail "CTID must be a numeric Proxmox VMID (100-999999999)"
+[[ ${#CT_HOSTNAME} -le 63 && "$CT_HOSTNAME" =~ ^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?$ ]] || fail "CT_HOSTNAME must be a valid DNS hostname"
+[[ "$DISTRO_VERSION" =~ ^[0-9]+([.][0-9]+)?$ ]] || fail "DISTRO_VERSION is invalid"
+[[ "$STORAGE" =~ ^[A-Za-z0-9._-]+$ ]] || fail "STORAGE contains unsupported characters"
+[[ "$TEMPLATE_STORAGE" =~ ^[A-Za-z0-9._-]+$ ]] || fail "TEMPLATE_STORAGE contains unsupported characters"
+[[ "$BRIDGE" =~ ^[A-Za-z0-9._-]+$ ]] || fail "BRIDGE contains unsupported characters"
+[[ "$NET_CONF" != *$'\n'* && "$NET_CONF" != *$'\r'* ]] || fail "NET_CONF must be a single line"
+for value_name in DISK_GB MEMORY_MB CORES PORT; do
+  value="${!value_name}"
+  is_uint "$value" || fail "$value_name must be a positive integer"
+  [ "$value" -gt 0 ] || fail "$value_name must be greater than zero"
+done
+[ "$PORT" -le 65535 ] || fail "OMNISIGHT_PORT must be at most 65535"
+[[ "$NESTING" = "0" || "$NESTING" = "1" ]] || fail "NESTING must be 0 or 1"
+[[ "$KEEP_FAILED_CT" = "0" || "$KEEP_FAILED_CT" = "1" ]] || fail "KEEP_FAILED_CT must be 0 or 1"
+[[ "$CONFIRM" = "0" || "$CONFIRM" = "1" ]] || fail "CONFIRM must be 0 or 1"
+[[ "$REPO" =~ ^https://[^[:space:]@]+$ ]] || fail "OMNISIGHT_REPO must be an HTTPS URL without embedded credentials"
+[[ "$BRANCH" =~ ^[A-Za-z0-9._/-]+$ ]] || fail "OMNISIGHT_BRANCH contains unsupported characters"
+[[ "$BRANCH" != -* && "$BRANCH" != *..* && "$BRANCH" != *//* && "$BRANCH" != */ && "$BRANCH" != *.lock ]] || fail "OMNISIGHT_BRANCH is not a safe branch name"
+[[ "$TOKEN_USER" =~ ^[A-Za-z0-9._+@-]+$ ]] || fail "OMNISIGHT_TOKEN_USER contains unsupported characters"
+if [ -n "$TOKEN_SOURCE" ]; then
+  [ -f "$TOKEN_SOURCE" ] && [ -r "$TOKEN_SOURCE" ] || fail "OMNISIGHT_TOKEN_FILE is not readable"
+fi
+
+if pct status "$CTID" >/dev/null 2>&1; then fail "CTID $CTID already exists"; fi
+
+msg "planned LXC: $CTID ($CT_HOSTNAME), $DISTRO $DISTRO_VERSION, ${CORES}c/${MEMORY_MB}MB/${DISK_GB}GB"
+msg "storage: $STORAGE, network: $NET_CONF, nesting: $NESTING"
+msg "source: $REPO ($BRANCH), OmniSight port: $PORT"
+if [ -t 0 ] && [ "$CONFIRM" != "1" ]; then
+  read -r -p "Create this LXC and install OmniSight? [y/N]: " answer
+  [[ "$answer" =~ ^[Yy]$ ]] || fail "cancelled"
+fi
+
+if [ -n "$TOKEN_SOURCE" ] || [ -n "$TOKEN_VALUE" ]; then
+  HOST_TOKEN_FILE=$(mktemp)
+  chmod 0600 "$HOST_TOKEN_FILE"
+  if [ -n "$TOKEN_SOURCE" ]; then cat -- "$TOKEN_SOURCE" > "$HOST_TOKEN_FILE"; else printf '%s' "$TOKEN_VALUE" > "$HOST_TOKEN_FILE"; fi
+  TOKEN_VALUE=""
+fi
+
+TEMPLATE_PREFIX="${DISTRO}-${DISTRO_VERSION}-standard_"
+msg "finding $DISTRO $DISTRO_VERSION template"
+pveam update >/dev/null
+TEMPLATE=$(pveam available --section system | awk '{print $2}' | grep -E "^${TEMPLATE_PREFIX}" | sort -V | tail -1 || true)
+[ -n "$TEMPLATE" ] || fail "no ${DISTRO}-${DISTRO_VERSION}-standard template available via pveam"
+if ! pveam list "$TEMPLATE_STORAGE" | grep -Fq "$TEMPLATE"; then
+  msg "downloading $TEMPLATE"
+  pveam download "$TEMPLATE_STORAGE" "$TEMPLATE"
+fi
+
+msg "creating unprivileged LXC $CTID"
+create_args=(
+  create "$CTID" "$TEMPLATE_STORAGE:vztmpl/$TEMPLATE"
+  --hostname "$CT_HOSTNAME"
+  --unprivileged 1
+  --cores "$CORES"
+  --memory "$MEMORY_MB"
+  --swap 512
+  --rootfs "$STORAGE:$DISK_GB"
+  --net0 "$NET_CONF"
+  --onboot 1
+  --start 1
+)
+if [ "$NESTING" = "1" ]; then create_args+=(--features nesting=1); fi
+if ! pct "${create_args[@]}"; then
+  if pct status "$CTID" >/dev/null 2>&1; then CREATED_CT=1; fi
+  fail "LXC creation failed"
+fi
+CREATED_CT=1
+
+msg "waiting for DNS/network in container"
+for attempt in $(seq 1 30); do
+  if pct exec "$CTID" -- getent hosts "$NETWORK_HOST" >/dev/null 2>&1; then break; fi
+  [ "$attempt" -eq 30 ] && fail "container has no working network after 60 seconds"
+  sleep 2
+done
+
+msg "copying and running the OmniSight installer"
+pct push "$CTID" "$INSTALLER" /root/install-lxc.sh --perms 0700
+install_env=(
+  env
+  "OMNISIGHT_REPO=$REPO"
+  "OMNISIGHT_BRANCH=$BRANCH"
+  "OMNISIGHT_PORT=$PORT"
+)
+if [ -n "$HOST_TOKEN_FILE" ]; then
+  pct push "$CTID" "$HOST_TOKEN_FILE" /root/.omnisight-repo-token --perms 0600
+  install_env+=(
+    "OMNISIGHT_TOKEN_FILE=/root/.omnisight-repo-token"
+    "OMNISIGHT_TOKEN_FILE_DELETE=1"
+    "OMNISIGHT_TOKEN_USER=$TOKEN_USER"
+  )
+fi
+pct exec "$CTID" -- "${install_env[@]}" bash /root/install-lxc.sh
+
+INSTALL_OK=1
+IP=$(pct exec "$CTID" -- hostname -I | awk '{print $1}')
+msg "done — OmniSight LXC $CTID is up: http://$IP:$PORT"

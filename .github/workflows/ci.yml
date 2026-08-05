@@ -24,5 +24,7 @@ jobs:
         run: |
           node --check server.js
           for f in src/*.js scripts/*.js; do node --check "$f"; done
+      - name: Native installer shell syntax
+        run: bash -n scripts/install-lxc.sh scripts/proxmox-lxc.sh
       - name: Smoke test
         run: node scripts/ci-smoke.js
