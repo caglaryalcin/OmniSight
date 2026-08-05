@@ -798,7 +798,9 @@ html[data-theme="light"] body.rail-collapsed .shell .sb-card.active{background:#
 .overview-icon{width:28px;height:28px;display:grid;place-items:center;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:5px;flex-shrink:0}
 .overview-head-main{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;min-width:0}
 .overview-title{font-size:15px;font-weight:750;letter-spacing:0;line-height:1.15;min-width:0;max-width:100%;overflow:hidden;text-overflow:clip;white-space:normal;overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2}
-.overview-meta{font-size:12px;color:var(--muted);min-width:0;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.25}
+.overview-meta{font-size:12px;color:var(--muted);min-width:0;max-width:100%;display:flex;align-items:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.25}
+.overview-meta-part{min-width:0;white-space:nowrap}
+.overview-meta-part+.overview-meta-part::before{content:"\00b7";margin:0 5px;color:var(--muted)}
 .overview-card-toggle{width:18px;height:18px;display:grid;place-items:center;color:var(--muted);transition:transform .16s ease,color .16s ease;flex-shrink:0}
 .overview-card-h:hover .overview-card-toggle{color:var(--text)}
 .overview-card-hide{width:24px;height:24px;border:0;background:transparent;color:var(--muted);border-radius:7px;display:grid;place-items:center;cursor:pointer}
@@ -864,6 +866,9 @@ html[data-theme="light"] .overview-card .sb-csum-item{background:transparent!imp
   .overview-card-h>.badge{grid-column:2;grid-row:2;justify-self:start;max-width:100%}
   .overview-card-h>.overview-card-toggle{grid-column:3;grid-row:1 / span 2}
   .overview-card-h>.overview-card-hide{grid-column:4;grid-row:1 / span 2}
+  .overview-meta{flex-direction:column;align-items:flex-start;white-space:normal;overflow:visible;text-overflow:clip;gap:1px}
+  .overview-meta-part{max-width:100%;overflow:hidden;text-overflow:ellipsis}
+  .overview-meta-part+.overview-meta-part::before{display:none}
   .overview-card .sb-csum{grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-flow:row;grid-auto-columns:auto;overflow:visible}
   .overview-card .sb-csum-item{padding-left:6px;padding-right:6px;overflow:visible}
   .overview-card .sb-csum-val{max-width:none;overflow:visible;font-size:19px}
@@ -7096,6 +7101,12 @@ function dashboardSummaryHtml(html){
   items.forEach(item => { if(zeroMetric(item)) item.remove(); });
   return wrap.querySelector('.sb-csum-item,.csum-item') ? wrap.innerHTML : '';
 }
+function overviewMetaHtml(meta){
+  const text = String(meta || '').trim();
+  if(!text) return '';
+  const parts = text.split(/\s+(?:\u00b7|-)\s+/).map(part => part.trim()).filter(Boolean);
+  return `<div class="overview-meta" title="${escAttr(text)}">${parts.map(part => `<span class="overview-meta-part">${escHtml(part)}</span>`).join('')}</div>`;
+}
 function renderDashboardOverview(data, ids, panels, opts = {}){
   const showSide = dashboardSidePanelVisible(data);
   const visibleIds = ids.filter(id => !dashboardHiddenPlatforms.has(id));
@@ -7116,7 +7127,7 @@ function renderDashboardOverview(data, ids, panels, opts = {}){
         <div class="overview-icon">${iconSvg}</div>
         <div class="overview-head-main">
           <div class="overview-title">${title}</div>
-          ${panel.meta?`<div class="overview-meta">${panel.meta}</div>`:''}
+          ${overviewMetaHtml(panel.meta)}
         </div>
         ${panel.badge}
         <div class="overview-card-toggle"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></div>

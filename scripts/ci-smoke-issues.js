@@ -133,6 +133,9 @@ function testStaticRegressions() {
   assert.ok(dashboard.includes("os_app_update_footer_v3") && dashboard.includes("cache:'no-store'"), 'app update check must bypass stale browser responses');
   assert.ok(!dashboard.includes("cachedUpdate || fetch('/api/update-check'"), 'cached app version must not replace the GitHub update request');
   assert.ok(dashboard.includes('@container (max-width:300px)') && dashboard.includes('-webkit-line-clamp:2'), 'overview titles must adapt to narrow cards');
+  assert.ok(dashboard.includes('function overviewMetaHtml(meta)'), 'overview metadata must be rendered as separate metrics');
+  assert.ok(dashboard.includes('.overview-meta-part+.overview-meta-part::before'), 'wide overview metadata must keep its separator');
+  assert.ok(dashboard.includes('.overview-meta{flex-direction:column;align-items:flex-start'), 'narrow overview metadata must wrap each metric onto its own line');
   assert.ok(dashboard.includes('grid-template-columns:repeat(auto-fit,minmax(78px,1fr))'), 'dense overview summaries must adapt their column count');
   assert.ok(dashboard.includes('.overview-card .sb-csum{grid-template-columns:repeat(2,minmax(0,1fr))'), 'narrow overview summaries must use two readable columns');
   assert.ok(server.includes('requestedHistoryPointLimit'));
