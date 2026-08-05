@@ -46,7 +46,7 @@ id() {
 pvesh() { echo 150; }
 pveam() {
   case "$1" in
-    update|download) return 0 ;;
+    update|download) echo "mock pveam details"; return 0 ;;
     available)
       echo "system debian-13-standard_13.6-1_amd64.tar.zst"
       echo "system ubuntu-24.04-standard_24.04-2_amd64.tar.zst"
@@ -70,11 +70,11 @@ pct() {
   printf '%s\n' "$*" >> "$MOCK_PCT_LOG"
   case "$1" in
     status) return 1 ;;
-    create) return 0 ;;
+    create) echo "mock pct create details"; return 0 ;;
     push|stop|destroy) return 0 ;;
     exec)
       case "$*" in
-        *"/root/install-lxc.sh"*) [ "$MOCK_INSTALL_FAIL" = "1" ] && return 1 ;;
+        *"/root/install-lxc.sh"*) echo "mock installer details"; [ "$MOCK_INSTALL_FAIL" = "1" ] && return 1 ;;
         *"hostname -I"*) echo "192.0.2.10" ;;
       esac
       return 0
@@ -97,9 +97,17 @@ pct() {
 
   let result = runScript(wrapper, env, mocks);
   assert.strictEqual(result.status, 0, result.stderr || result.stdout);
+  assert.match(result.stdout, /verbose mode: disabled/);
+  assert.ok(!result.stdout.includes('mock pveam details'), 'quiet mode must hide command output');
   let calls = fs.readFileSync(log, 'utf8');
   assert.match(calls, /create 150 .*debian-13-standard_/);
   assert.ok(!calls.includes('nesting=1'), 'nesting must be disabled by default');
+
+  fs.writeFileSync(log, '');
+  result = runScript(wrapper, { ...env, VERBOSE: '1' }, mocks);
+  assert.strictEqual(result.status, 0, result.stderr || result.stdout);
+  assert.match(result.stdout, /verbose mode: enabled/);
+  assert.match(result.stdout, /mock pveam details/, 'verbose mode must show command output');
 
   const remoteWrapper = path.join(root, 'proxmox-lxc-remote.sh');
   fs.copyFileSync(wrapper, remoteWrapper);
@@ -119,6 +127,7 @@ pct() {
   fs.writeFileSync(log, '');
   result = runScript(wrapper, { ...env, MOCK_INSTALL_FAIL: '1' }, mocks);
   assert.notStrictEqual(result.status, 0, 'failed install must fail the wrapper');
+  assert.match(result.stderr, /mock installer details/, 'quiet failures must reveal the last command output');
   calls = fs.readFileSync(log, 'utf8');
   assert.match(calls, /destroy 150 --purge 1/, 'failed new LXC must be removed');
 
@@ -135,6 +144,9 @@ pct() {
   assert.ok(installerSource.includes('GIT_ASKPASS'), 'private token must use GIT_ASKPASS');
   assert.ok(!installerSource.includes('reset --hard'), 'update must not silently discard local edits');
   assert.ok(!wrapperSource.includes('${TOKEN_USER}:${TOKEN}@'), 'wrapper must not embed tokens in URLs');
+  assert.ok(wrapperSource.includes('Enable verbose mode? [y/N]'), 'interactive runs must ask for verbose mode with No as the default');
+  assert.ok(wrapperSource.includes('Create this LXC and install OmniSight? [Y/n]'), 'final confirmation must default to Yes');
+  assert.match(wrapperSource, /""\|\[Yy\]\) break/, 'empty final confirmation must continue');
 
   fs.rmSync(root, { recursive: true, force: true });
   console.log('smoke ok — native LXC installer: Debian/Ubuntu, validation, cleanup');

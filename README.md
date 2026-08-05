@@ -229,6 +229,8 @@ bash <(curl --proto '=https' --tlsv1.2 -fsSL https://raw.githubusercontent.com/c
 # optional Ubuntu 24.04: DISTRO=ubuntu DISTRO_VERSION=24.04 bash <(curl --proto '=https' --tlsv1.2 -fsSL https://raw.githubusercontent.com/caglaryalcin/OmniSight/refs/heads/main/scripts/proxmox-lxc.sh)
 ```
 
+The installer asks whether verbose command output should be shown; the default is **No**. At the final `[Y/n]` confirmation, pressing Enter accepts the default and starts the installation.
+
 Or inside any existing Debian/Ubuntu LXC, VM or bare-metal server:
 
 ```bash
