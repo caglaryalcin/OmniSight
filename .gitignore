@@ -21,4 +21,7 @@ public/assets/*
 *.log
 npm-debug.log*
 
+# release notes belong in GitHub Releases
+RELEASE_NOTES_*.md
+
 .fuse_hidden*
