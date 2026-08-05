@@ -815,35 +815,57 @@ bash scripts/install-lxc.sh                          # fresh install
 bash /opt/omnisight/scripts/install-lxc.sh --update  # update in place, later
 ```
 
-Or one-liner from a running dashboard host:
+To download the installer separately, save it first, inspect it, and then run it:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/caglaryalcin/OmniSight/main/scripts/install-lxc.sh | sudo bash
+curl --proto '=https' --tlsv1.2 -fLo install-lxc.sh \
+  https://raw.githubusercontent.com/caglaryalcin/OmniSight/main/scripts/install-lxc.sh
+less install-lxc.sh
+sudo bash install-lxc.sh
 ```
 
-**On a Proxmox VE 8/9 host** — `scripts/proxmox-lxc.sh` (run as root on the host) additionally *creates* an unprivileged Ubuntu 24.04 LXC (nesting enabled), waits for network, then runs `install-lxc.sh` inside it. Interactive by default; set the env vars to run unattended.
+**On a Proxmox VE 8/9 host** — `scripts/proxmox-lxc.sh` (run as root on the host, with `install-lxc.sh` in the same directory) additionally creates an unprivileged Debian 13 LXC, waits for network, then runs `install-lxc.sh` inside it. LXC nesting is disabled by default because a native OmniSight installation does not require it. Interactive runs show a summary and require confirmation; set the environment variables to run unattended.
 
 ```bash
 bash scripts/proxmox-lxc.sh
 CTID=150 CT_HOSTNAME=mon STORAGE=tank BRIDGE=vmbr1 bash scripts/proxmox-lxc.sh   # unattended
+DISTRO=ubuntu DISTRO_VERSION=24.04 bash scripts/proxmox-lxc.sh                  # optional Ubuntu
 ```
 
 **Environment overrides:**
 
 | Variable | Used by | Default | Purpose |
 |---|---|---|---|
-| `OMNISIGHT_REPO` | both | `https://github.com/caglaryalcin/OmniSight.git` | Source git repo (fork or mirror). Private repos: embed a token, or use `OMNISIGHT_TOKEN`/`OMNISIGHT_TOKEN_USER` on the Proxmox wrapper |
-| `OMNISIGHT_BRANCH` | both | `main` | Branch or tag to check out |
+| `OMNISIGHT_REPO` | both | `https://github.com/caglaryalcin/OmniSight.git` | HTTPS source git repo (fork or mirror); embedded credentials are rejected |
+| `OMNISIGHT_BRANCH` | both | `main` | Branch to check out |
 | `OMNISIGHT_DIR` | install | `/opt/omnisight` | Install directory |
 | `OMNISIGHT_PORT` | both | `3000` | Listen port |
 | `NODE_MAJOR` | install | `22` | Node.js major version (NodeSource) |
+| `OMNISIGHT_TOKEN_FILE` | both | empty | Root-readable file containing a private-repository token; never stored in the Git remote URL |
+| `OMNISIGHT_TOKEN_USER` | both | `oauth2` | Username paired with the private-repository token |
+| `DISTRO` `DISTRO_VERSION` | proxmox | `debian`, `13` | LXC template family/version; `ubuntu` and `24.04` are also supported |
+| `NESTING` | proxmox | `0` | Set to `1` only when another workload inside the LXC requires nesting |
+| `KEEP_FAILED_CT` | proxmox | `0` | Keep a newly-created LXC after a failed install for diagnosis instead of removing it |
+| `CONFIRM` | proxmox | `0` | Set to `1` to skip the interactive final confirmation |
 | `CTID` `CT_HOSTNAME` `STORAGE` `TEMPLATE_STORAGE` `DISK_GB` `MEMORY_MB` `CORES` `BRIDGE` `NET_CONF` | proxmox | next free ID, `omnisight`, `local-lvm`, `local`, 6, 1024, 2, `vmbr0`, DHCP | LXC shape and placement (stock Proxmox conventions) |
 
-**`--update` semantics.** `install-lxc.sh --update` runs `git fetch --all` then `git reset --hard origin/$OMNISIGHT_BRANCH`, reinstalls production deps, `chown`s to `omnisight`, and restarts the service. The hard reset **discards any local edits** in the install directory — carry local patches on a branch/fork and point `OMNISIGHT_BRANCH`/the checkout's `origin` at it rather than editing in place.
+For a private repository, create a root-only token file instead of putting credentials in the repository URL:
+
+```bash
+install -m 0600 /dev/null /root/omnisight-repo.token
+printf '%s' '<read-only-token>' > /root/omnisight-repo.token
+OMNISIGHT_TOKEN_FILE=/root/omnisight-repo.token bash scripts/proxmox-lxc.sh
+```
+
+The wrapper copies the token to a temporary root-only file inside the new LXC. The installer supplies it to Git through a temporary `GIT_ASKPASS` helper, keeps the configured `origin` URL credential-free, and removes the copied token after use.
+
+**Failure cleanup.** Before creation, the wrapper rejects an existing CTID and validates the template, storage, network, resource, repository, branch, and port inputs. If a later installation step fails, it stops and removes only the LXC created by that run. Use `KEEP_FAILED_CT=1` when the failed container should remain available for diagnosis.
+
+**`--update` semantics.** `install-lxc.sh --update` refuses to continue when tracked files contain local edits. It then fetches the selected branch, checks out the fetched commit, reinstalls production dependencies, restores ownership, and restarts the service. It does not silently discard tracked local changes.
 
 **Systemd unit.** Runs as `User=omnisight`, `ExecStart=node --openssl-legacy-provider server.js` (the legacy OpenSSL provider flag is required), `Restart=on-failure`. Hardened with `NoNewPrivileges`, `PrivateTmp`, `ProtectSystem=strict`, `ProtectHome`, and `ReadWritePaths=$APP_DIR/data` — so at runtime the process can only write to `data/` (the only state that must survive redeploys). Manage with `systemctl status|restart omnisight` and `journalctl -u omnisight`.
 
-**Supported scope.** The installer targets Debian/Ubuntu (`apt` + NodeSource) and requires Node 20+. On other distributions do the equivalent by hand: install Node ≥ 20, `git clone` the repo, `npm ci --omit=dev`, then create a `systemd` unit mirroring the one above (same `ExecStart`, `NODE_ENV=production`, and `ReadWritePaths` for `data/`).
+**Supported scope.** The installer targets Debian/Ubuntu (`apt` + NodeSource) and requires Node 20.19+. On other distributions do the equivalent by hand: install a supported Node.js release, `git clone` the repo, `npm ci --omit=dev`, then create a `systemd` unit mirroring the one above (same `ExecStart`, `NODE_ENV=production`, and `ReadWritePaths` for `data/`).
 
 ### Docker
 

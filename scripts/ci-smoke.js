@@ -50,6 +50,9 @@ async function main() {
 
   // 5) Pure helpers extracted from public/index.html (no browser)
   require('./ci-smoke-client').run();
+
+  // 6) Native installer defaults, input validation, and failed-LXC cleanup
+  require('./ci-smoke-lxc').run();
 }
 
 main().catch(err => { console.error(err); process.exit(1); });

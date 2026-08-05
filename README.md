@@ -220,12 +220,13 @@ $env:OMNISIGHT_URL="http://<omnisight-host>:3000"; $env:OMNISIGHT_TOKEN="<token>
 
 ## Quick start (Proxmox LXC / bare metal, no Docker)
 
-Run OmniSight natively under systemd — no Docker required. On a **Proxmox VE 8/9 host**, this creates an unprivileged Ubuntu 24.04 LXC and installs everything inside it:
+Run OmniSight natively under systemd — no Docker required. On a **Proxmox VE 8/9 host**, this creates an unprivileged Debian 13 LXC and installs everything inside it:
 
 ```bash
 bash scripts/proxmox-lxc.sh
 # defaults: next free CTID, local-lvm, DHCP on vmbr0, 2 cores / 1 GB RAM / 6 GB disk
 # override via env: CTID=150 CT_HOSTNAME=mon STORAGE=tank BRIDGE=vmbr1 bash scripts/proxmox-lxc.sh
+# optional Ubuntu 24.04: DISTRO=ubuntu DISTRO_VERSION=24.04 bash scripts/proxmox-lxc.sh
 ```
 
 Or inside any existing Debian/Ubuntu LXC, VM or bare-metal server:
@@ -235,7 +236,7 @@ bash scripts/install-lxc.sh                 # installs Node 22, clones to /opt/o
 bash /opt/omnisight/scripts/install-lxc.sh --update   # update later
 ```
 
-State lives in `/opt/omnisight/data`, the service runs as the unprivileged `omnisight` user (`systemctl status omnisight`). `OMNISIGHT_REPO` / `OMNISIGHT_BRANCH` / `OMNISIGHT_PORT` env vars override the source and port.
+State lives in `/opt/omnisight/data`, and the service runs as the unprivileged `omnisight` user (`systemctl status omnisight`). The Proxmox wrapper validates its inputs, leaves LXC nesting disabled by default, and removes only the newly-created container if installation fails (`KEEP_FAILED_CT=1` keeps it for diagnosis). Private-repository tokens are passed through a temporary root-only file instead of being embedded in the Git remote URL.
 
 ## Quick start (Docker)
 
