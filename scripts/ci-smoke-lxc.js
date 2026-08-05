@@ -55,6 +55,17 @@ pveam() {
     *) return 1 ;;
   esac
 }
+curl() {
+  local output=""
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      -o) output="$2"; shift 2 ;;
+      *) shift ;;
+    esac
+  done
+  [ -n "$output" ] || return 1
+  cp "$MOCK_INSTALLER_SOURCE" "$output"
+}
 pct() {
   printf '%s\n' "$*" >> "$MOCK_PCT_LOG"
   case "$1" in
@@ -79,6 +90,7 @@ pct() {
     CONFIRM: '1',
     MOCK_PCT_LOG: bashPath(path.relative(repoRoot, log)),
     MOCK_INSTALL_FAIL: '0',
+    MOCK_INSTALLER_SOURCE: bashPath(path.join('scripts', 'install-lxc.sh')),
   };
   const wrapper = path.join('scripts', 'proxmox-lxc.sh');
   const installer = path.join('scripts', 'install-lxc.sh');
@@ -88,6 +100,15 @@ pct() {
   let calls = fs.readFileSync(log, 'utf8');
   assert.match(calls, /create 150 .*debian-13-standard_/);
   assert.ok(!calls.includes('nesting=1'), 'nesting must be disabled by default');
+
+  const remoteWrapper = path.join(root, 'proxmox-lxc-remote.sh');
+  fs.copyFileSync(wrapper, remoteWrapper);
+  fs.writeFileSync(log, '');
+  result = runScript(path.relative(repoRoot, remoteWrapper), env, mocks);
+  assert.strictEqual(result.status, 0, result.stderr || result.stdout);
+  assert.match(result.stdout, /downloading companion OmniSight installer/);
+  calls = fs.readFileSync(log, 'utf8');
+  assert.match(calls, /create 150 .*debian-13-standard_/);
 
   fs.writeFileSync(log, '');
   result = runScript(wrapper, { ...env, DISTRO: 'ubuntu', DISTRO_VERSION: '24.04' }, mocks);

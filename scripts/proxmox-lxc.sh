@@ -13,6 +13,7 @@
 #   KEEP_FAILED_CT             keep a failed new container (default: 0)
 #   CONFIRM                    skip interactive confirmation with 1
 #   OMNISIGHT_REPO / OMNISIGHT_BRANCH / OMNISIGHT_PORT
+#   OMNISIGHT_INSTALLER_URL    companion installer URL for remote execution
 #   OMNISIGHT_TOKEN_FILE       optional private-repo token file
 #   OMNISIGHT_TOKEN_USER       token username              (default: oauth2)
 set -Eeuo pipefail
@@ -26,11 +27,13 @@ is_uint() { [[ "$1" =~ ^[0-9]+$ ]]; }
 CREATED_CT=0
 INSTALL_OK=0
 HOST_TOKEN_FILE=""
+HOST_INSTALLER_DIR=""
 
 cleanup() {
   local exit_code=$?
   trap - EXIT
   if [ -n "$HOST_TOKEN_FILE" ]; then rm -f -- "$HOST_TOKEN_FILE"; fi
+  if [ -n "$HOST_INSTALLER_DIR" ]; then rm -rf -- "$HOST_INSTALLER_DIR"; fi
   if [ "$CREATED_CT" = "1" ] && [ "$INSTALL_OK" != "1" ]; then
     if [ "$KEEP_FAILED_CT" = "1" ]; then
       warn "installation failed; keeping newly-created LXC $CTID for diagnosis"
@@ -51,7 +54,16 @@ command -v pveam >/dev/null || fail "pveam is required"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INSTALLER="$SCRIPT_DIR/install-lxc.sh"
-[ -f "$INSTALLER" ] || fail "install-lxc.sh must be in the same directory as proxmox-lxc.sh"
+if [ ! -f "$INSTALLER" ]; then
+  command -v curl >/dev/null || fail "curl is required when running proxmox-lxc.sh from a URL"
+  INSTALLER_URL="${OMNISIGHT_INSTALLER_URL:-https://raw.githubusercontent.com/caglaryalcin/OmniSight/refs/heads/main/scripts/install-lxc.sh}"
+  [[ "$INSTALLER_URL" =~ ^https://[^[:space:]]+$ ]] || fail "OMNISIGHT_INSTALLER_URL must be an HTTPS URL"
+  HOST_INSTALLER_DIR=$(mktemp -d)
+  INSTALLER="$HOST_INSTALLER_DIR/install-lxc.sh"
+  msg "downloading companion OmniSight installer"
+  curl --proto '=https' --tlsv1.2 -fsSL "$INSTALLER_URL" -o "$INSTALLER" || fail "could not download install-lxc.sh"
+  chmod 0700 "$INSTALLER"
+fi
 
 NEXT_ID=$(pvesh get /cluster/nextid)
 DEFAULT_REPO="https://github.com/caglaryalcin/OmniSight.git"

@@ -223,10 +223,10 @@ $env:OMNISIGHT_URL="http://<omnisight-host>:3000"; $env:OMNISIGHT_TOKEN="<token>
 Run OmniSight natively under systemd — no Docker required. On a **Proxmox VE 8/9 host**, this creates an unprivileged Debian 13 LXC and installs everything inside it:
 
 ```bash
-bash scripts/proxmox-lxc.sh
+bash <(curl --proto '=https' --tlsv1.2 -fsSL https://raw.githubusercontent.com/caglaryalcin/OmniSight/refs/heads/main/scripts/proxmox-lxc.sh)
 # defaults: next free CTID, local-lvm, DHCP on vmbr0, 2 cores / 1 GB RAM / 6 GB disk
-# override via env: CTID=150 CT_HOSTNAME=mon STORAGE=tank BRIDGE=vmbr1 bash scripts/proxmox-lxc.sh
-# optional Ubuntu 24.04: DISTRO=ubuntu DISTRO_VERSION=24.04 bash scripts/proxmox-lxc.sh
+# override via env: CTID=150 CT_HOSTNAME=mon STORAGE=tank BRIDGE=vmbr1 bash <(curl --proto '=https' --tlsv1.2 -fsSL https://raw.githubusercontent.com/caglaryalcin/OmniSight/refs/heads/main/scripts/proxmox-lxc.sh)
+# optional Ubuntu 24.04: DISTRO=ubuntu DISTRO_VERSION=24.04 bash <(curl --proto '=https' --tlsv1.2 -fsSL https://raw.githubusercontent.com/caglaryalcin/OmniSight/refs/heads/main/scripts/proxmox-lxc.sh)
 ```
 
 Or inside any existing Debian/Ubuntu LXC, VM or bare-metal server:
