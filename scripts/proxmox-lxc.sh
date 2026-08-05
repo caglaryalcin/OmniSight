@@ -31,6 +31,7 @@ fail() {
 }
 
 is_uint() { [[ "$1" =~ ^[0-9]+$ ]]; }
+is_valid_hostname() { [[ ${#1} -le 63 && "$1" =~ ^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?$ ]]; }
 
 CREATED_CT=0
 INSTALL_OK=0
@@ -94,20 +95,13 @@ if [ -t 0 ]; then
     CTID="${CTID:-$NEXT_ID}"
   fi
   if [ -z "${CT_HOSTNAME:-}" ]; then
-    read -r -p "Hostname [omnisight]: " CT_HOSTNAME
-    CT_HOSTNAME="${CT_HOSTNAME:-omnisight}"
-  fi
-  if [ -z "$REPO" ]; then
-    read -r -p "Repo URL [$DEFAULT_REPO]: " REPO
-    REPO="${REPO:-$DEFAULT_REPO}"
-  fi
-  if [ -z "$BRANCH" ]; then
-    read -r -p "Branch [main]: " BRANCH
-    BRANCH="${BRANCH:-main}"
-  fi
-  if [ -z "$TOKEN_SOURCE" ] && [ -z "$TOKEN_VALUE" ]; then
-    read -r -s -p "Private-repo token (empty for public repo): " TOKEN_VALUE
-    echo
+    while true; do
+      read -r -p "Hostname [omnisight]: " CT_HOSTNAME
+      CT_HOSTNAME="${CT_HOSTNAME:-omnisight}"
+      is_valid_hostname "$CT_HOSTNAME" && break
+      warn "hostname must contain only letters, numbers and hyphens"
+      CT_HOSTNAME=""
+    done
   fi
   if [ -z "${VERBOSE:-}" ]; then
     while true; do
@@ -153,7 +147,7 @@ VERBOSE="${VERBOSE:-0}"
 PORT="${OMNISIGHT_PORT:-3000}"
 
 [[ "$CTID" =~ ^[1-9][0-9]{2,8}$ ]] || fail "CTID must be a numeric Proxmox VMID (100-999999999)"
-[[ ${#CT_HOSTNAME} -le 63 && "$CT_HOSTNAME" =~ ^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?$ ]] || fail "CT_HOSTNAME must be a valid DNS hostname"
+is_valid_hostname "$CT_HOSTNAME" || fail "CT_HOSTNAME must be a valid DNS hostname"
 [[ "$DISTRO_VERSION" =~ ^[0-9]+([.][0-9]+)?$ ]] || fail "DISTRO_VERSION is invalid"
 [[ "$STORAGE" =~ ^[A-Za-z0-9._-]+$ ]] || fail "STORAGE contains unsupported characters"
 [[ "$TEMPLATE_STORAGE" =~ ^[A-Za-z0-9._-]+$ ]] || fail "TEMPLATE_STORAGE contains unsupported characters"

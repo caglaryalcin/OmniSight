@@ -147,6 +147,9 @@ pct() {
   assert.ok(wrapperSource.includes('Enable verbose mode? [y/N]'), 'interactive runs must ask for verbose mode with No as the default');
   assert.ok(wrapperSource.includes('Create this LXC and install OmniSight? [Y/n]'), 'final confirmation must default to Yes');
   assert.match(wrapperSource, /""\|\[Yy\]\) break/, 'empty final confirmation must continue');
+  assert.ok(!wrapperSource.includes('Repo URL ['), 'interactive runs must not ask for a repository URL');
+  assert.ok(!wrapperSource.includes('Branch [main]'), 'interactive runs must not ask for a branch');
+  assert.ok(!wrapperSource.includes('Private-repo token ('), 'interactive runs must not ask for a private repository token');
 
   fs.rmSync(root, { recursive: true, force: true });
   console.log('smoke ok — native LXC installer: Debian/Ubuntu, validation, cleanup');

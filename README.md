@@ -229,7 +229,7 @@ bash <(curl --proto '=https' --tlsv1.2 -fsSL https://raw.githubusercontent.com/c
 # optional Ubuntu 24.04: DISTRO=ubuntu DISTRO_VERSION=24.04 bash <(curl --proto '=https' --tlsv1.2 -fsSL https://raw.githubusercontent.com/caglaryalcin/OmniSight/refs/heads/main/scripts/proxmox-lxc.sh)
 ```
 
-The installer asks whether verbose command output should be shown; the default is **No**. At the final `[Y/n]` confirmation, pressing Enter accepts the default and starts the installation.
+The standard interactive installer asks only for the container ID, hostname and verbose mode. It uses the public OmniSight repository and `main` branch automatically. Verbose output defaults to **No**. At the final `[Y/n]` confirmation, pressing Enter accepts the default and starts the installation. Invalid hostnames are requested again instead of terminating the installer.
 
 Or inside any existing Debian/Ubuntu LXC, VM or bare-metal server:
 

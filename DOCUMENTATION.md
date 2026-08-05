@@ -824,7 +824,7 @@ less install-lxc.sh
 sudo bash install-lxc.sh
 ```
 
-**On a Proxmox VE 8/9 host** — `scripts/proxmox-lxc.sh` (run as root on the host) additionally creates an unprivileged Debian 13 LXC, waits for network, then runs `install-lxc.sh` inside it. When launched from the remote command below, the companion installer is downloaded automatically over HTTPS. LXC nesting is disabled by default because a native OmniSight installation does not require it. Interactive runs ask whether verbose command output should be enabled; the default is No. The final confirmation uses `[Y/n]`, so pressing Enter starts the installation.
+**On a Proxmox VE 8/9 host** — `scripts/proxmox-lxc.sh` (run as root on the host) additionally creates an unprivileged Debian 13 LXC, waits for network, then runs `install-lxc.sh` inside it. When launched from the remote command below, the companion installer is downloaded automatically over HTTPS. LXC nesting is disabled by default because a native OmniSight installation does not require it. Standard interactive runs ask only for the container ID, hostname and verbose mode; the public upstream repository and `main` branch are selected automatically. Invalid hostnames are requested again. Verbose output defaults to No, and the final confirmation uses `[Y/n]`, so pressing Enter starts the installation. Repository, branch and private-token environment variables remain available for advanced unattended installations but are never prompted.
 
 ```bash
 bash <(curl --proto '=https' --tlsv1.2 -fsSL https://raw.githubusercontent.com/caglaryalcin/OmniSight/refs/heads/main/scripts/proxmox-lxc.sh)
