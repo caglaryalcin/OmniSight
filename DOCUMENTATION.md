@@ -71,6 +71,7 @@ The center of the application is `server.js`. It owns the Express server, authen
 | `src/docker.js` | Docker API/SSH hosts, logs, prune |
 | `src/kubernetes.js` | Kubernetes pods, services, deployments, logs |
 | `src/snmp.js` | SNMP v2c/v3 devices |
+| `src/unifi.js` | UniFi Network controller via the Integration API, merged with SNMP device data |
 | `src/healthchecks.js` | Healthchecks API |
 | `src/uptimekuma.js` | Uptime Kuma status page and socket history |
 | `src/checks.js` | Built-in HTTP/TCP/Ping/DNS checks |
