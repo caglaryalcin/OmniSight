@@ -812,18 +812,18 @@ html[data-theme="light"] body.rail-collapsed .shell .sb-card.active{background:#
 .overview-card .sb-csum-item{min-width:0;min-height:48px;padding:7px 8px;display:flex;flex-direction:column;align-items:center!important;justify-content:center!important;gap:3px;border:1px solid var(--border);background:transparent!important;border-radius:0;text-align:center;margin:-1px 0 0 -1px}
 .overview-card .sb-csum-val{font-size:20px;line-height:1;font-weight:850;white-space:nowrap;overflow:visible;text-overflow:clip}
 .overview-card .sb-csum-lbl{font-size:10px;line-height:1;margin-top:0;min-height:0;display:block;letter-spacing:.06em;white-space:nowrap}
-.overview-card[data-id="proxmox"] .pve-sb-csum{grid-template-columns:minmax(0,.82fr) minmax(0,1.16fr) minmax(0,1.3fr) minmax(0,.78fr) minmax(0,.94fr);padding-left:10px;padding-right:10px}
-.overview-card[data-id="proxmox"] .pve-sb-csum .sb-csum-item{min-height:48px;padding-left:3px;padding-right:3px;overflow:hidden}
-.overview-card[data-id="proxmox"] .pve-sb-csum .sb-csum-val{font-size:19px;max-width:100%;overflow:hidden;text-overflow:clip}
+.overview-card[data-id="proxmox"] .pve-sb-csum{grid-template-columns:repeat(auto-fit,minmax(78px,1fr));padding-left:10px;padding-right:10px}
+.overview-card[data-id="proxmox"] .pve-sb-csum .sb-csum-item{min-height:48px;padding-left:6px;padding-right:6px}
+.overview-card[data-id="proxmox"] .pve-sb-csum .sb-csum-val{font-size:19px;max-width:none;overflow:visible}
 .overview-card[data-id="proxmox"] .pve-sb-csum .sb-csum-lbl{font-size:10px}
 .overview-card[data-id="docker"] .sb-csum,
-.overview-card[data-id="dockhand"] .sb-csum{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);padding-left:10px;padding-right:10px;overflow:hidden}
+.overview-card[data-id="dockhand"] .sb-csum{grid-template-columns:repeat(auto-fit,minmax(78px,1fr));grid-auto-flow:row;grid-auto-columns:auto;padding-left:10px;padding-right:10px;overflow:visible}
 .overview-card[data-id="docker"] .sb-csum-item,
-.overview-card[data-id="dockhand"] .sb-csum-item{min-height:48px;padding-left:3px;padding-right:3px;overflow:hidden}
+.overview-card[data-id="dockhand"] .sb-csum-item{min-height:48px;padding-left:6px;padding-right:6px;overflow:visible}
 .overview-card[data-id="docker"] .sb-csum-val,
-.overview-card[data-id="dockhand"] .sb-csum-val{font-size:clamp(16px,1.2vw,20px);max-width:100%;overflow:hidden;text-overflow:clip}
+.overview-card[data-id="dockhand"] .sb-csum-val{font-size:clamp(16px,1.2vw,20px);max-width:none;overflow:visible;text-overflow:clip}
 .overview-card[data-id="docker"] .sb-csum-lbl,
-.overview-card[data-id="dockhand"] .sb-csum-lbl{font-size:clamp(8px,.62vw,10px);line-height:1;letter-spacing:.035em;max-width:100%;overflow:hidden;text-overflow:clip}
+.overview-card[data-id="dockhand"] .sb-csum-lbl{font-size:clamp(8px,.62vw,10px);line-height:1.15;letter-spacing:.035em;max-width:100%;overflow:visible;text-overflow:clip}
 html[data-theme="light"] .overview-card .csum-item{background:#eef1f6;border-color:#c9d5e5}
 html[data-theme="light"] .overview-card[data-id="healthchecks"] .sb-csum,
 html[data-theme="light"] .overview-card[data-id="database"] .sb-csum{background:transparent}
@@ -864,6 +864,10 @@ html[data-theme="light"] .overview-card .sb-csum-item{background:transparent!imp
   .overview-card-h>.badge{grid-column:2;grid-row:2;justify-self:start;max-width:100%}
   .overview-card-h>.overview-card-toggle{grid-column:3;grid-row:1 / span 2}
   .overview-card-h>.overview-card-hide{grid-column:4;grid-row:1 / span 2}
+  .overview-card .sb-csum{grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-flow:row;grid-auto-columns:auto;overflow:visible}
+  .overview-card .sb-csum-item{padding-left:6px;padding-right:6px;overflow:visible}
+  .overview-card .sb-csum-val{max-width:none;overflow:visible;font-size:19px}
+  .overview-card .sb-csum-lbl{white-space:normal;overflow:visible;overflow-wrap:anywhere;line-height:1.15}
 }
 .cmdk-backdrop{position:fixed;inset:0;z-index:3200;background:rgba(0,0,0,.42);backdrop-filter:blur(7px);display:none;align-items:flex-start;justify-content:center;padding:82px 18px 18px}
 .cmdk-backdrop.open{display:flex}
