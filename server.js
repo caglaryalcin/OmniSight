@@ -33,6 +33,7 @@ const { getDockerApiData, dockerLogs: dockerApiLogs, dockerPrune: dockerApiPrune
 const { dispatchAlert } = require('./src/alerts');
 const { decryptConfig, encryptConfigValue, isEncrypted, SENSITIVE_KEYS, encryptionEnabled } = require('./src/crypto');
 const { loadHistoryMap, scheduleSaveHistoryMap, setHistorySaveDelay, flushHistorySaves, cancelHistorySaves } = require('./src/historyStore');
+const { semverCompare, highestStableVersion } = require('./src/version');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -8106,27 +8107,8 @@ function versionCompare(a, b) {
 }
 
 let updateCheckCache = { expires: 0, value: null, pending: null };
-const UPDATE_CHECK_SUCCESS_TTL_MS = Math.max(60 * 1000, Number(process.env.OMNISIGHT_UPDATE_CHECK_TTL_MS || 6 * 60 * 60 * 1000));
+const UPDATE_CHECK_SUCCESS_TTL_MS = Math.max(60 * 1000, Number(process.env.OMNISIGHT_UPDATE_CHECK_TTL_MS || 60 * 60 * 1000));
 const UPDATE_CHECK_ERROR_TTL_MS = Math.max(60 * 1000, Number(process.env.OMNISIGHT_UPDATE_CHECK_ERROR_TTL_MS || 30 * 60 * 1000));
-
-function semverParts(v) {
-  return String(v || '0.0.0')
-    .trim()
-    .replace(/^v/i, '')
-    .split(/[+-]/)[0]
-    .split('.')
-    .slice(0, 3)
-    .map(n => Number.parseInt(n, 10) || 0);
-}
-
-function semverCompare(a, b) {
-  const pa = semverParts(a);
-  const pb = semverParts(b);
-  for (let i = 0; i < 3; i++) {
-    if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) - (pb[i] || 0);
-  }
-  return 0;
-}
 
 function githubJson(pathname, timeoutMs = 2200) {
   return new Promise((resolve, reject) => {
@@ -8161,7 +8143,11 @@ function githubJson(pathname, timeoutMs = 2200) {
 
 async function latestGithubVersion() {
   try {
-    const rel = await githubJson('/repos/caglaryalcin/OmniSight/releases/latest');
+    const releases = await githubJson('/repos/caglaryalcin/OmniSight/releases?per_page=100');
+    const rel = highestStableVersion(
+      Array.isArray(releases) ? releases.filter(item => !item?.draft && !item?.prerelease) : [],
+      item => item?.tag_name,
+    );
     if (rel?.tag_name) {
       return {
         version: String(rel.tag_name).replace(/^v/i, ''),
@@ -8173,8 +8159,8 @@ async function latestGithubVersion() {
   } catch (err) {
     if (err.statusCode && err.statusCode !== 404) throw err;
   }
-  const tags = await githubJson('/repos/caglaryalcin/OmniSight/tags?per_page=1');
-  const tag = Array.isArray(tags) ? tags[0] : null;
+  const tags = await githubJson('/repos/caglaryalcin/OmniSight/tags?per_page=100');
+  const tag = highestStableVersion(tags, item => item?.name);
   if (!tag?.name) throw new Error('No GitHub release or tag found');
   return {
     version: String(tag.name).replace(/^v/i, ''),
@@ -9020,23 +9006,8 @@ app.get('/api/about', (req, res) => {
 app.get('/api/update-check', async (req, res) => {
   try {
     const force = req.query.force === '1';
-    const updateTtlSeconds = Math.max(60, Math.floor(UPDATE_CHECK_SUCCESS_TTL_MS / 1000));
-    res.setHeader('Cache-Control', force ? 'no-store' : `private, max-age=${updateTtlSeconds}, stale-while-revalidate=86400`);
-    if (!force) {
-      if (updateCheckCache.value) {
-        checkForAppUpdate(false).catch(() => {});
-        return res.json(updateCheckCache.value);
-      }
-      checkForAppUpdate(false).catch(() => {});
-      return res.json({
-        currentVersion: appVersion(),
-        latestVersion: null,
-        updateAvailable: false,
-        checking: true,
-        url: 'https://github.com/caglaryalcin/OmniSight/releases',
-      });
-    }
-    res.json(await checkForAppUpdate(true));
+    res.setHeader('Cache-Control', 'private, no-cache, max-age=0, must-revalidate');
+    res.json(await checkForAppUpdate(force));
   } catch (err) {
     sendServerError(res, err, { currentVersion: appVersion(), updateAvailable: false });
   }

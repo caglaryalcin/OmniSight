@@ -223,10 +223,10 @@ $env:OMNISIGHT_URL="http://<omnisight-host>:3000"; $env:OMNISIGHT_TOKEN="<token>
 Run OmniSight natively under systemd — no Docker required. On a **Proxmox VE 8/9 host**, this creates an unprivileged Debian 13 LXC and installs everything inside it:
 
 ```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/caglaryalcin/OmniSight/main/scripts/proxmox-lxc.sh?cache=$(date +%s))"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/caglaryalcin/OmniSight/main/scripts/proxmox-lxc.sh)"
 # defaults: next free CTID, local-lvm, DHCP on vmbr0, 2 cores / 1 GB RAM / 6 GB disk
-# override via env: CTID=150 CT_HOSTNAME=mon STORAGE=tank BRIDGE=vmbr1 bash -c "$(curl -fsSL https://raw.githubusercontent.com/caglaryalcin/OmniSight/main/scripts/proxmox-lxc.sh?cache=$(date +%s))"
-# optional Ubuntu 24.04: DISTRO=ubuntu DISTRO_VERSION=24.04 bash -c "$(curl -fsSL https://raw.githubusercontent.com/caglaryalcin/OmniSight/main/scripts/proxmox-lxc.sh?cache=$(date +%s))"
+# override via env: CTID=150 CT_HOSTNAME=mon STORAGE=tank BRIDGE=vmbr1 bash -c "$(curl -fsSL https://raw.githubusercontent.com/caglaryalcin/OmniSight/main/scripts/proxmox-lxc.sh)"
+# optional Ubuntu 24.04: DISTRO=ubuntu DISTRO_VERSION=24.04 bash -c "$(curl -fsSL https://raw.githubusercontent.com/caglaryalcin/OmniSight/main/scripts/proxmox-lxc.sh)"
 ```
 
 The standard interactive installer asks only for the container ID, hostname and verbose mode. It uses the public OmniSight repository and `main` branch automatically. Verbose output defaults to **No**. At the final `[Y/n]` confirmation, pressing Enter accepts the default and starts the installation. Invalid hostnames are requested again instead of terminating the installer.

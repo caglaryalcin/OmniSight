@@ -1094,7 +1094,7 @@ function setFooterCurrentVersion(version = APP_VERSION){
   const clean = String(version || '1.0.0').replace(/^v/i, '');
   window._currentVersion = 'v' + clean;
   const el = document.getElementById('foot-ver');
-  if(el && !el.querySelector('a')) el.textContent = window._currentVersion;
+  if(el) el.textContent = window._currentVersion;
 }
 setFooterCurrentVersion();
 function showStartupError(err){
@@ -9432,8 +9432,8 @@ window.addEventListener('popstate', () => { applyHashRoute(); });
   scheduleDemoEmbedWarmup();
 })();
 
-const APP_UPDATE_FOOTER_CACHE_KEY = 'os_app_update_footer_v2';
-const APP_UPDATE_FOOTER_TTL_MS = 6 * 60 * 60 * 1000;
+const APP_UPDATE_FOOTER_CACHE_KEY = 'os_app_update_footer_v3';
+const APP_UPDATE_FOOTER_TTL_MS = 60 * 60 * 1000;
 function readAppUpdateFooterCache(){
   try{
     const raw = JSON.parse(localStorage.getItem(APP_UPDATE_FOOTER_CACHE_KEY) || 'null');
@@ -9463,6 +9463,7 @@ function checkAppUpdateFooter(){
   if(!v) return Promise.resolve();
   if(appUpdateFooterPromise) return appUpdateFooterPromise;
   const showUpdate = u => {
+    setFooterCurrentVersion();
     if(!u || !u.updateAvailable || !u.latestVersion) return;
     const label = `v${u.latestVersion} now available!`;
     v.innerHTML = `<a href="${escHtml(u.url || 'https://github.com/caglaryalcin/OmniSight/releases')}" target="_blank" rel="noopener" title="${escHtml(label)}">${escHtml(label)}</a>`;
@@ -9472,12 +9473,13 @@ function checkAppUpdateFooter(){
   appUpdateFooterController = ctrl;
   setFooterCurrentVersion();
   const cachedUpdate = cachedFooterUpdateForVersion(cached, APP_VERSION);
-  const promise = Promise.resolve(cachedUpdate || fetch('/api/update-check', {headers: authHeaders(), cache:'default', signal: ctrl.signal})
+  if(cachedUpdate) showUpdate(cachedUpdate);
+  const promise = fetch('/api/update-check', {headers: authHeaders(), cache:'no-store', signal: ctrl.signal})
     .then(r => r && r.ok ? r.json() : null)
     .then(update => {
       writeAppUpdateFooterCache({ update });
       return update;
-    }))
+    })
     .then(showUpdate)
     .catch(() => {})
     .finally(() => {

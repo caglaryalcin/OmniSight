@@ -101,6 +101,18 @@ function testProxmoxInstances() {
   assert.deepStrictEqual(rows.map(row => row.name), ['a', 'b']);
 }
 
+function testLatestStableVersion() {
+  const { semverCompare, highestStableVersion } = require('../src/version');
+  const releases = [
+    { tag_name: 'v2.1.1' },
+    { tag_name: 'v2.0.4' },
+    { tag_name: 'v2.2.0' },
+    { tag_name: 'v2.3.0-beta.1' },
+  ];
+  assert.strictEqual(highestStableVersion(releases, item => item.tag_name).tag_name, 'v2.2.0');
+  assert.ok(semverCompare('2.2.0', '2.1.1') > 0);
+}
+
 function testStaticRegressions() {
   const root = path.join(__dirname, '..');
   const windowsAgent = fs.readFileSync(path.join(root, 'agent', 'omnisight-agent.ps1'), 'utf8');
@@ -114,6 +126,8 @@ function testStaticRegressions() {
   assert.ok(windowsAgent.includes('Get-UpdateStatus') && linuxAgent.includes('updates_json'));
   assert.ok(server.includes("synology: 'Synology'"), 'public status title must say Synology');
   assert.ok(dashboard.includes('/api/status/history?points='));
+  assert.ok(dashboard.includes("os_app_update_footer_v3") && dashboard.includes("cache:'no-store'"), 'app update check must bypass stale browser responses');
+  assert.ok(!dashboard.includes("cachedUpdate || fetch('/api/update-check'"), 'cached app version must not replace the GitHub update request');
   assert.ok(dashboard.includes('@container (max-width:300px)') && dashboard.includes('-webkit-line-clamp:2'), 'overview titles must adapt to narrow cards');
   assert.ok(server.includes('requestedHistoryPointLimit'));
   assert.match(deploy, /linux\/amd64,linux\/arm64/);
@@ -127,6 +141,7 @@ async function run() {
   await testPbs();
   testDockerAndDockhand();
   testProxmoxInstances();
+  testLatestStableVersion();
   testStaticRegressions();
   console.log('smoke ok — issue regressions: #4 #5 #6 #7 #9 #10 #12 #18 #20 #22 #23 #24');
 }
