@@ -1,6 +1,6 @@
 name: CI
 
-# Runs the syntax and smoke checks on every push and pull request. Upstream's
+# Runs the syntax and smoke checks on every code-changing push and pull request. Upstream's
 # only workflow (deploy.yml) builds a Docker image and runs `npm audit`; nothing
 # actually exercises the code, and it does not run on pull_request at all, so a
 # broken PR shows green. This closes that gap. To make it a merge gate, enable it
@@ -8,7 +8,11 @@ name: CI
 on:
   push:
     branches: [main, master]
+    paths-ignore:
+      - '**.md'
   pull_request:
+    paths-ignore:
+      - '**.md'
 
 jobs:
   check:
