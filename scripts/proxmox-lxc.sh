@@ -76,7 +76,7 @@ INSTALLER="$SCRIPT_DIR/install-lxc.sh"
 NEEDS_INSTALLER_DOWNLOAD=0
 if [ ! -f "$INSTALLER" ]; then
   command -v curl >/dev/null || fail "curl is required when running proxmox-lxc.sh from a URL"
-  INSTALLER_URL="${OMNISIGHT_INSTALLER_URL:-https://raw.githubusercontent.com/caglaryalcin/OmniSight/refs/heads/main/scripts/install-lxc.sh}"
+  INSTALLER_URL="${OMNISIGHT_INSTALLER_URL:-https://raw.githubusercontent.com/caglaryalcin/OmniSight/main/scripts/install-lxc.sh?cache=$(date +%s)}"
   [[ "$INSTALLER_URL" =~ ^https://[^[:space:]]+$ ]] || fail "OMNISIGHT_INSTALLER_URL must be an HTTPS URL"
   NEEDS_INSTALLER_DOWNLOAD=1
 fi
