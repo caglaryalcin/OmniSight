@@ -2746,6 +2746,7 @@ function buildProxmox(px){
 
   const nodesHtml = px.nodes.map(({node,services=[],vms,history,host,backup,storage=[],metrics,metricsError,_connecting,clusterName})=>{
     const nodeKey = clusterName ? `${clusterName}:${node.name}` : node.name;
+    const clusterLabel = /^https?:\/\//i.test(String(clusterName || '').trim()) ? '' : clusterName;
     if(_connecting) return `
     <div class="node-hdr" style="cursor:default">
       <div class="mon-dot md-gray"></div>
@@ -2803,7 +2804,7 @@ function buildProxmox(px){
       <div class="pve-head-main">
         <div class="pve-head-title">
           <div class="node-name">${escHtml(node.name)}</div>
-          <div class="pve-head-sub">${escHtml([clusterName, node.online ? 'online' : 'offline'].filter(Boolean).join(' · '))}</div>
+          <div class="pve-head-sub">${escHtml([clusterLabel, node.online ? 'online' : 'offline'].filter(Boolean).join(' · '))}</div>
         </div>
         ${pveStats}
       </div>

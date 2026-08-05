@@ -2,6 +2,10 @@
 COMMUNITY_BUILD_URL="https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/misc/build.func"
 COMMUNITY_INSTALL_SOURCE='https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/install/${var_install}.sh'
 OMNISIGHT_INSTALL_URL="https://raw.githubusercontent.com/caglaryalcin/OmniSight/main/deploy/community-scripts/install/omnisight-install.sh"
+COMMUNITY_DONATE_BADGE_SOURCE='https://img.shields.io/badge/❤️-Sponsoring%20%26%20Donations-FF5E5B'
+COMMUNITY_DONATE_BADGE_TARGET='https://img.shields.io/badge/%E2%9D%A4%EF%B8%8F-Sponsoring%20%26%20Donations-FF5E5B'
+COMMUNITY_SCRIPT_BADGE_SOURCE='https://img.shields.io/badge/📦-Open%20Script%20Page-00617f'
+COMMUNITY_SCRIPT_BADGE_TARGET='https://img.shields.io/badge/%F0%9F%93%A6-Open%20Script%20Page-00617f'
 
 COMMUNITY_BUILD_FUNC="$(curl -fsSL "$COMMUNITY_BUILD_URL")" || {
   echo "Failed to download the Community Scripts framework." >&2
@@ -12,8 +16,11 @@ if [[ "$COMMUNITY_BUILD_FUNC" != *"$COMMUNITY_INSTALL_SOURCE"* ]]; then
   exit 115
 fi
 COMMUNITY_BUILD_FUNC="${COMMUNITY_BUILD_FUNC//$COMMUNITY_INSTALL_SOURCE/$OMNISIGHT_INSTALL_URL}"
+COMMUNITY_BUILD_FUNC="${COMMUNITY_BUILD_FUNC//$COMMUNITY_DONATE_BADGE_SOURCE/$COMMUNITY_DONATE_BADGE_TARGET}"
+COMMUNITY_BUILD_FUNC="${COMMUNITY_BUILD_FUNC//$COMMUNITY_SCRIPT_BADGE_SOURCE/$COMMUNITY_SCRIPT_BADGE_TARGET}"
 source /dev/stdin <<<"$COMMUNITY_BUILD_FUNC"
-unset COMMUNITY_BUILD_FUNC COMMUNITY_INSTALL_SOURCE
+unset COMMUNITY_BUILD_FUNC COMMUNITY_INSTALL_SOURCE COMMUNITY_DONATE_BADGE_SOURCE COMMUNITY_DONATE_BADGE_TARGET
+unset COMMUNITY_SCRIPT_BADGE_SOURCE COMMUNITY_SCRIPT_BADGE_TARGET
 # Copyright (c) 2026 community-scripts ORG
 # Author: caglaryalcin
 # License: MIT | https://github.com/community-scripts/ProxmoxVED/raw/main/LICENSE

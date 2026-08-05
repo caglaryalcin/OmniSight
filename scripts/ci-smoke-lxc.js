@@ -36,6 +36,7 @@ function run() {
   assert.ok(wrapperSource.includes('community-scripts/ProxmoxVE/main/misc/build.func'), 'wrapper must load the same stable framework as AdGuard');
   assert.ok(wrapperSource.includes('start\nbuild_container\ndescription'), 'wrapper must use the standard Community Scripts lifecycle');
   assert.ok(wrapperSource.includes('COMMUNITY_INSTALL_SOURCE') && wrapperSource.includes('OMNISIGHT_INSTALL_URL'), 'standalone wrapper must redirect only the missing upstream OmniSight installer');
+  assert.ok(wrapperSource.includes('%E2%9D%A4%EF%B8%8F') && wrapperSource.includes('%F0%9F%93%A6'), 'LXC Notes badge icons must use encoding-safe URLs');
   assert.ok(!wrapperSource.includes('pct create'), 'wrapper must not maintain a separate LXC implementation');
   assert.ok(!wrapperSource.includes('read -r -p "Container ID'), 'wrapper must not use the legacy plain-text prompt flow');
   assert.match(readmeSource, /bash -c "\$\(curl -fsSL https:\/\/raw\.githubusercontent\.com\/caglaryalcin\/OmniSight\/main\/scripts\/proxmox-lxc\.sh\)"/);
