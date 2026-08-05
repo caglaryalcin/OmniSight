@@ -2,6 +2,7 @@
 # Creates an unprivileged Debian 13 LXC on Proxmox VE and installs OmniSight
 # natively inside it (no Docker). Run on the Proxmox host as root:
 #   bash proxmox-lxc.sh
+#   bash -c "$(curl -fsSL https://raw.githubusercontent.com/caglaryalcin/OmniSight/main/scripts/proxmox-lxc.sh)"
 #
 # Environment overrides:
 #   DISTRO / DISTRO_VERSION     template family/version     (default: debian/13)
@@ -30,8 +31,10 @@ fail() {
   exit 1
 }
 
+HOSTNAME_REGEX='^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?$'
+DISTRO_VERSION_REGEX='^[0-9]+([.][0-9]+)?$'
 is_uint() { [[ "$1" =~ ^[0-9]+$ ]]; }
-is_valid_hostname() { [[ ${#1} -le 63 && "$1" =~ ^[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?$ ]]; }
+is_valid_hostname() { [[ ${#1} -le 63 && "$1" =~ $HOSTNAME_REGEX ]]; }
 
 CREATED_CT=0
 INSTALL_OK=0
@@ -71,7 +74,12 @@ command -v pvesh >/dev/null || fail "pvesh is required"
 command -v pveam >/dev/null || fail "pveam is required"
 [ "$(id -u)" -eq 0 ] || fail "run as root"
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_SOURCE="${BASH_SOURCE[0]:-}"
+if [ -n "$SCRIPT_SOURCE" ] && [ -f "$SCRIPT_SOURCE" ]; then
+  SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_SOURCE")" && pwd)"
+else
+  SCRIPT_DIR="$PWD"
+fi
 INSTALLER="$SCRIPT_DIR/install-lxc.sh"
 NEEDS_INSTALLER_DOWNLOAD=0
 if [ ! -f "$INSTALLER" ]; then
@@ -148,7 +156,7 @@ PORT="${OMNISIGHT_PORT:-3000}"
 
 [[ "$CTID" =~ ^[1-9][0-9]{2,8}$ ]] || fail "CTID must be a numeric Proxmox VMID (100-999999999)"
 is_valid_hostname "$CT_HOSTNAME" || fail "CT_HOSTNAME must be a valid DNS hostname"
-[[ "$DISTRO_VERSION" =~ ^[0-9]+([.][0-9]+)?$ ]] || fail "DISTRO_VERSION is invalid"
+[[ "$DISTRO_VERSION" =~ $DISTRO_VERSION_REGEX ]] || fail "DISTRO_VERSION is invalid"
 [[ "$STORAGE" =~ ^[A-Za-z0-9._-]+$ ]] || fail "STORAGE contains unsupported characters"
 [[ "$TEMPLATE_STORAGE" =~ ^[A-Za-z0-9._-]+$ ]] || fail "TEMPLATE_STORAGE contains unsupported characters"
 [[ "$BRIDGE" =~ ^[A-Za-z0-9._-]+$ ]] || fail "BRIDGE contains unsupported characters"

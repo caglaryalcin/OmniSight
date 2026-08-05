@@ -27,6 +27,17 @@ function runScript(script, env, mocks) {
   });
 }
 
+function runInlineScript(script, env, mocks) {
+  const mockSource = shellQuote(bashPath(path.relative(repoRoot, mocks)));
+  const scriptSource = shellQuote(bashPath(script));
+  const command = `source ${mockSource}; export -f id pvesh pveam pct curl; bash -c "$(cat ${scriptSource})"`;
+  return spawnSync('bash', ['-c', command], {
+    cwd: repoRoot,
+    env: { ...process.env, ...env },
+    encoding: 'utf8',
+  });
+}
+
 function run() {
   const bash = spawnSync('bash', ['--version'], { encoding: 'utf8' });
   if (bash.error?.code === 'ENOENT') {
@@ -36,6 +47,7 @@ function run() {
   assert.strictEqual(bash.status, 0, bash.stderr);
 
   const root = fs.mkdtempSync(path.join(repoRoot, '.omnisight-lxc-smoke-'));
+  try {
   const mocks = path.join(root, 'proxmox-mocks.sh');
   const log = path.join(root, 'pct.log');
   fs.writeFileSync(mocks, `
@@ -103,6 +115,15 @@ pct() {
   assert.match(calls, /create 150 .*debian-13-standard_/);
   assert.ok(!calls.includes('nesting=1'), 'nesting must be disabled by default');
 
+  if (process.platform !== 'win32') {
+    fs.writeFileSync(log, '');
+    result = runInlineScript(wrapper, env, mocks);
+    assert.strictEqual(result.status, 0, result.stderr || result.stdout);
+    assert.match(result.stdout, /downloading companion OmniSight installer/);
+    calls = fs.readFileSync(log, 'utf8');
+    assert.match(calls, /create 150 .*debian-13-standard_/);
+  }
+
   fs.writeFileSync(log, '');
   result = runScript(wrapper, { ...env, VERBOSE: '1' }, mocks);
   assert.strictEqual(result.status, 0, result.stderr || result.stdout);
@@ -141,6 +162,11 @@ pct() {
 
   const installerSource = fs.readFileSync(path.join(__dirname, 'install-lxc.sh'), 'utf8');
   const wrapperSource = fs.readFileSync(path.join(__dirname, 'proxmox-lxc.sh'), 'utf8');
+  const readmeSource = fs.readFileSync(path.join(repoRoot, 'README.md'), 'utf8');
+  const communityRoot = path.join(repoRoot, 'deploy', 'community-scripts');
+  const communityCt = fs.readFileSync(path.join(communityRoot, 'ct', 'omnisight.sh'), 'utf8');
+  const communityInstall = fs.readFileSync(path.join(communityRoot, 'install', 'omnisight-install.sh'), 'utf8');
+  const communityMetadata = JSON.parse(fs.readFileSync(path.join(communityRoot, 'json', 'omnisight.json'), 'utf8'));
   assert.ok(installerSource.includes('GIT_ASKPASS'), 'private token must use GIT_ASKPASS');
   assert.ok(!installerSource.includes('reset --hard'), 'update must not silently discard local edits');
   assert.ok(!wrapperSource.includes('${TOKEN_USER}:${TOKEN}@'), 'wrapper must not embed tokens in URLs');
@@ -150,9 +176,17 @@ pct() {
   assert.ok(!wrapperSource.includes('Repo URL ['), 'interactive runs must not ask for a repository URL');
   assert.ok(!wrapperSource.includes('Branch [main]'), 'interactive runs must not ask for a branch');
   assert.ok(!wrapperSource.includes('Private-repo token ('), 'interactive runs must not ask for a private repository token');
+  assert.match(readmeSource, /bash -c "\$\(curl -fsSL https:\/\/raw\.githubusercontent\.com\/caglaryalcin\/OmniSight\/main\/scripts\/proxmox-lxc\.sh/);
+  assert.strictEqual(communityMetadata.install_methods[0].config_path, '/opt/omnisight/data/config.yaml');
+  assert.strictEqual(communityMetadata.install_methods[0].script, 'ct/omnisight.sh');
+  assert.ok(communityInstall.includes('/opt/omnisight/data/config.yaml'));
+  assert.ok(communityCt.includes('build_container') && communityCt.includes('update_script'));
+  assert.ok(fs.existsSync(path.join(communityRoot, 'ct', 'headers', 'omnisight')));
 
-  fs.rmSync(root, { recursive: true, force: true });
   console.log('smoke ok — native LXC installer: Debian/Ubuntu, validation, cleanup');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 }
 
 if (require.main === module) run();

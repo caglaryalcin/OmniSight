@@ -23,5 +23,6 @@ npm-debug.log*
 
 # release notes belong in GitHub Releases
 RELEASE_NOTES_*.md
+.omnisight-lxc-smoke-*
 
 .fuse_hidden*

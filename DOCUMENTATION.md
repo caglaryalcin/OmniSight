@@ -827,9 +827,9 @@ sudo bash install-lxc.sh
 **On a Proxmox VE 8/9 host** — `scripts/proxmox-lxc.sh` (run as root on the host) additionally creates an unprivileged Debian 13 LXC, waits for network, then runs `install-lxc.sh` inside it. When launched from the remote command below, the companion installer is downloaded automatically over HTTPS. LXC nesting is disabled by default because a native OmniSight installation does not require it. Standard interactive runs ask only for the container ID, hostname and verbose mode; the public upstream repository and `main` branch are selected automatically. Invalid hostnames are requested again. Verbose output defaults to No, and the final confirmation uses `[Y/n]`, so pressing Enter starts the installation. Repository, branch and private-token environment variables remain available for advanced unattended installations but are never prompted.
 
 ```bash
-bash <(curl --proto '=https' --tlsv1.2 -fsSL "https://raw.githubusercontent.com/caglaryalcin/OmniSight/main/scripts/proxmox-lxc.sh?cache=$(date +%s)")
-CTID=150 CT_HOSTNAME=mon STORAGE=tank BRIDGE=vmbr1 bash <(curl --proto '=https' --tlsv1.2 -fsSL "https://raw.githubusercontent.com/caglaryalcin/OmniSight/main/scripts/proxmox-lxc.sh?cache=$(date +%s)")
-DISTRO=ubuntu DISTRO_VERSION=24.04 bash <(curl --proto '=https' --tlsv1.2 -fsSL "https://raw.githubusercontent.com/caglaryalcin/OmniSight/main/scripts/proxmox-lxc.sh?cache=$(date +%s)")
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/caglaryalcin/OmniSight/main/scripts/proxmox-lxc.sh?cache=$(date +%s))"
+CTID=150 CT_HOSTNAME=mon STORAGE=tank BRIDGE=vmbr1 bash -c "$(curl -fsSL https://raw.githubusercontent.com/caglaryalcin/OmniSight/main/scripts/proxmox-lxc.sh?cache=$(date +%s))"
+DISTRO=ubuntu DISTRO_VERSION=24.04 bash -c "$(curl -fsSL https://raw.githubusercontent.com/caglaryalcin/OmniSight/main/scripts/proxmox-lxc.sh?cache=$(date +%s))"
 ```
 
 **Environment overrides:**
@@ -855,7 +855,7 @@ For a private repository, create a root-only token file instead of putting crede
 ```bash
 install -m 0600 /dev/null /root/omnisight-repo.token
 printf '%s' '<read-only-token>' > /root/omnisight-repo.token
-OMNISIGHT_TOKEN_FILE=/root/omnisight-repo.token bash <(curl --proto '=https' --tlsv1.2 -fsSL "https://raw.githubusercontent.com/caglaryalcin/OmniSight/main/scripts/proxmox-lxc.sh?cache=$(date +%s)")
+OMNISIGHT_TOKEN_FILE=/root/omnisight-repo.token bash -c "$(curl -fsSL https://raw.githubusercontent.com/caglaryalcin/OmniSight/main/scripts/proxmox-lxc.sh?cache=$(date +%s))"
 ```
 
 The wrapper copies the token to a temporary root-only file inside the new LXC. The installer supplies it to Git through a temporary `GIT_ASKPASS` helper, keeps the configured `origin` URL credential-free, and removes the copied token after use.
