@@ -34,6 +34,7 @@ const { dispatchAlert } = require('./src/alerts');
 const { decryptConfig, encryptConfigValue, isEncrypted, SENSITIVE_KEYS, encryptionEnabled } = require('./src/crypto');
 const { loadHistoryMap, scheduleSaveHistoryMap, setHistorySaveDelay, flushHistorySaves, cancelHistorySaves } = require('./src/historyStore');
 const { semverCompare, highestStableVersion } = require('./src/version');
+const { normalizeLegacyEmptyBase64Blocks, fullBackupContentHeader } = require('./src/fullBackupFormat');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -4751,6 +4752,9 @@ function preservePlatformOnTransient(key, next, err) {
 
 function backgroundRefresh(opts = {}) {
   const force = opts === true || opts.force === true;
+  const onlyKeys = opts && typeof opts === 'object' && opts.only
+    ? new Set(Array.isArray(opts.only) ? opts.only : [...opts.only])
+    : null;
   if (refreshActiveCount >= maxRefreshActiveTasks()) {
     return refreshPromise || Promise.resolve(ensureRuntimeShell(cache.data));
   }
@@ -4795,6 +4799,7 @@ function backgroundRefresh(opts = {}) {
 
   const taskFns = [];
   for (const [key, isEnabled, factory, fb] of taskDefs) {
+    if (onlyKeys && !onlyKeys.has(key)) continue;
     if (!isEnabled) {
       base[key] = fb;
       const st = platformRefreshState[key];
@@ -6773,7 +6778,7 @@ function decodeFullBackupFile(rel, file) {
 function importFullBackupText(text) {
   if (!text || typeof text !== 'string') throw new Error('Backup file is empty');
   const previousConfig = authConfigured() ? clonePlain(config) : null;
-  const doc = yaml.load(text);
+  const doc = yaml.load(normalizeLegacyEmptyBase64Blocks(text));
   if (!doc || typeof doc !== 'object') throw new Error('Backup file is invalid');
   if (doc.kind !== 'omnisight-full-backup') throw new Error('This is not an OmniSight full backup');
   if (!doc.files || typeof doc.files !== 'object' || Array.isArray(doc.files)) throw new Error('Full backup does not contain files');
@@ -6910,16 +6915,17 @@ async function writeFullBackupArchive(job, entries, state) {
       await writeStreamChunk(stream, '    encoding: base64\n');
       await writeStreamChunk(stream, `    mode: ${yamlJson(entry.mode)}\n`);
       await writeStreamChunk(stream, `    size: ${Number(entry.size || 0)}\n`);
-      await writeStreamChunk(stream, '    content: |-\n');
-      await writeBase64FileBlock(stream, entry.file, readBytes => {
-        bytesDone += readBytes;
-        job.bytesDone = bytesDone;
-        const ratio = Number(state.total || 0) > 0 ? bytesDone / state.total : filesDone / Math.max(1, entries.length);
-        job.progress = 5 + Math.floor(Math.max(0, Math.min(1, ratio)) * 83);
-      });
+      await writeStreamChunk(stream, fullBackupContentHeader(entry.size));
+      if (entry.size > 0) {
+        await writeBase64FileBlock(stream, entry.file, readBytes => {
+          bytesDone += readBytes;
+          job.bytesDone = bytesDone;
+          const ratio = Number(state.total || 0) > 0 ? bytesDone / state.total : filesDone / Math.max(1, entries.length);
+          job.progress = 5 + Math.floor(Math.max(0, Math.min(1, ratio)) * 83);
+        });
+      }
       filesDone += 1;
       job.filesDone = filesDone;
-      if (entry.size === 0) await writeStreamChunk(stream, '      \n');
       await new Promise(resolve => setImmediate(resolve));
     }
     await endWriteStream(stream);
@@ -7280,8 +7286,11 @@ app.post('/api/config', async (req, res) => {
       configChangeConnectingUntil.kubernetes = Date.now() + CONFIG_CHANGE_CONNECTING_MS;
     }
     markConfigChanged();
-    refreshGeneration += 1;
-    refreshPromise = null;
+    const previousRefresh = connectingPlatforms.size ? refreshPromise : null;
+    if (connectingPlatforms.size) {
+      refreshGeneration += 1;
+      refreshPromise = null;
+    }
     const uptimeKumaChanged = uptimeKumaConfigChanged(previousConfig?.uptimekuma, config.uptimekuma);
 
     if (!cache.data) {
@@ -7293,7 +7302,9 @@ app.post('/api/config', async (req, res) => {
 
       if (en(config.proxmox)) {
         if (hasProxmoxApi()) {
-          cache.data.proxmox = preserveProxmoxOnTransient({ clusterSummary: null, nodes: [], _connecting: true });
+          if (connectingPlatforms.has('proxmox') || !cache.data.proxmox) {
+            cache.data.proxmox = preserveProxmoxOnTransient({ clusterSummary: null, nodes: [], _connecting: true });
+          }
         } else {
           cache.data.proxmox = agents.getProxmoxData({ excludedServices: config.excludedServices });
         }
@@ -7467,7 +7478,12 @@ app.post('/api/config', async (req, res) => {
       }
     }
 
-    const refreshForResponse = backgroundRefresh({ force: true });
+    const refreshChangedPlatforms = () => backgroundRefresh({ force: true, only: connectingPlatforms });
+    const refreshForResponse = connectingPlatforms.size
+      ? (previousRefresh
+          ? Promise.resolve(previousRefresh).catch(() => {}).then(refreshChangedPlatforms)
+          : refreshChangedPlatforms())
+      : Promise.resolve(cache.data || EMPTY);
     let responseData = cache.data || EMPTY;
     try {
       await Promise.race([

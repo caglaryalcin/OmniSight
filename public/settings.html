@@ -183,7 +183,8 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 .card.platform-mutations-locked .platform-add,
 .card.platform-mutations-locked .arr-item .btn-rm,
 .card.platform-mutations-locked .sys-list .btn-rm,
-.card.platform-mutations-locked .card-body .toggle{opacity:.38;cursor:not-allowed;pointer-events:none;box-shadow:none;transform:none}
+.card.platform-mutations-locked .card-body .toggle,
+.card.platform-mutations-locked .card-body .check-chip{opacity:.38;cursor:not-allowed;pointer-events:none;box-shadow:none;transform:none}
 
 .toggle{position:relative;display:inline-block;width:50px;height:28px;flex-shrink:0}
 .toggle input{display:none}
@@ -1989,7 +1990,7 @@ function setSettingsCardOpen(card, open, persist = true) {
   if (!body) return;
   body.classList.remove('hidden');
 }
-const PLATFORM_MUTATION_CONTROL_SELECTOR = '.btn-add,.platform-add,.arr-item .btn-rm,.sys-list .btn-rm,.card-body .toggle input[type="checkbox"]';
+const PLATFORM_MUTATION_CONTROL_SELECTOR = '.btn-add,.platform-add,.arr-item .btn-rm,.sys-list .btn-rm,.card-body input[type="checkbox"]';
 function setPlatformMutationControlLocked(control, locked) {
   if (locked) {
     if (!control.dataset.platformLock) control.dataset.platformLock = control.disabled ? 'preserve' : 'managed';
@@ -2065,7 +2066,7 @@ function toggleCard(id) {
   setSettingsCardOpen(card, true, false);
   applyPlatformMutationStates();
   refreshSettingsSectionVisibility();
-  if (!on) saveConfig();
+  saveConfig({ platformToggle: id, enabled: on, fast: true });
 }
 
 document.addEventListener('click', e => {
@@ -5769,7 +5770,16 @@ async function deleteCertificate(name, btn) {
 }
 
 /* ── Save ── */
-async function saveConfig(opts = {}) {
+let settingsSaveQueue = Promise.resolve();
+function saveConfig(opts = {}) {
+  const queuedOpts = { ...opts };
+  const run = () => performSaveConfig(queuedOpts);
+  const result = settingsSaveQueue.then(run, run);
+  settingsSaveQueue = result.catch(() => {});
+  return result;
+}
+
+async function performSaveConfig(opts = {}) {
   if (settingsReadOnly) {
     if (!opts.silent) toast(trText('Only admins can change settings'), 'err');
     return;
@@ -5784,6 +5794,22 @@ async function saveConfig(opts = {}) {
   btns.forEach(b => b.disabled = true);
   try {
     const cfgPayload = preservePlatformConfigSections(collect(), window._settingsConfig || {});
+    if (opts.platformToggle === 'public') {
+      cfgPayload.publicStatus = opts.enabled === true;
+    } else if (opts.platformToggle) {
+      const keys = opts.platformToggle === 'unifi'
+        ? ['snmp', 'unifi']
+        : (['synology', 'mikrotik'].includes(opts.platformToggle) ? ['snmp'] : [opts.platformToggle]);
+      keys.forEach(key => {
+        const existingSection = window._settingsConfig?.[key];
+        const collectedSection = cfgPayload[key];
+        cfgPayload[key] = {
+          ...(existingSection && typeof existingSection === 'object' ? existingSection : {}),
+          ...(collectedSection && typeof collectedSection === 'object' ? collectedSection : {}),
+          enabled: opts.enabled === true,
+        };
+      });
+    }
     const configChanged = settingsConfigChanged(cfgPayload);
     if (!configChanged) {
       const userResult = opts.skipUsers ? null : await saveUserRows({ silent: true });
@@ -5797,7 +5823,7 @@ async function saveConfig(opts = {}) {
       return;
     }
     applySettingsPreview(cfgPayload);
-    const r = await fetch('/api/config?slim=1', {
+    const r = await fetch('/api/config?slim=1' + (opts.fast ? '&wait=0' : ''), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify(cfgPayload),

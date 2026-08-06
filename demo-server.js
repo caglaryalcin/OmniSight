@@ -262,6 +262,17 @@ function demoConfigFlag(value, fallback = false) {
   return fallback;
 }
 
+const DEMO_PLATFORM_CONFIG_KEYS = [
+  'proxmox', 'linux', 'windows', 'kubernetes', 'snmp', 'healthchecks',
+  'uptimekuma', 'checks', 'prometheus', 'docker', 'dockhand', 'firewall',
+  'truenas', 'qnap', 'ugreen', 'pbs', 'cloudflare', 'cicd', 'veeam',
+  'portainer', 'database',
+];
+
+function demoPlatformEnabled(key) {
+  return demoConfigFlag(demoPrefs.config?.[key]?.enabled, true);
+}
+
 function parseClockMinutes(value) {
   const m = String(value || '').match(/^(\d{1,2}):(\d{2})$/);
   if (!m) return null;
@@ -304,6 +315,13 @@ function rememberDemoConfig(body = {}) {
   demoPrefs.config.publicStatusShowDetails = demoConfigFlag(body.publicStatusShowDetails, false);
   demoPrefs.config.publicStatusShowHistory = demoConfigFlag(body.publicStatusShowHistory, false);
   demoPrefs.config.publicPlatforms = Array.isArray(body.publicPlatforms) ? body.publicPlatforms.map(String).filter(Boolean) : [];
+  DEMO_PLATFORM_CONFIG_KEYS.forEach(key => {
+    if (!body[key] || typeof body[key] !== 'object') return;
+    demoPrefs.config[key] = {
+      ...(demoPrefs.config[key] || {}),
+      enabled: demoConfigFlag(body[key].enabled, true),
+    };
+  });
   if (body.alerts && typeof body.alerts === 'object') {
     demoPrefs.config.alerts = cloneJson(body.alerts);
   }
@@ -507,6 +525,7 @@ function setDemoSession(req, res, remember = false) {
 
 function demoConfig() {
   const cfg = demoPrefs.config || {};
+  const platform = (key, defaults) => ({ ...defaults, enabled: demoPlatformEnabled(key) });
   return {
     timezone: 'Europe/Istanbul',
     timeFormat: '24h',
@@ -522,31 +541,31 @@ function demoConfig() {
     appearance: { dashboardSidePanel: false },
     performance: { lowIoMode: true },
     security: { passwordResetEnabled: true },
-    proxmox: { enabled: true, url: 'https://192.0.2.10:8006', tokenId: '__demo__', tokenSecret: '__demo__', tls: 'verify', sshMetrics: [] },
-    linux: { enabled: true, agentToken: '__demo_agent_token__' },
-    windows: { enabled: true, icon: 'windows' },
-    kubernetes: { enabled: true, kubeconfig: '__demo_kubeconfig__' },
-    snmp: { enabled: true, devices: [
+    proxmox: platform('proxmox', { url: 'https://192.0.2.10:8006', tokenId: '__demo__', tokenSecret: '__demo__', tls: 'verify', sshMetrics: [] }),
+    linux: platform('linux', { agentToken: '__demo_agent_token__' }),
+    windows: platform('windows', { icon: 'windows' }),
+    kubernetes: platform('kubernetes', { kubeconfig: '__demo_kubeconfig__' }),
+    snmp: platform('snmp', { devices: [
       { name: 'core-switch', host: '192.0.2.2', profile: 'mikrotik', method: 'snmp', community: 'public' },
       { name: 'demo-ap', host: '192.0.2.3', profile: 'unifi', method: 'snmp', community: 'public' },
       { name: 'demo-nas', host: '192.0.2.20', profile: 'synology', method: 'snmp', community: 'public' },
-    ] },
-    healthchecks: { enabled: true, url: 'https://healthchecks.example.invalid' },
-    uptimekuma: { enabled: true, url: 'https://kuma.example.invalid', historyHours: demoPrefs.uptimekuma.historyHours },
-    checks: { enabled: true, historyHours: demoPrefs.checks.historyHours, services: [{ name: 'demo website', type: 'http', target: 'https://example.invalid' }] },
-    prometheus: { enabled: true, instances: [{ name: 'prometheus-demo', url: 'https://prometheus.example.invalid' }] },
-    docker: { enabled: true, hosts: [{ type: 'ssh', name: 'demo-docker', host: '192.0.2.30', port: 22 }] },
-    dockhand: { enabled: true, instances: [{ name: 'dockhand-demo', url: 'https://dockhand.example.invalid' }] },
-    firewall: { enabled: true, instances: [{ name: 'edge-opnsense', type: 'opnsense', url: 'https://firewall.example.invalid', apiKey: '__demo__', apiSecret: '__demo__' }] },
-    truenas: { enabled: true, instances: [{ name: 'truenas-demo', url: 'https://truenas.example.invalid', apiMode: 'auto', method: 'auto', apiKey: '__demo__' }] },
-    qnap: { enabled: true, instances: [{ name: 'qnap-demo', url: 'https://qnap.example.invalid', method: 'qts-api', username: 'monitoring', password: '__demo__' }] },
-    ugreen: { enabled: true, instances: [{ name: 'ugreen-demo', url: 'https://ugreen.example.invalid', method: 'web' }] },
-    pbs: { enabled: true, instances: [{ name: 'pbs-demo', url: 'https://pbs.example.invalid:8007', tokenId: 'root@pam!monitoring', tokenSecret: '__demo__' }] },
-    cloudflare: { enabled: true, apiToken: '__demo__', accountId: 'demo-account', zones: ['example.com', 'internal.example.com'], includeTunnels: true, includeRegistrarDomains: true },
-    cicd: { enabled: true, projects: [{ name: 'OmniSight', provider: 'github', owner: 'caglaryalcin', repo: 'OmniSight', branch: 'main', token: '__demo__' }, { name: 'infra-playbooks', provider: 'gitlab', projectId: 'ops/infra-playbooks', branch: 'main', token: '__demo__' }] },
-    veeam: { enabled: true, instances: [{ name: 'veeam-demo', url: 'https://veeam.example.invalid:9419', username: 'DOMAIN\\monitoring', password: '__demo__', apiVersion: '1.3-rev1' }] },
-    portainer: { enabled: true, instances: [{ name: 'portainer-demo', url: 'https://portainer.example.invalid:9443', apiKey: '__demo__' }] },
-    database: { enabled: true, instances: [{ name: 'demo-postgres', type: 'postgresql', host: '192.0.2.40', port: 5432 }] },
+    ] }),
+    healthchecks: platform('healthchecks', { url: 'https://healthchecks.example.invalid' }),
+    uptimekuma: platform('uptimekuma', { url: 'https://kuma.example.invalid', historyHours: demoPrefs.uptimekuma.historyHours }),
+    checks: platform('checks', { historyHours: demoPrefs.checks.historyHours, services: [{ name: 'demo website', type: 'http', target: 'https://example.invalid' }] }),
+    prometheus: platform('prometheus', { instances: [{ name: 'prometheus-demo', url: 'https://prometheus.example.invalid' }] }),
+    docker: platform('docker', { hosts: [{ type: 'ssh', name: 'demo-docker', host: '192.0.2.30', port: 22 }] }),
+    dockhand: platform('dockhand', { instances: [{ name: 'dockhand-demo', url: 'https://dockhand.example.invalid' }] }),
+    firewall: platform('firewall', { instances: [{ name: 'edge-opnsense', type: 'opnsense', url: 'https://firewall.example.invalid', apiKey: '__demo__', apiSecret: '__demo__' }] }),
+    truenas: platform('truenas', { instances: [{ name: 'truenas-demo', url: 'https://truenas.example.invalid', apiMode: 'auto', method: 'auto', apiKey: '__demo__' }] }),
+    qnap: platform('qnap', { instances: [{ name: 'qnap-demo', url: 'https://qnap.example.invalid', method: 'qts-api', username: 'monitoring', password: '__demo__' }] }),
+    ugreen: platform('ugreen', { instances: [{ name: 'ugreen-demo', url: 'https://ugreen.example.invalid', method: 'web' }] }),
+    pbs: platform('pbs', { instances: [{ name: 'pbs-demo', url: 'https://pbs.example.invalid:8007', tokenId: 'root@pam!monitoring', tokenSecret: '__demo__' }] }),
+    cloudflare: platform('cloudflare', { apiToken: '__demo__', accountId: 'demo-account', zones: ['example.com', 'internal.example.com'], includeTunnels: true, includeRegistrarDomains: true }),
+    cicd: platform('cicd', { projects: [{ name: 'OmniSight', provider: 'github', owner: 'caglaryalcin', repo: 'OmniSight', branch: 'main', token: '__demo__' }, { name: 'infra-playbooks', provider: 'gitlab', projectId: 'ops/infra-playbooks', branch: 'main', token: '__demo__' }] }),
+    veeam: platform('veeam', { instances: [{ name: 'veeam-demo', url: 'https://veeam.example.invalid:9419', username: 'DOMAIN\\monitoring', password: '__demo__', apiVersion: '1.3-rev1' }] }),
+    portainer: platform('portainer', { instances: [{ name: 'portainer-demo', url: 'https://portainer.example.invalid:9443', apiKey: '__demo__' }] }),
+    database: platform('database', { instances: [{ name: 'demo-postgres', type: 'postgresql', host: '192.0.2.40', port: 5432 }] }),
     alerts: cloneJson(cfg.alerts || {
       enabled: true,
       channels: { ntfy: { enabled: true, url: 'https://ntfy.sh', topics: ['omnisight-demo'] } },
@@ -582,7 +601,16 @@ function demoStatus() {
     loading: false,
     refreshing: false,
     publicStatus: cfg.publicStatus !== false,
-    configured: ['proxmox', 'linux', 'windows', 'kubernetes', 'synology', 'mikrotik', 'unifi', 'healthchecks', 'uptimekuma', 'checks', 'prometheus', 'docker', 'dockhand', 'firewall', 'truenas', 'qnap', 'ugreen', 'pbs', 'cloudflare', 'cicd', 'veeam', 'portainer', 'database'],
+    configured: [
+      ['proxmox', 'proxmox'], ['linux', 'linux'], ['windows', 'windows'],
+      ['kubernetes', 'kubernetes'], ['synology', 'snmp'], ['mikrotik', 'snmp'],
+      ['unifi', 'snmp'], ['healthchecks', 'healthchecks'], ['uptimekuma', 'uptimekuma'],
+      ['checks', 'checks'], ['prometheus', 'prometheus'], ['docker', 'docker'],
+      ['dockhand', 'dockhand'], ['firewall', 'firewall'], ['truenas', 'truenas'],
+      ['qnap', 'qnap'], ['ugreen', 'ugreen'], ['pbs', 'pbs'],
+      ['cloudflare', 'cloudflare'], ['cicd', 'cicd'], ['veeam', 'veeam'],
+      ['portainer', 'portainer'], ['database', 'database'],
+    ].filter(([, key]) => demoPlatformEnabled(key)).map(([id]) => id),
     preferredLanguage: cfg.preferredLanguage || 'en',
     timeFormat: '24h',
     defaultTimePeriodHours: 1,

@@ -113,12 +113,39 @@ function testLatestStableVersion() {
   assert.ok(semverCompare('2.2.0', '2.1.1') > 0);
 }
 
+function testFullBackupEmptyFileCompatibility() {
+  const yaml = require('js-yaml');
+  const { normalizeLegacyEmptyBase64Blocks, fullBackupContentHeader } = require('../src/fullBackupFormat');
+  const legacy = [
+    'kind: omnisight-full-backup',
+    'files:',
+    '  ".gitkeep":',
+    '    encoding: base64',
+    '    mode: "600"',
+    '    size: 0',
+    '    content: |-',
+    '      ',
+    '  "config.yaml":',
+    '    encoding: base64',
+    '    mode: "600"',
+    '    size: 3',
+    '    content: |-',
+    '      e30=',
+  ].join('\n');
+  const parsed = yaml.load(normalizeLegacyEmptyBase64Blocks(legacy));
+  assert.strictEqual(parsed.files['.gitkeep'].content, '');
+  assert.strictEqual(parsed.files['config.yaml'].content, 'e30=');
+  assert.strictEqual(fullBackupContentHeader(0), '    content: ""\n');
+  assert.strictEqual(fullBackupContentHeader(3), '    content: |-\n');
+}
+
 function testStaticRegressions() {
   const root = path.join(__dirname, '..');
   const windowsAgent = fs.readFileSync(path.join(root, 'agent', 'omnisight-agent.ps1'), 'utf8');
   const linuxAgent = fs.readFileSync(path.join(root, 'agent', 'omnisight-agent.sh'), 'utf8');
   const dashboard = fs.readFileSync(path.join(root, 'public', 'index.html'), 'utf8');
   const settings = fs.readFileSync(path.join(root, 'public', 'settings.html'), 'utf8');
+  const demoServer = fs.readFileSync(path.join(root, 'demo-server.js'), 'utf8');
   const server = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
   const deploy = fs.readFileSync(path.join(root, '.github', 'workflows', 'deploy.yml'), 'utf8');
   const snmp = fs.readFileSync(path.join(root, 'src', 'snmp.js'), 'utf8');
@@ -148,8 +175,17 @@ function testStaticRegressions() {
   assert.ok(snmp.indexOf("snmpWalk(session, '1.3.6.1.2.1.25.3.3.1.2')") < snmp.indexOf('cpuUser == null && synologyCpuUser'), 'HOST-RESOURCES CPU must take priority over Synology vendor CPU');
   assert.ok(server.includes("const ADMIN_VISIBLE_CONFIG_SECRET_KEYS = new Set(['community'])"), 'admins must see the configured SNMP community');
   assert.ok(server.includes("role === 'admin' ? ADMIN_VISIBLE_CONFIG_SECRET_KEYS : null"), 'SNMP community visibility must remain admin-only');
-  assert.ok(settings.includes("const PLATFORM_MUTATION_CONTROL_SELECTOR = '.btn-add,.platform-add,.arr-item .btn-rm,.sys-list .btn-rm,.card-body .toggle input[type=\"checkbox\"]'"), 'platform add/remove controls and subordinate toggles must share one lock selector');
+  assert.ok(settings.includes("const PLATFORM_MUTATION_CONTROL_SELECTOR = '.btn-add,.platform-add,.arr-item .btn-rm,.sys-list .btn-rm,.card-body input[type=\"checkbox\"]'"), 'platform add/remove controls and all subordinate checkboxes must share one lock selector');
   assert.ok(settings.includes("card.classList.toggle('platform-mutations-locked', platformOff)"), 'disabled platforms must lock host, instance and subordinate-toggle mutations');
+  assert.ok(settings.includes("saveConfig({ platformToggle: id, enabled: on, fast: true });"), 'top-level settings toggles must save their explicit state without waiting for collection');
+  assert.ok(settings.includes("const result = settingsSaveQueue.then(run, run);"), 'rapid settings saves must run in order');
+  assert.ok(settings.includes("(opts.fast ? '&wait=0' : '')"), 'top-level toggle saves must return before platform collection completes');
+  assert.ok(settings.includes("cfgPayload.publicStatus = opts.enabled === true;"), 'status page toggle must persist its disabled state');
+  assert.ok(settings.includes("? ['snmp', 'unifi']") && settings.includes("['synology', 'mikrotik'].includes(opts.platformToggle) ? ['snmp']"), 'brand SNMP toggles must persist through the shared collector');
+  assert.ok(demoServer.includes("enabled: demoConfigFlag(body[key].enabled, true)"), 'demo settings must remember platform toggle state');
+  assert.ok(demoServer.includes(".filter(([, key]) => demoPlatformEnabled(key)).map(([id]) => id)"), 'demo dashboard must hide disabled platforms');
+  assert.ok(server.includes("backgroundRefresh({ force: true, only: connectingPlatforms })"), 'settings saves must refresh only platforms whose connection config changed');
+  assert.ok(server.includes("if (connectingPlatforms.has('proxmox') || !cache.data.proxmox)"), 'unrelated settings saves must preserve current Proxmox runtime data');
   assert.ok((settings.match(/class="btn-sm platform-add"/g) || []).length >= 5, 'non-standard platform add buttons must participate in the lock');
 }
 
@@ -159,6 +195,7 @@ async function run() {
   testDockerAndDockhand();
   testProxmoxInstances();
   testLatestStableVersion();
+  testFullBackupEmptyFileCompatibility();
   testStaticRegressions();
   console.log('smoke ok — issue regressions: #4 #5 #6 #7 #9 #10 #12 #18 #20 #22 #23 #24');
 }
