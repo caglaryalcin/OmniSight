@@ -179,6 +179,11 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 .arr-body.hidden{display:none}
 .btn-rm{background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:2px 6px;border-radius:4px;line-height:1}
 .btn-rm:hover{color:var(--red);background:rgba(231,76,60,.1)}
+.card.platform-mutations-locked .btn-add,
+.card.platform-mutations-locked .platform-add,
+.card.platform-mutations-locked .arr-item .btn-rm,
+.card.platform-mutations-locked .sys-list .btn-rm,
+.card.platform-mutations-locked .card-body .toggle{opacity:.38;cursor:not-allowed;pointer-events:none;box-shadow:none;transform:none}
 
 .toggle{position:relative;display:inline-block;width:50px;height:28px;flex-shrink:0}
 .toggle input{display:none}
@@ -803,7 +808,7 @@ html[data-theme="light"] .ci-help{color:#53657c}
   <div class="card-body hidden" id="cb-synology">
     <div id="synology-section-desc" style="font-size:12px;color:var(--muted);line-height:1.35;margin-bottom:10px">Choose the collection method inside the Synology platform. SNMP is active today; API/REST/WebSocket can be stored per system as the integration grows.</div>
     <div id="syn-list"></div>
-    <button class="btn-sm" style="margin-top:4px" onclick="addSynDevice({profile:'synology'}, 'syn-list', 'synology')">+ Add Synology</button>
+    <button class="btn-sm platform-add" style="margin-top:4px" onclick="addSynDevice({profile:'synology'}, 'syn-list', 'synology')">+ Add Synology</button>
   </div>
 </div>
 
@@ -819,7 +824,7 @@ html[data-theme="light"] .ci-help{color:#53657c}
   <div class="card-body hidden" id="cb-mikrotik">
     <div id="mikrotik-section-desc" style="font-size:12px;color:var(--muted);line-height:1.35;margin-bottom:10px">MikroTik devices use the SNMP collector, but appear under their own brand section.</div>
     <div id="mikrotik-list"></div>
-    <button class="btn-sm" style="margin-top:4px" onclick="addSynDevice({profile:'mikrotik'}, 'mikrotik-list', 'mikrotik')">+ Add MikroTik</button>
+    <button class="btn-sm platform-add" style="margin-top:4px" onclick="addSynDevice({profile:'mikrotik'}, 'mikrotik-list', 'mikrotik')">+ Add MikroTik</button>
   </div>
 </div>
 
@@ -853,7 +858,7 @@ html[data-theme="light"] .ci-help{color:#53657c}
       <div class="sec-head"><h3 id="unifi-snmp-title">SNMP devices</h3></div>
       <div id="unifi-section-desc" style="font-size:12px;color:var(--muted);line-height:1.35;margin-bottom:10px">UniFi devices use the SNMP collector, but appear under their own brand section.</div>
       <div id="unifi-list"></div>
-      <button class="btn-sm" style="margin-top:4px" onclick="addSynDevice({profile:'unifi'}, 'unifi-list', 'unifi')">+ Add UniFi</button>
+      <button class="btn-sm platform-add" style="margin-top:4px" onclick="addSynDevice({profile:'unifi'}, 'unifi-list', 'unifi')">+ Add UniFi</button>
     </div>
   </div>
 </div>
@@ -877,7 +882,7 @@ html[data-theme="light"] .ci-help{color:#53657c}
     </div>
     <div id="snmp-section-desc" style="font-size:12px;color:var(--muted);line-height:1.35;margin-bottom:10px">Use this section for generic or unknown-brand SNMP devices.</div>
     <div id="snmp-list"></div>
-    <button class="btn-sm" style="margin-top:4px" onclick="addSynDevice({profile:'generic'}, 'snmp-list', 'generic')">+ Add SNMP Device</button>
+    <button class="btn-sm platform-add" style="margin-top:4px" onclick="addSynDevice({profile:'generic'}, 'snmp-list', 'generic')">+ Add SNMP Device</button>
   </div>
 </div>
 
@@ -1356,7 +1361,7 @@ html[data-theme="light"] .ci-help{color:#53657c}
       </div>
     </div>
     <div id="db-list"></div>
-    <button class="btn-sm" type="button" onclick="addDbInstance()" style="margin-top:8px">+ Add Database</button>
+    <button class="btn-sm platform-add" type="button" onclick="addDbInstance()" style="margin-top:8px">+ Add Database</button>
   </div>
 </div>
 
@@ -1984,6 +1989,30 @@ function setSettingsCardOpen(card, open, persist = true) {
   if (!body) return;
   body.classList.remove('hidden');
 }
+const PLATFORM_MUTATION_CONTROL_SELECTOR = '.btn-add,.platform-add,.arr-item .btn-rm,.sys-list .btn-rm,.card-body .toggle input[type="checkbox"]';
+function setPlatformMutationControlLocked(control, locked) {
+  if (locked) {
+    if (!control.dataset.platformLock) control.dataset.platformLock = control.disabled ? 'preserve' : 'managed';
+    control.disabled = true;
+    control.setAttribute('aria-disabled', 'true');
+    return;
+  }
+  if (control.dataset.platformLock === 'managed') control.disabled = false;
+  delete control.dataset.platformLock;
+  control.removeAttribute('aria-disabled');
+}
+function applyPlatformMutationState(card) {
+  const toggle = card?.querySelector(':scope > .card-hdr .toggle input[type="checkbox"][id^="en-"]');
+  if (!toggle) return;
+  const platformOff = !toggle.checked;
+  card.classList.toggle('platform-mutations-locked', platformOff);
+  card.querySelectorAll(PLATFORM_MUTATION_CONTROL_SELECTOR).forEach(control => {
+    setPlatformMutationControlLocked(control, settingsReadOnly || platformOff);
+  });
+}
+function applyPlatformMutationStates() {
+  document.querySelectorAll('.card[data-settings-section]').forEach(applyPlatformMutationState);
+}
 function applyRolePermissions() {
   settingsReadOnly = currentRole !== 'admin';
   document.body.classList.toggle('settings-readonly', settingsReadOnly);
@@ -2002,6 +2031,7 @@ function applyRolePermissions() {
   document.querySelectorAll('main .card-hdr .toggle input[type="checkbox"]').forEach(el => {
     el.disabled = settingsReadOnly;
   });
+  applyPlatformMutationStates();
   refreshSettingsSectionVisibility();
 }
 async function loadCurrentRole() {
@@ -2023,6 +2053,7 @@ function applySettingsCardOpen() {
     card.classList.toggle('card-off', !!en && !en.checked);
     setSettingsCardOpen(card, true, false);
   });
+  applyPlatformMutationStates();
   refreshSettingsSectionVisibility();
 }
 function toggleCard(id) {
@@ -2032,9 +2063,31 @@ function toggleCard(id) {
   const on = en.checked;
   card.classList.toggle('card-off', !on);
   setSettingsCardOpen(card, true, false);
+  applyPlatformMutationStates();
   refreshSettingsSectionVisibility();
   if (!on) saveConfig();
 }
+
+document.addEventListener('click', e => {
+  const control = e.target.closest(PLATFORM_MUTATION_CONTROL_SELECTOR);
+  const card = control?.closest('.card[data-settings-section]');
+  if (!control || !card?.classList.contains('platform-mutations-locked')) return;
+  e.preventDefault();
+  e.stopImmediatePropagation();
+}, true);
+
+const platformMutationObserver = new MutationObserver(records => {
+  const cards = new Set();
+  records.forEach(record => record.addedNodes.forEach(node => {
+    if (!(node instanceof Element)) return;
+    const ownCard = node.closest('.card[data-settings-section]');
+    if (ownCard) cards.add(ownCard);
+    node.querySelectorAll?.('.card[data-settings-section]').forEach(card => cards.add(card));
+  }));
+  cards.forEach(applyPlatformMutationState);
+});
+const settingsContent = document.querySelector('.settings-content');
+if (settingsContent) platformMutationObserver.observe(settingsContent, { childList: true, subtree: true });
 
 document.addEventListener('click', e => {
   const hdr = e.target.closest('.card-hdr');

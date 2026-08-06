@@ -118,6 +118,7 @@ function testStaticRegressions() {
   const windowsAgent = fs.readFileSync(path.join(root, 'agent', 'omnisight-agent.ps1'), 'utf8');
   const linuxAgent = fs.readFileSync(path.join(root, 'agent', 'omnisight-agent.sh'), 'utf8');
   const dashboard = fs.readFileSync(path.join(root, 'public', 'index.html'), 'utf8');
+  const settings = fs.readFileSync(path.join(root, 'public', 'settings.html'), 'utf8');
   const server = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
   const deploy = fs.readFileSync(path.join(root, '.github', 'workflows', 'deploy.yml'), 'utf8');
   const snmp = fs.readFileSync(path.join(root, 'src', 'snmp.js'), 'utf8');
@@ -141,8 +142,15 @@ function testStaticRegressions() {
   assert.ok(server.includes('requestedHistoryPointLimit'));
   assert.match(deploy, /linux\/amd64,linux\/arm64/);
   assert.ok(fs.existsSync(path.join(root, 'src', 'unifi.js')));
+  assert.ok(snmp.includes('session.subtree(oid, 20'), 'SNMP reads must stop at the requested OID subtree');
+  assert.ok(!snmp.includes('session.walk(oid, 20'), 'unbounded SNMP walks must not return unrelated OIDs');
   assert.ok(snmp.indexOf('const raw = await ucdRawCpu') < snmp.indexOf('cpuUser == null && synologyCpuUser'), 'UCD CPU must take priority over Synology vendor CPU');
   assert.ok(snmp.indexOf("snmpWalk(session, '1.3.6.1.2.1.25.3.3.1.2')") < snmp.indexOf('cpuUser == null && synologyCpuUser'), 'HOST-RESOURCES CPU must take priority over Synology vendor CPU');
+  assert.ok(server.includes("const ADMIN_VISIBLE_CONFIG_SECRET_KEYS = new Set(['community'])"), 'admins must see the configured SNMP community');
+  assert.ok(server.includes("role === 'admin' ? ADMIN_VISIBLE_CONFIG_SECRET_KEYS : null"), 'SNMP community visibility must remain admin-only');
+  assert.ok(settings.includes("const PLATFORM_MUTATION_CONTROL_SELECTOR = '.btn-add,.platform-add,.arr-item .btn-rm,.sys-list .btn-rm,.card-body .toggle input[type=\"checkbox\"]'"), 'platform add/remove controls and subordinate toggles must share one lock selector');
+  assert.ok(settings.includes("card.classList.toggle('platform-mutations-locked', platformOff)"), 'disabled platforms must lock host, instance and subordinate-toggle mutations');
+  assert.ok((settings.match(/class="btn-sm platform-add"/g) || []).length >= 5, 'non-standard platform add buttons must participate in the lock');
 }
 
 async function run() {

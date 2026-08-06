@@ -6554,16 +6554,17 @@ app.get('/api/refresh', async (req, res) => {
 });
 
 app.get('/api/config', (req, res) => {
-  const masked = cachedView('config:masked', configRevision, () => {
+  const role = sessionRole(req);
+  const visibleSensitiveKeys = role === 'admin' ? ADMIN_VISIBLE_CONFIG_SECRET_KEYS : null;
+  const masked = cachedView(`config:masked:${role}`, configRevision, () => {
     const raw = clonePlain(config || {});
 
     if (!raw.timezone && process.env.TZ) {
       raw.timezone = process.env.TZ;
     }
 
-    return maskConfig(raw);
+    return maskConfig(raw, visibleSensitiveKeys);
   });
-  const role = sessionRole(req);
   const requestUi = uiPreferencesForRequest(req);
   const uiSig = JSON.stringify(requestUi);
   const uiKey = uiPreferenceKeyFromRequest(req) || 'global';
@@ -7099,13 +7100,15 @@ app.post('/api/backup/import', (req, res) => {
   }
 });
 
-function maskConfig(obj) {
+const ADMIN_VISIBLE_CONFIG_SECRET_KEYS = new Set(['community']);
+
+function maskConfig(obj, visibleSensitiveKeys = null) {
   if (!obj || typeof obj !== 'object') return obj;
-  if (Array.isArray(obj)) return obj.map(maskConfig);
+  if (Array.isArray(obj)) return obj.map(value => maskConfig(value, visibleSensitiveKeys));
   const out = {};
   for (const [k, v] of Object.entries(obj)) {
-    if (SENSITIVE_KEYS.has(k) && v) out[k] = isEncrypted(v) ? '__encrypted__' : '__set__';
-    else if (typeof v === 'object' && v !== null) out[k] = maskConfig(v);
+    if (SENSITIVE_KEYS.has(k) && v && !visibleSensitiveKeys?.has(k)) out[k] = isEncrypted(v) ? '__encrypted__' : '__set__';
+    else if (typeof v === 'object' && v !== null) out[k] = maskConfig(v, visibleSensitiveKeys);
     else out[k] = v;
   }
   return out;

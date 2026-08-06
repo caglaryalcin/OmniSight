@@ -87,7 +87,7 @@ function snmpWalk(session, oid) {
   return new Promise((resolve, reject) => {
     try {
       const items = [];
-      session.walk(oid, 20,
+      session.subtree(oid, 20,
         (varbinds) => {
           varbinds.forEach(vb => {
             if (!snmp.isVarbindError(vb)) items.push({ oid: vb.oid, value: vb.value });
