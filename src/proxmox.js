@@ -678,6 +678,7 @@ function configuredInstances(config = {}) {
       ...row,
       name: String(row.name || row.label || row.url || `Proxmox ${idx + 1}`),
       sshMetrics: Array.isArray(row.sshMetrics) ? row.sshMetrics : config.sshMetrics,
+      excludedServices: row.excludedServices || config.excludedServices,
       instanceKey: `${idx}:${normBase(row.url)}`,
     }));
 }

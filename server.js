@@ -32,6 +32,7 @@ const { getAllProxmoxApiData, configuredInstances: proxmoxConfigInstances } = re
 const { getDockerApiData, dockerLogs: dockerApiLogs, dockerPrune: dockerApiPrune } = require('./src/docker');
 const { dispatchAlert } = require('./src/alerts');
 const { decryptConfig, encryptConfigValue, isEncrypted, SENSITIVE_KEYS, encryptionEnabled } = require('./src/crypto');
+const { mergePreservingSecrets } = require('./src/config-merge');
 const { loadHistoryMap, scheduleSaveHistoryMap, setHistorySaveDelay, flushHistorySaves, cancelHistorySaves } = require('./src/historyStore');
 const { semverCompare, highestStableVersion } = require('./src/version');
 const { normalizeLegacyEmptyBase64Blocks, fullBackupContentHeader } = require('./src/fullBackupFormat');
@@ -7882,43 +7883,6 @@ app.post('/api/notifications', (req, res) => {
     res.json({ ok: true, disabled: Array.from(notifyDisabled), topics: Object.fromEntries(notifyTopics) });
   } catch (err) { sendServerError(res, err); }
 });
-
-function configItemKey(item) {
-  if (!item || typeof item !== 'object' || Array.isArray(item)) return null;
-  const parts = [item.type, item.name, item.host, item.url, item.socketPath, item.sshHost, item.database]
-    .filter(v => v != null && v !== '')
-    .map(String);
-  return parts.length ? parts.join('|') : null;
-}
-
-function mergePreservingSecrets(incoming, existing) {
-  if (!incoming || typeof incoming !== 'object') return incoming;
-  if (Array.isArray(incoming)) {
-    const existingArr = Array.isArray(existing) ? existing : [];
-    const existingByKey = new Map();
-    existingArr.forEach(item => {
-      const key = configItemKey(item);
-      if (key && !existingByKey.has(key)) existingByKey.set(key, item);
-    });
-    return incoming.map((item, i) => {
-      const key = configItemKey(item);
-      return mergePreservingSecrets(item, key ? existingByKey.get(key) : existingArr[i]);
-    });
-  }
-  const out = {};
-  for (const [k, v] of Object.entries(incoming)) {
-    if (SENSITIVE_KEYS.has(k) && (v === '__encrypted__' || v === '__set__')) {
-      out[k] = existing?.[k] ?? v;
-    } else if (k === 'instances' && Array.isArray(v) && existing && !Array.isArray(existing.instances) && existing.url) {
-      out[k] = mergePreservingSecrets(v, [existing]);
-    } else if (typeof v === 'object' && v !== null) {
-      out[k] = mergePreservingSecrets(v, existing?.[k]);
-    } else {
-      out[k] = v;
-    }
-  }
-  return out;
-}
 
 app.get('/api/debug/docker', async (req, res) => {
   if (sessionRole(req) !== 'admin') return res.status(403).json({ error: 'Forbidden' });
