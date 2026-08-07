@@ -15,16 +15,37 @@ function close(server) {
 
 async function testQnap() {
   let loginQuery = null;
+  const requests = [];
   const server = await listen((req, res) => {
     const url = new URL(req.url, 'http://127.0.0.1');
+    requests.push(url);
     if (url.pathname === '/cgi-bin/authLogin.cgi') {
       loginQuery = url.searchParams;
+      res.setHeader('Set-Cookie', 'QTS_SID=sid123; Path=/; HttpOnly');
       res.setHeader('Content-Type', 'text/xml');
-      return res.end('<QDocRoot><authPassed>1</authPassed><authSid>sid123</authSid><displayModelName>TS-464</displayModelName><firmwareVersion>5.2.9</firmwareVersion><firmwareBuild>20250623</firmwareBuild></QDocRoot>');
+      return res.end('<QDocRoot><authPassed><![CDATA[1]]></authPassed><authSid><![CDATA[sid123]]></authSid><hostname><![CDATA[qnap01]]></hostname><displayModelName><![CDATA[TBS-464]]></displayModelName><firmwareVersion><![CDATA[5.2.9]]></firmwareVersion><firmwareBuild><![CDATA[20260701]]></firmwareBuild></QDocRoot>');
     }
     if (url.pathname === '/cgi-bin/filemanager/utilRequest.cgi') {
       res.setHeader('Content-Type', 'application/json');
-      return res.end(JSON.stringify({ status: 1, server_name: 'qnap01' }));
+      if (url.searchParams.get('func') === 'check_sid') return res.end(JSON.stringify({ status: 1, server_name: 'qnap01' }));
+      if (url.searchParams.get('func') === 'get_tree') return res.end(JSON.stringify([{ volume_id: 1, volume_name: 'System', volume_status: 0, capacity: 4, volume_unit: 'TB', free_size: 1, volume_free_unit: 'TB', used_size: 3, volume_used_unit: 'TB' }]));
+    }
+    if (url.pathname === '/cgi-bin/management/manaRequest.cgi') {
+      res.setHeader('Content-Type', 'text/xml');
+      return res.end('<?xml version="1.0"?><QDocRoot><authPassed><![CDATA[1]]></authPassed><model><displayModelName><![CDATA[TBS-464]]></displayModelName></model><firmware><version><![CDATA[5.2.9]]></version><build><![CDATA[20260701]]></build></firmware><func><ownContent><root><server_name><![CDATA[qnap01]]></server_name><cpu_model><![CDATA[Intel N5105]]></cpu_model><cpu_usage><![CDATA[13.7 %]]></cpu_usage><total_memory><![CDATA[8192]]></total_memory><free_memory><![CDATA[6144]]></free_memory><cpu_tempc>48</cpu_tempc><sys_tempc>42</sys_tempc><uptime_day>2</uptime_day><uptime_hour>3</uptime_hour><uptime_min>4</uptime_min><uptime_sec>5</uptime_sec></root></ownContent></func></QDocRoot>');
+    }
+    if (url.pathname === '/cgi-bin/disk/qsmart.cgi') {
+      res.setHeader('Content-Type', 'text/xml');
+      const entries = [1, 2, 3, 4].map(number => `<entry><Disk_Alias><![CDATA[M.2 SSD ${number}]]></Disk_Alias><Disk_Status>0</Disk_Status><HDNo><![CDATA[0:${number}]]></HDNo><Health><![CDATA[OK]]></Health><Capacity><![CDATA[931.51 GB]]></Capacity><Temperature><oC><![CDATA[${39 + number}]]></oC></Temperature><Model><![CDATA[WD Red SN700 NVMe]]></Model><Serial><![CDATA[NVME${number}]]></Serial><hd_is_ssd><![CDATA[1]]></hd_is_ssd></entry>`).join('');
+      return res.end(`<QDocRoot><authPassed>1</authPassed><Disk_Info>${entries}</Disk_Info></QDocRoot>`);
+    }
+    if (url.pathname === '/cgi-bin/management/chartReq.cgi') {
+      res.setHeader('Content-Type', 'text/xml');
+      return res.end('<QDocRoot><authPassed><![CDATA[1]]></authPassed><volumeList><volume><volumeStat><![CDATA[raid5]]></volumeStat><volumeStatus>0</volumeStatus><volumeValue><![CDATA[1]]></volumeValue><volumeLabel><![CDATA[System]]></volumeLabel></volume></volumeList><volumeUseList><volumeUse><volumeValue><![CDATA[1]]></volumeValue><total_size><![CDATA[4398046511104]]></total_size><free_size><![CDATA[1099511627776]]></free_size></volumeUse></volumeUseList></QDocRoot>');
+    }
+    if (url.pathname === '/cgi-bin/authLogout.cgi') {
+      res.setHeader('Content-Type', 'text/xml');
+      return res.end('<QDocRoot><authPassed>1</authPassed></QDocRoot>');
     }
     res.statusCode = 404;
     res.end('missing');
@@ -37,9 +58,74 @@ async function testQnap() {
     assert.strictEqual(loginQuery.get('serviceKey'), '1');
     assert.strictEqual(loginQuery.has('service'), false);
     assert.strictEqual(data.instances[0].system.hostname, 'qnap01');
-    assert.strictEqual(data.instances[0].system.model, 'TS-464');
+    assert.strictEqual(data.instances[0].system.model, 'TBS-464');
+    assert.strictEqual(data.instances[0].system.cpuPercent, 13.7);
+    assert.strictEqual(data.instances[0].system.memoryPercent, 25);
+    assert.strictEqual(data.instances[0].system.cpuTemp, 48);
+    assert.strictEqual(data.instances[0].system.uptimeSeconds, 183845);
+    assert.strictEqual(data.instances[0].disks.length, 4);
+    assert.strictEqual(data.instances[0].disks[0].type, 'ssd');
+    assert.strictEqual(data.instances[0].disks[0].temperature, 40);
+    assert.strictEqual(data.instances[0].volumes.length, 1);
+    assert.strictEqual(data.instances[0].summary.disks, 4);
+    assert.strictEqual(data.instances[0].summary.volumes, 1);
+    assert.strictEqual(data.instances[0].summary.usedPercent, 75);
+    assert.strictEqual(data.instances[0].partial, false);
+    assert.deepStrictEqual(data.instances[0].available, { system: true, storage: true, disks: true });
+    assert.ok(requests.filter(url => /manaRequest|qsmart|chartReq/.test(url.pathname)).every(url => url.searchParams.get('sid') === 'sid123'));
+    assert.ok(requests.some(url => url.pathname === '/cgi-bin/authLogout.cgi'));
   } finally {
     await close(server);
+  }
+
+  const jsonServer = await listen((req, res) => {
+    const url = new URL(req.url, 'http://127.0.0.1');
+    res.setHeader('Content-Type', 'application/json');
+    if (url.pathname === '/cgi-bin/filemanager/utilRequest.cgi' && url.searchParams.get('func') === 'check_sid') return res.end(JSON.stringify({ status: 1, server_name: 'json-qnap' }));
+    if (url.pathname === '/cgi-bin/filemanager/utilRequest.cgi') return res.end('[]');
+    if (url.pathname === '/cgi-bin/management/manaRequest.cgi') return res.end(JSON.stringify({ authPassed: 1, model: { displayModelName: 'TS-464' }, firmware: { version: '5.2.9', build: '20260701' }, func: { ownContent: { root: { server_name: 'json-qnap', cpu_usage: '21 %', total_memory: '4096', free_memory: '1024' } } } }));
+    if (url.pathname === '/cgi-bin/disk/qsmart.cgi') return res.end(JSON.stringify({ authPassed: 1, Disk_Info: { entry: { Disk_Alias: 'Disk 1', Disk_Status: 0, HDNo: '0:1', Health: 'GOOD', Capacity: '1.82 TB', Temperature: { oC: 44 }, Model: 'NVMe SSD', Serial: 'JSON1', hd_is_ssd: 1 } } }));
+    if (url.pathname === '/cgi-bin/management/chartReq.cgi') return res.end(JSON.stringify({ authPassed: 1, volumeList: { volume: { volumeValue: 1, volumeStatus: 0, volumeLabel: 'Data' } }, volumeUseList: { volumeUse: { volumeValue: 1, total_size: 2000, free_size: 1000 } } }));
+    res.statusCode = 404;
+    return res.end(JSON.stringify({ error: 'missing' }));
+  });
+  try {
+    const { getAllQnapData } = require('../src/qnap');
+    const url = `http://127.0.0.1:${jsonServer.address().port}`;
+    const data = await getAllQnapData({ url, sid: 'existing-sid' });
+    const instance = data.instances[0];
+    assert.strictEqual(instance.system.cpuPercent, 21);
+    assert.strictEqual(instance.system.memoryPercent, 75);
+    assert.strictEqual(instance.disks.length, 1);
+    assert.strictEqual(instance.disks[0].temperature, 44);
+    assert.strictEqual(instance.volumes.length, 1);
+    assert.strictEqual(instance.summary.usedPercent, 50);
+    assert.strictEqual(instance.partial, false);
+  } finally {
+    await close(jsonServer);
+  }
+
+  const deniedServer = await listen((req, res) => {
+    const url = new URL(req.url, 'http://127.0.0.1');
+    res.setHeader('Content-Type', url.pathname.includes('utilRequest') ? 'application/json' : 'text/xml');
+    if (url.pathname === '/cgi-bin/authLogin.cgi') return res.end('<QDocRoot><authPassed>1</authPassed><authSid>limited</authSid></QDocRoot>');
+    if (url.pathname === '/cgi-bin/filemanager/utilRequest.cgi' && url.searchParams.get('func') === 'check_sid') return res.end(JSON.stringify({ status: 1, server_name: 'limited-qnap' }));
+    if (url.pathname === '/cgi-bin/authLogout.cgi') return res.end('<QDocRoot><authPassed>1</authPassed></QDocRoot>');
+    if (url.pathname === '/cgi-bin/disk/qsmart.cgi') return res.end('<QDocRoot><authPassed>1</authPassed></QDocRoot>');
+    return res.end('<QDocRoot><authPassed>0</authPassed></QDocRoot>');
+  });
+  try {
+    const { getAllQnapData } = require('../src/qnap');
+    const url = `http://127.0.0.1:${deniedServer.address().port}`;
+    const data = await getAllQnapData({ url, username: 'monitor', password: 'secret' });
+    const instance = data.instances[0];
+    assert.strictEqual(instance.online, true);
+    assert.strictEqual(instance.partial, true);
+    assert.deepStrictEqual(instance.available, { system: false, storage: false, disks: false });
+    assert.ok(instance.errors.some(error => error.includes('administrators group')));
+    assert.ok(instance.errors.some(error => error.includes('did not include a disk inventory')));
+  } finally {
+    await close(deniedServer);
   }
 }
 
@@ -166,6 +252,9 @@ function testStaticRegressions() {
   assert.ok(dashboard.includes('.overview-meta{flex-direction:column;align-items:flex-start'), 'narrow overview metadata must wrap each metric onto its own line');
   assert.ok(dashboard.includes('grid-template-columns:repeat(auto-fit,minmax(78px,1fr))'), 'dense overview summaries must adapt their column count');
   assert.ok(dashboard.includes('.overview-card .sb-csum{grid-template-columns:repeat(2,minmax(0,1fr))'), 'narrow overview summaries must use two readable columns');
+  assert.ok(dashboard.includes("const storageKnown = inst.available?.storage !== false"), 'unavailable QNAP storage metrics must not be displayed as zero');
+  assert.ok(dashboard.includes("const disksKnown = inst.available?.disks !== false"), 'unavailable QNAP disk metrics must not be displayed as zero');
+  assert.ok(settings.includes('The monitoring account must belong to the QNAP administrators group'), 'QNAP metric permissions must be documented in settings');
   assert.ok(server.includes('requestedHistoryPointLimit'));
   assert.match(deploy, /linux\/amd64,linux\/arm64/);
   assert.ok(fs.existsSync(path.join(root, 'src', 'unifi.js')));

@@ -4958,8 +4958,9 @@ function buildSimpleNasPanel(value, opts){
   const up = Number(sm.up || 0);
   const total = Number(sm.instances || instances.length || 0);
   const connecting = !!value._connecting || instances.some(i => i._connecting && !i.online);
-  const healthCls = connecting && !up ? 'gray' : up === 0 ? 'red' : up < total ? 'yellow' : 'green';
-  const healthTxt = connecting && !up ? 'connecting...' : up === 0 ? 'offline' : up < total ? 'partial' : 'online';
+  const partial = instances.some(i => i.partial);
+  const healthCls = connecting && !up ? 'gray' : up === 0 ? 'red' : (up < total || partial) ? 'yellow' : 'green';
+  const healthTxt = connecting && !up ? 'connecting...' : up === 0 ? 'offline' : (up < total || partial) ? 'partial' : 'online';
   const onlineInstances = instances.filter(i => i.online);
   const sysVals = (key) => onlineInstances.map(i => i.system?.[key]).filter(hasNum).map(Number);
   const cpuAvg = avgPct(sysVals('cpuPercent'));
@@ -5004,21 +5005,23 @@ function buildSimpleNasPanel(value, opts){
   const body = instances.length ? instances.map((inst, idx) => {
     const key = inst.name || inst.url || String(idx);
     const isOpen = panelOpenState(opts.id + ':' + key, true);
-    const stateClass = inst._connecting ? 'connecting' : !inst.online ? 'offline' : 'online';
+    const stateClass = inst._connecting ? 'connecting' : !inst.online ? 'offline' : inst.partial ? 'warn' : 'online';
     const sys = inst.system || {};
     const cpuTemp = sys.cpuTemp ?? sys.cpuTemperature ?? sys.temperature ?? inst.systemTemp;
     const instSm = inst.summary || {};
+    const storageKnown = inst.available?.storage !== false;
+    const disksKnown = inst.available?.disks !== false;
     const storageHtml = storageRows(inst);
     const disksHtml = diskRows(inst);
     const servicesHtml = serviceRows(inst);
     return `<section class="prom-instance">
       <div class="prom-instance-h service-node-hdr ${stateClass}" onclick="toggleSimpleNasInstance(${jsStr(opts.id)},${idx},${jsStr(key)})">
-        <div class="mon-dot ${inst._connecting?'md-gray':inst.online?'md-green':'md-red'}"></div>
+        <div class="mon-dot ${inst._connecting?'md-gray':inst.online?(inst.partial?'md-yellow':'md-green'):'md-red'}"></div>
         <div class="prom-instance-main">
           <div class="prom-instance-name">${escHtml(inst.name || sys.hostname || inst.url || opts.title)}</div>
           <div class="prom-instance-url">${escHtml(inst.url || inst.error || '')}</div>
         </div>
-        <div class="prom-instance-meta">${inst.online ? `${instSm.disks || 0} disks${hasNum(instSm.usedPercent) ? ` - ${fmtPct(instSm.usedPercent)} used` : ''}` : inst._connecting ? 'waiting for first check' : 'unreachable'}</div>
+        <div class="prom-instance-meta">${inst.online ? (disksKnown ? `${instSm.disks || 0} disks${hasNum(instSm.usedPercent) ? ` - ${fmtPct(instSm.usedPercent)} used` : ''}` : 'partial data') : inst._connecting ? 'waiting for first check' : 'unreachable'}</div>
         ${notifyBell(opts.id + ':' + (inst.name || inst.url || 'default'))}
         <span class="chevron ${isOpen?'open':''}" id="${opts.id}-chev-${idx}" style="margin-left:4px">▼</span>
       </div>
@@ -5033,15 +5036,16 @@ function buildSimpleNasPanel(value, opts){
             ${hasNum(sys.memoryPercent) ? pveHeadStat('RAM', fmtPct(sys.memoryPercent), bc(sys.memoryPercent), '', 'is-db-primary') : ''}
             ${hasNum(cpuTemp) ? pveHeadStat('CPU temp', `${cpuTemp}°C`, tempColor(cpuTemp), '', 'is-db-primary') : ''}
             ${hasNum(instSm.usedPercent) ? pveHeadStat('Storage used', fmtPct(instSm.usedPercent), bc(instSm.usedPercent), '', 'is-db-primary') : ''}
-            ${pveHeadStat('Storage', (instSm.volumes || instSm.pools || 0), 'var(--text)', '', 'is-db-primary')}
-            ${pveHeadStat('Disks', instSm.disks || 0, instSm.disksWarn ? 'var(--yellow)' : 'var(--green)', '', 'is-db-primary')}
+            ${storageKnown ? pveHeadStat('Storage', (instSm.volumes || instSm.pools || 0), 'var(--text)', '', 'is-db-primary') : ''}
+            ${disksKnown ? pveHeadStat('Disks', instSm.disks || 0, instSm.disksWarn ? 'var(--yellow)' : 'var(--green)', '', 'is-db-primary') : ''}
             ${instSm.services ? pveHeadStat('Services', instSm.services, 'var(--green)', '', 'is-db-primary') : ''}
           </div>
         </div>
         ${storageHtml ? `<div class="overview-nested-title"><span>Storage</span></div>${storageHtml}` : ''}
         ${disksHtml ? `<div class="overview-nested-title" style="margin-top:10px"><span>Disks</span></div>${disksHtml}` : ''}
         ${servicesHtml ? `<div class="overview-nested-title" style="margin-top:10px"><span>Services</span></div>${servicesHtml}` : ''}
-        ${!storageHtml && !disksHtml && !servicesHtml ? '<div class="empty">No detailed NAS metrics available</div>' : ''}` : `<div class="offline-row"><div class="mon-dot ${inst._connecting?'md-gray':'md-red'}"></div><div>${inst._connecting?`Connecting to ${escHtml(opts.title)}...`:`${escHtml(opts.title)} unreachable`}<div class="offline-err">${escHtml(inst._connecting ? (inst.url||'') : (inst.error||inst.url||''))}</div></div></div>`}
+        ${!storageHtml && !disksHtml && !servicesHtml ? `<div class="empty">${inst.partial ? 'Detailed NAS metrics are unavailable' : 'No detailed NAS metrics available'}</div>` : ''}
+        ${inst.partial && inst.errors?.length ? `<div class="offline-err" style="margin:10px 14px">Partial API data: ${escHtml(inst.errors.join(' - '))}</div>` : ''}` : `<div class="offline-row"><div class="mon-dot ${inst._connecting?'md-gray':'md-red'}"></div><div>${inst._connecting?`Connecting to ${escHtml(opts.title)}...`:`${escHtml(opts.title)} unreachable`}<div class="offline-err">${escHtml(inst._connecting ? (inst.url||'') : (inst.error||inst.url||''))}</div></div></div>`}
       </div>
     </section>`;
   }).join('') : `<div class="offline-row"><div class="mon-dot md-gray"></div><div>Connecting to ${escHtml(opts.title)}...</div></div>`;

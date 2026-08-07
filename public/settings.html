@@ -1165,7 +1165,7 @@ html[data-theme="light"] .ci-help{color:#53657c}
         <h3 id="qnap-section-title">Storage systems</h3>
         <button class="btn-add" type="button" onclick="addQnapInstance()">+ Add QNAP</button>
       </div>
-      <div id="qnap-section-desc" style="font-size:12px;color:var(--muted);line-height:1.35;margin-bottom:10px">Choose the collection method inside the QNAP platform. The default uses QTS HTTP API login and SID checks.</div>
+      <div id="qnap-section-desc" style="font-size:12px;color:var(--muted);line-height:1.35;margin-bottom:10px">QTS HTTP API collects CPU, RAM, storage and disk health. The monitoring account must belong to the QNAP administrators group; QTS allows non-admin login but hides these metrics.</div>
       <div id="qnap-list"></div>
     </div>
   </div>
@@ -2216,8 +2216,8 @@ function renderLocalizedBlocks(lang = currentLang()) {
     },
     'qnap-section-title': { en: 'Storage systems', tr: 'Depolama sistemleri' },
     'qnap-section-desc': {
-      en: 'Choose the collection method inside the QNAP platform. The default uses QTS HTTP API login and SID checks.',
-      tr: 'QNAP platformunda veri toplama yöntemini seçin. Varsayılan yöntem QTS HTTP API oturumu ve SID kontrollerini kullanır.',
+      en: 'QTS HTTP API collects CPU, RAM, storage and disk health. The monitoring account must belong to the QNAP administrators group; QTS allows non-admin login but hides these metrics.',
+      tr: 'QTS HTTP API; CPU, RAM, depolama ve disk sağlığı bilgilerini toplar. İzleme hesabı QNAP administrators grubunda olmalıdır; QTS yönetici olmayan hesabın girişine izin verir ancak bu metrikleri gizler.',
     },
     'ugreen-section-title': { en: 'Storage systems', tr: 'Depolama sistemleri' },
     'ugreen-section-desc': {

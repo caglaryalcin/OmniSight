@@ -567,7 +567,7 @@
       '+ Add Ugreen':'+ Ugreen ekle',
       'Choose the collection method inside the Ugreen platform. Web check is the default until a stable UGOS API is available.':'Ugreen platformunda veri toplama yöntemini seçin. Kararlı bir UGOS API çıkana kadar varsayılan yöntem web kontrolüdür.',
       'Choose the collection method inside the TrueNAS platform. Auto uses WebSocket first, then falls back to REST when needed.':'TrueNAS platformunda veri toplama yöntemini seçin. Auto önce WebSocket kullanır, gerekirse REST yöntemine döner.',
-      'Choose the collection method inside the QNAP platform. The default uses QTS HTTP API login and SID checks.':'QNAP platformunda veri toplama yöntemini seçin. Varsayılan yöntem QTS HTTP API oturumu ve SID kontrollerini kullanır.',
+      'QTS HTTP API collects CPU, RAM, storage and disk health. The monitoring account must belong to the QNAP administrators group; QTS allows non-admin login but hides these metrics.':'QTS HTTP API; CPU, RAM, depolama ve disk sağlığı bilgilerini toplar. İzleme hesabı QNAP administrators grubunda olmalıdır; QTS yönetici olmayan hesabın girişine izin verir ancak bu metrikleri gizler.',
       '+ Add TrueNAS':'+ TrueNAS ekle',
       '+ Add QNAP':'+ QNAP ekle',
       'Connection method':'Bağlantı yöntemi',
