@@ -16,13 +16,14 @@ const { loadHistoryMap, scheduleSaveHistoryMap } = require('./historyStore');
 //                                    └──────────────────────────────────────┘
 //   HTTP 429 anywhere ──► keep last-good result, skip this instance for
 //   COOLDOWN_CYCLES refreshes (per-instance; other instances unaffected).
-//   Per-device stats fetched every STATS_EVERY_N refreshes; device list +
-//   WAN state every refresh.
+//   Per-device stats fetched every STATS_EVERY_N refreshes; topology details
+//   every DETAILS_EVERY_N refreshes; device list + WAN state every refresh.
 
 const UNIFI_HISTORY_MAX = 5760;
 const uniHistory = loadHistoryMap('unifi-history', UNIFI_HISTORY_MAX);
 
 const STATS_EVERY_N = 4;      // stats cadence: every 4th refresh (~60s at 15s)
+const DETAILS_EVERY_N = 20;   // topology cadence: every 20th refresh (~5m at 15s)
 const COOLDOWN_CYCLES = 4;    // refreshes to skip after a 429
 const LEGACY_MAX_FAILS = 3;   // consecutive legacy failures before degrading
 const MAX_PAGES = 40;         // pagination walk safety cap
@@ -53,6 +54,9 @@ function rt(inst) {
       legacySiteName: null,
       tick: 0,
       statsCache: new Map(),   // device id -> normalized stats
+      detailsCache: new Map(), // device id -> adopted-device detail (uplink/features)
+      detailsSupported: null,  // null unknown, true available, false unsupported
+      detailsNextTick: 1,
       cooldown: 0,             // refreshes left to skip after 429
       lastGood: null,
       legacy: { cookie: '', csrf: '', fails: 0 },
@@ -241,9 +245,40 @@ function normalizeState(raw) {
 }
 
 function isGatewayDevice(dev = {}) {
-  const feats = [].concat(dev.features || [], dev.capabilities || []).map(f => String(f).toLowerCase());
+  const featureNames = value => Array.isArray(value)
+    ? value.map(String)
+    : (value && typeof value === 'object' ? Object.keys(value) : []);
+  const feats = [...featureNames(dev.features), ...featureNames(dev.capabilities)].map(f => String(f).toLowerCase());
   if (feats.some(f => f.includes('gateway'))) return true;
-  return /gateway|udm|uxg|usg/i.test(String(dev.model || dev.type || ''));
+  return /gateway|cloud\s*gateway|dream\s*(machine|router|wall)|\budm|\budr|\bucg|\buxg|\busg/i.test(String(dev.model || dev.type || ''));
+}
+
+function deviceKind(dev = {}) {
+  if (isGatewayDevice(dev)) return 'gateway';
+  const features = dev.features && typeof dev.features === 'object' ? dev.features : {};
+  const featureNames = Array.isArray(dev.features) ? dev.features.map(v => String(v).toLowerCase()) : Object.keys(features).map(v => v.toLowerCase());
+  const source = `${dev.model || ''} ${dev.type || ''}`.toLowerCase();
+  if (/\busw[-\s]|switch/i.test(source)) return 'switch';
+  if (/access\s*point|\bu[67][\s-]|\buap[-\s]/i.test(source)) return 'access-point';
+  const hasAccessPoint = featureNames.some(name => /access.?point|wireless|wifi/.test(name));
+  const hasSwitching = featureNames.some(name => /switch/.test(name));
+  if (Array.isArray(dev.interfaces?.radios) && dev.interfaces.radios.length) return 'access-point';
+  if (hasAccessPoint && !hasSwitching) return 'access-point';
+  if (hasSwitching && !hasAccessPoint) return 'switch';
+  return 'device';
+}
+
+function unwrapDeviceDetail(body = {}) {
+  if (body && !Array.isArray(body) && body.data && !Array.isArray(body.data) && typeof body.data === 'object') return body.data;
+  return body && typeof body === 'object' ? body : {};
+}
+
+function applyDetails(dev, body = {}) {
+  const detail = unwrapDeviceDetail(body);
+  const merged = { ...dev, ...detail, macAddress: detail.macAddress || dev.mac, ipAddress: detail.ipAddress || dev.ip };
+  dev.kind = deviceKind(merged);
+  dev.uplinkDeviceId = String(detail.uplink?.deviceId || detail.uplinkDeviceId || dev.uplinkDeviceId || '').trim() || null;
+  return dev;
 }
 
 function normalizeDevice(row = {}) {
@@ -262,10 +297,56 @@ function normalizeDevice(row = {}) {
     firmware: row.firmwareVersion || '',
     firmwareUpdatable: row.firmwareUpdatable === true,
     isGateway: isGatewayDevice(row),
+    kind: deviceKind(row),
+    uplinkDeviceId: String(row.uplink?.deviceId || row.uplinkDeviceId || '').trim() || null,
     cpu: null,
     ram: null,
     uptimeSeconds: null,
   };
+}
+
+async function refreshDeviceDetails(inst, devices, complete) {
+  const state = rt(inst);
+  const wantDetails = state.tick >= state.detailsNextTick;
+  if (wantDetails && devices.length) {
+    state.detailsNextTick = state.tick + DETAILS_EVERY_N;
+    let remaining = devices;
+    if (state.detailsSupported !== true) {
+      const probe = devices[0];
+      try {
+        const body = await apiGet(inst, `/sites/${state.siteId}/devices/${probe.id}`);
+        state.detailsCache.set(probe.id, unwrapDeviceDetail(body));
+        state.detailsSupported = true;
+        remaining = devices.slice(1);
+      } catch (err) {
+        if (err instanceof HttpError && err.status === 429) throw err;
+        if (err instanceof HttpError && [404, 405].includes(err.status)) state.detailsSupported = false;
+        remaining = [];
+      }
+    }
+
+    if (state.detailsSupported === true && remaining.length) {
+      await mapLimit(remaining, Number(inst.detailsConcurrency || 4), async dev => {
+        try {
+          const body = await apiGet(inst, `/sites/${state.siteId}/devices/${dev.id}`);
+          state.detailsCache.set(dev.id, unwrapDeviceDetail(body));
+        } catch (err) {
+          if (err instanceof HttpError && err.status === 429) throw err;
+        }
+      });
+    }
+  }
+
+  if (complete) {
+    const present = new Set(devices.map(dev => String(dev.id)));
+    for (const id of state.detailsCache.keys()) {
+      if (!present.has(String(id))) state.detailsCache.delete(id);
+    }
+  }
+  for (const dev of devices) {
+    if (state.detailsCache.has(dev.id)) applyDetails(dev, state.detailsCache.get(dev.id));
+  }
+  return state.detailsSupported === true;
 }
 
 function applyStats(dev, stats = {}) {
@@ -465,6 +546,7 @@ async function getUnifiInstance(inst, idx) {
 
     const { rows, complete } = await apiGetAll(inst, `/sites/${state.siteId}/devices`);
     const devices = rows.map(normalizeDevice);
+    const topologyDetailsAvailable = await refreshDeviceDetails(inst, devices, complete);
 
     // Split cadence: stats every STATS_EVERY_N refreshes; cached in between.
     const wantStats = state.tick % STATS_EVERY_N === 1 || state.statsCache.size === 0;
@@ -522,6 +604,7 @@ async function getUnifiInstance(inst, idx) {
       unifiOs: state.unifiOs,
       devices,
       devicesComplete: complete,
+      topologyDetailsAvailable,
       wan,
       wanQuality: quality.quality,
       wanQualityError: quality.quality === 'unavailable' && rt(inst).legacy.fails >= LEGACY_MAX_FAILS ? quality.error : undefined,

@@ -4,6 +4,7 @@ const { allSettledLimit } = require('./concurrency');
 
 const DISK_STATUS = { 1: 'normal', 2: 'initialized', 3: 'not initialized', 4: 'sys partition failed', 5: 'crashed' };
 const VOLUME_STATUS = { 1: 'normal', 2: 'repairing', 3: 'migrating', 4: 'expanding', 5: 'deleting', 6: 'creating', 11: 'degraded', 12: 'crashed' };
+const SNMP_SENSOR_LAST_KNOWN_MS = 60 * 60 * 1000;
 
 function toNum(val) {
   if (val == null) return null;
@@ -57,14 +58,14 @@ function createSession(device) {
       context: '',
       transport: 'udp4',
       timeout: 5000,
-      retries: 0,
+      retries: 1,
     });
   }
   if (!device.community) throw new Error('SNMP community is required for SNMP v1/v2c devices');
   return snmp.createSession(device.host, device.community, {
     version: snmp.Version2c,
     timeout: 5000,
-    retries: 0,
+    retries: 1,
   });
 }
 
@@ -274,24 +275,35 @@ async function getHrMemory(session) {
 
 const cpuPrev = new Map();
 const memPrev = new Map();
+const temperaturePrev = new Map();
 // Vendor-neutral CPU via UCD ssCpuRaw counters (delta over poll interval).
 // Works on any net-snmp based device (Linux, UniFi, pfSense, …).
+function ucdRawCpuSnapshot(values = []) {
+  const [user, nice, system, idle, wait] = values.map(toNum);
+  if (![user, system, idle].every(Number.isFinite)) return null;
+  const idleTotal = idle + (Number.isFinite(wait) ? wait : 0);
+  const total = user + (Number.isFinite(nice) ? nice : 0) + system + idleTotal;
+  return Number.isFinite(total) && total > 0 ? { idle: idleTotal, total } : null;
+}
+
+function ucdRawCpuPercent(previous, current) {
+  if (!previous || !current) return null;
+  const totalDelta = current.total - previous.total;
+  const idleDelta = current.idle - previous.idle;
+  if (totalDelta <= 0 || idleDelta < 0) return null;
+  return Math.max(0, Math.min(100, Math.round(100 * (1 - idleDelta / totalDelta))));
+}
+
 async function ucdRawCpu(session, key) {
   try {
     const base = '1.3.6.1.4.1.2021.11';
-    const oids = ['50', '51', '52', '53', '54', '55', '56'].map(s => `${base}.${s}.0`);
+    const oids = ['50', '51', '52', '53', '54'].map(s => `${base}.${s}.0`);
     const v = await snmpGet(session, oids);
-    const nums = oids.map(o => toNum(v[o]));
-    if (nums[0] == null || nums[2] == null || nums[3] == null) return null;
-    const idle = (nums[3] || 0) + (nums[4] || 0);
-    const total = nums.reduce((a, b) => a + (b || 0), 0);
+    const current = ucdRawCpuSnapshot(oids.map(o => v[o]));
+    if (!current) return null;
     const prev = cpuPrev.get(key);
-    cpuPrev.set(key, { idle, total });
-    if (!prev) return null;
-    const dTotal = total - prev.total;
-    const dIdle = idle - prev.idle;
-    if (dTotal <= 0) return null;
-    return Math.max(0, Math.min(100, Math.round(100 * (1 - dIdle / dTotal))));
+    cpuPrev.set(key, current);
+    return ucdRawCpuPercent(prev, current);
   } catch { return null; }
 }
 
@@ -539,6 +551,63 @@ async function getSensorMetrics(session) {
   };
 }
 
+function temperatureSnapshot(sysInfo = {}) {
+  const temperatures = Array.isArray(sysInfo.sensors?.temperatures)
+    ? sysInfo.sensors.temperatures.filter(row => row && isNum(row.value)).map(row => ({ ...row }))
+    : [];
+  const nvmeTemps = Array.isArray(sysInfo.nvmeTemps)
+    ? sysInfo.nvmeTemps.filter(row => row && isNum(row.value)).map(row => ({ ...row }))
+    : [];
+  const hasTemperature = [sysInfo.cpuTemp, sysInfo.systemTemperature, sysInfo.systemTemp].some(isNum)
+    || temperatures.length > 0
+    || nvmeTemps.length > 0;
+  if (!hasTemperature) return null;
+  return {
+    cpuTemp: sysInfo.cpuTemp ?? null,
+    cpuTempLabel: sysInfo.cpuTempLabel ?? null,
+    systemTemperature: sysInfo.systemTemperature ?? null,
+    systemTemperatureLabel: sysInfo.systemTemperatureLabel ?? null,
+    systemTemp: sysInfo.systemTemp ?? null,
+    systemTempLabel: sysInfo.systemTempLabel ?? null,
+    nvmeTemps,
+    temperatures,
+  };
+}
+
+function retainLastKnownTemperature(deviceKey, sysInfo = {}, now = Date.now(), ttlMs = SNMP_SENSOR_LAST_KNOWN_MS) {
+  const key = String(deviceKey || 'unknown');
+  const fresh = temperatureSnapshot(sysInfo);
+  if (fresh) {
+    temperaturePrev.set(key, { at: now, values: fresh });
+    return { ...sysInfo, temperatureStale: false, temperatureLastKnownAt: now };
+  }
+
+  const previous = temperaturePrev.get(key);
+  if (!previous || now - previous.at > ttlMs) {
+    if (previous) temperaturePrev.delete(key);
+    return { ...sysInfo, temperatureStale: false, temperatureLastKnownAt: null };
+  }
+
+  const currentSensors = sysInfo.sensors && typeof sysInfo.sensors === 'object' ? sysInfo.sensors : {};
+  return {
+    ...sysInfo,
+    cpuTemp: previous.values.cpuTemp,
+    cpuTempLabel: previous.values.cpuTempLabel,
+    systemTemperature: previous.values.systemTemperature,
+    systemTemperatureLabel: previous.values.systemTemperatureLabel,
+    systemTemp: previous.values.systemTemp,
+    systemTempLabel: previous.values.systemTempLabel,
+    nvmeTemps: previous.values.nvmeTemps.map(row => ({ ...row, stale: true })),
+    sensors: {
+      ...currentSensors,
+      temperatures: previous.values.temperatures.map(row => ({ ...row, stale: true })),
+      fanSpeeds: Array.isArray(currentSensors.fanSpeeds) ? currentSensors.fanSpeeds : (sysInfo.fanSpeeds || []),
+    },
+    temperatureStale: true,
+    temperatureLastKnownAt: previous.at,
+  };
+}
+
 async function getSystemInfo(session, deviceKey) {
   const synVals = await snmpGet(session, [
     '1.3.6.1.4.1.6574.1.4.1.0',
@@ -658,7 +727,7 @@ async function getSystemInfo(session, deviceKey) {
     memPrev.set(deviceKey, { ram, time: Date.now() });
   }
 
-  return {
+  return retainLastKnownTemperature(deviceKey, {
     cpu: cpuUser != null ? clampPercent(Number(cpuUser) + Number(cpuSystem || 0)) : null,
     cpuTemp: cpuTemp?.value ?? null,
     cpuTempLabel: cpuTemp?.label ?? null,
@@ -674,7 +743,7 @@ async function getSystemInfo(session, deviceKey) {
     },
     uptimeSeconds,
     ram,
-  };
+  });
 }
 
 async function getDisks(session) {
@@ -1102,7 +1171,7 @@ async function getDeviceData(device) {
     const isSynology = /synology/i.test(profile) || /synology/i.test(sysDescr);
     const sysInfo = await getSystemInfo(session, device.host).catch(e => {
       console.error(`[SNMP ${device.name}] sysInfo:`, e.message);
-      return {};
+      return retainLastKnownTemperature(device.host, {});
     });
     const readSynologyTable = (label, fn) => fn().catch(e => {
       if (isSynology) console.error(`[SNMP ${device.name}] ${label}:`, e.message);
@@ -1119,7 +1188,7 @@ async function getDeviceData(device) {
     const sanitized = sanitizeSnmpHistory(rawHist, bandwidth?.historyCapacityBps || bandwidth?.activeCapacityBps || bandwidth?.largestCapacityBps || bandwidth?.capacityBps);
     const hist = sanitized.history;
     let shouldSaveHistory = sanitized.changed;
-    const historyTemp = sysInfo.cpuTemp ?? sysInfo.systemTemp ?? sysInfo.systemTemperature ?? null;
+    const historyTemp = sysInfo.temperatureStale ? null : (sysInfo.cpuTemp ?? sysInfo.systemTemp ?? sysInfo.systemTemperature ?? null);
     if (sysInfo.cpu != null || sysInfo.ram || historyTemp != null || diskIO || bandwidth) {
       hist.push({
         time: Date.now(),
@@ -1151,6 +1220,8 @@ async function getDeviceData(device) {
       systemTemperatureLabel: sysInfo.systemTemperatureLabel ?? null,
       systemTemp: sysInfo.systemTemp ?? null,
       systemTempLabel: sysInfo.systemTempLabel ?? null,
+      temperatureStale: !!sysInfo.temperatureStale,
+      temperatureLastKnownAt: sysInfo.temperatureLastKnownAt ?? null,
       ram:     sysInfo.ram     ?? null,
       nvmeTemps: sysInfo.nvmeTemps || [],
       fanSpeeds: sysInfo.fanSpeeds || [],
@@ -1226,4 +1297,11 @@ async function sampleSnmpBandwidth(config) {
   );
 }
 
-module.exports = { getAllSynologyData, sampleSnmpBandwidth };
+module.exports = {
+  getAllSynologyData,
+  sampleSnmpBandwidth,
+  ucdRawCpuSnapshot,
+  ucdRawCpuPercent,
+  retainLastKnownTemperature,
+  SNMP_SENSOR_LAST_KNOWN_MS,
+};

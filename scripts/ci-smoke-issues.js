@@ -150,6 +150,26 @@ async function testPbs() {
   } finally {
     await close(server);
   }
+
+  const deniedServer = await listen((req, res) => {
+    const url = new URL(req.url, 'http://127.0.0.1');
+    res.setHeader('Content-Type', 'application/json');
+    if (url.pathname === '/api2/json/version') return res.end(JSON.stringify({ data: { version: '3.4.2' } }));
+    res.statusCode = 403;
+    return res.end(JSON.stringify({ message: 'permission denied' }));
+  });
+  try {
+    const { getAllPbsData } = require('../src/pbs');
+    const url = `http://127.0.0.1:${deniedServer.address().port}`;
+    const data = await getAllPbsData({ url, tokenId: 'limited@pbs!omnisight', tokenSecret: 'secret' });
+    const instance = data.instances[0];
+    assert.strictEqual(instance.online, true);
+    assert.strictEqual(instance.partial, true, 'missing datastore access must mark PBS data partial');
+    assert.match(instance.error, /Datastore inventory: .*HTTP 403/);
+    assert.match(instance.permissionHint, /DatastoreAudit/);
+  } finally {
+    await close(deniedServer);
+  }
 }
 
 function testDockerAndDockhand() {
@@ -166,6 +186,10 @@ function testDockerAndDockhand() {
     { cpu: 70, memUsageBytes: 200, memLimitBytes: 1000 },
     { cpu: 50, memUsageBytes: 100, memLimitBytes: 1000 },
   ]), { cpu: 100, memPercent: 30 });
+  assert.deepStrictEqual(resourceSummary([
+    { cpu: 10, memUsageBytes: 512 * 1024 ** 2, memLimitBytes: 1024 ** 3 },
+    { cpu: 15, memUsageBytes: 512 * 1024 ** 2, memLimitBytes: 1024 ** 3 },
+  ], 8 * 1024 ** 3), { cpu: 25, memPercent: 12.5 }, 'Docker host RAM must use MemTotal instead of container limits');
 
   const { enrichDockhandWithDocker } = require('../src/dockhand');
   const enriched = enrichDockhandWithDocker({
@@ -175,6 +199,76 @@ function testDockerAndDockhand() {
   assert.strictEqual(enriched.containers[0].cpu, 12);
   assert.strictEqual(enriched.instances[0].containers[0].memPercent, 8);
   assert.strictEqual(enriched.containers[0].imageUpdate.status, 'update');
+}
+
+async function testDockhandEnvironments() {
+  const requests = [];
+  const server = await listen((req, res) => {
+    const url = new URL(req.url, 'http://127.0.0.1');
+    requests.push(`${url.pathname}${url.search}`);
+    res.setHeader('Content-Type', 'application/json');
+    if (url.pathname === '/api/environments') {
+      return res.end(JSON.stringify([{ id: 1, name: 'production' }, { id: 2, name: 'lab' }]));
+    }
+    if (url.pathname === '/api/containers') {
+      const env = url.searchParams.get('env');
+      if (env === '1') return res.end(JSON.stringify([{ id: 'prod12345678', name: 'web', image: 'nginx:latest', state: 'running', updateAvailable: false }]));
+      if (env === '2') return res.end(JSON.stringify([{ id: 'lab123456789', name: 'worker', image: 'alpine:latest', state: 'running', updateAvailable: false }]));
+      return res.end('[]');
+    }
+    if (url.pathname === '/api/images') {
+      const env = url.searchParams.get('env');
+      if (env === '1') return res.end(JSON.stringify([{ id: 'nginx-image', repository: 'nginx', tag: 'latest', containers: 1, updateAvailable: false }]));
+      if (env === '2') return res.end(JSON.stringify([{ id: 'alpine-image', repository: 'alpine', tag: 'latest', containers: 1, updateAvailable: false }]));
+      return res.end('[]');
+    }
+    res.statusCode = 404;
+    return res.end(JSON.stringify({ error: 'missing' }));
+  });
+  try {
+    const { getAllDockhand } = require('../src/dockhand');
+    const url = `http://127.0.0.1:${server.address().port}`;
+    const data = await getAllDockhand({ instances: [{ name: 'dockhand', url }] });
+    assert.strictEqual(data.instances[0].environments.length, 2);
+    assert.strictEqual(data.containers.length, 2);
+    assert.deepStrictEqual(data.containers.map(container => container.environmentId).sort(), ['1', '2']);
+    assert.deepStrictEqual(data.containers.map(container => container.environment).sort(), ['lab', 'production']);
+    assert.ok(requests.includes('/api/containers?env=1'));
+    assert.ok(requests.includes('/api/containers?env=2'));
+  } finally {
+    await close(server);
+  }
+}
+
+function testSynologyCpuCounters() {
+  const {
+    ucdRawCpuSnapshot,
+    ucdRawCpuPercent,
+    retainLastKnownTemperature,
+    SNMP_SENSOR_LAST_KNOWN_MS,
+  } = require('../src/snmp');
+  const previous = ucdRawCpuSnapshot([100, 0, 100, 700, 100]);
+  const current = ucdRawCpuSnapshot([130, 0, 120, 740, 110]);
+  assert.deepStrictEqual(previous, { idle: 800, total: 1000 });
+  assert.deepStrictEqual(current, { idle: 850, total: 1100 });
+  assert.strictEqual(ucdRawCpuPercent(previous, current), 50, 'UCD raw CPU must not count kernel/IRQ counters twice');
+  assert.strictEqual(ucdRawCpuPercent(current, previous), null, 'counter resets must wait for a fresh sample');
+
+  const fresh = retainLastKnownTemperature('fixture-temperature', {
+    cpuTemp: 70,
+    cpuTempLabel: 'CPU temperature',
+    systemTemp: 70,
+    systemTempLabel: 'CPU temperature',
+    sensors: { temperatures: [{ label: 'CPU temperature', value: 70 }], fanSpeeds: [] },
+  }, 1_000);
+  assert.strictEqual(fresh.temperatureStale, false);
+  const retained = retainLastKnownTemperature('fixture-temperature', { sensors: { temperatures: [], fanSpeeds: [] } }, 2_000);
+  assert.strictEqual(retained.cpuTemp, 70, 'temporary sensor failure must retain the last real temperature');
+  assert.strictEqual(retained.temperatureStale, true, 'retained temperature must be labeled last known');
+  assert.strictEqual(retained.temperatureLastKnownAt, 1_000);
+  const expired = retainLastKnownTemperature('fixture-temperature', {}, 1_000 + SNMP_SENSOR_LAST_KNOWN_MS + 1);
+  assert.strictEqual(expired.cpuTemp, undefined, 'last-known temperature must expire');
+  assert.strictEqual(expired.temperatureStale, false);
 }
 
 function testProxmoxInstances() {
@@ -228,16 +322,27 @@ function testFullBackupEmptyFileCompatibility() {
 function testStaticRegressions() {
   const root = path.join(__dirname, '..');
   const windowsAgent = fs.readFileSync(path.join(root, 'agent', 'omnisight-agent.ps1'), 'utf8');
+  const windowsInstaller = fs.readFileSync(path.join(root, 'agent', 'install-windows.ps1'), 'utf8');
   const linuxAgent = fs.readFileSync(path.join(root, 'agent', 'omnisight-agent.sh'), 'utf8');
   const dashboard = fs.readFileSync(path.join(root, 'public', 'index.html'), 'utf8');
   const settings = fs.readFileSync(path.join(root, 'public', 'settings.html'), 'utf8');
+  const readme = fs.readFileSync(path.join(root, 'README.md'), 'utf8');
   const demoServer = fs.readFileSync(path.join(root, 'demo-server.js'), 'utf8');
   const server = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
   const deploy = fs.readFileSync(path.join(root, '.github', 'workflows', 'deploy.yml'), 'utf8');
+  const docker = fs.readFileSync(path.join(root, 'src', 'docker.js'), 'utf8');
   const snmp = fs.readFileSync(path.join(root, 'src', 'snmp.js'), 'utf8');
   assert.ok(!windowsAgent.includes('Get-Counter'), 'localized Windows counters must not return');
   assert.ok(windowsAgent.includes('Win32_PerfFormattedData_PerfDisk_PhysicalDisk'));
+  assert.ok(windowsAgent.includes('SecurityProtocolType]::Tls12') && windowsInstaller.includes('SecurityProtocolType]::Tls12'));
+  const windowsDownloadLines = [settings, server, readme].flatMap(source => source.split(/\r?\n/).filter(line => /\biwr\b/.test(line)));
+  assert.ok(windowsDownloadLines.length >= 5);
+  assert.ok(windowsDownloadLines.every(line => /psTLS12|WINDOWS_TLS12_BOOTSTRAP|SecurityProtocolType\]::Tls12/.test(line)), 'every generated Windows download must enable TLS 1.2 before iwr runs');
   assert.ok(windowsAgent.includes('Get-UpdateStatus') && linuxAgent.includes('updates_json'));
+  for (const manager of ['apt-get', 'dnf', 'yum', 'zypper', 'apk', 'pacman']) {
+    assert.ok(linuxAgent.includes(`output=$(${manager}`), `${manager} update output must be captured before it is counted`);
+    assert.ok(!linuxAgent.includes(`count=$(${manager}`), `${manager} failures must not be converted to zero updates by a pipeline`);
+  }
   assert.ok(server.includes("synology: 'Synology'"), 'public status title must say Synology');
   assert.ok(dashboard.includes('/api/status/history?points='));
   assert.ok(dashboard.includes("const clusterLabel = /^https?:\\/\\//i"), 'Proxmox node subtitle must hide a URL-shaped cluster fallback');
@@ -255,12 +360,17 @@ function testStaticRegressions() {
   assert.ok(dashboard.includes("const storageKnown = inst.available?.storage !== false"), 'unavailable QNAP storage metrics must not be displayed as zero');
   assert.ok(dashboard.includes("const disksKnown = inst.available?.disks !== false"), 'unavailable QNAP disk metrics must not be displayed as zero');
   assert.ok(settings.includes('The monitoring account must belong to the QNAP administrators group'), 'QNAP metric permissions must be documented in settings');
-  assert.ok(server.includes('requestedHistoryPointLimit'));
+  assert.ok(server.includes('Number.isFinite(requested) && requested > 0'), 'invalid history point requests must use the safe dashboard default');
   assert.match(deploy, /linux\/amd64,linux\/arm64/);
+  assert.ok(docker.includes("reqJson(host, '/info')") && docker.includes("info --format '{{.MemTotal}}'"), 'Docker collectors must read host memory totals');
   assert.ok(fs.existsSync(path.join(root, 'src', 'unifi.js')));
   assert.ok(snmp.includes('session.subtree(oid, 20'), 'SNMP reads must stop at the requested OID subtree');
   assert.ok(!snmp.includes('session.walk(oid, 20'), 'unbounded SNMP walks must not return unrelated OIDs');
+  assert.strictEqual((snmp.match(/retries:\s*1/g) || []).length, 2, 'SNMP v2c and v3 sessions must retry once');
+  assert.ok(dashboard.includes('last known'), 'stale SNMP temperatures must be visibly marked last known');
   assert.ok(snmp.indexOf('const raw = await ucdRawCpu') < snmp.indexOf('cpuUser == null && synologyCpuUser'), 'UCD CPU must take priority over Synology vendor CPU');
+  assert.ok(snmp.includes("const oids = ['50', '51', '52', '53', '54']"), 'UCD CPU must use the canonical non-overlapping counters');
+  assert.ok(!snmp.includes("'55', '56'"), 'UCD raw kernel and interrupt counters must not be added to raw system twice');
   assert.ok(snmp.indexOf("snmpWalk(session, '1.3.6.1.2.1.25.3.3.1.2')") < snmp.indexOf('cpuUser == null && synologyCpuUser'), 'HOST-RESOURCES CPU must take priority over Synology vendor CPU');
   assert.ok(server.includes("const ADMIN_VISIBLE_CONFIG_SECRET_KEYS = new Set(['community'])"), 'admins must see the configured SNMP community');
   assert.ok(server.includes("role === 'admin' ? ADMIN_VISIBLE_CONFIG_SECRET_KEYS : null"), 'SNMP community visibility must remain admin-only');
@@ -282,11 +392,13 @@ async function run() {
   await testQnap();
   await testPbs();
   testDockerAndDockhand();
+  await testDockhandEnvironments();
+  testSynologyCpuCounters();
   testProxmoxInstances();
   testLatestStableVersion();
   testFullBackupEmptyFileCompatibility();
   testStaticRegressions();
-  console.log('smoke ok — issue regressions: #4 #5 #6 #7 #9 #10 #12 #18 #20 #22 #23 #24');
+  console.log('smoke ok — issue regressions: #4 #5 #6 #7 #9 #10 #12 #18 #20 #22 #23 #24 #25');
 }
 
 module.exports = { run };

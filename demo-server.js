@@ -3,6 +3,7 @@ const path = require('path');
 const crypto = require('crypto');
 const fs = require('fs');
 const zlib = require('zlib');
+const { buildUnifiTopology } = require('./src/unifiTopology');
 
 const app = express();
 const PORT = Number(process.env.PORT || 4000);
@@ -181,7 +182,6 @@ let demoTopology = {
     { from: 'snmp:core-switch', to: 'proxmox-host:px-demo-02' },
     { from: 'snmp:core-switch', to: 'proxmox-host:px-demo-03' },
     { from: 'snmp:core-switch', to: 'snmp:demo-nas' },
-    { from: 'snmp:core-switch', to: 'snmp:demo-ap' },
     { from: 'snmp:core-switch', to: 'docker:demo-docker' },
     { from: 'snmp:core-switch', to: 'dockhand:dockhand-demo' },
     { from: 'docker:demo-docker', to: 'dockhand:dockhand-demo' },
@@ -190,6 +190,7 @@ let demoTopology = {
   hidden: [],
   spacing: { proxmoxVmGap: 180 },
   positions: {
+    'unifi:default:d-01': { x: 700, y: -100 },
     'snmp:core-switch': { x: 700, y: 90 },
     'proxmox-host:px-demo-01': { x: 300, y: 250 },
     'proxmox-host:px-demo-02': { x: 700, y: 250 },
@@ -202,7 +203,8 @@ let demoTopology = {
     'proxmox-guest:px-demo-03:302': { x: 1215, y: 430 },
     'kubernetes:cluster': { x: 700, y: 615 },
     'snmp:demo-nas': { x: 430, y: -23.33333333333333 },
-    'snmp:demo-ap': { x: 920, y: -55 },
+    'snmp:demo-ap': { x: 940, y: 250 },
+    'unifi:default:d-03': { x: 1120, y: 250 },
     'docker:demo-docker': { x: 1122.7777777777778, y: -83.33333333333334 },
     'dockhand:dockhand-demo': { x: 1575, y: 90 },
   },
@@ -1010,10 +1012,10 @@ function demoStatus() {
       };
     };
     const devices = [
-      dev('d-01', 'demo-gateway', 'UDM Pro', '192.0.2.1', 'ONLINE', '4.3.6', { isGateway: true, cpu: 22, ram: { percent: 61 }, history: gwHist, uplink: { rxBps: 7_200_000, txBps: 2_100_000 } }),
-      dev('d-02', 'demo-switch', 'USW Pro 24', '192.0.2.2', 'ONLINE', '7.4.1', { cpu: 14, ram: { percent: 38 }, history: devHist(12) }),
-      dev('d-03', 'demo-ap-warehouse', 'U6 Pro', '192.0.2.4', 'OFFLINE', '6.6.65'),
-      dev('d-04', 'demo-ap-lobby', 'U6 Lite', '192.0.2.5', 'UPDATING', '6.6.65', { cpu: 48, ram: { percent: 52 }, history: devHist(33) }),
+      dev('d-01', 'demo-gateway', 'UDM Pro', '192.0.2.1', 'ONLINE', '4.3.6', { isGateway: true, kind: 'gateway', cpu: 22, ram: { percent: 61 }, history: gwHist, uplink: { rxBps: 7_200_000, txBps: 2_100_000 } }),
+      dev('d-02', 'demo-switch', 'USW Pro 24', '192.0.2.2', 'ONLINE', '7.4.1', { kind: 'switch', uplinkDeviceId: 'd-01', cpu: 14, ram: { percent: 38 }, history: devHist(12) }),
+      dev('d-03', 'demo-ap-warehouse', 'U6 Pro', '192.0.2.4', 'OFFLINE', '6.6.65', { kind: 'access-point', uplinkDeviceId: 'd-02' }),
+      dev('d-04', 'demo-ap-lobby', 'U6 Lite', '192.0.2.5', 'UPDATING', '6.6.65', { kind: 'access-point', uplinkDeviceId: 'd-02', cpu: 48, ram: { percent: 52 }, history: devHist(33) }),
     ];
     const summary = {
       instances: 1, up: 1, down: 0,
@@ -1034,6 +1036,7 @@ function demoStatus() {
         unifiOs: true,
         devices,
         devicesComplete: true,
+        topologyDetailsAvailable: true,
         wan: { state: 'up', rxBps: 7_200_000, txBps: 2_100_000, latencyMs: 11, lossPct: 0, history: wanHistory, downEvents: { count: downEdges.length, recent: downEdges.slice(-5) } },
         wanQuality: 'ok',
         stale: false,
@@ -1357,6 +1360,7 @@ function topologyData() {
     topologySpacing: demoTopology.spacing,
     topologyPositions: demoTopology.positions,
     topologyView: demoTopology.view,
+    unifiTopology: buildUnifiTopology(d.unifi?.instances || [], d.snmp || []),
     proxmox: {
       nodes: d.proxmox.nodes.map(n => ({
         name: n.name,
@@ -1379,6 +1383,7 @@ function topologyData() {
     cicd: d.cicd,
     veeam: d.veeam,
     portainer: d.portainer,
+    unifi: d.unifi,
     snmp: d.snmp.map(s => ({ name: s.name, host: s.host, online: true, profile: s.profile, vendor: s.vendor, model: s.model })),
   };
 }

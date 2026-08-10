@@ -192,7 +192,7 @@ EOF
 **Windows (elevated PowerShell):**
 
 ```powershell
-$env:OMNISIGHT_URL="http://<omnisight-host>:3000"; $env:OMNISIGHT_TOKEN="<token>"; $env:OMNISIGHT_AGENT_ROLE="windows"; iwr -UseBasicParsing "http://<omnisight-host>:3000/agent/install-windows.ps1" | iex
+[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12; $env:OMNISIGHT_URL="http://<omnisight-host>:3000"; $env:OMNISIGHT_TOKEN="<token>"; $env:OMNISIGHT_AGENT_ROLE="windows"; iwr -UseBasicParsing "http://<omnisight-host>:3000/agent/install-windows.ps1" | iex
 ```
 
 3. Run it on the server — the dialog shows a live "✓ connected" confirmation and the system appears on the dashboard within seconds.

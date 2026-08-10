@@ -31,7 +31,7 @@ UPDATES_JSON_CACHE=""
 UPDATES_CHECKED_AT=0
 
 updates_json() {
-  local now count source reboot rc
+  local now count source reboot rc output
   now=$(date +%s 2>/dev/null || echo 0)
   if [ -n "$UPDATES_JSON_CACHE" ] && [ $((now-UPDATES_CHECKED_AT)) -lt 1800 ]; then
     printf '"updates":%s,' "$UPDATES_JSON_CACHE"
@@ -41,23 +41,47 @@ updates_json() {
   count=null
   source=unavailable
   if command -v apt-get >/dev/null 2>&1; then
-    count=$(apt-get -s -o Debug::NoLocking=1 upgrade 2>/dev/null | awk '/^Inst /{c++} END{print c+0}')
-    source=apt
+    output=$(apt-get -s -o Debug::NoLocking=1 upgrade 2>/dev/null)
+    rc=$?
+    if [ "$rc" -eq 0 ]; then
+      count=$(printf '%s\n' "$output" | awk '/^Inst /{c++} END{print c+0}')
+      source=apt
+    fi
   elif command -v dnf >/dev/null 2>&1; then
-    count=$(dnf -q check-update --cacheonly 2>/dev/null | awk '/^[[:alnum:]_.+:-]+[[:space:]]+[[:alnum:]_.:-]+[[:space:]]+[[:alnum:]_.:+~-]+/{c++} END{print c+0}')
-    source=dnf
+    output=$(dnf -q check-update --cacheonly 2>/dev/null)
+    rc=$?
+    if [ "$rc" -eq 0 ] || [ "$rc" -eq 100 ]; then
+      count=$(printf '%s\n' "$output" | awk '/^[[:alnum:]_.+:-]+[[:space:]]+[[:alnum:]_.:-]+[[:space:]]+[[:alnum:]_.:+~-]+/{c++} END{print c+0}')
+      source=dnf
+    fi
   elif command -v yum >/dev/null 2>&1; then
-    count=$(yum -q check-update --cacheonly 2>/dev/null | awk '/^[[:alnum:]_.+:-]+[[:space:]]+[[:alnum:]_.:-]+[[:space:]]+[[:alnum:]_.:+~-]+/{c++} END{print c+0}')
-    source=yum
+    output=$(yum -q check-update --cacheonly 2>/dev/null)
+    rc=$?
+    if [ "$rc" -eq 0 ] || [ "$rc" -eq 100 ]; then
+      count=$(printf '%s\n' "$output" | awk '/^[[:alnum:]_.+:-]+[[:space:]]+[[:alnum:]_.:-]+[[:space:]]+[[:alnum:]_.:+~-]+/{c++} END{print c+0}')
+      source=yum
+    fi
   elif command -v zypper >/dev/null 2>&1; then
-    count=$(zypper --non-interactive --no-refresh list-updates 2>/dev/null | awk -F'|' '$1 ~ /^[[:space:]]*v[[:space:]]*$/ {c++} END{print c+0}')
-    source=zypper
+    output=$(zypper --non-interactive --no-refresh list-updates 2>/dev/null)
+    rc=$?
+    if [ "$rc" -eq 0 ] || [ "$rc" -eq 100 ] || [ "$rc" -eq 101 ] || [ "$rc" -eq 102 ]; then
+      count=$(printf '%s\n' "$output" | awk -F'|' '$1 ~ /^[[:space:]]*v[[:space:]]*$/ {c++} END{print c+0}')
+      source=zypper
+    fi
   elif command -v apk >/dev/null 2>&1; then
-    count=$(apk version -l '<' 2>/dev/null | awk 'END{print NR+0}')
-    source=apk
+    output=$(apk version -l '<' 2>/dev/null)
+    rc=$?
+    if [ "$rc" -eq 0 ]; then
+      count=$(printf '%s\n' "$output" | awk 'NF{c++} END{print c+0}')
+      source=apk
+    fi
   elif command -v pacman >/dev/null 2>&1; then
-    count=$(pacman -Qu 2>/dev/null | awk 'END{print NR+0}')
-    source=pacman
+    output=$(pacman -Qu 2>/dev/null)
+    rc=$?
+    if [ "$rc" -eq 0 ]; then
+      count=$(printf '%s\n' "$output" | awk 'NF{c++} END{print c+0}')
+      source=pacman
+    fi
   fi
 
   reboot=false

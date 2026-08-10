@@ -382,7 +382,7 @@ function platformStatus(total, good, connecting){
   if(good <= 0) return 'bad';
   return good < total ? 'warn' : 'good';
 }
-function addNode(nodes, parent, level, key, label, meta, status, icon, kind, refKey){
+function addNode(nodes, parent, level, key, label, meta, status, icon, kind, refKey, platform){
   const id = safeId(`${level}-${key}-${nodes.length}`);
   const baseRef = refKey || `${level}:${safeId(key)}`;
   if(refKey){
@@ -392,7 +392,7 @@ function addNode(nodes, parent, level, key, label, meta, status, icon, kind, ref
   let ref = baseRef;
   let n = 2;
   while(nodes.some(item => item.ref === ref)) ref = `${baseRef}-${n++}`;
-  nodes.push({id,parent,ref,level,label,meta,status,icon:icon||kind||'node',kind:kind||''});
+  nodes.push({id,parent,ref,level,label,meta,status,icon:icon||kind||'node',kind:kind||'',platform:platform||''});
   return id;
 }
 function dashboardIconUrl(key){
@@ -476,11 +476,11 @@ function nodeIconHtml(n){
   if(!url) return fallback;
   return `<img src="${esc(url)}" alt="" onerror="this.replaceWith(document.createTextNode('${fallback}'))">`;
 }
-function candidate(level, key, label, meta, status, icon, kind, refKey){
-  return { parent:null, level, key, label, meta, status, icon:icon||kind||'node', kind:kind||'', ref:refKey || `${level}:${safeId(key)}` };
+function candidate(level, key, label, meta, status, icon, kind, refKey, platform){
+  return { parent:null, level, key, label, meta, status, icon:icon||kind||'node', kind:kind||'', ref:refKey || `${level}:${safeId(key)}`, platform:platform||'' };
 }
 function addCandidate(nodes, c){
-  return addNode(nodes, c.parent, c.level, c.key, c.label, c.meta, c.status, c.icon, c.kind, c.ref);
+  return addNode(nodes, c.parent, c.level, c.key, c.label, c.meta, c.status, c.icon, c.kind, c.ref, c.platform);
 }
 function limited(items, max){return Array.isArray(items) ? items.slice(0,max) : []}
 function plusNode(nodes, parent, level, total, shown){
@@ -497,6 +497,8 @@ function buildGraph(d){
   const docker = Array.isArray(d.docker)?d.docker:[];
   const dockhand = d.dockhand || null;
   const snmp = Array.isArray(d.snmp)?d.snmp:[];
+  const unifiTopology = d.unifiTopology && typeof d.unifiTopology === 'object' ? d.unifiTopology : {};
+  const mergedSnmpRefs = new Set(Array.isArray(unifiTopology.matchedSnmpRefs) ? unifiTopology.matchedSnmpRefs : []);
   const configured = new Set(Array.isArray(d.configured)?d.configured:[]);
   function shouldShowProxmox(count){return count || !hideEmpty || configured.has('proxmox')}
   function maybeLinked(c){
@@ -545,12 +547,26 @@ function buildGraph(d){
       maybeLinked(candidate(2,`dh-${name}`,name,`${rows.filter(c=>c.state==='running').length}/${rows.length} running`,i.online?'good':i._connecting?'idle':'bad','dockhand','host',`dockhand:${safeId(name)}`));
     });
   }
+  if(Array.isArray(unifiTopology.nodes) && unifiTopology.nodes.length){
+    const idsByRef = new Map();
+    limited(unifiTopology.nodes,120).forEach((row,index)=>{
+      const ref = row.ref || `unifi:device-${index}`;
+      const c = candidate(Number(row.level ?? -2),`unifi-${ref}`,row.label || 'UniFi device',row.meta || '',row.status || 'idle',row.icon || 'unifi',row.kind || 'host',ref,'unifi');
+      topologyCandidates.push(c);
+      if(hiddenRefs.has(ref)) return;
+      const parent = row.parentRef ? (idsByRef.get(row.parentRef) || null) : null;
+      const id = addNode(nodes,parent,c.level,c.key,c.label,c.meta,c.status,c.icon,c.kind,c.ref,c.platform);
+      idsByRef.set(ref,id);
+    });
+  }
   if(snmp.length){
     limited(snmp,80).forEach(s=>{
       const name = s.name || s.host || 'device';
+      const ref = `snmp:${safeId(name)}`;
+      if(mergedSnmpRefs.has(ref)) return;
       const icon = snmpDeviceIcon(s);
       const level = snmpDeviceLevel(s);
-      maybeLinked(candidate(level,`snmp-${name}`,name,s.host || '',s.online?'good':s._connecting?'idle':'bad',icon,'host',`snmp:${safeId(name)}`));
+      maybeLinked(candidate(level,`snmp-${name}`,name,s.host || '',s.online?'good':s._connecting?'idle':'bad',icon,'host',ref));
     });
   }
   return nodes;
@@ -904,7 +920,10 @@ function centerTopology(nodes, shell){
   topoView.x = Math.round(shell.clientWidth / 2 - centerX * topoView.scale);
   topoView.y = Math.round(shell.clientHeight / 2 - centerY * topoView.scale);
 }
-function topologyPlatformId(ref){
+function topologyPlatformId(value){
+  const node = value && typeof value === 'object' ? value : null;
+  if(node?.platform) return node.platform;
+  const ref = node?.ref || value;
   if(String(ref || '').startsWith('proxmox-')) return 'proxmox';
   if(String(ref || '').startsWith('kubernetes:')) return 'kubernetes';
   if(String(ref || '').startsWith('snmp:')) return 'snmp';
@@ -912,9 +931,22 @@ function topologyPlatformId(ref){
   if(String(ref || '').startsWith('dockhand:')) return 'dockhand';
   return '';
 }
+function topologyPairKey(from,to){return [String(from||''),String(to||'')].sort().join('\u0000')}
+function automaticTopologyPairs(nodes){
+  const byId = new Map((nodes||[]).map(node=>[node.id,node]));
+  return new Set((nodes||[])
+    .filter(node=>node.parent && byId.has(node.parent))
+    .map(node=>topologyPairKey(byId.get(node.parent).ref,node.ref)));
+}
+function visibleTopologyLinkEntries(nodes){
+  const refs = new Set((nodes||[]).map(n=>n.ref));
+  const automatic = automaticTopologyPairs(nodes);
+  return topologyLinks
+    .map((link,index)=>({link,index}))
+    .filter(({link})=>refs.has(link.from) && refs.has(link.to) && !automatic.has(topologyPairKey(link.from,link.to)));
+}
 function visibleTopologyLinks(nodes){
-  const refs = new Set(nodes.map(n => n.ref));
-  return topologyLinks.filter(l => refs.has(l.from) && refs.has(l.to));
+  return visibleTopologyLinkEntries(nodes).map(entry=>entry.link);
 }
 function edgeMidpoint(a,b){
   if(Math.abs(a.y - b.y) < 10) return { x: (a.x + b.x) / 2, y: a.y - 42 };
@@ -954,15 +986,15 @@ function refreshTopologyEdges(){
     const p = byId.get(n.parent);
     setEdgePathD(`edge-${i}`, edgePath(p, n), edgeLayerClass(p, n, false));
   });
-  topologyLinks.forEach((link,i) => {
+  visibleTopologyLinkEntries(currentNodes).forEach(({link,index}) => {
     const a = byRef.get(link.from);
     const b = byRef.get(link.to);
     if(!a || !b) return;
     const top = a.y <= b.y ? a : b;
     const bottom = a.y <= b.y ? b : a;
-    setEdgePathD(`manual-edge-${i}`, edgePath(top,bottom), edgeLayerClass(a, b, true));
+    setEdgePathD(`manual-edge-${index}`, edgePath(top,bottom), edgeLayerClass(a, b, true));
     const mid = edgeMidpoint(top,bottom);
-    const btn = inner.querySelector(`.edge-delete[data-link-index="${i}"]`);
+    const btn = inner.querySelector(`.edge-delete[data-link-index="${index}"]`);
     if(btn) {
       btn.style.left = `${mid.x}px`;
       btn.style.top = `${mid.y}px`;
@@ -1058,7 +1090,7 @@ function renderTopology(d){
     const c = edgeLayerClass(p,n,false);
     return edgeSvg(`edge-${i}`, path, c, edgeShouldAnimate(p,n));
   }).join('');
-  const customEdgeParts = topologyLinks.map((link,i) => {
+  const customEdgeParts = visibleTopologyLinkEntries(nodes).map(({link,index}) => {
     const a = byRef.get(link.from);
     const b = byRef.get(link.to);
     if(!a || !b) return null;
@@ -1067,8 +1099,8 @@ function renderTopology(d){
     const path = edgePath(top,bottom);
     const cls = edgeLayerClass(a,b,true);
     return {
-      edge: edgeSvg(`manual-edge-${i}`, path, cls, edgeShouldAnimate(top,bottom), `data-link-index="${i}"`),
-      action: edgeDeleteButton(i, edgeMidpoint(top,bottom)),
+      edge: edgeSvg(`manual-edge-${index}`, path, cls, edgeShouldAnimate(top,bottom), `data-link-index="${index}"`),
+      action: edgeDeleteButton(index, edgeMidpoint(top,bottom)),
     };
   }).filter(Boolean);
   const customEdges = customEdgeParts.map(p => p.edge).join('');
@@ -1088,7 +1120,7 @@ function renderTopology(d){
   updateLinkPanel();
 }
 function buildSummary(d, nodes = currentNodes){
-  const platformCount = new Set(nodes.map(n => topologyPlatformId(n.ref)).filter(Boolean)).size;
+  const platformCount = new Set(nodes.map(n => topologyPlatformId(n)).filter(Boolean)).size;
   const hostCount = nodes.filter(n => n.kind === 'host').length;
   const workloadCount = nodes.filter(n => n.kind === 'guest').length;
   const counts = [

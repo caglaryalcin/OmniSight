@@ -86,11 +86,16 @@ function memoryFromCli(value) {
   };
 }
 
-function resourceSummary(containers = []) {
+function resourceSummary(containers = [], hostMemoryBytes = null) {
   const cpu = Math.min(100, containers.reduce((sum, container) => sum + Number(container.cpu || 0), 0));
-  const memoryRows = containers.filter(container => Number.isFinite(Number(container.memUsageBytes)) && Number.isFinite(Number(container.memLimitBytes)) && Number(container.memLimitBytes) > 0);
+  const memoryRows = containers.filter(container => Number.isFinite(Number(container.memUsageBytes)) && Number(container.memUsageBytes) >= 0);
   const totalUsage = memoryRows.reduce((sum, container) => sum + Number(container.memUsageBytes), 0);
-  const hostLimit = memoryRows.reduce((max, container) => Math.max(max, Number(container.memLimitBytes)), 0);
+  const reportedHostMemory = Number(hostMemoryBytes);
+  const observedHostLimit = containers.reduce((max, container) => {
+    const limit = Number(container.memLimitBytes);
+    return Number.isFinite(limit) && limit > 0 ? Math.max(max, limit) : max;
+  }, 0);
+  const hostLimit = Number.isFinite(reportedHostMemory) && reportedHostMemory > 0 ? reportedHostMemory : observedHostLimit;
   const fallback = containers.filter(container => Number.isFinite(Number(container.memPercent))).map(container => Number(container.memPercent));
   const memPercent = hostLimit
     ? Math.min(100, Math.round((totalUsage / hostLimit) * 1000) / 10)
@@ -360,7 +365,12 @@ async function getDockerSshHost(host) {
         warnThrottled(`docker-images:${name}`, `[Docker ${name}] unused image check failed: ${err.message}`);
         return '';
       });
-    const hostCpus = Math.max(1, Number(String(await execDockerCli(host, "info --format '{{.NCPU}}'").catch(() => '1')).trim()) || 1);
+    const [hostCpuText, hostMemoryText] = await Promise.all([
+      execDockerCli(host, "info --format '{{.NCPU}}'").catch(() => '1'),
+      execDockerCli(host, "info --format '{{.MemTotal}}'").catch(() => '0'),
+    ]);
+    const hostCpus = Math.max(1, Number(String(hostCpuText).trim()) || 1);
+    const hostMemoryBytes = Math.max(0, Number(String(hostMemoryText).trim()) || 0);
     const stats = new Map(parseJsonLines(statsTxt).map(s => [String(s.ID || '').slice(0, 12), s]));
     const containers = parseJsonLines(psTxt).slice(0, 200).map(c => {
       const id = String(c.ID || '').slice(0, 12);
@@ -410,7 +420,7 @@ async function getDockerSshHost(host) {
     const running = containers.filter(c => c.state === 'running').length;
     const stopped = containers.filter(c => c.state === 'exited' || c.state === 'dead').length;
     const updates = containers.filter(c => c.imageUpdate?.status === 'update').length;
-    const resources = resourceSummary(containers);
+    const resources = resourceSummary(containers, hostMemoryBytes);
     return {
       source: 'configured',
       name,
@@ -437,12 +447,13 @@ async function getDockerHost(host) {
   if (host.sshHost) return getDockerSshHost(host);
   const name = host.name || host.url || host.socketPath || 'docker';
   try {
-    const [containers, images] = await Promise.all([
+    const [containers, images, info] = await Promise.all([
       reqJson(host, '/containers/json?all=1'),
       reqJson(host, '/images/json').catch(err => {
         warnThrottled(`docker-images:${name}`, `[Docker ${name}] unused image check failed: ${err.message}`);
         return [];
       }),
+      reqJson(host, '/info').catch(() => null),
     ]);
     const detailed = await mapLimit((containers || []).slice(0, 200), 6, async c => {
       const id = String(c.Id || '').slice(0, 12);
@@ -478,7 +489,7 @@ async function getDockerHost(host) {
     const running = detailed.filter(c => c.state === 'running').length;
     const stopped = detailed.filter(c => c.state === 'exited' || c.state === 'dead').length;
     const updates = detailed.filter(c => c.imageUpdate?.status === 'update').length;
-    const resources = resourceSummary(detailed);
+    const resources = resourceSummary(detailed, info?.MemTotal);
     return {
       source: 'configured',
       name,

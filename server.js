@@ -22,6 +22,7 @@ const { getAllFirewallData } = require('./src/firewall');
 const { getAllTrueNasData, configuredInstances: trueNasConfigInstances } = require('./src/truenas');
 const { getAllQnapData, configuredInstances: qnapConfigInstances } = require('./src/qnap');
 const { getAllUnifiData, configuredInstances: unifiConfigInstances } = require('./src/unifi');
+const { buildUnifiTopology } = require('./src/unifiTopology');
 const { getAllUgreenData, configuredInstances: ugreenConfigInstances } = require('./src/ugreen');
 const { getAllPbsData, configuredInstances: pbsConfigInstances } = require('./src/pbs');
 const { getAllPortainerData, configuredInstances: portainerConfigInstances, portainerLogs } = require('./src/portainer');
@@ -3155,6 +3156,7 @@ function settingsStatusData(data = cache.data || EMPTY) {
 }
 
 function topologyStatusData(data = cache.data || EMPTY) {
+  const unifiTopology = buildUnifiTopology(data.unifi?.instances || [], data.snmp || []);
   return {
     timestamp: data.timestamp || new Date().toISOString(),
     loading: !!data.loading,
@@ -3166,6 +3168,7 @@ function topologyStatusData(data = cache.data || EMPTY) {
     topologySpacing: topologySpacingConfig(),
     topologyPositions: topologyPositionsConfig(),
     topologyView: topologyViewConfig(),
+    unifiTopology,
     proxmox: {
       nodes: (data.proxmox?.nodes || []).map(n => ({
         name: n.name || n.node?.name || '',
@@ -3248,7 +3251,22 @@ function topologyStatusData(data = cache.data || EMPTY) {
         _connecting: !!i._connecting,
         stale: !!i.stale,
         wan: i.wan ? { state: i.wan.state, latencyMs: i.wan.latencyMs, lossPct: i.wan.lossPct } : null,
-        devices: Array.isArray(i.devices) ? i.devices.map(d => ({ name: d.name, state: d.state, online: !!d.online })) : [],
+        topologyDetailsAvailable: !!i.topologyDetailsAvailable,
+        devices: Array.isArray(i.devices) ? i.devices.map(d => ({
+          id: d.id,
+          name: d.name,
+          model: d.model,
+          mac: d.mac,
+          ip: d.ip,
+          aliases: Array.isArray(d.aliases) ? d.aliases : [],
+          state: d.state,
+          online: !!d.online,
+          alertable: !!d.alertable,
+          warn: !!d.warn,
+          isGateway: !!d.isGateway,
+          kind: d.kind,
+          uplinkDeviceId: d.uplinkDeviceId || null,
+        })) : [],
       })),
     } : null,
     ugreen: data.ugreen ? {
@@ -3303,6 +3321,8 @@ function topologyStatusData(data = cache.data || EMPTY) {
       type: s.type,
       vendor: s.vendor,
       model: s.model,
+      mac: s.mac,
+      aliases: Array.isArray(s.aliases) ? s.aliases : [],
       sysDescr: s.sysDescr,
       systemDescription: s.systemDescription,
     })),
@@ -3376,7 +3396,8 @@ function cloneDashboardHistories(value, key = '', limit = dashboardHistoryPointL
 function requestedHistoryPointLimit(value) {
   const options = [80, 240, 720, 1440, 2880, 5760];
   const requested = Number(value);
-  const selected = options.find(points => points >= requested) || options[options.length - 1];
+  const requestedPoints = Number.isFinite(requested) && requested > 0 ? requested : dashboardHistoryPointLimit();
+  const selected = options.find(points => points >= requestedPoints) || options[options.length - 1];
   const configuredCap = Number(process.env.OMNISIGHT_VIEW_HISTORY_POINTS);
   const cap = Number.isFinite(configuredCap) && configuredCap > 0 ? Math.round(configuredCap) : historyRetentionMaxPoints();
   return Math.max(30, Math.min(selected, historyRetentionMaxPoints(), cap));
@@ -8203,6 +8224,8 @@ function agentInstallRole(agent) {
   return agent?.platform === 'synology' ? 'synology' : 'linux';
 }
 
+const WINDOWS_TLS12_BOOTSTRAP = '[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12;';
+
 function agentRepairCommands(req, agent) {
   const base = browserRequestOrigin(req);
   const token = String(config.linux?.agentToken || '');
@@ -8210,7 +8233,7 @@ function agentRepairCommands(req, agent) {
   const id = String(agent.id || '');
   if (role === 'windows') {
     const install = token
-      ? `$env:OMNISIGHT_URL="${base}"; $env:OMNISIGHT_TOKEN="${token}"; $env:OMNISIGHT_AGENT_ROLE="windows"; iwr -UseBasicParsing "${base}/agent/install-windows.ps1" | iex`
+      ? `${WINDOWS_TLS12_BOOTSTRAP} $env:OMNISIGHT_URL="${base}"; $env:OMNISIGHT_TOKEN="${token}"; $env:OMNISIGHT_AGENT_ROLE="windows"; iwr -UseBasicParsing "${base}/agent/install-windows.ps1" | iex`
       : 'Generate an agent token in Settings before reinstalling agents.';
     return [
       {
@@ -8350,7 +8373,7 @@ app.post('/api/agent/update', async (req, res) => {
       return res.status(409).json({
         error: 'This Windows agent needs a one-time reinstall before remote updates are available.',
         manualCommand: token
-          ? `$env:OMNISIGHT_URL="${base}"; $env:OMNISIGHT_TOKEN="${token}"; $env:OMNISIGHT_AGENT_ROLE="windows"; $env:OMNISIGHT_AGENT_ID="${id}"; iwr -UseBasicParsing "${base}/agent/install-windows.ps1" | iex`
+          ? `${WINDOWS_TLS12_BOOTSTRAP} $env:OMNISIGHT_URL="${base}"; $env:OMNISIGHT_TOKEN="${token}"; $env:OMNISIGHT_AGENT_ROLE="windows"; $env:OMNISIGHT_AGENT_ID="${id}"; iwr -UseBasicParsing "${base}/agent/install-windows.ps1" | iex`
           : 'Generate an agent token in Settings before reinstalling the Windows agent.',
       });
     }

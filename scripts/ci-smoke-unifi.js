@@ -4,6 +4,7 @@ const http = require('http');
 const assert = require('assert');
 
 const { getAllUnifiData, _resetRuntime } = require('../src/unifi');
+const { buildUnifiTopology } = require('../src/unifiTopology');
 const { cancelHistorySaves } = require('../src/historyStore');
 
 // The collector schedules debounced history persistence; in a smoke run that
@@ -14,7 +15,7 @@ function discardFixtureHistory() {
 
 const SITES = { offset: 0, limit: 1, count: 1, totalCount: 1, data: [{ id: 'site-1', internalReference: 'default', name: 'Default' }] };
 const DEVICES = [
-  { id: 'd-gw', name: 'gw-office', model: 'UDM-Pro', macAddress: 'AA:BB:CC:00:00:01', ipAddress: '192.168.30.1', state: 'ONLINE', firmwareVersion: '4.3.6', features: ['switching', 'gateway'] },
+  { id: 'd-gw', name: 'gw-office', model: 'UDR7', macAddress: 'AA:BB:CC:00:00:01', ipAddress: '192.168.30.1', state: 'ONLINE', firmwareVersion: '4.3.6', features: ['switching'] },
   { id: 'd-sw', name: 'sw-rack-1', model: 'USW-Pro-24', macAddress: 'AA:BB:CC:00:00:02', ipAddress: '192.168.30.2', state: 'ONLINE', firmwareVersion: '7.1.20' },
   { id: 'd-ap1', name: 'ap-warehouse', model: 'U6-Pro', macAddress: 'AA:BB:CC:00:00:03', ipAddress: '192.168.30.3', state: 'OFFLINE', firmwareVersion: '6.6.65' },
   { id: 'd-ap2', name: 'ap-frontdesk', model: 'U6-Lite', macAddress: 'AA:BB:CC:00:00:04', ipAddress: '192.168.30.4', state: 'UPDATING', firmwareVersion: '6.6.65' },
@@ -23,6 +24,13 @@ const STATS = {
   'd-gw': { cpuUtilizationPct: 22, memoryUtilizationPct: 61, uptimeSec: 3542400, uplink: { rxRateBps: 842e6, txRateBps: 96e6 } },
   'd-sw': { cpuUtilizationPct: 14, memoryUtilizationPct: 38, uptimeSec: 3542400, uplink: {} },
   'd-ap2': { cpuUtilizationPct: 48, memoryUtilizationPct: 52, uptimeSec: 120, uplink: {} },
+};
+const DETAILS = {
+  'd-gw': { ...DEVICES[0], features: { switching: null }, uplink: {} },
+  'd-sw': { ...DEVICES[1], features: { switching: null }, uplink: { deviceId: 'd-gw' } },
+  'd-ap1': { ...DEVICES[2], features: { accessPoint: null }, uplink: { deviceId: 'd-sw' } },
+  'd-ap2': { ...DEVICES[3], features: { accessPoint: null }, uplink: { deviceId: 'd-sw' } },
+  'd-b1': { id: 'd-b1', name: 'branch-ap', model: 'U6-Lite', macAddress: 'AA:BB:CC:00:00:99', ipAddress: '192.168.40.2', state: 'ONLINE', firmwareVersion: '6.6.65', features: { accessPoint: null }, uplink: {} },
 };
 const HEALTH = { data: [{ subsystem: 'www', status: 'ok', latency: 11, drops: 0 }, { subsystem: 'wan', status: 'ok' }] };
 
@@ -34,7 +42,7 @@ const HEALTH = { data: [{ subsystem: 'www', status: 'ok', latency: 11, drops: 0 
 //   loginFails   — every legacy login is 500 (3-strike degrade)
 //   devices429At — Nth device-list request answers 429 (cooldown path)
 function fixtureServer(opts = {}) {
-  const counters = { deviceLists: 0, logins: 0, health: 0 };
+  const counters = { deviceLists: 0, deviceDetails: 0, logins: 0, health: 0 };
   let healthCallsThisLogin = 0;
   const srv = http.createServer((req, res) => {
     const url = new URL(req.url, 'http://x');
@@ -54,6 +62,10 @@ function fixtureServer(opts = {}) {
       const only = [{ id: 'd-b1', name: 'branch-ap', model: 'U6-Lite', macAddress: 'AA:BB:CC:00:00:99', ipAddress: '192.168.40.2', state: 'ONLINE', firmwareVersion: '6.6.65' }];
       return json(200, { offset: 0, limit: 25, count: 1, totalCount: 1, data: only });
     }
+    if (opts.twoSites && path === `${base}/sites/site-2/devices/d-b1`) {
+      counters.deviceDetails += 1;
+      return json(200, DETAILS['d-b1']);
+    }
     if (opts.twoSites && /\/sites\/site-2\/devices\/[^/]+\/statistics\/latest$/.test(path)) return json(200, {});
 
     if (path === `${base}/sites/site-1/devices`) {
@@ -69,6 +81,12 @@ function fixtureServer(opts = {}) {
 
     const stat = path.match(new RegExp(`^${base}/sites/site-1/devices/([^/]+)/statistics/latest$`));
     if (stat) return json(200, STATS[stat[1]] || {});
+
+    const detail = path.match(new RegExp(`^${base}/sites/site-1/devices/([^/]+)$`));
+    if (detail) {
+      counters.deviceDetails += 1;
+      return json(200, DETAILS[detail[1]] || {});
+    }
 
     if (path === loginPath && req.method === 'POST') {
       counters.logins += 1;
@@ -116,11 +134,28 @@ async function run() {
     assert.ok(byId['d-ap2'].warn && !byId['d-ap2'].alertable, 'happy: UPDATING is warn, not alertable');
     assert.strictEqual(byId['d-gw'].cpu, 22, 'happy: gateway stats applied');
     assert.ok(byId['d-gw'].isGateway, 'happy: gateway detected');
+    assert.strictEqual(byId['d-gw'].kind, 'gateway', 'happy: gateway topology kind detected');
+    assert.strictEqual(byId['d-sw'].kind, 'switch', 'happy: switch topology kind detected');
+    assert.strictEqual(byId['d-ap2'].kind, 'access-point', 'happy: AP topology kind detected');
+    assert.strictEqual(byId['d-sw'].uplinkDeviceId, 'd-gw', 'happy: switch parent collected');
+    assert.strictEqual(byId['d-ap2'].uplinkDeviceId, 'd-sw', 'happy: AP parent collected');
+    assert.ok(inst.topologyDetailsAvailable, 'happy: topology details available');
     assert.ok((byId['d-gw'].aliases || []).includes('127.0.0.1'), 'happy: gateway aliased to controller URL host for SNMP dedupe');
     assert.strictEqual(inst.wan.state, 'up', 'happy: WAN up');
     assert.strictEqual(inst.wan.latencyMs, 11, 'happy: legacy latency present');
     assert.strictEqual(inst.wanQuality, 'ok', 'happy: wanQuality ok');
     assert.strictEqual(out.summary.devicesOffline, 1, 'happy: summary counts offline');
+    const detailCalls = f.counters.deviceDetails;
+    await getAllUnifiData(cfg(f.url, LEGACY));
+    assert.strictEqual(f.counters.deviceDetails, detailCalls, 'happy: topology details cached between refreshes');
+
+    const topology = buildUnifiTopology([inst], [{ name: 'ap-snmp', host: '192.168.30.4', online: true }]);
+    const topologyByLabel = Object.fromEntries(topology.nodes.map(node => [node.label, node]));
+    assert.strictEqual(topologyByLabel['sw-rack-1'].parentRef, topologyByLabel['gw-office'].ref, 'topology: gateway -> switch');
+    assert.strictEqual(topologyByLabel['ap-frontdesk'].parentRef, topologyByLabel['sw-rack-1'].ref, 'topology: switch -> AP');
+    assert.strictEqual(topologyByLabel['ap-frontdesk'].ref, 'snmp:ap-snmp', 'topology: matching SNMP device reuses one node');
+    assert.strictEqual(topologyByLabel['ap-frontdesk'].status, 'warn', 'topology: updating devices are degraded, not down');
+    assert.deepStrictEqual(topology.matchedSnmpRefs, ['snmp:ap-snmp'], 'topology: matched SNMP row suppressed');
     await f.close();
   }
 

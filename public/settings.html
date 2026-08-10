@@ -3502,12 +3502,13 @@ function agentCmds() {
   const synology = amKind === 'docker' && !!document.getElementById('am-synology')?.checked;
   const dockerBin = synology ? 'sudo /usr/local/bin/docker' : 'docker';
   const psTLS = insecure ? '; $env:OMNISIGHT_INSECURE_TLS="1"' : '';
+  const psTLS12 = '[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12;';
   return {
     binary: amKind === 'windows'
-      ? `$env:OMNISIGHT_URL="${base}"; $env:OMNISIGHT_TOKEN="${token}"; $env:OMNISIGHT_AGENT_ROLE="windows"${psTLS}; iwr -UseBasicParsing "${base}/agent/install-windows.ps1" | iex`
+      ? `${psTLS12} $env:OMNISIGHT_URL="${base}"; $env:OMNISIGHT_TOKEN="${token}"; $env:OMNISIGHT_AGENT_ROLE="windows"${psTLS}; iwr -UseBasicParsing "${base}/agent/install-windows.ps1" | iex`
       : `curl -fsSL${curlTLS} ${base}/agent/install.sh | sudo OMNISIGHT_URL=${base} OMNISIGHT_TOKEN=${token} OMNISIGHT_AGENT_ROLE=${role}${envTLS} bash`,
     uninstall: amKind === 'windows'
-      ? `iwr -UseBasicParsing "${base}/agent/install-windows.ps1" | iex; Uninstall-OmniSightAgent`
+      ? `${psTLS12} iwr -UseBasicParsing "${base}/agent/install-windows.ps1" | iex; Uninstall-OmniSightAgent`
       : `curl -fsSL${curlTLS} ${base}/agent/install.sh | sudo${sudoTLS} bash -s uninstall`,
     docker: `${dockerBin} run -d --name omnisight-agent --restart unless-stopped \\
   --network host --pid host \\
