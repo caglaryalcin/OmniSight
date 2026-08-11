@@ -2595,7 +2595,7 @@ function miniSparkline(data, key, current, colorFn = bchex, maxScale = 100, unit
 function pveHeadStat(label, value, color = 'var(--text)', spark = '', extraClass = '') {
   if (value === null || value === undefined || value === '') return '';
   const cls = [extraClass, spark ? 'has-spark' : ''].filter(Boolean).join(' ');
-  return `<div class="pve-head-stat ${cls}" title="${escAttr(`${label}: ${value}`)}">
+  return `<div class="pve-head-stat ${cls}" data-morph-key="${escAttr(`stat:${label}`)}" title="${escAttr(`${label}: ${value}`)}">
     <div class="pve-head-text"><div class="pve-head-val" style="color:${color}">${escHtml(value)}</div><div class="pve-head-lbl">${escHtml(label)}</div></div>
     ${spark}
   </div>`;
@@ -2948,9 +2948,10 @@ function buildLinux(linux){
   const rebootCount = linux.filter(s=>s.online && s.updates?.rebootRequired).length;
   const updateAttention = updateCount > 0 || rebootCount > 0;
   const allOk = realLinux.length > 0 && realLinux.every(s=>s.online && s.services?.every(sv=>sv.active || sv.excluded) && !Number(s.updates?.count || 0) && !s.updates?.rebootRequired);
-  const failed = linux.flatMap(s=>s.services||[]).filter(s=>!s.active&&s.state!=='unknown'&&!s.excluded).length;
-  const totalSvcs = linux.flatMap(s=>s.services||[]).length;
-  const upSvcs   = linux.flatMap(s=>s.services||[]).filter(s=>s.active).length;
+  const allServices = linux.flatMap(s=>s.services||[]);
+  const failed = allServices.filter(s=>!s.active&&s.state!=='unknown'&&!s.excluded).length;
+  const totalSvcs = allServices.length;
+  const upSvcs = allServices.filter(s=>s.active).length;
   const reachable = linux.filter(s=>s.online).length;
   const cpuVals = linux.filter(s=>s.online&&s.cpu!=null).map(s=>s.cpu);
   const ramVals = linux.filter(s=>s.online&&s.ram).map(s=>s.ram.percent);
@@ -2967,7 +2968,7 @@ function buildLinux(linux){
     ${cpuM?`<div class="sb-csum-item"><div class="sb-csum-val" style="color:${cpuM.color}">${cpuM.val}</div><div class="sb-csum-lbl">CPU usage</div></div>`:''}
     ${ramM?`<div class="sb-csum-item"><div class="sb-csum-val" style="color:${ramM.color}">${ramM.val}</div><div class="sb-csum-lbl">RAM usage</div></div>`:''}
     <div class="sb-csum-item"><div class="sb-csum-val">${upSvcs}/${totalSvcs}</div><div class="sb-csum-lbl">Services up</div></div>
-    ${updateAttention?`<div class="sb-csum-item"><div class="sb-csum-val" style="color:var(--yellow)">${updateCount}</div><div class="sb-csum-lbl">Updates</div></div>`:''}
+    ${updateAttention?`<div class="sb-csum-item agent-update-summary" data-morph-key="summary:updates"><div class="sb-csum-val" style="color:var(--yellow)">${updateCount}</div><div class="sb-csum-lbl">Updates</div></div>`:''}
   </div>`;
 
   const summaryHtml = `<div class="csum">
@@ -3025,8 +3026,8 @@ function buildLinux(linux){
       };
     }) : [];
     const ptag = srv.platform && srv.platform!=='linux' ? ` <span class="badge bg-blue" style="font-size:10px;padding:1px 7px">${srv.platform}</span>` : '';
-    const srvSvcTotal = (srv.services || []).filter(s => !s.excluded).length;
-    const srvSvcUp = (srv.services || []).filter(s => s.active && !s.excluded).length;
+    const srvSvcTotal = (srv.services || []).length;
+    const srvSvcUp = (srv.services || []).filter(s => s.active).length;
     const srvUpdates = Number(srv.updates?.count || 0);
     const srvReboot = !!srv.updates?.rebootRequired;
     const srvAttention = srvUpdates > 0 || srvReboot;
@@ -3040,7 +3041,7 @@ function buildLinux(linux){
       pveHeadStat('Disk I/O', diskIOTxt || '--', diskIOTxt ? 'var(--cyan)' : 'var(--muted)', diskIOMbps != null ? miniSparkline(diskIOHistory, 'diskIOMbps', diskIOMbps, rateColor, rateSparkMax(diskIOHistory, 'diskIOMbps', diskIOMbps), ' MB/s', 'Disk I/O') : ''),
       srv.temp != null ? pveHeadStat('Temp', `${srv.temp}°C`, tempColor(srv.temp), miniSparkline(srv.history, 'temp', srv.temp, tempHex, 100, '°C', 'Temperature')) : '',
       srvSvcTotal ? pveHeadStat('Services', `${srvSvcUp}/${srvSvcTotal}`) : '',
-      srv.updates ? pveHeadStat('Updates', srvUpdates, srvUpdates ? 'var(--yellow)' : 'var(--green)') : '',
+      srv.updates ? pveHeadStat('Updates', srvUpdates, srvUpdates ? 'var(--yellow)' : 'var(--green)', '', 'agent-update-stat') : '',
       srvReboot ? pveHeadStat('Reboot', 'required', 'var(--yellow)') : '',
       srv.uptime ? pveHeadStat('Uptime', fmtUptime(srv.uptime)) : '',
     ].filter(Boolean).join('');
@@ -3142,6 +3143,7 @@ function buildLinux(linux){
     sbSummary: sbSummaryHtml,
     summary: summaryHtml,
     body,
+    agentUpdateState: { count: updateCount, visible: updateAttention },
   };
 }
 
@@ -3150,9 +3152,10 @@ function buildWindows(windows){
   const connecting = windows.filter(s=>s._connecting).length;
   const real = windows.filter(s=>!s._connecting);
   const reachable = windows.filter(s=>s.online).length;
-  const failed = windows.flatMap(s=>s.services||[]).filter(s=>!s.active&&s.state!=='unknown'&&!s.excluded).length;
-  const totalSvcs = windows.flatMap(s=>s.services||[]).length;
-  const upSvcs = windows.flatMap(s=>s.services||[]).filter(s=>s.active).length;
+  const allServices = windows.flatMap(s=>s.services||[]);
+  const failed = allServices.filter(s=>!s.active&&s.state!=='unknown'&&!s.excluded).length;
+  const totalSvcs = allServices.length;
+  const upSvcs = allServices.filter(s=>s.active).length;
   const updateCount = windows.reduce((sum,s)=>sum+(s.online ? Number(s.updates?.count || 0) : 0),0);
   const rebootCount = windows.filter(s=>s.online && s.updates?.rebootRequired).length;
   const updateAttention = updateCount > 0 || rebootCount > 0;
@@ -3171,7 +3174,7 @@ function buildWindows(windows){
     ${cpuM?`<div class="sb-csum-item"><div class="sb-csum-val" style="color:${cpuM.color}">${cpuM.val}</div><div class="sb-csum-lbl">CPU usage</div></div>`:''}
     ${ramM?`<div class="sb-csum-item"><div class="sb-csum-val" style="color:${ramM.color}">${ramM.val}</div><div class="sb-csum-lbl">RAM usage</div></div>`:''}
     <div class="sb-csum-item"><div class="sb-csum-val">${upSvcs}/${totalSvcs}</div><div class="sb-csum-lbl">Services up</div></div>
-    ${updateAttention?`<div class="sb-csum-item"><div class="sb-csum-val" style="color:var(--yellow)">${updateCount}</div><div class="sb-csum-lbl">Updates</div></div>`:''}
+    ${updateAttention?`<div class="sb-csum-item agent-update-summary" data-morph-key="summary:updates"><div class="sb-csum-val" style="color:var(--yellow)">${updateCount}</div><div class="sb-csum-lbl">Updates</div></div>`:''}
   </div>`;
   const summaryHtml = `<div class="csum">
     <div class="csum-item"><div class="csum-val">${reachable}/${windows.length}</div><div class="csum-lbl">Servers</div></div>
@@ -3220,8 +3223,8 @@ function buildWindows(windows){
       const tx = hasNum(h?.bandwidthTxBps) ? Number(h.bandwidthTxBps) : null;
       return { time: h?.time, bandwidthMbps: (rx != null || tx != null) ? rateToMBps((rx || 0) + (tx || 0)) : null };
     }) : [];
-    const svcTotal = (srv.services || []).filter(s => !s.excluded).length;
-    const svcUp = (srv.services || []).filter(s => s.active && !s.excluded).length;
+    const svcTotal = (srv.services || []).length;
+    const svcUp = (srv.services || []).filter(s => s.active).length;
     const srvUpdates = Number(srv.updates?.count || 0);
     const srvReboot = !!srv.updates?.rebootRequired;
     const srvAttention = srvUpdates > 0 || srvReboot;
@@ -3235,7 +3238,7 @@ function buildWindows(windows){
       diskTotal != null ? pveHeadStat('Disk I/O', fmtRate(diskTotal), 'var(--cyan)', diskIOMbps != null ? miniSparkline(diskHistory.map(h=>({ time:h.time, diskIOMbps:(h.diskReadMBps||0)+(h.diskWriteMBps||0) })), 'diskIOMbps', diskIOMbps, rateColor, rateSparkMax(diskHistory, 'diskReadMBps', diskIOMbps), ' MB/s', 'Disk I/O') : '') : '',
       bwTotal != null ? pveHeadStat('BW', fmtRate(bwTotal), 'var(--green)', bwMbps != null ? miniSparkline(bwHistory, 'bandwidthMbps', bwMbps, ()=>'#34D399', rateSparkMax(bwHistory, 'bandwidthMbps', bwMbps), ' MB/s', 'Bandwidth') : '') : '',
       svcTotal ? pveHeadStat('Services', `${svcUp}/${svcTotal}`) : '',
-      srv.updates ? pveHeadStat('Updates', srvUpdates, srvUpdates ? 'var(--yellow)' : 'var(--green)') : '',
+      srv.updates ? pveHeadStat('Updates', srvUpdates, srvUpdates ? 'var(--yellow)' : 'var(--green)', '', 'agent-update-stat') : '',
       srvReboot ? pveHeadStat('Reboot', 'required', 'var(--yellow)') : '',
       srv.uptime ? pveHeadStat('Uptime', fmtUptime(srv.uptime)) : '',
     ].filter(Boolean).join('');
@@ -3285,6 +3288,7 @@ function buildWindows(windows){
     sbSummary: sbSummaryHtml,
     summary: summaryHtml,
     body,
+    agentUpdateState: { count: updateCount, visible: updateAttention },
   };
 }
 
@@ -7307,7 +7311,10 @@ function sameMorphNode(a, b){
   if(a.tagName !== b.tagName) return false;
   const aid = a.getAttribute('id') || '';
   const bid = b.getAttribute('id') || '';
-  return !aid && !bid ? true : aid === bid;
+  if(aid || bid) return aid === bid;
+  const akey = a.getAttribute('data-morph-key') || '';
+  const bkey = b.getAttribute('data-morph-key') || '';
+  return !akey && !bkey ? true : akey === bkey;
 }
 function syncAttrs(oldEl, newEl){
   [...oldEl.attributes].forEach(attr => {
@@ -7365,6 +7372,17 @@ function morphDetailHtml(detail, html){
   morphChildren(detail, tpl.content);
   restoreDetailScroll(detail, scroll);
   return true;
+}
+
+function agentUpdateDetailConsistent(detail, panel){
+  const state = panel?.agentUpdateState;
+  if(!state) return true;
+  const expected = Number(state.count || 0);
+  const rowTotal = [...detail.querySelectorAll('.det-body .agent-update-stat .pve-head-val')]
+    .reduce((sum, el) => sum + (Number(el.textContent) || 0), 0);
+  const summary = detail.querySelector('.det-platform-summary .agent-update-summary .sb-csum-val');
+  const summaryTotal = summary ? Number(summary.textContent) : null;
+  return rowTotal === expected && (state.visible ? summaryTotal === expected : summary === null);
 }
 
 function panelDetailHtml(panel){
@@ -7441,6 +7459,11 @@ function selectPanel(id, opts = {}){
   const html = panelDetailHtml(panel);
   const canSoftPatch = opts.soft && !wasEmbedOpen && detail.dataset.panelId === id && detail.dataset.panelHtml !== html;
   if(canSoftPatch && morphDetailHtml(detail, html)){
+    if(!agentUpdateDetailConsistent(detail, panel)){
+      const scroll = captureDetailScroll(detail);
+      detail.innerHTML = html;
+      restoreDetailScroll(detail, scroll);
+    }
     detail.dataset.panelHtml = html;
   } else if(wasEmbedOpen || detail.dataset.panelId !== id || detail.dataset.panelHtml !== html){
     detail.innerHTML = html;
