@@ -56,6 +56,8 @@ async function main() {
 
   // 7) Open-issue regressions and collector fixtures
   await require('./ci-smoke-issues').run();
+
+  await require('./ci-smoke-demo').run();
 }
 
 main().catch(err => { console.error(err); process.exit(1); });

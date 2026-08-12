@@ -21,7 +21,10 @@ app.use((req, res, next) => {
 });
 
 function demoAppVersion() {
-  try { return require('./package.json').version || '1.0.0'; }
+  try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf8'));
+    return String(pkg.version || '').trim() || '1.0.0';
+  }
   catch { return '1.0.0'; }
 }
 function demoVersionedStaticRequest(req) {
@@ -37,7 +40,7 @@ function setDemoStaticCacheHeaders(res, filePath = '', req = null) {
   }
   if (/\.html$/i.test(filePath)) {
     if (demoVersionedStaticRequest(req)) res.setHeader('Cache-Control', 'private, max-age=31536000, immutable');
-    else res.setHeader('Cache-Control', 'private, max-age=60, stale-while-revalidate=300');
+    else res.setHeader('Cache-Control', 'private, no-cache, must-revalidate');
     res.removeHeader('Pragma');
     res.removeHeader('Expires');
     return;
@@ -1404,7 +1407,7 @@ app.get(['/healthz', '/api/healthz'], (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   res.json({ ok: true, demo: true, version: demoAppVersion(), uptime: Math.round(process.uptime()), timestamp: nowIso() });
 });
-app.get('/api/about', (req, res) => res.json({ name: 'OmniSight Demo', version: require('./package.json').version, demo: true }));
+app.get('/api/about', (req, res) => res.json({ name: 'OmniSight Demo', version: demoAppVersion(), demo: true }));
 app.get('/api/update-check', (req, res) => res.json({ updateAvailable: false }));
 app.get('/api/auth-status', (req, res) => {
   const authenticated = demoAuthenticated(req);
@@ -1667,4 +1670,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { app, demoStatus, demoConfig, topologyData };
+module.exports = { app, demoStatus, demoConfig, topologyData, demoAppVersion };
