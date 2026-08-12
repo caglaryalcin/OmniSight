@@ -810,22 +810,22 @@ html[data-theme="light"] body.rail-collapsed .shell .sb-card.active{background:#
 .overview-card .csum{border-bottom:1px solid var(--border);padding:10px;background:rgba(0,0,0,.08);grid-template-columns:repeat(auto-fit,minmax(92px,1fr))}
 .overview-card .csum-item{min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
 .overview-card .hc-csum .csum-item{padding:9px 10px;align-items:center;justify-content:center}
-.overview-card .sb-csum{display:grid;grid-template-columns:repeat(auto-fit,minmax(70px,1fr));gap:0;padding:10px 14px 8px;border-bottom:0;background:transparent;text-align:center;min-height:66px}
-.overview-card .sb-csum-item{min-width:0;min-height:48px;padding:7px 8px;display:flex;flex-direction:column;align-items:center!important;justify-content:center!important;gap:3px;border:1px solid var(--border);background:transparent!important;border-radius:0;text-align:center;margin:-1px 0 0 -1px}
-.overview-card .sb-csum-val{font-size:20px;line-height:1;font-weight:850;white-space:nowrap;overflow:visible;text-overflow:clip}
-.overview-card .sb-csum-lbl{font-size:10px;line-height:1;margin-top:0;min-height:0;display:block;letter-spacing:.06em;white-space:nowrap}
-.overview-card[data-id="proxmox"] .pve-sb-csum{grid-template-columns:repeat(auto-fit,minmax(78px,1fr));padding-left:10px;padding-right:10px}
+.overview-card .sb-csum{display:flex;flex-wrap:nowrap;gap:0;padding:10px 14px 8px;border-bottom:0;background:transparent;text-align:center;min-height:66px;overflow:hidden}
+.overview-card .sb-csum-item{flex:1 1 max-content;min-width:0;min-height:48px;padding:7px 2px;display:flex;flex-direction:column;align-items:center!important;justify-content:center!important;gap:3px;border:1px solid var(--border);background:transparent!important;border-radius:0;text-align:center;margin:-1px 0 0 -1px}
+.overview-card .sb-csum-val{font-size:19px;line-height:1;font-weight:850;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.overview-card .sb-csum-lbl{font-size:9.5px;line-height:1;margin-top:0;min-height:0;max-width:100%;display:block;letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.overview-card[data-id="proxmox"] .pve-sb-csum{padding-left:10px;padding-right:10px}
 .overview-card[data-id="proxmox"] .pve-sb-csum .sb-csum-item{min-height:48px;padding-left:6px;padding-right:6px}
-.overview-card[data-id="proxmox"] .pve-sb-csum .sb-csum-val{font-size:19px;max-width:none;overflow:visible}
+.overview-card[data-id="proxmox"] .pve-sb-csum .sb-csum-val{font-size:19px}
 .overview-card[data-id="proxmox"] .pve-sb-csum .sb-csum-lbl{font-size:10px}
 .overview-card[data-id="docker"] .sb-csum,
-.overview-card[data-id="dockhand"] .sb-csum{grid-template-columns:repeat(auto-fit,minmax(78px,1fr));grid-auto-flow:row;grid-auto-columns:auto;padding-left:10px;padding-right:10px;overflow:visible}
+.overview-card[data-id="dockhand"] .sb-csum{padding-left:10px;padding-right:10px}
 .overview-card[data-id="docker"] .sb-csum-item,
-.overview-card[data-id="dockhand"] .sb-csum-item{min-height:48px;padding-left:6px;padding-right:6px;overflow:visible}
+.overview-card[data-id="dockhand"] .sb-csum-item{min-height:48px;padding-left:6px;padding-right:6px}
 .overview-card[data-id="docker"] .sb-csum-val,
-.overview-card[data-id="dockhand"] .sb-csum-val{font-size:clamp(16px,1.2vw,20px);max-width:none;overflow:visible;text-overflow:clip}
+.overview-card[data-id="dockhand"] .sb-csum-val{font-size:clamp(16px,1.2vw,20px)}
 .overview-card[data-id="docker"] .sb-csum-lbl,
-.overview-card[data-id="dockhand"] .sb-csum-lbl{font-size:clamp(8px,.62vw,10px);line-height:1.15;letter-spacing:.035em;max-width:100%;overflow:visible;text-overflow:clip}
+.overview-card[data-id="dockhand"] .sb-csum-lbl{font-size:clamp(8px,.62vw,10px);line-height:1.15;letter-spacing:.035em}
 html[data-theme="light"] .overview-card .csum-item{background:#eef1f6;border-color:#c9d5e5}
 html[data-theme="light"] .overview-card[data-id="healthchecks"] .sb-csum,
 html[data-theme="light"] .overview-card[data-id="database"] .sb-csum{background:transparent}
@@ -859,6 +859,12 @@ html[data-theme="light"] .overview-card .sb-csum-item{background:transparent!imp
 .overview-nested-title:first-child{border-top:0}
 .overview-nested-title .mon-dot{width:7px;height:7px;margin:0}
 .overview-nested-title span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@container (max-width:360px){
+  .overview-card .sb-csum{padding-left:6px;padding-right:6px}
+  .overview-card .sb-csum-item{padding-left:1px;padding-right:1px}
+  .overview-card .sb-csum-val{font-size:16px}
+  .overview-card .sb-csum-lbl{font-size:8px;letter-spacing:.01em}
+}
 @container (max-width:300px){
   .overview-card-h{grid-template-columns:28px minmax(0,1fr) 18px 24px;grid-template-rows:auto auto;column-gap:8px}
   .overview-card-h>.overview-icon{grid-column:1;grid-row:1 / span 2}
@@ -869,10 +875,10 @@ html[data-theme="light"] .overview-card .sb-csum-item{background:transparent!imp
   .overview-meta{flex-direction:column;align-items:flex-start;white-space:normal;overflow:visible;text-overflow:clip;gap:1px}
   .overview-meta-part{max-width:100%;overflow:hidden;text-overflow:ellipsis}
   .overview-meta-part+.overview-meta-part::before{display:none}
-  .overview-card .sb-csum{grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-flow:row;grid-auto-columns:auto;overflow:visible}
-  .overview-card .sb-csum-item{padding-left:6px;padding-right:6px;overflow:visible}
-  .overview-card .sb-csum-val{max-width:none;overflow:visible;font-size:19px}
-  .overview-card .sb-csum-lbl{white-space:normal;overflow:visible;overflow-wrap:anywhere;line-height:1.15}
+  .overview-card .sb-csum{padding-left:4px;padding-right:4px}
+  .overview-card .sb-csum-item{padding-left:0;padding-right:0}
+  .overview-card .sb-csum-val{font-size:14px}
+  .overview-card .sb-csum-lbl{font-size:7px;letter-spacing:0}
 }
 .cmdk-backdrop{position:fixed;inset:0;z-index:3200;background:rgba(0,0,0,.42);backdrop-filter:blur(7px);display:none;align-items:flex-start;justify-content:center;padding:82px 18px 18px}
 .cmdk-backdrop.open{display:flex}
@@ -3051,7 +3057,7 @@ function buildLinux(linux){
         <div class="pve-head-main">
           <div class="pve-head-title">
             <div class="node-name">${escHtml(srv.name)}${ptag}</div>
-            <div class="pve-head-sub">${svcFailed ? `${svcFailed} failed` : srvReboot ? 'reboot required' : srvUpdates ? `${srvUpdates} updates` : 'online'}</div>
+            <div class="pve-head-sub">${svcFailed ? `${svcFailed} failed` : srvReboot ? 'reboot required' : 'online'}</div>
           </div>
           ${linuxStats}
         </div>
@@ -3248,7 +3254,7 @@ function buildWindows(windows){
         <div class="pve-head-main">
           <div class="pve-head-title">
             <div class="node-name">${escHtml(srv.name)}</div>
-            <div class="pve-head-sub">${svcFailed ? `${svcFailed} failed` : srvReboot ? 'reboot required' : srvUpdates ? `${srvUpdates} updates` : 'online'}</div>
+            <div class="pve-head-sub">${svcFailed ? `${svcFailed} failed` : srvReboot ? 'reboot required' : 'online'}</div>
           </div>
           ${stats}
         </div>
@@ -5843,14 +5849,45 @@ function orderedDashboardIds(ids){
 function overviewLayoutKey(){
   return dashboardSidePanelVisible(window._lastData) ? 'side' : 'wide';
 }
-function getOverviewLayout(){
+const overviewResponsiveLayouts = {};
+const overviewCanonicalOrders = {};
+function overviewResponsiveLayoutKey(colCount){
+  return `${overviewLayoutKey()}:${Math.max(1, Number(colCount) || 1)}`;
+}
+function rememberOverviewLayout(cols, colCount){
+  overviewResponsiveLayouts[overviewResponsiveLayoutKey(colCount)] = cols.map(col => [...col]);
+}
+function clearOverviewResponsiveLayouts(){
+  const prefix = `${overviewLayoutKey()}:`;
+  Object.keys(overviewResponsiveLayouts).forEach(key => {
+    if(key.startsWith(prefix)) delete overviewResponsiveLayouts[key];
+  });
+}
+function stableOverviewIds(ids){
+  const key = overviewLayoutKey();
+  const preferred = overviewCanonicalOrders[key] || getDashboardPanelOrder();
+  const ordered = orderIds(ids, preferred);
+  overviewCanonicalOrders[key] = [...preferred, ...ordered.filter(id => !preferred.includes(id))];
+  return ordered;
+}
+function getOverviewLayout(colCount){
+  const responsive = overviewResponsiveLayouts[overviewResponsiveLayoutKey(colCount)];
+  if(Array.isArray(responsive)) return responsive;
   const v = overviewLayouts?.[overviewLayoutKey()];
-  return Array.isArray(v) ? v : [];
+  if(Array.isArray(v) && v.length === colCount) return v;
+  return [];
 }
 function saveOverviewLayout(grid){
   const cols = [...grid.querySelectorAll('.overview-col')].map(col => [...col.querySelectorAll('.overview-card')].map(c => c.dataset.id));
-  overviewLayouts = { ...(overviewLayouts || {}), [overviewLayoutKey()]: cols };
-  saveDashboardPanelOrder(cols.flat());
+  const key = overviewLayoutKey();
+  const visibleOrder = cols.flat();
+  const previousOrder = overviewCanonicalOrders[key] || getDashboardPanelOrder();
+  const completeOrder = [...visibleOrder, ...previousOrder.filter(id => !visibleOrder.includes(id))];
+  overviewLayouts = { ...(overviewLayouts || {}), [key]: cols };
+  overviewCanonicalOrders[key] = completeOrder;
+  clearOverviewResponsiveLayouts();
+  rememberOverviewLayout(cols, cols.length);
+  saveDashboardPanelOrder(completeOrder);
 }
 function overviewColCount(grid){
   const cols = getComputedStyle(grid).gridTemplateColumns
@@ -5861,11 +5898,12 @@ function overviewColCount(grid){
 }
 function normalizeOverviewColumns(ids, colCount, fallbackCards = []){
   normalizeOverviewColumns.repaired = false;
-  const idSet = new Set(ids);
+  const orderedIds = stableOverviewIds(ids);
+  const idSet = new Set(orderedIds);
   const seen = new Set();
-  let saved = getOverviewLayout().slice(0, colCount).map(col => Array.isArray(col) ? col.filter(id => idSet.has(id) && !seen.has(id) && seen.add(id)) : []);
+  let saved = getOverviewLayout(colCount).slice(0, colCount).map(col => Array.isArray(col) ? col.filter(id => idSet.has(id) && !seen.has(id) && seen.add(id)) : []);
   while(saved.length < colCount) saved.push([]);
-  let missing = ids.filter(id => !seen.has(id));
+  let missing = orderedIds.filter(id => !seen.has(id));
   if(saved.some(col => col.length)){
     const nonEmptyCols = saved.filter(col => col.length).length;
     const savedCount = saved.reduce((sum, col) => sum + col.length, 0);
@@ -5915,15 +5953,31 @@ function layoutOverviewMasonry(force = false){
     }
   }));
   grid.replaceChildren(...colEls);
-  if(normalizeOverviewColumns.repaired) saveOverviewLayout(grid);
+  rememberOverviewLayout(columns, colCount);
 }
 function initOverviewDrag(){
   const grid = document.querySelector('.overview-grid');
   if(!grid || grid.dataset.dragReady) return;
   grid.dataset.dragReady = '1';
+  if(window._overviewResizeObserver){
+    window._overviewResizeObserver.disconnect();
+    window._overviewResizeObserver = null;
+  }
+  if(window._overviewResizeFrame){
+    cancelAnimationFrame(window._overviewResizeFrame);
+    window._overviewResizeFrame = 0;
+  }
   if('ResizeObserver' in window){
-    const ro = new ResizeObserver(() => layoutOverviewMasonry());
+    if(window._overviewResizeHandler) window.removeEventListener('resize', window._overviewResizeHandler);
+    const ro = new ResizeObserver(() => {
+      if(window._overviewResizeFrame) return;
+      window._overviewResizeFrame = requestAnimationFrame(() => {
+        window._overviewResizeFrame = 0;
+        layoutOverviewMasonry();
+      });
+    });
     ro.observe(grid);
+    window._overviewResizeObserver = ro;
     grid._overviewResizeObserver = ro;
   }else{
     if(window._overviewResizeHandler) window.removeEventListener('resize', window._overviewResizeHandler);

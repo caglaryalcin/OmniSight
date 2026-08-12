@@ -355,8 +355,9 @@ function testStaticRegressions() {
   assert.ok(dashboard.includes('function overviewMetaHtml(meta)'), 'overview metadata must be rendered as separate metrics');
   assert.ok(dashboard.includes('.overview-meta-part+.overview-meta-part::before'), 'wide overview metadata must keep its separator');
   assert.ok(dashboard.includes('.overview-meta{flex-direction:column;align-items:flex-start'), 'narrow overview metadata must wrap each metric onto its own line');
-  assert.ok(dashboard.includes('grid-template-columns:repeat(auto-fit,minmax(78px,1fr))'), 'dense overview summaries must adapt their column count');
-  assert.ok(dashboard.includes('.overview-card .sb-csum{grid-template-columns:repeat(2,minmax(0,1fr))'), 'narrow overview summaries must use two readable columns');
+  assert.ok(dashboard.includes('.overview-card .sb-csum{display:flex;flex-wrap:nowrap'), 'overview summary metrics must remain on one row');
+  assert.ok(dashboard.includes('flex:1 1 max-content'), 'overview summary widths must adapt to their content');
+  assert.ok(dashboard.includes('overviewResponsiveLayoutKey') && dashboard.includes('stableOverviewIds'), 'responsive resizing must preserve the dashboard card order');
   assert.ok(dashboard.includes("const storageKnown = inst.available?.storage !== false"), 'unavailable QNAP storage metrics must not be displayed as zero');
   assert.ok(dashboard.includes("const disksKnown = inst.available?.disks !== false"), 'unavailable QNAP disk metrics must not be displayed as zero');
   assert.ok(settings.includes('The monitoring account must belong to the QNAP administrators group'), 'QNAP metric permissions must be documented in settings');
