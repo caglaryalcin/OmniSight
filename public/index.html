@@ -4155,9 +4155,11 @@ function uptimeKumaHealth(uk){
   const up = Number(s.up || 0);
   const down = Number(s.down || 0);
   const warn = Number(s.pending || 0) + Number(s.unknown || 0);
-  if(down > 0) return up > 0
-    ? { state:'degraded', badgeCls:'yellow', label:'degraded' }
-    : { state:'down', badgeCls:'red', label:`${down} down` };
+  if(down > 0) return {
+    state: up > 0 ? 'degraded' : 'down',
+    badgeCls: up > 0 ? 'yellow' : 'red',
+    label: `${down} down`,
+  };
   if(warn > 0) return { state:'degraded', badgeCls:'yellow', label:'degraded' };
   return { state:'ok', badgeCls:'green', label:'healthy' };
 }

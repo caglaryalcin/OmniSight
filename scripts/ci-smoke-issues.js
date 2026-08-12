@@ -358,6 +358,8 @@ function testStaticRegressions() {
   assert.ok(dashboard.includes('.overview-card .sb-csum{display:flex;flex-wrap:nowrap'), 'overview summary metrics must remain on one row');
   assert.ok(dashboard.includes('flex:1 1 max-content'), 'overview summary widths must adapt to their content');
   assert.ok(dashboard.includes('overviewResponsiveLayoutKey') && dashboard.includes('stableOverviewIds'), 'responsive resizing must preserve the dashboard card order');
+  const uptimeKumaHealthSource = dashboard.slice(dashboard.indexOf('function uptimeKumaHealth'), dashboard.indexOf('function buildUptimeKuma'));
+  assert.ok(uptimeKumaHealthSource.includes("label: `${down} down`"), 'Uptime Kuma degradation badges must show the number of down monitors');
   assert.ok(dashboard.includes("const storageKnown = inst.available?.storage !== false"), 'unavailable QNAP storage metrics must not be displayed as zero');
   assert.ok(dashboard.includes("const disksKnown = inst.available?.disks !== false"), 'unavailable QNAP disk metrics must not be displayed as zero');
   assert.ok(settings.includes('The monitoring account must belong to the QNAP administrators group'), 'QNAP metric permissions must be documented in settings');
