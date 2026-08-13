@@ -11,7 +11,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-const BLOCKS = ['fmtChartValue', 'offlineRatioLabel', 'offlineRatioBadgeClass'];
+const BLOCKS = ['fmtChartValue', 'localizeOperationalText', 'offlineRatioLabel', 'offlineRatioBadgeClass'];
 
 function extract(source, name) {
   const begin = `/* ci-extract:begin ${name} */`;
@@ -28,7 +28,17 @@ function run() {
   const ctx = {};
   vm.createContext(ctx);
   vm.runInContext(BLOCKS.map(name => extract(html, name)).join('\n'), ctx);
-  const { fmtChartValue, offlineRatioLabel, offlineRatioBadgeClass } = ctx;
+  const { fmtChartValue, localizeOperationalText, offlineRatioLabel, offlineRatioBadgeClass } = ctx;
+
+  const translations = { healthy: 'sağlıklı' };
+  const translateText = text => translations[text] || text;
+  assert.strictEqual(localizeOperationalText('healthy', 'tr', translateText), 'sağlıklı');
+  assert.strictEqual(localizeOperationalText('3/3 online', 'tr', translateText), '3/3 çevrimiçi');
+  assert.strictEqual(localizeOperationalText('16/16 up', 'tr', translateText), '16/16 aktif');
+  assert.strictEqual(localizeOperationalText('2/2 servers', 'tr', translateText), '2/2 sunucu');
+  assert.strictEqual(localizeOperationalText('1 reboot required', 'tr', translateText), '1 yeniden başlatma gerekli');
+  assert.strictEqual(localizeOperationalText('3/3 online', 'en', translateText), '3/3 online');
+  assert.strictEqual(localizeOperationalText('download', 'tr', translateText), 'download');
 
   assert.strictEqual(offlineRatioLabel(1, 1), 'Offline');
   assert.strictEqual(offlineRatioLabel(1, 2), '1/2 Online');
@@ -76,7 +86,28 @@ function run() {
     assert.strictEqual(fmtChartValue(bad), '--', `non-numeric ${String(bad)} -> --`);
   }
 
-  console.log('smoke ok — client helpers: fmtChartValue, offlineRatioLabel');
+  const prefetchStart = html.indexOf('let embedPrefetchStarted = false;');
+  const prefetchEnd = html.indexOf('let demoEmbedWarmupStarted = false;', prefetchStart);
+  assert.ok(prefetchStart >= 0 && prefetchEnd > prefetchStart, 'embed prefetch block must be extractable');
+  for (const options of [{ immediate: true }, undefined]) {
+    const prefetchContext = {
+      navigator: { connection: null },
+      document: {
+        querySelector: () => null,
+        querySelectorAll: () => [],
+        createElement: () => ({ dataset: {} }),
+        head: { appendChild: () => {} },
+      },
+      window: { requestIdleCallback: fn => fn() },
+      requestIdleCallback: fn => fn(),
+      setTimeout: fn => fn(),
+    };
+    vm.createContext(prefetchContext);
+    vm.runInContext(html.slice(prefetchStart, prefetchEnd), prefetchContext);
+    assert.doesNotThrow(() => prefetchContext.scheduleEmbedPrefetch(options), 'embed prefetch scheduling must run without undefined options');
+  }
+
+  console.log('smoke ok — client helpers: fmtChartValue, localization, availability');
 }
 
 module.exports = { run };

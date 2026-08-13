@@ -85,6 +85,7 @@ html[data-theme="light"] .tab.active{background:#edf4ff;color:var(--text)}
     <div class="search-empty" id="search-empty">No matching sections.</div>
   </aside>
 </main>
+<script src="/i18n.js"></script>
 <script>
 function applyTheme(theme){
   const t = theme === 'light' ? 'light' : 'dark';
@@ -93,14 +94,33 @@ function applyTheme(theme){
 window.addEventListener('message', event => {
   if(event.origin !== location.origin) return;
   if(event.data?.type === 'omnisight-theme') applyTheme(event.data.theme);
+  if(event.data?.type === 'omnisight-language') loadDocumentation(event.data.lang || 'en');
 });
 window.addEventListener('storage', event => {
   if(event.key === 'os_theme') applyTheme(event.newValue);
+  if(event.key === 'os_lang') loadDocumentation(event.newValue || 'en');
 });
 function authHeaders(){ const t=sessionStorage.getItem('os_token')||localStorage.getItem('os_token'); return t?{'x-session-token':t}:{}; }
 function handleUnauth(r){ if(r.status===401 || (r.redirected && r.url.includes('/login'))){ sessionStorage.removeItem('os_token'); localStorage.removeItem('os_token'); document.cookie='session=; path=/; max-age=0'; (window.top || window).location.href='/login'; throw new Error('Unauthorized'); } }
 function esc(s){ return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-function slug(s){ return String(s || '').toLowerCase().replace(/`/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'') || 'section'; }
+function slug(s){ return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/ı/g,'i').replace(/`/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'') || 'section'; }
+function currentLang(){ return window.OmniI18n?.currentLang('en') || 'en'; }
+function trText(text, lang = currentLang()){ return window.OmniI18n?.t(text, lang) || text; }
+function normalizeDocsLang(lang){
+  const clean = String(lang || 'en').trim().toLowerCase().replace(/_/g,'-').replace(/[^a-z0-9-]/g,'');
+  return clean || 'en';
+}
+function documentationUiLang(lang){
+  const requested = normalizeDocsLang(lang);
+  const base = requested.split('-')[0];
+  if(window.OmniI18n?.locales?.[requested]) return requested;
+  if(window.OmniI18n?.locales?.[base]) return base;
+  return 'en';
+}
+function applyDocumentationChrome(lang = currentLang()){
+  document.title = `OmniSight - ${trText('Documentation', lang)}`;
+  window.OmniI18n?.apply(document, lang);
+}
 function inline(s){
   return esc(s)
     .replace(/`([^`]+)`/g,'<code>$1</code>')
@@ -191,7 +211,7 @@ function renderTabs(heads){
   });
   const input = document.getElementById('doc-search');
   const empty = document.getElementById('search-empty');
-  input.addEventListener('input', () => {
+  input.oninput = () => {
     const q = input.value.trim().toLowerCase();
     let visible = 0;
     document.querySelectorAll('.tab').forEach(tab => {
@@ -200,40 +220,86 @@ function renderTabs(heads){
       if(hit) visible++;
     });
     empty.classList.toggle('show', visible === 0);
-  });
-  input.addEventListener('keydown', event => {
+  };
+  input.onkeydown = event => {
     if(event.key !== 'Enter') return;
     const first = document.querySelector('.tab:not(.hidden)');
     if(first) first.click();
-  });
+  };
 }
+let documentationObserver = null;
 function activateTabs(){
+  documentationObserver?.disconnect();
   const tabs = new Map([...document.querySelectorAll('.tab')].map(tab => [tab.getAttribute('href').slice(1), tab]));
   function setActive(id){ document.querySelectorAll('.tab.active').forEach(t => t.classList.remove('active')); tabs.get(id)?.classList.add('active'); }
-  const observer = new IntersectionObserver(entries => {
+  documentationObserver = new IntersectionObserver(entries => {
     const visible = entries.filter(e => e.isIntersecting).sort((a,b) => b.intersectionRatio - a.intersectionRatio)[0];
     if(visible) setActive(visible.target.id);
   }, { rootMargin:'-12% 0px -70% 0px', threshold:[0, .2, .5, 1] });
   document.querySelectorAll('.doc h2').forEach(h => {
-    if(h && h.nodeType === 1) observer.observe(h);
+    if(h && h.nodeType === 1) documentationObserver.observe(h);
   });
-  setActive((location.hash || '#1-overview').slice(1));
+  setActive((location.hash || document.querySelector('.tab')?.getAttribute('href') || '').replace(/^#/,''));
 }
-(async()=>{
+async function fetchDocumentation(lang){
+  const requested = normalizeDocsLang(lang);
+  const base = requested.split('-')[0];
+  const candidates = [...new Set([requested, base, 'en'].filter(Boolean))];
+  let lastError = null;
+  for(const candidate of candidates){
+    try{
+      const r = await fetch(`/docs/${encodeURIComponent(candidate)}.txt`, { headers:authHeaders(), cache:'no-store' });
+      handleUnauth(r);
+      if(r.status === 404) continue;
+      if(!r.ok) throw new Error(r.statusText || trText('Could not load documentation', requested));
+      return { lang:candidate, markdown:await r.text() };
+    }catch(error){
+      if(error?.message === 'Unauthorized') throw error;
+      lastError = error;
+    }
+  }
+  throw lastError || new Error(trText('Could not load documentation', requested));
+}
+function currentSectionNumber(){
+  return (location.hash.match(/^#(\d+)-/) || [])[1] || '';
+}
+let documentationLoadSequence = 0;
+let loadedDocumentationLang = '';
+async function loadDocumentation(lang = currentLang()){
+  const requested = normalizeDocsLang(lang);
+  const uiLang = documentationUiLang(requested);
+  window.OmniI18n?.setLang?.(uiLang);
+  const sequence = ++documentationLoadSequence;
+  const sectionNumber = currentSectionNumber();
+  const doc = document.getElementById('doc');
+  doc.innerHTML = `<div class="loading">${esc(trText('Loading documentation...', uiLang))}</div>`;
+  applyDocumentationChrome(uiLang);
   try{
-    const r = await fetch('/docs.md', { headers: authHeaders(), cache:'no-store' });
-    handleUnauth(r);
-    if(!r.ok) throw new Error(r.statusText || 'Could not load documentation');
-    const md = await r.text();
-    const rendered = renderMarkdown(md);
-    document.getElementById('doc').innerHTML = rendered.html;
+    const pack = await fetchDocumentation(requested);
+    if(sequence !== documentationLoadSequence) return;
+    const rendered = renderMarkdown(pack.markdown);
+    doc.innerHTML = rendered.html;
     renderTabs(rendered.heads);
     activateTabs();
-    if(location.hash && document.querySelector(location.hash)) setTimeout(() => document.querySelector(location.hash).scrollIntoView(), 0);
+    loadedDocumentationLang = pack.lang;
+    applyDocumentationChrome(uiLang);
+    let target = null;
+    if(location.hash){
+      try{ target = document.getElementById(decodeURIComponent(location.hash.slice(1))); }catch(e){}
+    }
+    if(!target && sectionNumber) target = [...document.querySelectorAll('.doc h2')].find(h => h.textContent.trim().startsWith(`${sectionNumber}.`));
+    if(target){
+      history.replaceState(null, '', `#${target.id}`);
+      setTimeout(() => target.scrollIntoView(), 0);
+    }
   }catch(e){
-    document.getElementById('doc').innerHTML = `<div class="err">${esc(e.message || e)}</div>`;
+    if(sequence !== documentationLoadSequence) return;
+    doc.innerHTML = `<div class="err">${esc(e.message || e)}</div>`;
   }
-})();
+}
+window.applyLanguage = loadDocumentation;
+applyDocumentationChrome(currentLang());
+loadDocumentation(currentLang());
 </script>
 </body>
 </html>

@@ -1102,6 +1102,11 @@ html[data-theme="light"] .overview-card .sb-csum-item{background:transparent!imp
 <script>
 const INTERVAL = 15000;
 const APP_VERSION = __OMNISIGHT_VERSION_JSON__;
+const EMBED_VERSIONS = Object.freeze(
+  typeof __OMNISIGHT_EMBED_VERSIONS_JSON__ === 'undefined'
+    ? {}
+    : __OMNISIGHT_EMBED_VERSIONS_JSON__
+);
 const DEMO_MODE = location.port === '4000' || /^demo(?:-|\.|$)/i.test(location.hostname) || /^demo-omni/i.test(location.hostname);
 let runtimeDemoMode = DEMO_MODE;
 const EMBED_WARM_ROUTES = ['/topology','/agents','/settings','/event-center','/profile','/docs','/about'];
@@ -1223,8 +1228,71 @@ function currentLang(data = window._lastData) {
 function trText(text, lang = currentLang()) {
   return window.OmniI18n?.t ? window.OmniI18n.t(text, lang) : String(text ?? '');
 }
+/* ci-extract:begin localizeOperationalText */
+function localizeOperationalText(text, lang = 'en', translateText = null) {
+  const raw = String(text ?? '');
+  if (String(lang || '').toLowerCase() !== 'tr') return raw;
+  const direct = typeof translateText === 'function' ? String(translateText(raw, lang)) : raw;
+  if (direct !== raw) return direct;
+  const replacements = [
+    [/\breboot required\b/gi, 'yeniden başlatma gerekli'],
+    [/\ball ok\b/gi, 'tümü iyi'],
+    [/\bunreachable\b/gi, 'erişilemiyor'],
+    [/\breachable\b/gi, 'erişilebilir'],
+    [/\bconnecting\b/gi, 'bağlanıyor'],
+    [/\bhealthy\b/gi, 'sağlıklı'],
+    [/\bdegraded\b/gi, 'sorunlu'],
+    [/\boffline\b/gi, 'çevrimdışı'],
+    [/\bonline\b/gi, 'çevrimiçi'],
+    [/\brunning\b/gi, 'çalışıyor'],
+    [/\bstopped\b/gi, 'durdu'],
+    [/\bfailing\b/gi, 'başarısız'],
+    [/\bfailed\b/gi, 'başarısız'],
+    [/\bsucceeded\b/gi, 'başarılı'],
+    [/\bpending\b/gi, 'bekliyor'],
+    [/\bunknown\b/gi, 'bilinmiyor'],
+    [/\battention\b/gi, 'dikkat'],
+    [/\bup\b/gi, 'aktif'],
+    [/\bdown\b/gi, 'kapalı'],
+    [/\bupdates?\b/gi, 'güncelleme'],
+    [/\bservers?\b/gi, 'sunucu'],
+    [/\bsystems?\b/gi, 'sistem'],
+    [/\bdevices?\b/gi, 'cihaz'],
+    [/\bservices?\b/gi, 'servis'],
+    [/\bcontainers?\b/gi, 'container'],
+    [/\bmonitors?\b/gi, 'monitör'],
+    [/\btargets?\b/gi, 'hedef'],
+    [/\bprojects?\b/gi, 'proje'],
+    [/\bgateways?\b/gi, 'ağ geçidi'],
+    [/\btunnels?\b/gi, 'tünel'],
+    [/\bzones?\b/gi, 'bölge'],
+    [/\bcores?\b/gi, 'çekirdek'],
+    [/\bpods?\b/gi, 'pod'],
+    [/\bnodes?\b/gi, 'node'],
+    [/\blinks?\b/gi, 'bağlantı'],
+    [/\benv\b/gi, 'ortam'],
+  ];
+  return replacements.reduce((value, [pattern, replacement]) => value.replace(pattern, replacement), direct);
+}
+/* ci-extract:end localizeOperationalText */
+function localizeSidebarOperationalText(lang = currentLang()) {
+  document.querySelectorAll('#sidebar .sb-meta, #sidebar .sb-badge-wrap, #sidebar .sb-summary').forEach(root => {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    let node;
+    while((node = walker.nextNode())) {
+      const original = node._osOrigText ?? node.nodeValue;
+      const trimmed = original.trim();
+      if(!trimmed) continue;
+      node.nodeValue = original.replace(trimmed, localizeOperationalText(trimmed, lang, trText));
+    }
+  });
+}
 window.applyLanguage = function(lang = currentLang()) {
   if (window.OmniI18n?.apply) window.OmniI18n.apply(document, lang);
+  localizeSidebarOperationalText(lang);
+  document.querySelectorAll('#detail iframe.embed-frame,#embed-cache-bin iframe.embed-frame').forEach(ifr => {
+    try{ ifr.contentWindow?.postMessage({ type:'omnisight-language', lang }, location.origin); }catch(e){}
+  });
 };
 const BELL_ON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>';
 const BELL_OFF = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13.73 21a2 2 0 0 1-3.46 0"/><path d="M18.63 13A17.89 17.89 0 0 1 18 8"/><path d="M6.26 6.26A5.86 5.86 0 0 0 6 8c0 7-3 9-3 9h14"/><path d="M18 8a6 6 0 0 0-9.33-5"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
@@ -1486,6 +1554,21 @@ function sortDockerContainers(containers) {
     const d = val(b) - val(a);
     return d || byName(a, b);
   });
+}
+function dockerContainerStateCounts(containers) {
+  const states = (containers || []).map(container => String(container?.state || '').toLowerCase());
+  return {
+    running: states.filter(state => state === 'running').length,
+    stopped: states.filter(state => state === 'exited').length,
+    pending: states.filter(state => ['created','restarting','paused','removing'].includes(state)).length,
+    failed: states.filter(state => state === 'dead').length,
+  };
+}
+function dockerContainerIssueLabel(counts) {
+  if((counts?.failed || 0) > 0) return `${counts.failed} ${trText('failed')}`;
+  if((counts?.stopped || 0) > 0) return `${counts.stopped} ${trText('stopped')}`;
+  if((counts?.pending || 0) > 0) return `${counts.pending} ${trText('pending')}`;
+  return '';
 }
 function dockerSortButton(mode, label) {
   const active = dockerContainerSort === mode;
@@ -2740,7 +2823,6 @@ function buildProxmox(px){
     <div class="sb-csum-item"><div class="sb-csum-val"><span style="color:${bc(cs.totalCores?Math.round(cs.usedCores/cs.totalCores*100):0)}">${cs.usedCores.toFixed(1)}</span>/${cs.totalCores}</div><div class="sb-csum-lbl">Cores</div></div>
     <div class="sb-csum-item"><div class="sb-csum-val">${cs.totalRAM?`<span style="color:${bc(Math.round(cs.usedRAM/cs.totalRAM*100))}">${(cs.usedRAM/1024**3).toFixed(0)}</span>/${(cs.totalRAM/1024**3).toFixed(0)}G`:'—'}</div><div class="sb-csum-lbl">RAM</div></div>
     ${allVms.length?`<div class="sb-csum-item"><div class="sb-csum-val">${vmRunning}/${allVms.length}</div><div class="sb-csum-lbl">VMs</div></div>`:''}
-    ${ceph ? `<div class="sb-csum-item"><div class="sb-csum-val" style="color:${ceph.health==='HEALTH_ERR'?'var(--red)':ceph.health==='HEALTH_WARN'?'var(--yellow)':'var(--green)'}">${ceph.health==='HEALTH_OK'?'OK':ceph.health.replace('HEALTH_','')}</div><div class="sb-csum-lbl">Ceph</div></div>` : ''}
   </div>` : `...`;
 
   let cephHtml = '';
@@ -2996,7 +3078,6 @@ function buildLinux(linux){
     ${cpuM?`<div class="sb-csum-item"><div class="sb-csum-val" style="color:${cpuM.color}">${cpuM.val}</div><div class="sb-csum-lbl">CPU usage</div></div>`:''}
     ${ramM?`<div class="sb-csum-item"><div class="sb-csum-val" style="color:${ramM.color}">${ramM.val}</div><div class="sb-csum-lbl">RAM usage</div></div>`:''}
     <div class="sb-csum-item"><div class="sb-csum-val">${upSvcs}/${totalSvcs}</div><div class="sb-csum-lbl">Services up</div></div>
-    ${updateAttention?`<div class="sb-csum-item agent-update-summary" data-morph-key="summary:updates"><div class="sb-csum-val" style="color:var(--yellow)">${updateCount}</div><div class="sb-csum-lbl">Updates</div></div>`:''}
   </div>`;
 
   const summaryHtml = `<div class="csum">
@@ -4524,10 +4605,11 @@ function buildDocker(docker){
   const totalAll     = docker.reduce((a,h)=>a+(h.summary?.total||0),0);
   const totalDockerCpu = Math.round(docker.reduce((a,h)=>a+(h.summary?.cpu||0),0) * 10) / 10;
   const totalDockerMem = Math.round(docker.reduce((a,h)=>a+(h.summary?.memPercent||0),0) * 10) / 10;
-  const cStates = docker.filter(h=>h.online).flatMap(h=>h.containers||[]).map(c=>c.state);
-  const cStopped = cStates.filter(s=>s==='exited').length;
-  const cPending = cStates.filter(s=>['created','restarting','paused','removing'].includes(s)).length;
-  const cFailed  = cStates.filter(s=>s==='dead').length;
+  const containerCounts = dockerContainerStateCounts(docker.filter(h=>h.online).flatMap(h=>h.containers||[]));
+  const cStopped = containerCounts.stopped;
+  const cPending = containerCounts.pending;
+  const cFailed  = containerCounts.failed;
+  const containerIssueLabel = dockerContainerIssueLabel(containerCounts);
   const noContainersReported = onlineHosts > 0 && totalAll === 0;
 
   const sbSummaryHtml = `<div class="sb-csum">
@@ -4571,7 +4653,10 @@ function buildDocker(docker){
 
     const dkey = host.name;
     const hostContainers = host.containers || [];
-    const stopped = hostContainers.filter(c=>c.state==='exited'||c.state==='dead').length;
+    const hostContainerCounts = dockerContainerStateCounts(hostContainers);
+    const hostIssueLabel = dockerContainerIssueLabel(hostContainerCounts);
+    const hostHasIssue = !!hostIssueLabel;
+    const hostHasFailed = hostContainerCounts.failed > 0;
     const containers = sortDockerContainers(hostContainers);
     const isOpen = panelOpenState('docker:'+dkey, dockerOpen[dkey]);
     dockerOpen[dkey] = isOpen;
@@ -4585,8 +4670,8 @@ function buildDocker(docker){
     const dockerStats = dockerStatsArr.join('');
     const dockerHeadClass = dockerStatsArr.length >= 6 ? ' docker-head-7' : '';
     return `
-      <div class="node-hdr pve-node-hdr service-node-hdr ${stopped?'warn':'online'}" onclick="toggleDocker(${jsStr(dkey)})">
-        <div class="mon-dot ${stopped?'md-yellow':'md-green'}"></div>
+      <div class="node-hdr pve-node-hdr service-node-hdr ${hostHasIssue?'warn':'online'}" onclick="toggleDocker(${jsStr(dkey)})">
+        <div class="mon-dot ${hostHasFailed?'md-red':hostHasIssue?'md-yellow':'md-green'}"></div>
         <div class="pve-head-main docker-head-main service-head-main${dockerHeadClass}">
           <div class="pve-head-title">
             <div class="node-name">${escHtml(host.name)}</div>
@@ -4594,7 +4679,7 @@ function buildDocker(docker){
           </div>
           ${dockerStats}
         </div>
-        ${bdg(stopped?'yellow':hostContainers.length?'green':'gray', stopped?`${stopped} stopped`:hostContainers.length?'all running':'no containers')}
+        ${bdg(hostHasFailed?'red':hostHasIssue?'yellow':hostContainers.length?'green':'gray', hostIssueLabel || (hostContainers.length?'all running':'no containers'))}
         ${notifyBell('dk:'+host.name)}
       </div>
       <div class="node-body ${isOpen?'open':''}" id="dk-${dkey}">
@@ -4631,8 +4716,8 @@ function buildDocker(docker){
       ? bdg(offlineRatioBadgeClass(offlineHosts, docker.length, onlineHosts), offlineRatioLabel(offlineHosts, docker.length, onlineHosts))
       : anyConnecting
       ? bdg(onlineHosts ? 'yellow' : 'gray', onlineHosts ? `${connectingHosts} connecting` : 'connecting...')
-      : bdg(noContainersReported?'gray':allOk&&totalStopped===0?'green':onlineHosts===0?'red':totalStopped>0?'yellow':'red',
-            noContainersReported?'no containers':allOk&&totalStopped===0?'healthy':onlineHosts===0?offlineRatioLabel(docker.length, docker.length, onlineHosts):`${totalStopped} stopped`),
+      : bdg(noContainersReported?'gray':onlineHosts===0?'red':cFailed>0?'red':containerIssueLabel?'yellow':allOk&&totalStopped===0?'green':'red',
+            noContainersReported?'no containers':onlineHosts===0?offlineRatioLabel(docker.length, docker.length, onlineHosts):containerIssueLabel || (allOk&&totalStopped===0?'healthy':`${totalStopped} ${trText('stopped')}`)),
     sbSummary: sbSummaryHtml,
     summary: '',
     body,
@@ -6283,6 +6368,7 @@ function renderConfiguredSidebarShell(){
   if(!ids.length) return false;
   window._panels = panels;
   renderSidebar(ids, panels, null);
+  applyLanguage(currentLang());
   return true;
 }
 
@@ -6611,12 +6697,14 @@ function overviewRows(id, data){
     const hosts = data.docker || [];
     const hostRows = hosts.map(host => {
       const connecting = host._connecting && !host.online;
-      const stopped = (host.containers||[]).filter(c=>c.state==='exited'||c.state==='dead').length;
+      const containerCounts = dockerContainerStateCounts(host.containers || []);
+      const issueLabel = dockerContainerIssueLabel(containerCounts);
+      const hasFailed = containerCounts.failed > 0;
       const noContainers = host.online && Number(host.summary?.total || 0) === 0;
       const sub = connecting ? (host.host||'Connecting') :
         host.online ? [`${host.summary?.running||0} running`, `${host.summary?.total||0} total`, hasNum(host.summary?.cpu)?`CPU ${host.summary.cpu}%`:'', hasNum(host.summary?.memPercent)?`Mem ${host.summary.memPercent}%`:'' ].filter(Boolean).join(' · ') :
         (host.error || 'Connection failed');
-      return overviewRow('docker', host.name, sub, connecting||noContainers?'gray':!host.online?'red':stopped?'yellow':'green', connecting?'connecting':!host.online?'offline':noContainers?'no containers':stopped?`${stopped} stopped`:'healthy', connecting||noContainers?'md-gray':!host.online?'md-red':stopped?'md-yellow':'md-green');
+      return overviewRow('docker', host.name, sub, connecting||noContainers?'gray':!host.online||hasFailed?'red':issueLabel?'yellow':'green', connecting?'connecting':!host.online?'offline':noContainers?'no containers':issueLabel||'healthy', connecting||noContainers?'md-gray':!host.online||hasFailed?'md-red':issueLabel?'md-yellow':'md-green');
     }).join('');
     const stateOrder = { running: 0, restarting: 1, paused: 2, created: 3, exited: 4, dead: 5 };
     const containerRows = hosts.filter(host => host.online).map(host => {
@@ -7020,7 +7108,12 @@ function activeAlerts(data){
   (data.docker||[]).forEach(h => {
     if(h._connecting) return;
     if(!h.online) out.push(['Docker offline', h.name]);
-    else if((h.summary?.stopped||0)>0) out.push(['Stopped containers', `${h.name}: ${h.summary.stopped}`]);
+    else {
+      const counts = dockerContainerStateCounts(h.containers || []);
+      if(counts.failed > 0) out.push(['Failed containers', `${h.name}: ${counts.failed}`]);
+      else if(counts.stopped > 0) out.push(['Stopped containers', `${h.name}: ${counts.stopped}`]);
+      else if(counts.pending > 0) out.push(['Pending containers', `${h.name}: ${counts.pending}`]);
+    }
   });
   const hc = data.healthchecks;
   (hc?.checks||[]).filter(c=>c.status==='down'||c.status==='grace').forEach(c=>out.push([c.status==='grace'?'Healthcheck grace':'Healthcheck down', c.name || c.slug]));
@@ -7649,8 +7742,8 @@ function selectPanel(id, opts = {}){
 
   if(id === 'docker'){
     (data.docker||[]).forEach(host => {
-      const hasStopped = (host.summary?.stopped||0) > 0 || !host.online;
-      if(shouldOpen('docker:'+host.name, hasStopped)){
+      const hasIssue = Number(host.summary?.total || 0) > Number(host.summary?.running || 0) || !host.online;
+      if(shouldOpen('docker:'+host.name, hasIssue)){
         dockerOpen[host.name] = true;
         const el = document.getElementById(`dk-${host.name}`);
         if(el){ el.classList.add('open'); el.style.display=''; }
@@ -7763,8 +7856,8 @@ function render(data, opts = {}){
     if(dockerConnecting && !realDocker.length) platforms.push('connecting');
     else {
       const o=realDocker.filter(h=>h.online).length;
-      const stopped=realDocker.some(h=>h.online&&(h.summary?.stopped||0)>0);
-      platforms.push(o===0?'down':(o<realDocker.length||dockerConnecting||stopped)?'degraded':'ok');
+      const containerIssue=realDocker.some(h=>h.online&&Number(h.summary?.total||0)>Number(h.summary?.running||0));
+      platforms.push(o===0?'down':(o<realDocker.length||dockerConnecting||containerIssue)?'degraded':'ok');
     }
   }
   const dh=data.dockhand;
@@ -7862,9 +7955,9 @@ function render(data, opts = {}){
   if(gh){
     let cls,txt;
     if(!platforms.length && !connectingCount){ cls='gray'; txt=trText('Unconfigured', lang); }
-    else if(downCount>0){ cls='red'; txt=downCount+' down'; }
+    else if(downCount>0){ cls='red'; txt=downCount+' '+trText('down', lang); }
     else if(connectingCount>0){ cls='yellow'; txt=trText('connecting…', lang); }
-    else if(degradedCount>0){ cls='yellow'; txt=lang === 'tr' ? degradedCount+' sorunlu' : degradedCount+' degraded'; }
+    else if(degradedCount>0){ cls='yellow'; txt=degradedCount+' '+trText('degraded', lang); }
     else { cls='green'; txt=trText('All healthy', lang); }
     gh.className='ghealth gh-'+cls;
     gh.innerHTML='<span class="gh-dot"></span>'+txt;
@@ -8197,8 +8290,11 @@ function versionedEmbedUrl(url){
   const hashAt = raw.indexOf('#');
   const beforeHash = hashAt >= 0 ? raw.slice(0, hashAt) : raw;
   const hash = hashAt >= 0 ? raw.slice(hashAt) : '';
-  if(!APP_VERSION || /[?&]v=/.test(beforeHash)) return raw;
-  return `${beforeHash}${beforeHash.includes('?') ? '&' : '?'}v=${encodeURIComponent(APP_VERSION)}${hash}`;
+  let route = '';
+  try{ route = new URL(beforeHash, location.origin).pathname.replace(/\/+$/, '') || '/'; }catch(e){}
+  const version = EMBED_VERSIONS[route] || APP_VERSION;
+  if(!version || /[?&]v=/.test(beforeHash)) return raw;
+  return `${beforeHash}${beforeHash.includes('?') ? '&' : '?'}v=${encodeURIComponent(version)}${hash}`;
 }
 function embedCacheBin(){
   let bin = document.getElementById('embed-cache-bin');
@@ -8284,9 +8380,7 @@ function createEmbedFrame(url, priority = 'high'){
     ifr.classList.add('loaded');
     scheduleEmbedReveal(ifr, url);
     applyThemeToEmbed();
-    if(!ifr.classList.contains('active')){
-      try{ ifr.contentWindow?.postMessage({ type:'omnisight-embed-visibility', visible:false }, location.origin); }catch(e){}
-    }
+    try{ ifr.contentWindow?.postMessage({ type:'omnisight-embed-visibility', visible:ifr.classList.contains('active') }, location.origin); }catch(e){}
   });
   embedFrameCache.set(key, ifr);
   return ifr;
@@ -8585,17 +8679,6 @@ function prefetchRouteResource(href, as = 'document'){
   link.dataset.embedPrefetch = '1';
   document.head.appendChild(link);
 }
-function warmRouteDocument(url){
-  const href = versionedEmbedUrl(url);
-  prefetchRouteResource(href, 'document');
-  try{
-    fetch(href, {
-      credentials: 'same-origin',
-      cache: 'force-cache',
-      priority: 'low'
-    }).catch(() => {});
-  }catch(e){}
-}
 function scheduleEmbedPrefetch(opts = {}){
   if(embedPrefetchStarted) return;
   if(navigator.connection?.saveData) return;
@@ -8603,17 +8686,6 @@ function scheduleEmbedPrefetch(opts = {}){
   const run = () => {
     const i18nSrc = document.querySelector('script[src^="/i18n.js"]')?.getAttribute('src') || '/i18n.js';
     prefetchRouteResource(i18nSrc, 'script');
-    let index = 0;
-    const next = () => {
-      if(index >= EMBED_WARM_ROUTES.length) return;
-      if(pageHidden()){
-        setTimeout(next, 1200);
-        return;
-      }
-      warmRouteDocument(EMBED_WARM_ROUTES[index++]);
-      setTimeout(next, opts.immediate ? 25 : 90);
-    };
-    next();
   };
   if(opts.immediate) run();
   else if(window.requestIdleCallback) requestIdleCallback(run, { timeout: 2500 });
@@ -9243,9 +9315,9 @@ function applyShellSummary(summary){
   if(gh){
     let cls,txt;
     if(!health.length && !connectingCount){ cls='gray'; txt=trText('Unconfigured', lang); }
-    else if(downCount>0){ cls='red'; txt=downCount+' down'; }
+    else if(downCount>0){ cls='red'; txt=downCount+' '+trText('down', lang); }
     else if(connectingCount>0){ cls='yellow'; txt=trText('connecting…', lang); }
-    else if(degradedCount>0){ cls='yellow'; txt=lang === 'tr' ? degradedCount+' sorunlu' : degradedCount+' degraded'; }
+    else if(degradedCount>0){ cls='yellow'; txt=degradedCount+' '+trText('degraded', lang); }
     else { cls='green'; txt=trText('All healthy', lang); }
     gh.className='ghealth gh-'+cls;
     gh.innerHTML='<span class="gh-dot"></span>'+txt;

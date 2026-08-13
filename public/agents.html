@@ -46,11 +46,21 @@ h1{font-size:18px;font-weight:750;flex:1}
 .cmd.has-title{padding:33px 90px 12px 12px;white-space:normal}
 .cmd-title{position:absolute;left:12px;top:7px;right:92px;color:var(--muted);font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cmd-body{display:block;margin:0 0 10px;font:inherit;line-height:1.42;white-space:pre-wrap;word-break:break-word}
-.cmd-note{margin-top:0;color:var(--muted);font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:12px;line-height:1.35;white-space:normal}
+.cmd-note{display:flex;align-items:flex-start;gap:8px;margin-top:0;color:var(--muted);font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:12px;line-height:1.35;white-space:normal}
+.cmd-note-text{min-width:0;flex:1}
+.cmd-recommendation{display:inline-flex;align-items:center;flex:0 0 auto;border:1px solid rgba(96,165,250,.32);background:rgba(96,165,250,.10);color:var(--blue);border-radius:999px;padding:2px 7px;font-size:10px;font-weight:850;line-height:1.4;text-transform:uppercase;letter-spacing:.04em}
+.cmd-recommendation.repair{border-color:rgba(251,191,36,.32);background:rgba(251,191,36,.10);color:var(--yellow)}
+.cmd.no-command{padding-right:12px}.cmd.no-command .cmd-title{right:12px}
 .cmd-panel-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
 .cmd-panel-title{font-weight:800;color:var(--text);font-size:14px}
 .cmd-host-chip{display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(96,165,250,.35);background:rgba(96,165,250,.10);color:var(--text);border-radius:9px;padding:7px 10px;font-weight:800;font-size:13px;box-shadow:inset 0 0 0 1px rgba(96,165,250,.08)}
 .cmd-host-chip span{color:var(--blue);font-size:10px;text-transform:uppercase;letter-spacing:.08em}
+.cmd-guide{border:1px solid rgba(96,165,250,.28);background:rgba(96,165,250,.07);border-radius:9px;padding:12px 14px;color:var(--text);font-size:12px;line-height:1.45}
+.cmd-guide-title{font-size:13px;font-weight:850;margin-bottom:4px}
+.cmd-guide-intro{color:var(--muted);margin-bottom:8px}
+.cmd-guide ol{display:grid;gap:6px;margin:0;padding-left:19px}
+.cmd-guide li::marker{color:var(--blue);font-weight:850}
+.cmd-guide-warning{margin-top:9px;border-left:3px solid var(--yellow);background:rgba(251,191,36,.07);padding:7px 9px;color:var(--muted)}
 .notice{display:none;align-items:flex-start;gap:10px;margin:0 0 14px;border:1px solid rgba(251,191,36,.30);background:rgba(251,191,36,.08);border-radius:8px;padding:10px 12px;color:var(--text);font-size:13px;line-height:1.35}
 .notice.show{display:flex}
 .notice-dot{width:9px;height:9px;border-radius:50%;background:var(--yellow);margin-top:4px;flex:0 0 auto}
@@ -253,22 +263,22 @@ function demoAgentRepairCommands(id){
   return [
     {
       title: 'Query agent',
-      description: 'Checks service state, recent logs and dashboard reachability on the offline host.',
+      description: 'Run this first to check service state, recent logs and dashboard reachability on the offline host.',
       command: `sudo bash -lc 'systemctl status omnisight-agent --no-pager -l || true\njournalctl -u omnisight-agent -n 120 --no-pager || true\ncurl -sS -m 20 http://demo.local/api/agent/ping -H "X-Agent-Token: demo-token" -H "Content-Type: application/json" --data "{\"id\":\"${safeId}\"}"'`,
     },
     {
       title: 'Repair systemd agent',
-      description: 'Reinstalls the agent with the current dashboard token, keeps the same agent identity and restarts the service.',
+      description: 'Run this when logs show 401 invalid agent token or after restoring a backup. It reinstalls the agent with the current dashboard token, keeps the same agent identity and restarts the service.',
       command: `curl -fsSL http://demo.local/agent/install.sh | sudo OMNISIGHT_URL=http://demo.local OMNISIGHT_TOKEN=demo-token OMNISIGHT_AGENT_ID=${safeId} bash`,
     },
   ];
 }
 
 const ADD_AGENT_META = {
-  linux: { title: 'Add Linux Agent', desc: 'Run this on a Linux server. The agent pushes host metrics and service state to OmniSight.' },
-  windows: { title: 'Add Windows Agent', desc: 'Run this in an elevated PowerShell window. The agent reports Windows host metrics and services.' },
-  proxmox: { title: 'Add Proxmox Agent', desc: 'Run this on a Proxmox VE node. The agent uses local pvesh data for nodes, guests, storage and backups.' },
-  docker: { title: 'Add Docker Agent', desc: 'Run this on a Docker host. The agent reports containers and can run logs/prune actions locally.' },
+  linux: { title: 'Add Linux Agent', desc: 'Works on any systemd Linux: bare-metal/VM servers, NAS and other Linux devices. The agent pushes metrics + services; no inbound access to the server is needed.' },
+  windows: { title: 'Add Windows Agent', desc: 'Run the PowerShell command in an elevated PowerShell window. The agent pushes CPU, RAM, disk, network and Windows service status with no inbound access to the server.' },
+  proxmox: { title: 'Add Proxmox Agent', desc: 'Run the command on a Proxmox VE node (as root). The agent uses pvesh locally to report VMs/LXC, storage, backups and Ceph — no API token needed. Repeat on every node of the cluster.' },
+  docker: { title: 'Add Docker Agent', desc: 'The agent reports containers, unused images and host metrics, and runs logs/prune commands locally. Pick Binary for a normal install or Docker to run the agent itself in a container.' },
 };
 let addAgentKind = 'linux';
 let addAgentTab = 'binary';
@@ -298,7 +308,7 @@ async function getAgentToken(){
   const b = await readJson(r);
   if(!r.ok) throw new Error(b.error || r.statusText);
   addAgentToken = b.token || '';
-  if(!addAgentToken) throw new Error('Agent token could not be created');
+  if(!addAgentToken) throw new Error(t('Agent token could not be created'));
   return addAgentToken;
 }
 
@@ -370,7 +380,7 @@ function setAgentInstallTab(tab){
     if(panel) panel.style.display = name === tab ? '' : 'none';
   });
   const binary = document.getElementById('aa-tab-binary');
-  if(binary) binary.textContent = addAgentKind === 'windows' ? 'PowerShell' : 'Binary';
+  if(binary) binary.textContent = t(addAgentKind === 'windows' ? 'PowerShell' : 'Binary');
   const showDockerTabs = addAgentKind !== 'windows';
   document.getElementById('aa-tab-docker').style.display = showDockerTabs ? '' : 'none';
   document.getElementById('aa-tab-stack').style.display = showDockerTabs ? '' : 'none';
@@ -380,8 +390,8 @@ function setAgentInstallTab(tab){
 function setAgentKind(kind){
   addAgentKind = ADD_AGENT_META[kind] ? kind : 'linux';
   const meta = ADD_AGENT_META[addAgentKind];
-  document.getElementById('add-agent-title').textContent = meta.title;
-  document.getElementById('add-agent-desc').textContent = meta.desc;
+  document.getElementById('add-agent-title').textContent = t(meta.title);
+  document.getElementById('add-agent-desc').textContent = t(meta.desc);
   document.querySelectorAll('.kind-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.kind === addAgentKind));
   refreshAddAgentCommands();
   setAgentInstallTab(addAgentKind === 'docker' ? 'docker' : 'binary');
@@ -399,7 +409,7 @@ async function registerPendingAgent(kind){
     if(!r.ok) throw new Error(b.error || r.statusText);
   }catch(e){
     const msg = document.getElementById('aa-wait');
-    if(msg) msg.textContent = e.message || 'Could not create pending agent';
+    if(msg) msg.textContent = e.message || t('Could not create pending agent');
   }
 }
 
@@ -410,7 +420,7 @@ async function openAddAgentModal(kind = 'linux'){
     addAgentKnownIds = new Set((readAgentsCache()?.agents || []).map(a => a.id || a.name).filter(Boolean));
     document.getElementById('add-agent-modal').classList.add('open');
     setAgentKind(kind);
-    document.getElementById('aa-wait').textContent = 'Waiting for the agent to connect...';
+    document.getElementById('aa-wait').textContent = t('Waiting for the agent to connect...');
     document.querySelector('#add-agent-modal .await-dot').style.background = 'var(--yellow)';
     await registerPendingAgent(addAgentKind);
     clearInterval(addAgentPollTimer);
@@ -423,7 +433,7 @@ async function openAddAgentModal(kind = 'linux'){
         return id && !addAgentKnownIds.has(id) && (a.online || Number(a.lastSeen || 0) >= addAgentOpenedAt - 3000);
       });
       if(fresh){
-        document.getElementById('aa-wait').textContent = `${fresh.name || fresh.id} connected.`;
+        document.getElementById('aa-wait').textContent = `${fresh.name || fresh.id} ${t('connected.')}`;
         document.querySelector('#add-agent-modal .await-dot').style.background = 'var(--green)';
       }
     }, 4000);
@@ -482,14 +492,49 @@ function showManualCommand(message, command){
   msg.innerHTML = `${esc(message)}<div class="cmd">${esc(command)}<button class="btn" onclick="copyText(this.parentElement.childNodes[0].textContent,this)">${t('Copy')}</button></div>`;
   setTimeout(() => clearMsg(), 60050);
 }
+function commandRecommendation(command){
+  const title = String(command?.title || '');
+  if(/^Query\b/i.test(title)) return { label: 'Run first', className: '' };
+  if(/^Repair\b/i.test(title) && title !== 'Repair unavailable') return { label: 'Only when required', className: ' repair' };
+  return null;
+}
+function commandPanelGuide(commands){
+  const titles = (commands || []).map(command => String(command?.title || ''));
+  const isWindows = titles.some(title => /Windows agent/i.test(title));
+  const hasDockerRepair = titles.includes('Repair Docker container agent');
+  const intro = isWindows
+    ? 'Run these commands on the affected Windows host, not on the OmniSight server. Open PowerShell as administrator.'
+    : 'Run these commands on the affected host, not on the OmniSight server. Connect to that host with SSH and use its terminal.';
+  const dockerStep = hasDockerRepair
+    ? `<li><strong>${esc(t('Choose the repair type that matches the installation.'))}</strong> ${esc(t('Use Repair Docker container agent only when the agent itself was installed as a Docker container; otherwise use Repair systemd agent.'))}</li>`
+    : '';
+  return `<div class="cmd-guide">
+    <div class="cmd-guide-title">${esc(t('How to use these commands'))}</div>
+    <div class="cmd-guide-intro">${esc(t(intro))}</div>
+    <ol>
+      <li><strong>${esc(t('Run the query command first.'))}</strong> ${esc(t('It only checks the service state, recent logs and dashboard access; it does not restart or repair the agent.'))}</li>
+      <li><strong>${esc(t('Use a repair command only when required.'))}</strong> ${esc(t('Run it if the query shows 401/403, a failed or missing agent service, or after restoring the host from a backup.'))}</li>
+      ${dockerStep}
+      <li><strong>${esc(t('Verify the result.'))}</strong> ${esc(t('After repair, wait up to 30 seconds and then refresh the Agents page.'))}</li>
+    </ol>
+    <div class="cmd-guide-warning">${esc(t('If the query reports a timeout, DNS, connection or TLS error, do not repair the agent; check the network, dashboard address or certificate.'))}</div>
+  </div>`;
+}
 function showCommandPanel(title, commands, opts = {}){
   const msg = document.getElementById('msg');
   msg.className = 'msg';
   msgHoldUntil = Date.now() + 120000;
   const subject = opts.subjectValue ? `<div class="cmd-host-chip"><span>${esc(t(opts.subjectLabel || 'Hostname'))}</span>${esc(opts.subjectValue)}</div>` : '';
   const head = `<div class="cmd-panel-head"><div class="cmd-panel-title">${esc(title)}</div>${subject}</div>`;
-  const blocks = (commands || []).map(c => `<div class="cmd has-title"><div class="cmd-title">${esc(t(c.title || 'Command'))}</div><pre class="cmd-body">${esc(c.command || '')}</pre><button class="btn" onclick="copyText(this.parentElement.querySelector('.cmd-body').textContent,this)">${t('Copy')}</button>${c.description ? `<div class="cmd-note">${esc(t(c.description))}</div>` : ''}</div>`).join('');
-  msg.innerHTML = `${head}${blocks}`;
+  const guide = commandPanelGuide(commands);
+  const blocks = (commands || []).map(c => {
+    const recommendation = commandRecommendation(c);
+    const command = String(c.command || '').trim();
+    const body = command ? `<pre class="cmd-body">${esc(command)}</pre><button class="btn" onclick="copyText(this.parentElement.querySelector('.cmd-body').textContent,this)">${t('Copy')}</button>` : '';
+    const note = c.description ? `<div class="cmd-note">${recommendation ? `<span class="cmd-recommendation${recommendation.className}">${esc(t(recommendation.label))}</span>` : ''}<span class="cmd-note-text">${esc(t(c.description))}</span></div>` : '';
+    return `<div class="cmd has-title${command ? '' : ' no-command'}"><div class="cmd-title">${esc(t(c.title || 'Command'))}</div>${body}${note}</div>`;
+  }).join('');
+  msg.innerHTML = `${head}${guide}${blocks}`;
   setTimeout(() => clearMsg(), 120050);
 }
 function agentHeaderHtml(){
@@ -502,10 +547,6 @@ function cssEscapeValue(v){
 }
 function jsArg(v){
   return esc(JSON.stringify(String(v ?? '')));
-}
-function repairCommandTitle(a){
-  if(a.role === 'docker' || a.hasDocker) return 'Repair systemd agent or Docker container agent';
-  return 'Repair systemd agent';
 }
 function renderAgentNotice(rows){
   const el = document.getElementById('agent-notice');
@@ -522,9 +563,9 @@ function renderAgentNotice(rows){
   el.innerHTML = `<div class="notice-dot"></div>
     <div class="notice-body">
       <div class="notice-title">${esc(countText)}</div>
-      <div class="notice-text">${esc(t('If the host logs show 401 invalid agent token after a backup restore, open the repair panel and run'))} <strong>${esc(t(repairCommandTitle(first)))}</strong> ${esc(t('on the affected host.'))}</div>
+      <div class="notice-text">${esc(t('Open the command panel and run Query agent first on the affected host. Use a repair command only if the diagnostic result requires it.'))}</div>
     </div>
-    <button class="btn" onclick="showAgentRepair(${jsArg(first.id)},this)">${esc(t('Show command'))}</button>`;
+    <button class="btn" onclick="showAgentRepair(${jsArg(first.id)},this)">${esc(t('Show commands'))}</button>`;
 }
 function agentRowHtml(a, latest){
   const ver = a.agentVersion || 'unknown';
@@ -535,7 +576,7 @@ function agentRowHtml(a, latest){
   const action = a.connecting
     ? `<button class="btn" disabled>${t('Waiting')}</button><div class="action-hint">${esc(t('Waiting for report'))}</div>`
     : !a.online
-    ? `<button class="btn" onclick="showAgentRepair(${jsArg(a.id)},this)">${t('Repair command')}</button><div class="action-hint">${esc(t('Run on host'))}</div>`
+    ? `<button class="btn" onclick="showAgentRepair(${jsArg(a.id)},this)">${t('Check / repair')}</button><div class="action-hint">${esc(t('Run on affected host'))}</div>`
     : outdated
     ? `<button class="btn primary" onclick="updateAgent(${jsArg(a.id)},this)">${t('Update')}</button>`
     : `<button class="btn" disabled>${t('Current')}</button>`;
@@ -710,13 +751,13 @@ async function showAgentRepair(id, btn){
   const msg = document.getElementById('msg');
   clearMsg(true);
   if(AGENTS_DEMO_MODE){
-    showCommandPanel(t('Agent repair commands'), demoAgentRepairCommands(id), { subjectLabel: 'Hostname', subjectValue: id || 'demo-offline' });
+    showCommandPanel(t('Agent diagnostic and repair commands'), demoAgentRepairCommands(id), { subjectLabel: 'Hostname', subjectValue: id || 'demo-offline' });
     return;
   }
   const old = btn.textContent; btn.disabled = true; btn.textContent = t('Loading...');
   try{
     const d = await fetchJson(`/api/agent/repair-commands?id=${encodeURIComponent(id)}`, { headers:authHeaders() }, 6000);
-    showCommandPanel(t('Agent repair commands'), d.commands || [], { subjectLabel: 'Hostname', subjectValue: d.name || id });
+    showCommandPanel(t('Agent diagnostic and repair commands'), d.commands || [], { subjectLabel: 'Hostname', subjectValue: d.name || id });
   }catch(e){
     msg.textContent = e.message;
     msg.className = 'msg err';

@@ -31,7 +31,7 @@ const { getAllCiData, configuredProjects: ciConfigProjects } = require('./src/ci
 const { getAllVeeamData, configuredInstances: veeamConfigInstances } = require('./src/veeam');
 const { getAllProxmoxApiData, configuredInstances: proxmoxConfigInstances } = require('./src/proxmox');
 const { getDockerApiData, dockerLogs: dockerApiLogs, dockerPrune: dockerApiPrune } = require('./src/docker');
-const { dispatchAlert } = require('./src/alerts');
+const { dispatchAlert, serverUpdateNotificationsEnabled, buildServerUpdateDetections } = require('./src/alerts');
 const { decryptConfig, encryptConfigValue, isEncrypted, SENSITIVE_KEYS, encryptionEnabled } = require('./src/crypto');
 const { mergePreservingSecrets } = require('./src/config-merge');
 const { loadHistoryMap, scheduleSaveHistoryMap, setHistorySaveDelay, flushHistorySaves, cancelHistorySaves } = require('./src/historyStore');
@@ -4044,6 +4044,12 @@ function extractChecks(data) {
       });
     }
   });
+  if (serverUpdateNotificationsEnabled(config.alerts)) {
+    buildServerUpdateDetections(data).forEach(check => {
+      const { key, ok, label, detail, ...extra } = check;
+      add(key, ok, label, detail, extra);
+    });
+  }
   const k = data.kubernetes;
   if (k && k.online !== undefined) {
     add('k8s', !!k.online, 'Kubernetes', 'unreachable');
@@ -4435,26 +4441,34 @@ function runAlertChecks(data) {
   for (const key of Array.from(alertProblemSince.keys())) {
     if (!cur.has(key) || cur.get(key)?.ok) alertProblemSince.delete(key);
   }
+  for (const key of Array.from(alertActiveSeverity.keys())) {
+    if (!cur.has(key)) alertActiveSeverity.delete(key);
+  }
   if (prevChecks === null) { prevChecks = cur; return; }
   const sendProblem = c => {
     const threshold = c.kind === 'threshold';
     const anomaly = c.kind === 'anomaly';
-    const critical = (!threshold && !anomaly) || c.severity === 'critical';
+    const updates = c.kind === 'updates';
+    const critical = updates ? false : ((!threshold && !anomaly) || c.severity === 'critical');
     dispatchTrackedAlert(config.alerts, {
-      title: anomaly
+      title: updates
+        ? `\u2B06\uFE0F UPDATES AVAILABLE \u2014 ${c.label}`
+        : anomaly
         ? `${critical ? '\u{1F534} CRITICAL' : '\u26A0\uFE0F WARNING'} ANOMALY \u2014 ${c.label}`
         : threshold
         ? `${critical ? '\u{1F534} CRITICAL' : '\u26A0\uFE0F WARNING'} \u2014 ${c.label}`
         : `\u{1F534} DOWN \u2014 ${c.label}`,
-      message: anomaly
+      message: updates
+        ? `${c.detail}\n${new Date().toLocaleString()}`
+        : anomaly
         ? `${c.label} is outside normal range: ${c.detail}\n${new Date().toLocaleString()}`
         : threshold
         ? `${c.label} is ${c.severity}: ${c.detail}\n${new Date().toLocaleString()}`
         : `${c.label} is ${c.detail || 'down'}${alertInfoText(c)}\n${new Date().toLocaleString()}`,
-      priority: critical ? 'high' : 'default', tags: critical ? 'rotating_light' : 'warning',
+      priority: critical ? 'high' : 'default', tags: updates ? 'arrow_up' : (critical ? 'rotating_light' : 'warning'),
     }, {
       type: 'problem',
-      severity: (threshold || anomaly) ? c.severity : 'critical',
+      severity: (threshold || anomaly || updates) ? c.severity : 'critical',
       key: c.key,
       label: c.label,
       detail: c.detail,
@@ -4466,9 +4480,14 @@ function runAlertChecks(data) {
   const sendRecovery = c => {
     const threshold = c.kind === 'threshold';
     const anomaly = c.kind === 'anomaly';
+    const updates = c.kind === 'updates';
     dispatchTrackedAlert(config.alerts, {
-      title: (threshold || anomaly) ? `\u{1F7E2} NORMAL \u2014 ${c.label}` : `\u{1F7E2} UP \u2014 ${c.label}`,
-      message: anomaly
+      title: updates
+        ? `\u{1F7E2} UPDATES CLEARED \u2014 ${c.label}`
+        : (threshold || anomaly) ? `\u{1F7E2} NORMAL \u2014 ${c.label}` : `\u{1F7E2} UP \u2014 ${c.label}`,
+      message: updates
+        ? `${c.label} has no pending operating system updates\n${new Date().toLocaleString()}`
+        : anomaly
         ? `${c.label} is back in its normal range\n${new Date().toLocaleString()}`
         : threshold
         ? `${c.label} is back below threshold\n${new Date().toLocaleString()}`
@@ -4499,7 +4518,7 @@ function runAlertChecks(data) {
     if (muted || inMaintenanceWindow(now)) continue;
     if (now - (alertFirstSeen.get(key) || now) < ALERT_STARTUP_GRACE_MS) continue;
     if (now - (alertProblemSince.get(key) || now) < alertDelayMs(key, c)) continue;
-    const severity = c.kind === 'threshold' ? c.severity : 'critical';
+    const severity = (c.kind === 'threshold' || c.kind === 'anomaly' || c.kind === 'updates') ? c.severity : 'critical';
     sendProblem(c);
     alertActiveSeverity.set(key, severity || 'critical');
   }
@@ -5519,13 +5538,48 @@ const STATIC_GZIP_TYPES = new Map([
 ]);
 const staticGzipCache = new Map();
 const staticHtmlCache = new Map();
-const PREFETCHABLE_HTML_PATHS = new Set(['/', '/about', '/agents', '/docs', '/event-center', '/profile', '/settings', '/topology']);
+const staticAssetVersionCache = new Map();
+const STATIC_EMBED_PAGE_FILES = Object.freeze({
+  '/topology': '/topology.html',
+  '/agents': '/agents.html',
+  '/settings': '/settings.html',
+  '/event-center': '/event-center.html',
+  '/profile': '/profile.html',
+  '/docs': '/docs.html',
+  '/about': '/about.html',
+});
 function requestCachePath(req) {
   return String(req?.path || '').replace(/\/+$/, '') || '/';
 }
+function staticAssetVersion(relativePath) {
+  const normalized = String(relativePath || '').replace(/\\/g, '/').replace(/^\/+/, '');
+  const publicRoot = path.resolve(PUBLIC_DIR);
+  const filePath = path.resolve(PUBLIC_DIR, normalized);
+  if (!normalized || !filePath.startsWith(publicRoot + path.sep)) return appVersion();
+  try {
+    const stat = fs.statSync(filePath);
+    const signature = `${stat.size}:${Math.round(stat.mtimeMs)}`;
+    const cached = staticAssetVersionCache.get(normalized);
+    if (cached?.signature === signature) return cached.version;
+    const digest = crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex').slice(0, 12);
+    const version = `${appVersion()}-${digest}`;
+    staticAssetVersionCache.set(normalized, { signature, version });
+    return version;
+  } catch {
+    return appVersion();
+  }
+}
+function versionedRequestAssetPath(req) {
+  const requestPath = requestCachePath(req);
+  if (requestPath === '/') return '/index.html';
+  return path.posix.extname(requestPath) ? requestPath : `${requestPath}.html`;
+}
+function staticEmbedVersions() {
+  return Object.fromEntries(Object.entries(STATIC_EMBED_PAGE_FILES).map(([route, file]) => [route, staticAssetVersion(file)]));
+}
 function versionedStaticRequest(req) {
   const raw = String(req?.query?.v || '').trim();
-  return raw && raw === appVersion();
+  return !!raw && (raw === appVersion() || raw === staticAssetVersion(req?.path) || raw === staticAssetVersion(versionedRequestAssetPath(req)));
 }
 function setPublicStaticCacheHeaders(res, filePath, req = null) {
   if (filePath.endsWith('.html')) {
@@ -5563,13 +5617,16 @@ function injectCspNonce(html, nonce) {
   return String(html).replace(/<script\b(?![^>]*\bnonce=)/gi, `<script nonce="${nonce}"`);
 }
 function injectAssetVersion(html) {
-  const v = encodeURIComponent(appVersion());
+  const i18nVersion = encodeURIComponent(staticAssetVersion('/i18n.js'));
+  const logoVersion = encodeURIComponent(staticAssetVersion('/assets/omnisight-logo.svg'));
   return String(html)
-    .replace(/(<script\b[^>]*\bsrc=["'])\/i18n\.js(["'][^>]*>)/gi, `$1/i18n.js?v=${v}$2`)
-    .replace(/(["'])\/assets\/omnisight-logo\.svg(\?v=[^"']*)?(["'])/gi, `$1/assets/omnisight-logo.svg?v=${v}$3`);
+    .replace(/(<script\b[^>]*\bsrc=["'])\/i18n\.js(["'][^>]*>)/gi, `$1/i18n.js?v=${i18nVersion}$2`)
+    .replace(/(["'])\/assets\/omnisight-logo\.svg(\?v=[^"']*)?(["'])/gi, `$1/assets/omnisight-logo.svg?v=${logoVersion}$3`);
 }
 function injectRuntimeConstants(html) {
-  return String(html).replace(/__OMNISIGHT_VERSION_JSON__/g, JSON.stringify(appVersion()));
+  return String(html)
+    .replace(/__OMNISIGHT_VERSION_JSON__/g, JSON.stringify(appVersion()))
+    .replace(/__OMNISIGHT_EMBED_VERSIONS_JSON__/g, JSON.stringify(staticEmbedVersions()));
 }
 function readPublicHtmlCached(filePath, stat) {
   const cacheKey = `${filePath}:${stat.size}:${Math.round(stat.mtimeMs)}`;
@@ -5656,11 +5713,6 @@ const publicStaticMiddleware = express.static(path.join(__dirname, 'public'), {
 app.use((req, res, next) => {
   if (req.path.startsWith('/api/') || req.path.startsWith('/agent/')) return next();
   return publicStaticMiddleware(req, res, next);
-});
-
-app.get('/docs.md', (req, res) => {
-  res.setHeader('Cache-Control', 'no-cache, must-revalidate');
-  res.type('text/markdown; charset=utf-8').sendFile(path.join(__dirname, 'DOCUMENTATION.md'));
 });
 
 function onboardingPlatformConfig(input = {}) {
@@ -8236,21 +8288,25 @@ function agentRepairCommands(req, agent) {
   const role = agentInstallRole(agent);
   const id = String(agent.id || '');
   if (role === 'windows') {
-    const install = token
-      ? `${WINDOWS_TLS12_BOOTSTRAP} $env:OMNISIGHT_URL="${base}"; $env:OMNISIGHT_TOKEN="${token}"; $env:OMNISIGHT_AGENT_ROLE="windows"; iwr -UseBasicParsing "${base}/agent/install-windows.ps1" | iex`
-      : 'Generate an agent token in Settings before reinstalling agents.';
-    return [
-      {
-        title: 'Query Windows agent',
-        description: 'Run in an elevated PowerShell window on the Windows host.',
-        command: 'Get-ScheduledTask -TaskName OmniSightAgent -ErrorAction SilentlyContinue | Format-List *; Get-Content "$env:ProgramData\\OmniSight\\agent.id" -ErrorAction SilentlyContinue',
-      },
-      {
+    const commands = [{
+      title: 'Query Windows agent',
+      description: 'Run in an elevated PowerShell window on the Windows host.',
+      command: 'Get-ScheduledTask -TaskName OmniSightAgent -ErrorAction SilentlyContinue | Format-List *; Get-Content "$env:ProgramData\\OmniSight\\agent.id" -ErrorAction SilentlyContinue',
+    }];
+    if (token) {
+      commands.push({
         title: 'Repair Windows agent',
         description: 'Reinstalls the scheduled task and keeps the same agent identity when ProgramData still exists.',
-        command: install,
-      },
-    ];
+        command: `${WINDOWS_TLS12_BOOTSTRAP} $env:OMNISIGHT_URL="${base}"; $env:OMNISIGHT_TOKEN="${token}"; $env:OMNISIGHT_AGENT_ROLE="windows"; iwr -UseBasicParsing "${base}/agent/install-windows.ps1" | iex`,
+      });
+    } else {
+      commands.push({
+        title: 'Repair unavailable',
+        description: 'No Linux agent token is configured. Generate a token in Settings before reinstalling agents.',
+        command: '',
+      });
+    }
+    return commands;
   }
   const queryScript = [
     'echo "== omnisight-agent service =="',
@@ -8331,7 +8387,7 @@ function agentRepairCommands(req, agent) {
     commands.push({
       title: 'Repair unavailable',
       description: 'No Linux agent token is configured. Generate a token in Settings before reinstalling agents.',
-      command: 'Open Settings -> Linux Server and generate an agent token.',
+      command: '',
     });
   }
   return commands;
@@ -8835,8 +8891,9 @@ function buildPublicSummary(data) {
     const running = dockerRows.reduce((a, h) => a + (h.summary?.running || 0), 0);
     const total = dockerRows.reduce((a, h) => a + (h.summary?.total || 0), 0);
     const stopped = dockerRows.reduce((a, h) => a + (h.summary?.stopped || 0), 0);
-    const status = !dockerRows.length && connecting ? 'connecting' : up < dockerRows.length ? (up > 0 ? 'warn' : 'down') : (connecting || stopped > 0 ? 'warn' : 'ok');
-    const meta = stopped > 0 ? `${running}/${total} running\n${stopped} stopped` : `${running}/${total} containers`;
+    const pending = Math.max(0, total - running - stopped);
+    const status = !dockerRows.length && connecting ? 'connecting' : up < dockerRows.length ? (up > 0 ? 'warn' : 'down') : (connecting || stopped > 0 || pending > 0 ? 'warn' : 'ok');
+    const meta = stopped > 0 ? `${running}/${total} running\n${stopped} stopped` : pending > 0 ? `${running}/${total} running\n${pending} pending` : `${running}/${total} containers`;
     out.push({ id: 'docker', title: 'Docker', status, meta: dockerRows.length ? meta : 'connecting...' });
   }
   const dh = data.dockhand;

@@ -87,6 +87,40 @@ async function sendMattermost(cfg, alert) {
   });
 }
 
+function serverUpdateNotificationsEnabled(alertConfig = {}) {
+  return alertConfig?.detections?.serverUpdates === true;
+}
+
+function buildServerUpdateDetections(data = {}) {
+  const detections = [];
+  const append = (servers, keyPrefix, labelPrefix) => {
+    if (!Array.isArray(servers)) return;
+    servers.forEach(server => {
+      if (!server || server._connecting || !server.online || !server.updates || typeof server.updates !== 'object') return;
+      const rawCount = server.updates.count;
+      if (rawCount === null || rawCount === undefined || rawCount === '') return;
+      const parsedCount = Number(rawCount);
+      if (!Number.isFinite(parsedCount) || parsedCount < 0) return;
+      const name = String(server.name || server.host || server.id || '').trim();
+      if (!name) return;
+      const count = Math.floor(parsedCount);
+      detections.push({
+        key: `${keyPrefix}:${name}:updates`,
+        ok: count === 0,
+        label: `${labelPrefix} ${name}`,
+        detail: `${count} operating system update${count === 1 ? '' : 's'} available`,
+        kind: 'updates',
+        severity: count > 0 ? 'warning' : 'normal',
+        metric: 'updates',
+        value: count,
+      });
+    });
+  };
+  append(data.linux, 'lx', 'Linux server');
+  append(data.windows, 'win', 'Windows server');
+  return detections;
+}
+
 const CHANNELS = { ntfy: sendNtfy, telegram: sendTelegram, smtp: sendSmtp, mattermost: sendMattermost };
 
 async function dispatchAlert(alertConfig, alert, only) {
@@ -105,4 +139,4 @@ async function dispatchAlert(alertConfig, alert, only) {
   }));
 }
 
-module.exports = { dispatchAlert };
+module.exports = { dispatchAlert, serverUpdateNotificationsEnabled, buildServerUpdateDetections };

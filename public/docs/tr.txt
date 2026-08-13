@@ -1,0 +1,962 @@
+# OmniSight Dokümantasyonu
+
+OmniSight; Proxmox, Linux sunucular, Docker, Kubernetes, SNMP cihazları, Healthchecks, Uptime Kuma, Prometheus, Dockhand, güvenlik duvarları, TrueNAS/QNAP/UGREEN depolama sistemleri, Proxmox Backup Server, Portainer ve veritabanları için tek bakışta izleme sağlayan bir paneldir.
+
+Bu doküman platformun ne olduğunu, nasıl çalıştığını, verileri nerede sakladığını, her entegrasyonun verileri nasıl topladığını, ajan ve bildirim akışlarının nasıl işlediğini, kimlik doğrulama ile güvenliğin nasıl yönetildiğini ve üretim sorunlarının nasıl giderileceğini açıklar.
+
+## İçindekiler
+
+- [1. Genel Bakış](#1-genel-bakis)
+- [2. Mimari](#2-mimari)
+- [3. Veri Akışı ve Yenileme Modeli](#3-veri-akisi-ve-yenileme-modeli)
+- [4. Panel](#4-panel)
+- [5. Platformlar](#5-platformlar)
+- [6. Ajan Sistemi](#6-ajan-sistemi)
+- [7. Ayarlar ve Yapılandırma](#7-ayarlar-ve-yapilandirma)
+- [8. Kullanıcılar, Roller ve Güvenlik](#8-kullanicilar-roller-ve-guvenlik)
+- [9. Bildirimler ve Olay Merkezi](#9-bildirimler-ve-olay-merkezi)
+- [10. Topoloji](#10-topoloji)
+- [11. Yedekleme, Geri Yükleme ve Felaket Kurtarma](#11-yedekleme-geri-yukleme-ve-felaket-kurtarma)
+- [12. Demo, Üretim ve Dağıtım](#12-demo-uretim-ve-dagitim)
+- [13. API ve Entegrasyon Yüzeyi](#13-api-ve-entegrasyon-yuzeyi)
+- [14. Sorun Giderme](#14-sorun-giderme)
+- [15. Operasyon Kontrol Listesi](#15-operasyon-kontrol-listesi)
+
+## 1. Genel Bakış
+
+OmniSight tek süreçli bir izleme uygulamasıdır. Backend, Node.js + Express kullanır. Frontend herhangi bir framework olmadan düz HTML/CSS/JavaScript ile hazırlanmıştır. Platform veri toplayıcıları `src/`, statik sayfalar `public/`, ajan scriptleri ise `agent/` altında bulunur.
+
+Temel hedefler:
+
+- Altyapı sağlığını tek panelde göstermek.
+- Proxmox, Linux, Docker, Kubernetes ve harici servisleri ortak bir arayüz modeliyle izlemek.
+- NAT veya güvenlik duvarı arkasındaki sistemleri push ajanı ile izlemek.
+- Servis ve container işlemlerini arayüzden çalıştırmak.
+- Bildirim, denetim ve çalışma zamanı olaylarını Olay Merkezi'nde toplamak.
+- Kalıcı durumun tamamını tek bir `data/` dizini veya volume içinde tutmak.
+
+Ana sayfalar:
+
+| Yol | Amaç |
+|---|---|
+| `/` | Ana panel |
+| `/settings` | Platform, kullanıcı, güvenlik, bildirim ve yedekleme ayarları |
+| `/agents` | Ajan envanteri, kurulu sürümler, güncelleme ve onarım işlemleri |
+| `/event-center` | Çalışma zamanı kayıtları, denetim kayıtları, bildirim geçmişi ve zaman çizelgeleri |
+| `/topology` | Platform, sunucu ve iş yükü ilişki haritası |
+| `/profile` | Profil, parola, 2FA ve passkey ayarları |
+| `/status` | Herkese açık salt okunur durum sayfası |
+| `/about` | Sürüm ve proje bilgileri |
+
+## 2. Mimari
+
+Uygulamanın merkezinde `server.js` bulunur. Express sunucusunu, kimlik doğrulama ara katmanını, RBAC yetkilendirmesini, statik dosya sunumunu, API endpointlerini, yenileme planlayıcısını, çalışma zamanı önbelleğini, ajan komut kanalını ve bildirim dağıtımını yönetir.
+
+### Ana Katmanlar
+
+| Katman | Dosyalar | Sorumluluk |
+|---|---|---|
+| Çalışma zamanı sunucusu | `server.js` | API, kimlik doğrulama, RBAC, planlayıcı, önbellek, bildirimler ve statik sunum |
+| Frontend | `public/*.html`, `public/i18n.js` | Panel, Ayarlar, Olay Merkezi, Ajanlar, Topoloji ve Profil |
+| Ajan | `agent/install.sh`, `agent/omnisight-agent.sh`, `agent/install-windows.ps1`, `agent/omnisight-agent.ps1` | Linux, Windows, Proxmox ve Docker sunucularından push raporları gönderir ve komut çalıştırır |
+| Veri toplayıcılar | `src/*.js` | Platforma özel veri toplama |
+| Kalıcı durum | `data/` | Yapılandırma, kullanıcılar, oturumlar, ajanlar, geçmiş, sertifikalar ve ikonlar |
+
+### Veri Toplayıcı Modülleri
+
+| Modül | Platform |
+|---|---|
+| `src/proxmox.js` | Proxmox API ve SSH fallback |
+| `src/agents.js` | Push ajan raporları ve normalize edilmiş Linux/Docker/Proxmox ajan verileri |
+| `src/docker.js` | Docker API/SSH sunucuları, kayıtlar ve prune işlemi |
+| `src/kubernetes.js` | Kubernetes pod, servis, deployment ve kayıtları |
+| `src/snmp.js` | SNMP v2c/v3 cihazları |
+| `src/unifi.js` | Integration API üzerinden UniFi Network controller; SNMP cihaz verileriyle birleştirilir |
+| `src/healthchecks.js` | Healthchecks API |
+| `src/uptimekuma.js` | Uptime Kuma durum sayfası ve socket geçmişi |
+| `src/checks.js` | Dahili HTTP/TCP/Ping/DNS kontrolleri |
+| `src/prometheus.js` | Prometheus targetları |
+| `src/dockhand.js` | Dockhand API |
+| `src/firewall.js` | OPNsense gatewayleri ve uyumlu güvenlik duvarı API'leri |
+| `src/truenas.js` | TrueNAS SCALE/CORE depolama sistemleri |
+| `src/qnap.js` | Resmî HTTP doğrulaması ve File Station SID kontrolleri kullanan QNAP QTS sistemleri |
+| `src/ugreen.js` | UGREEN UGOS Pro web endpoint erişilebilirlik kontrolleri |
+| `src/pbs.js` | Proxmox Backup Server yönetim API'si |
+| `src/veeam.js` | Veeam Backup & Replication REST API |
+| `src/portainer.js` | Portainer instance ve environment verileri |
+| `src/database.js` | PostgreSQL, MySQL/MariaDB ve MongoDB |
+| `src/alerts.js` | ntfy, Telegram, Mattermost ve SMTP gönderimi |
+| `src/crypto.js` | Yapılandırma secret değerlerinin şifrelenmesi ve çözülmesi |
+| `src/historyStore.js` | Geçmiş haritasının yüklenmesi, kaydedilmesi ve gecikmeli diske yazılması |
+
+### Kalıcı Dosyalar
+
+| Dosya veya Dizin | İçerik |
+|---|---|
+| `data/config.yaml` | Platform ayarları, bildirim kanalları, arayüz, performans ve güvenlik ayarları |
+| `data/users.yaml` | Kullanıcılar, roller, parola hashleri, 2FA, passkey ve profil verileri |
+| `data/auth.yaml` | Eski tek kullanıcılı kimlik doğrulama verileri |
+| `data/sessions.yaml` | Aktif oturum tokenları ve metadata |
+| `data/agents.yaml` | Ajan kimlikleri, sunucu metadata ve son görülme zamanı |
+| `data/secret.key` | Yapılandırma şifreleme anahtarı |
+| `data/certs/` | Güvenilen CA sertifikaları |
+| `data/icons/` | Yüklenen platform ikonları |
+| `data/*history*` | Grafik ve heartbeat geçmişi |
+| `data/runtime-snapshot.json` | Çalışma zamanı snapshotı |
+
+## 3. Veri Akışı ve Yenileme Modeli
+
+OmniSight her panel isteğinde tüm sistemlerden yeniden veri toplamaz. Backend bir çalışma zamanı önbelleği tutar ve platform veri toplayıcılarını belirlenen programa göre yeniler.
+
+### Akış
+
+1. Frontend durumu `/api/status`, `/api/status/dashboard` veya `/api/status/stream` üzerinden okur.
+2. Backend her platform için `inFlight`, `nextDue`, `failures`, `lastStarted` ve `lastFinished` yenileme durumlarını izler.
+3. Veri toplayıcı çalışır ve platform verisini normalize eder.
+4. Çalışma zamanı önbelleği güncellenir, geçmiş noktaları kalıcı kayıt için sıraya alınır.
+5. Bildirim motoru yeni önbelleğe göre durum geçişlerini ve eşikleri değerlendirir.
+6. Frontend panel kartlarını ve detay görünümlerini oluşturur.
+
+### Yenileme Davranışı
+
+- Varsayılan yenileme aralığı 15 saniyedir.
+- Platforma özel yenileme aralıkları yapılandırılabilir.
+- Veri toplayıcı eşzamanlılığı performans ayarlarından kontrol edilir.
+- Başarısız veri toplayıcılar artan bekleme süresi kullanır.
+- Docker ve Proxmox kısa süreli yenileme hatalarında önceki sağlıklı sonucu geçici olarak koruyabilir.
+- Düşük I/O modu disk yazımını azaltmak için geçmişi ve ajan durumunu daha seyrek diske yazar.
+
+### SSE Akışı
+
+`/api/status/stream`, Server-Sent Events kullanır. Frontend normal yenileme isteklerine ek olarak update, refresh ve snapshot olaylarını alır ve çalışma zamanı değişikliklerine tepki verir.
+
+## 4. Panel
+
+Panel hızlı operasyonel kontrol için tasarlanmıştır.
+
+### Ana Parçalar
+
+- Üst KPI kartları: CPU, Bellek, Disk I/O ve Bant Genişliği.
+- Platform kartları: Proxmox, Linux, Docker, Kubernetes, SNMP, Healthchecks, Uptime Kuma, Checks, Prometheus, Dockhand, Firewalls, TrueNAS, QNAP, Ugreen, Proxmox Backup, Cloudflare, GitHub/GitLab CI, Portainer ve Database.
+- Aktif bildirimler ve son kayıtlar için isteğe bağlı yan panel.
+- Genel sağlık rozeti.
+- Herkese açık durum sayfası bağlantısı.
+- Komut paleti ve genel arama.
+
+### Kart Davranışı
+
+- Kartlar sürükle-bırak ile sıralanabilir.
+- Kartlar daraltılıp genişletilebilir.
+- Gizlenen platformlar panelin üstündeki kompakt gizli platform çubuğunda görünür.
+- Geri yükleme düğmesi gizli platformları geri getirir.
+- Platform kartına tıklamak detay görünümünü açar.
+- Detay başlığı, panel kartındaki kompakt özet sayaçlarını yeniden kullanır.
+
+### Sağlık Modeli
+
+Her platform kendi sinyallerini ortak panel sağlığına dönüştürür:
+
+- Linux: çevrimdışı sunucu, başarısız veya pasif servis.
+- Proxmox: çevrimdışı node, başarısız servis, Ceph uyarısı/hatası veya kaynak sorunu.
+- Docker: çevrimdışı sunucu, durmuş veya başarısız container, image güncelleme sinyalleri.
+- Kubernetes: başarısız veya bekleyen pod, deployment uyuşmazlığı.
+- Healthchecks: down veya grace durumu.
+- Uptime Kuma: down monitör.
+- Checks: başarısız kontrol.
+- Prometheus: down target veya instance.
+- Güvenlik duvarları: erişilemeyen gateway, kısmi endpoint verisi, link uyarısı, bekleyen güncelleme veya yeniden başlatma gereksinimi.
+- TrueNAS: erişilemeyen cihaz, kısmi endpoint verisi, pool/disk uyarısı veya kritik cihaz bildirimi.
+- QNAP/UGREEN: erişilemeyen cihaz veya endpoint uyarısı.
+- Proxmox Backup Server: erişilemeyen sunucu, kısmi endpoint verisi, datastore uyarısı veya başarısız görev.
+- Cloudflare: erişilemeyen API, kısmi endpoint verisi, pasif/bekleyen zone veya down Tunnel bağlantısı.
+- GitHub/GitLab CI: erişilemeyen API, kısmi endpoint verisi, başarısız workflow, pipeline veya job.
+- Portainer: erişilemeyen instance, kısmi endpoint verisi, down environment veya stack uyarısı.
+- Veritabanı: çevrimdışı veritabanı veya bağlantı sorunu.
+
+Hariç tutulan servisler sağlığı bozmaz ve bildirim üretmez.
+
+## 5. Platformlar
+
+### Proxmox
+
+Proxmox iki ana yöntemle izlenebilir:
+
+- Proxmox API tokenı: merkezî pull modeli.
+- Proxmox node ajanı: yerel `pvesh` ve sunucu komutlarını kullanan push modeli.
+
+İsteğe bağlı SSH metrik fallback'i API'nin sunmadığı metrikleri tamamlayabilir.
+
+Toplanan veriler:
+
+- Node çevrimiçi/çevrimdışı durumu.
+- CPU, RAM ve çalışma süresi.
+- CPU/Sistem/NVMe sıcaklıkları.
+- Disk I/O ve bant genişliği.
+- VM/LXC listesi, durum, CPU ve RAM.
+- Node depolama kullanımı.
+- Son vzdump yedekleme durumu.
+- Systemd servis durumu ve işlemleri.
+- SMART/NVMe disk sağlığı, model, seri numarası, firmware, sıcaklık, çalışma saati ve medya hataları.
+- Ceph sağlığı, kontroller, OSD total/up/in ve kullanım yüzdesi.
+
+Notlar:
+
+- Proxmox API her zaman sunucu sensörlerini yayınlamaz. NVMe SMART, CPU sıcaklığı veya sunucu Disk I/O değerleri için ajan ya da SSH fallback gerekebilir.
+- Proxmox ajanı bulunan sunucu, tekrarlı görünümü önlemek için Linux kartından çıkarılır.
+- Mini grafikler bilerek kompakt tutulur; ayrıntılı disk ve sağlık verileri detay görünümündedir.
+
+### Linux Server
+
+Linux verileri push ajan raporlarından gelir.
+
+Toplanan veriler:
+
+- Hostname, IP, işletim sistemi ve kernel.
+- CPU, RAM, swap ve load.
+- Root disk kullanımı.
+- Disk I/O.
+- Bant genişliği.
+- Sıcaklıklar.
+- Çalışma süresi.
+- Systemd servisleri.
+- Kurulabilir paket güncellemeleri ve yeniden başlatma gereksinimi.
+
+Servis işlemleri:
+
+- Durum.
+- Başlat.
+- Durdur.
+- Yeniden başlat.
+- Hariç tut/Dahil et.
+
+Ajan rapor göndermeyi bıraktığında sunucu çevrimdışı işaretlenir. Çevrimdışı penceresi ajan aralığına göre hesaplanır; ajan tekrar rapor gönderdiğinde sunucu çevrimiçi olur.
+
+### Cloudflare
+
+Cloudflare, sınırlandırılmış bir API tokenı ile resmî API'yi kullanır. OmniSight zone durumlarını, isteğe bağlı Cloudflare Tunnel bağlantılarını ve isteğe bağlı Cloudflare Registrar domain sürelerini okur. Tunnel izleme için `accountId` ve Tunnel okuma izni gerekir. Domain süresi için `accountId`, Registrar okuma izni ve domainin Cloudflare Registrar üzerinde kayıtlı olması gerekir.
+
+Önerilen yapılandırma:
+
+```yaml
+cloudflare:
+  enabled: true
+  apiToken: "${CLOUDFLARE_API_TOKEN}"
+  accountId: "your-account-id"
+  includeTunnels: true
+  includeRegistrarDomains: true
+  domainExpiryWarningDays: 30
+  zones:
+    - example.com
+```
+
+Toplanan veriler:
+
+- Zone active/paused/pending durumu.
+- Account ID yapılandırıldığında Tunnel durumu ve aktif bağlantı sayısı.
+- Etkinleştirildiğinde domain bitiş tarihi, otomatik yenileme ve süresi yaklaşan/dolan domain uyarıları.
+- İsteğe bağlı Tunnel veya Registrar izinleri eksik olduğunda kısmi API hataları.
+
+### GitHub/GitLab CI
+
+GitHub/GitLab CI, repo veya proje build durumunu salt okunur API ile toplar. GitHub projelerinde Actions workflow çalışmaları, GitLab projelerinde pipeline'lar ve isteğe bağlı son pipeline jobları okunur.
+
+Önerilen yapılandırma:
+
+```yaml
+cicd:
+  enabled: true
+  projects:
+    - name: App GitHub
+      provider: github
+      repo: "owner/repo"
+      branch: main
+      token: "${GITHUB_TOKEN}"
+    - name: App GitLab
+      provider: gitlab
+      baseUrl: "https://gitlab.com"
+      projectId: "group/project"
+      branch: main
+      token: "${GITLAB_TOKEN}"
+      includeJobs: true
+```
+
+Toplanan veriler:
+
+- Son GitHub Actions workflow çalışmaları.
+- Son GitLab proje pipeline'ları.
+- Etkinleştirildiğinde son pipeline jobları.
+- Çalışan, başarısız, iptal edilen ve başarılı çalışma sayıları.
+
+### Veeam
+
+Veeam izleme, Veeam Backup & Replication REST API'yi kullanır. Access token verilmezse parola grant yöntemiyle doğrulanır; ardından joblar, son sessionlar ve yedek repositoryleri okunur.
+
+Önerilen yapılandırma:
+
+```yaml
+veeam:
+  enabled: true
+  instances:
+    - name: VBR
+      url: "https://veeam.example.com:9419"
+      username: "DOMAIN\\monitoring"
+      password: "${VEEAM_PASSWORD}"
+      apiVersion: "1.3-rev1"
+      insecureTLS: false
+```
+
+Toplanan veriler:
+
+- VBR sunucusunun çevrimiçi/çevrimdışı durumu.
+- Job listesi, devre dışı job sayısı ve varsa son çalışma alanları.
+- Çalışan, uyarılı ve başarısız son yedekleme sessionları.
+- Varsa repository durumu ve kullanım yüzdesi.
+- İsteğe bağlı job, session veya repository endpointleri kullanılamadığında kısmi API hataları.
+
+### Docker
+
+Docker üç kaynaktan toplanabilir:
+
+- Ajan.
+- Docker API sunucusu.
+- Docker CLI çalıştıran SSH sunucusu.
+
+Toplanan veriler:
+
+- Sunucu çevrimiçi/çevrimdışı durumu.
+- Container durumu ve running/stopped/pending/failed özetleri.
+- Container CPU/RAM, Network I/O ve Block I/O.
+- Portlar, image güncelleme durumu ve kullanılmayan image sayısı.
+- Canlı container kayıtları ve prune işlemi.
+
+Durmuş, bekleyen ve başarısız sayaçlar sıfır olduğunda panel özetinde gizlenir.
+
+### Kubernetes
+
+Kubernetes, cluster API'ye bağlanmak için kubeconfig kullanır.
+
+Toplanan veriler:
+
+- Podlar, deploymentlar ve servisler.
+- Namespace özetleri.
+- Pod durumu ve yeniden başlatma sayısı.
+- Pod kayıtları.
+- Metrics API kullanılabiliyorsa CPU/RAM.
+
+Namespace filtreleri Ayarlar'dan yapılandırılır. Kimlik bilgileri bir kaynağa erişemiyorsa OmniSight yalnızca API'nin izin verdiği veriyi gösterir.
+
+### SNMP
+
+SNMP v2c ve v3 desteklenir. Cihaza bağlı olarak sistem bilgisi, CPU, RAM, sıcaklık, disk/volume durumu, ağ bant genişliği, Disk I/O ve cihaz sağlığı toplanır. Synology, UniFi, switch, router ve genel SNMP cihazları farklı OID kümeleriyle yorumlanır.
+
+### UniFi Network (controller)
+
+UniFi controllerlar resmî **Integration API** üzerinden izlenir. UniFi Network 9.3+ gerekir ve stateless `X-API-KEY` kullanılır. Anahtarı konsolda **Settings → Control Plane → Integrations** altında oluşturun. UniFi OS konsolları (`/proxy/network/integration/v1`) ve self-hosted Network uygulamaları (`/v1`) desteklenir; base path otomatik algılanır.
+
+Toplanan veriler:
+
+- Site başına cihaz envanteri; `online`, `offline`, `updating`, `adopting` gibi anlamlı durumlar, model ve firmware.
+- Controller yükünü düşük tutmak için her dördüncü yenilemede cihaz CPU, bellek ve çalışma süresi.
+- Gateway WAN durumu ve uplink throughput.
+- İsteğe bağlı eski API kimlik bilgileriyle WAN gecikmesi ve paket kaybı.
+- WAN up/down geçmişi ve kesinti zaman açıklamaları.
+
+Integration API WAN gecikmesi ve paket kaybını sunmadığı için OmniSight isteğe bağlı olarak klasik API'deki `stat/health` endpointini sorgulayabilir. Bunun için local-only, read-only ve MFA muafiyetli özel bir controller hesabı kullanın. MFA bulunan hesaplar headless giriş yapamaz. Eski API kimlik bilgileri olmadan da platform çalışır; yalnızca latency/loss gösterilmez.
+
+Bildirim davranışı:
+
+- Controller tarafından `OFFLINE` bildirilen cihaz SNMP ile de izlenmiyorsa bildirim üretir. SNMP kapsamındaki cihazlarda daha hızlı olan SNMP down bildirimi kullanılır.
+- Cihaz `updating` veya `adopting` durumundayken planlı firmware güncellemesinin bildirim üretmemesi için SNMP down bildirimi bastırılır.
+- WAN Up→Down geçişi 120 saniyelik `alerts.rules.unifi` kuralını kullanır. İsteğe bağlı WAN latency eşiği `alerts.thresholds.wanLatency` ile ayarlanabilir.
+- Bildirim kanalı izlenen WAN üzerinden erişiliyorsa WAN down bildirimi bağlantı geri gelene kadar gönderilemez; WAN bildirimi için LAN içinde bir kanal kullanın.
+
+SNMP `unifi` profili ve controller cihazları tek UniFi kartında birleştirilir. Controller satırları önce, çevrimdışı cihazlar en üstte gösterilir; eşleşen SNMP detayları genişletilmiş görünümde yer alır. HTTP 429 rate limit durumunda son başarılı veri geçici olarak gösterilir. Birden fazla controller ve site desteklenir.
+
+### Healthchecks
+
+Healthchecks cron/job durumunu API üzerinden okur. `up`, `down`, `grace` ve `paused` durumları desteklenir. Grace uyarı, down kritik sorun olarak değerlendirilir.
+
+### Uptime Kuma
+
+Uptime Kuma, monitör ve heartbeat geçmişini durum sayfası slug'ı veya isteğe bağlı kimlik doğrulama yapılandırmasıyla okur. Up, Down, Pending, Maintenance ve Unknown durumları desteklenir. Heartbeat çubukları mevcut monitör geçmişinden oluşturulur.
+
+### Dahili Kontroller
+
+Basit kontroller için ayrı bir dış servise ihtiyaç bırakmaz. HTTP/HTTPS, TCP, Ping ve DNS kontrolleri desteklenir. Her kontrol durum, gecikme ve heartbeat geçmişi tutar.
+
+### Prometheus
+
+Prometheus instance ve target sağlığını okur. Instance çevrimiçi/çevrimdışı durumu, target up/down/unknown durumu, target gruplaması ve son hata bilgisi toplanır. Birden fazla Prometheus instance desteklenir.
+
+### Dockhand
+
+Dockhand API instance'ları birinci sınıf platform olarak izlenir. Instance bağlantısı, environment, container durumu ve container kayıtları toplanır.
+
+### Güvenlik Duvarları
+
+OPNsense, yerleşik API key/secret doğrulamasını kullanır. pfSense girdileri uyumlu bir REST API sunduğunda desteklenir.
+
+Toplanan veriler:
+
+- Gateway çevrimiçi/çevrimdışı durumu.
+- Varsa hostname, sürüm, CPU, bellek, güncelleme sayısı ve yeniden başlatma gereksinimi.
+- İzin verildiğinde interface/link durumu, adresler, açıklamalar ve sayaçlar.
+- İzin verildiğinde packet-filter durum sayıları.
+
+İsteğe bağlı bir endpoint kullanılamazsa tüm platformu başarısız saymak yerine instance kısmi veriyle çevrimiçi kalır.
+
+### TrueNAS
+
+Desteklenen yöntemler:
+
+- Güncel TrueNAS SCALE sürümleri için WebSocket JSON-RPC.
+- Eski TrueNAS CORE/SCALE kurulumları için REST v2.0 fallback.
+- `apiMode: auto` önce WebSocket'i, ardından REST'i dener.
+
+Toplanan veriler:
+
+- Cihaz çevrimiçi/çevrimdışı durumu.
+- Varsa hostname, sürüm, model, load ve bellek kapasitesi.
+- Varsa pool sağlığı, boyut, kullanılan/boş yüzdesi ve scan durumu.
+- Varsa disk durumu, model, boyut ve sıcaklık.
+- Aktif TrueNAS bildirimleri.
+
+Pool, disk, bildirim veya güncelleme endpointlerinden biri yasak ya da kullanılamazsa cihaz kısmi veriyle çevrimiçi kalır.
+
+### QNAP
+
+QNAP sistemleri resmî QTS HTTP API giriş akışını (`authLogin.cgi`) kullanır ve dönen sessionı File Station `check_sid` isteğiyle doğrular. Kullanıcı adı/parolaya sahip bir izleme hesabı yapılandırın veya OmniSight'ın giriş yapmasını istemiyorsanız mevcut SID/token sağlayın.
+
+Toplanan veriler:
+
+- Cihaz çevrimiçi/çevrimdışı durumu.
+- Hostname, model, firmware ve çalışma süresi.
+- CPU ve RAM kullanımı ile sıcaklıklar.
+- Storage kapasitesi, volume bilgisi ve disk sayısı/sağlığı.
+- QTS/File Station HTTP API session doğrulama durumu.
+
+İzleme hesabı QNAP administrators grubunda olmalıdır; aksi halde bazı detay metrikleri gösterilmeyebilir.
+
+### UGREEN
+
+UGREEN ürün dokümanları ve indirmeler yayınlasa da kararlı, herkese açık bir UGOS Pro izleme API'si sunmuyor. Bu nedenle OmniSight yapılandırılan UGOS Pro endpointini web erişilebilirlik kontrolü olarak izler.
+
+Toplanan veriler:
+
+- Endpoint çevrimiçi/çevrimdışı durumu.
+- Erişilebildiğinde HTTP durum kodu.
+- Yapılandırılan sistem adı ve URL.
+
+### Proxmox Backup Server
+
+Toplanan veriler:
+
+- Yedekleme sunucusu çevrimiçi/çevrimdışı durumu.
+- Varsa sürüm ve node durumu.
+- Varsa datastore kapasitesi, kullanım yüzdesi, grup ve snapshot sayıları.
+- Son görev durumu.
+
+`PBSAPIToken` biçiminde API tokenı kullanın. Datastore veya task endpointleri yasaksa sunucu kısmi veriyle çevrimiçi kalır.
+
+### Portainer
+
+Toplanan veriler:
+
+- Portainer instance çevrimiçi/çevrimdışı durumu ve varsa sürüm.
+- Environment listesi ve durumları.
+- Varsa stack sayısı ve uyarı durumu.
+- İzin verildiğinde Docker uyumlu environmentlar için hafif container özetleri.
+
+Portainer access tokenı kullanın. Kullanıcının stack veya Docker gateway endpoint izinleri yoksa instance kısmi veriyle çevrimiçi kalır.
+
+### Veritabanları
+
+PostgreSQL, MySQL, MariaDB ve MongoDB desteklenir.
+
+Toplanan veriler:
+
+- Up/down durumu.
+- Sürüm.
+- Aktif ve azami bağlantı sayısı.
+- Veritabanı boyutu.
+
+İzleme kullanıcısının bağlantı veya boyut metriklerine izni yoksa temel erişilebilirlik çalışmaya devam ederken bu alanlar gösterilmeyebilir.
+
+## 6. Ajan Sistemi
+
+Ajan, hedef sistemde çalışan küçük bir bash veya PowerShell scriptidir. Gelen bağlantı portuna ihtiyaç duymaz; OmniSight'a giden HTTP(S) bağlantısıyla rapor gönderir.
+
+### Kurulum Modeli
+
+Ayarlar'daki uygun işlemi kullanın:
+
+- Linux Server → Sistem Ekle.
+- Proxmox → Node Ekle.
+- Docker → Host Ekle.
+
+Desteklenen kurulum biçimleri:
+
+- Binary/systemd.
+- Docker container.
+- Docker Stack/Swarm.
+
+Örnek binary kurulumu:
+
+```bash
+curl -fsSL https://omnisight.example/agent/install.sh | \
+  sudo OMNISIGHT_URL=https://omnisight.example OMNISIGHT_TOKEN=<token> bash
+```
+
+Kendinden imzalı TLS için:
+
+```bash
+curl -fsSL --insecure https://omnisight.example/agent/install.sh | \
+  sudo OMNISIGHT_URL=https://omnisight.example OMNISIGHT_TOKEN=<token> OMNISIGHT_INSECURE_TLS=1 bash
+```
+
+### Ajan Endpointleri
+
+| Endpoint | Amaç |
+|---|---|
+| `/api/agent/ping` | Token ve panel erişilebilirlik testi |
+| `/api/agent/report` | Metrik ve envanter raporunu alma |
+| `/api/agent/commands` | Long-poll komut kanalı |
+| `/api/agent/result` | Komut sonucunu yükleme |
+
+### Komut Kanalı
+
+Arayüz servis yeniden başlatma, Docker kayıtları, Docker prune veya ajan güncellemesi gibi bir işlem başlattığında:
+
+1. Backend `src/agents.js` içinde bekleyen bir komut oluşturur.
+2. Ajan komutu long-poll üzerinden alır.
+3. Komut hedef sunucuda yerel olarak çalışır.
+4. Ajan stdout/stderr sonucunu `/api/agent/result` adresine gönderir.
+5. Arayüz sonucu gösterir.
+
+### Ajan Rolleri
+
+| Rol | Davranış |
+|---|---|
+| `linux` | Sistem metrikleri ve systemd servisleri |
+| `windows` | Windows sunucu metrikleri ve Windows servisleri |
+| `proxmox` | Linux metriklerine ek olarak Proxmox `pvesh`, VM/LXC, storage, Ceph, backup ve SMART |
+| `docker` | Docker sunucu/container metrikleri, kayıtlar ve prune |
+
+### Tanılama ve Onarım
+
+Ajanlar sayfasında önce **Ajanı kontrol et** komutunu kullanın. Bu komut servis durumunu, son kayıtları ve panel erişimini kontrol eder; ajanı yeniden başlatmaz veya onarmaz.
+
+Onarım komutu gerektiğinde:
+
+- Mevcut `/etc/omnisight-agent/agent.env` dosyasını okur.
+- Ajan kimliğini korur.
+- Güncel panel URL'si ve token ile kurulum scriptini indirir.
+- Ajanı yeniden kurar ve systemd servisini başlatır.
+
+Servis mevcut değilse kurulum scripti systemd unitini yeniden oluşturur. Timeout, DNS, bağlantı veya TLS hatasında ajanı onarmak yerine önce ağ, panel adresi ve sertifikayı düzeltin.
+
+## 7. Ayarlar ve Yapılandırma
+
+Ayarlar sayfası `data/config.yaml` dosyasının arayüz karşılığıdır.
+
+### Ana Bölümler
+
+| Bölüm | Amaç |
+|---|---|
+| Sistem | Saat dilimi, saat biçimi, varsayılan dönem, geçmiş saklama, düşük I/O, dil, yan panel ve yedekleme |
+| Durum Sayfası | Herkese açık sayfa görünümü, görünür platformlar ve Bakım Modu |
+| Kullanıcılar ve roller | Kullanıcılar, roller ve parola sıfırlama ayarı |
+| Oturumlar ve erişim | Aktif oturumlar, tarayıcı/IP, zorla çıkış ve public IP allowlist |
+| Sertifikalar | CA yükleme ve güven deposu |
+| Platform kartları | Proxmox, Linux, Kubernetes, SNMP, Healthchecks, Uptime Kuma, Checks, Prometheus, Docker, Dockhand ve Database |
+| Bildirimler | Kaynak eşikleri, bildirim zamanlaması, anomali algılama, sunucu güncellemeleri, webhook ve bildirim kanalları |
+
+### Yapılandırma Kaydetme Davranışı
+
+- Boş bırakılan maskeli secret alanı mevcut secret değerini silmez.
+- Yapılandırma şifrelemesi açıksa hassas alanlar şifrelenir.
+- `ui` ve `topology` yan ayarları ayrı saklanabilir.
+- Kaydet ve Uygula, çalışma zamanı önbelleğini yeni yapılandırmaya göre yeniden şekillendirir.
+- Bakım Modu aktif zaman penceresinde bildirim gönderimini susturur; izleme ve veri toplama devam eder.
+
+### Yapılandırma Şifrelemesi
+
+Yapılandırma şifrelemesi varsayılan olarak açıktır.
+
+- Anahtar kaynağı: `OMNISIGHT_SECRET` veya `data/secret.key`.
+- Algoritma: AES-256-GCM.
+- Token, password, apiKey, tokenSecret, botToken, sshKey ve benzeri hassas alanlar şifrelenir.
+
+`data/secret.key` kaybolursa önceden şifrelenen secret değerleri çözülemez.
+
+## 8. Kullanıcılar, Roller ve Güvenlik
+
+### Roller
+
+| Rol | İzinler |
+|---|---|
+| admin | Tüm ayarlar, kullanıcı/oturum yönetimi, ajan onarımı ve yapılandırma içe/dışa aktarma |
+| operator | Operasyonel işlemler, bildirim onaylama/susturma ve kendi profili |
+| read-only | Salt okunur erişim; secret ve hassas alanlar gizlenir |
+
+### Kimlik Doğrulama
+
+- İlk çalıştırmada onboarding ilk admin kullanıcısını oluşturur.
+- Giriş sayfasındaki self-registration yalnızca read-only kullanıcı oluşturur ve admin tarafından kapatılabilir.
+- Parolalar salt eklenmiş hash olarak saklanır.
+- Giriş denemeleri rate limit ile sınırlandırılır.
+- Cookie'ler `HttpOnly` ve `SameSite=Strict` kullanır.
+- TOTP 2FA isteğe bağlıdır.
+- Passkey desteklenir.
+- Geçici parola ile oluşturulan kullanıcı panele devam etmeden önce parolasını değiştirmelidir.
+
+### Oturumlar ve Erişim
+
+Ayarlar'daki Oturumlar ve erişim bölümü:
+
+- Aktif giriş oturumlarını listeler.
+- Kullanıcı adı, tarayıcı, User-Agent, IP, public IP, oluşturulma, sona erme ve son görülme zamanını gösterir.
+- Adminin bir oturumdan zorla çıkış yaptırmasına izin verir.
+- Zorla çıkış tokenı siler; kullanıcı tekrar parola ve etkinse 2FA ile giriş yapmalıdır.
+- Allowed public IPs boş değilse platforma yalnızca bu public IP'lerden erişilebilir.
+- Yanlışlıkla kilitlenmeyi önlemek için backend mevcut admin public IP'sini içermeyen dolu bir allowlist kaydetmez.
+
+## 9. Bildirimler ve Olay Merkezi
+
+Bildirim motoru çalışma zamanı önbelleğini sorunlar ve düzelmeler için değerlendirir.
+
+### Bildirim Kaynakları
+
+- Platform down/up.
+- Sunucu offline/online.
+- Servis failed/recovered.
+- Docker container stopped/failed.
+- Kubernetes pod failed/pending.
+- Prometheus target down.
+- Healthchecks down/grace.
+- CPU/RAM/disk kaynak eşikleri.
+- CPU/RAM anomali algılama.
+- Linux/Windows bekleyen güncellemeleri.
+- Webhook olayları.
+
+Bildirim ayarları kategori başına `durationSeconds` tanımlayabilir. `rules.default` varsayılan olarak 60 saniyedir ve Proxmox servis durumu ya da Prometheus instance erişimi gibi daha özel kuralı olmayan kontroller için kullanılır. Anında bildirim için `0` yapın.
+
+### Bildirim Kanalları
+
+- ntfy.
+- Telegram.
+- Mattermost gelen webhook; payload Slack/Rocket.Chat ile uyumludur.
+- SMTP.
+
+### Bakım Modu
+
+Bakım Modu, Durum Sayfası ayarlarında başlangıç, bitiş ve günlere göre yapılandırılır. Aktif pencere sırasında sorunlar izlenmeye devam eder ancak bildirim kanallarına gönderim yapılmaz. Bakım penceresi sona erdiğinde normal bildirim akışı devam eder.
+
+### Cooldown ve Tekrarlı Bildirim Engelleme
+
+Aynı sorunun tekrar tekrar gönderilmemesi için olay imzası ve cooldown kullanılır. Varsayılan cooldown bir saattir.
+
+Ortam değişkeni:
+
+```bash
+OMNISIGHT_ALERT_COOLDOWN_MS=3600000
+```
+
+### Olay Merkezi
+
+Olay Merkezi şunları birleştirir:
+
+- Çalışma zamanı kayıtları.
+- Denetim olayları.
+- Bildirim geçmişi ve zaman çizelgesi.
+- Onaylama.
+- Geçici susturma ve susturmayı kaldırma.
+
+Adminler denetim olaylarını `/api/audit/export?format=json|csv|syslog` üzerinden dışa aktarabilir. Artımlı dışa aktarma için `since` ve `limit` query parametreleri desteklenir.
+
+### Webhook Olayları
+
+Harici sistemler olay gönderebilir:
+
+```bash
+curl -fsS https://omnisight.example/api/webhook/event \
+  -H "Authorization: Bearer <webhook-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Backup failed","severity":"critical","source":"backup01","key":"backup01:nightly"}'
+```
+
+## 10. Topoloji
+
+Topoloji platformlar, sunucular ve iş yükleri arasındaki ilişkileri görselleştirir.
+
+Özellikler:
+
+- Platform node'ları.
+- Sunucu ve iş yükü node'ları.
+- Elle düzenlenebilir bağlantılar.
+- Kalıcı konumlar.
+- Panel sağlık verisine göre durum renkleri.
+- Proxmox altyapı ilişkilerine ek olarak UniFi controller cihazlarından otomatik ağ ilişkileri.
+
+UniFi verisi seyrek ve önbellekli okunur. Aynı cihaz SNMP ile de izleniyorsa topolojide ikinci kez gösterilmez. Topoloji yapılandırması, yerleşim verisinin platform ayarlarından ayrı yönetilebilmesi için yan durum olarak saklanır.
+
+## 11. Yedekleme, Geri Yükleme ve Felaket Kurtarma
+
+### Yedek Türleri
+
+| Tür | İçerik |
+|---|---|
+| Yapılandırma yedeği | `config.yaml` ve platform ayarları |
+| Tam yedek | Kullanıcılar, secret key, sertifikalar, ikonlar, geçmiş ve önemli veri dosyaları |
+
+### Geri Yükleme Davranışı
+
+- Yapılandırma geri yükleme ayarları değiştirir.
+- Tam geri yükleme aktif oturumları temizler.
+- Tam geri yüklemeden sonra kullanıcı giriş ekranına dönmelidir.
+- Geri yüklemeden sonra OmniSight'ı yeniden başlatmak önerilir.
+
+### Felaket Kurtarma Akışı
+
+1. OmniSight'ı durdurun.
+2. `data/` volume'ünü geri yükleyin.
+3. `data/secret.key` dosyasının geri geldiğini doğrulayın.
+4. OmniSight'ı başlatın.
+5. Giriş yapın.
+6. Ayarlar, Ajanlar ve Olay Merkezi'ni kontrol edin.
+
+## 12. Demo, Üretim ve Dağıtım
+
+### Yerel Node.js
+
+```bash
+npm install
+npm start
+```
+
+Varsayılan portlar:
+
+- Üretim paneli: `3000`.
+- Etkinse demo listener: `4000`.
+
+### Native Kurulum (LXC / bare metal, systemd)
+
+OmniSight Docker olmadan doğrudan `systemd` altında çalışabilir. `scripts/` altındaki iki script varsayılan olarak upstream repository'yi kullanır. Ortama özel değerler environment variable ile değiştirildiği için aynı script farklı kurulumlarda değişmeden çalışır.
+
+**Debian/Ubuntu container, VM veya bare-metal sunucu içinde:** `scripts/install-lxc.sh`, Node.js kurar, repository'yi `/opt/omnisight` altına klonlar, `npm ci --omit=dev` çalıştırır, yetkisiz `omnisight` kullanıcısını oluşturur ve sıkılaştırılmış systemd unitini kurup başlatır.
+
+```bash
+bash scripts/install-lxc.sh                          # yeni kurulum
+bash /opt/omnisight/scripts/install-lxc.sh --update  # daha sonra yerinde güncelleme
+```
+
+Kurulum scriptini ayrı indirip incelemek için:
+
+```bash
+curl --proto '=https' --tlsv1.2 -fLo install-lxc.sh \
+  https://raw.githubusercontent.com/caglaryalcin/OmniSight/main/scripts/install-lxc.sh
+less install-lxc.sh
+sudo bash install-lxc.sh
+```
+
+**Proxmox VE 8/9 sunucusunda:** `scripts/proxmox-lxc.sh`, AdGuard gibi uygulamaların kullandığı resmî Community Scripts arayüzünü açar. Yetkisiz Debian 13 LXC oluşturur ve son kararlı OmniSight sürümünü içine kurar.
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/caglaryalcin/OmniSight/main/scripts/proxmox-lxc.sh)"
+```
+
+Önerilen 2 CPU, 1 GB RAM ve 6 GB disk için **Default Install** seçin. Container türü, root parolası, CTID, hostname, disk, CPU, RAM, bridge, IPv4/IPv6, DNS, MAC, VLAN, SSH, FUSE, TUN/TAP, nesting, GPU passthrough, APT cache, saat dilimi, protection ve verbose ayarları için **Advanced Install** seçin. Birden fazla uyumlu pool varsa template ve container depolaması Community Scripts storage-pool ekranından seçilir. Framework doğrulama, template indirme, container oluşturma ve başarısız kurulum temizliğini yönetir.
+
+Mevcut Debian/Ubuntu sistemi içinde kullanılan bağımsız `scripts/install-lxc.sh` değişkenleri:
+
+| Değişken | Kullanım | Varsayılan | Amaç |
+|---|---|---|---|
+| `OMNISIGHT_REPO` | kurulum | `https://github.com/caglaryalcin/OmniSight.git` | HTTPS kaynak repository; URL içine gömülü kimlik bilgileri reddedilir |
+| `OMNISIGHT_BRANCH` | kurulum | `main` | Checkout yapılacak branch |
+| `OMNISIGHT_DIR` | kurulum | `/opt/omnisight` | Kurulum dizini |
+| `OMNISIGHT_PORT` | kurulum | `3000` | Dinleme portu |
+| `NODE_MAJOR` | kurulum | `22` | Node.js ana sürümü |
+| `OMNISIGHT_TOKEN_FILE` | kurulum | boş | Private repository için root tarafından okunabilen token dosyası |
+| `OMNISIGHT_TOKEN_USER` | kurulum | `oauth2` | Private repository tokenıyla kullanılan kullanıcı adı |
+
+Private repository için tokenı URL içine yazmak yerine root-only dosya oluşturun:
+
+```bash
+install -m 0600 /dev/null /root/omnisight-repo.token
+printf '%s' '<read-only-token>' > /root/omnisight-repo.token
+OMNISIGHT_TOKEN_FILE=/root/omnisight-repo.token sudo bash install-lxc.sh
+```
+
+Bağımsız kurulum scripti tokenı geçici bir `GIT_ASKPASS` yardımcısıyla Git'e verir, `origin` URL'sini kimlik bilgisiz tutar ve tokenı remote URL'ye yazmaz.
+
+**Başarısız kurulum temizliği:** Community Scripts seçilen template, storage, ağ ve kaynakları doğrular. Standart kurtarma ekranı başarısız LXC'nin silinmesini veya tanılama için tutulmasını yönetir.
+
+**`--update` davranışı:** İzlenen dosyalarda yerel değişiklik varsa güncelleme devam etmez. Seçilen branch fetch edilir, alınan commit checkout edilir, production bağımlılıkları yeniden kurulur, sahiplik düzeltilir ve servis yeniden başlatılır. Yerel değişiklikler sessizce silinmez.
+
+**Systemd uniti:** `User=omnisight`, `ExecStart=node --openssl-legacy-provider server.js` ve `Restart=on-failure` ile çalışır. `NoNewPrivileges`, `PrivateTmp`, `ProtectSystem=strict`, `ProtectHome` ve `ReadWritePaths=$APP_DIR/data` ile sıkılaştırılmıştır. Çalışma zamanında yalnızca kalıcı olması gereken `data/` dizinine yazabilir. `systemctl status|restart omnisight` ve `journalctl -u omnisight` ile yönetin.
+
+**Desteklenen kapsam:** Kurulum scripti Debian/Ubuntu (`apt` + NodeSource) hedefler ve Node 20.19+ gerektirir. Diğer dağıtımlarda desteklenen Node.js sürümünü kurun, repository'yi klonlayın, `npm ci --omit=dev` çalıştırın ve aynı `ExecStart`, `NODE_ENV=production` ve `ReadWritePaths` ayarlarıyla systemd uniti oluşturun.
+
+### Docker
+
+```bash
+docker compose up -d
+```
+
+Kritik gereksinim kalıcı bir `data/` volume'üdür.
+
+### Kubernetes
+
+`deploy/kubernetes.yaml`, PVC, Deployment ve Service tanımlarını içerir.
+
+Üretimden önce kontrol edin:
+
+- Image tag.
+- PVC.
+- Service portu.
+- İsteğe bağlı health endpointi: `/healthz`.
+- İsteğe bağlı readiness endpointi: `/readyz`.
+- Gerekiyorsa Secret olarak `OMNISIGHT_SECRET`.
+- Gerektiğinde `data/certs/` veya `NODE_EXTRA_CA_CERTS` üzerinden CA yönetimi.
+
+### Önbellek Davranışı
+
+Üretim dağıtımından sonra eski arayüzü önlemek için:
+
+- HTML yanıtları no-store/no-cache kullanır.
+- `sw.js` eski cache'leri temizler ve network-only çalışır.
+- JS/CSS dosyaları yeniden doğrulanır.
+- Dil paketleri `no-store` ile istenir.
+
+Bu ayarlar güncellemelerden sonra Ctrl+F5 ihtiyacını azaltır.
+
+## 13. API ve Entegrasyon Yüzeyi
+
+| Endpoint | Amaç |
+|---|---|
+| `GET /healthz` | Node.js sürecinin yanıt verdiğini doğrulayan hafif health endpointi |
+| `GET /readyz` | Data volume ve çekirdek durum dosyalarının okunup yazılabildiğini doğrulayan readiness endpointi |
+| `GET /api/status` | Tam çalışma zamanı durumu |
+| `GET /api/status/dashboard` | Panel için optimize edilmiş durum |
+| `GET /api/status/summary` | Hafif özet |
+| `GET /api/status/stream` | SSE durum akışı |
+| `GET /api/config` | Yapılandırmayı oku |
+| `POST /api/config` | Yapılandırmayı kaydet |
+| `GET /api/settings/status` | Ayarlar için hafif durum |
+| `GET /api/settings/agents` | Ayarlar için ajan satırları |
+| `GET /api/agents` | Ajanlar sayfası envanteri |
+| `GET /api/agent/repair-commands` | Admin onarım komutları |
+| `POST /api/agent/report` | Ajan raporunu al |
+| `GET /api/agent/commands` | Ajan long-poll komutları |
+| `POST /api/agent/result` | Ajan komut sonucu |
+| `POST /api/webhook/event` | Harici olay alma |
+| `GET /api/public/status` | Herkese açık durum verisi |
+| `GET /api/about` | Sürüm ve yazar bilgisi |
+
+Kimlik doğrulamalı endpointler session cookie veya `x-session-token` headerı gerektirir. Ajan endpointleri `X-Agent-Token`, webhook olayları bearer/webhook tokenıyla korunur.
+
+## 14. Sorun Giderme
+
+### Ajan Çevrimdışı
+
+Hedef sunucuda:
+
+```bash
+sudo systemctl status omnisight-agent --no-pager -l
+sudo journalctl -u omnisight-agent -n 120 --no-pager
+```
+
+Panel erişilebilirlik testi:
+
+```bash
+sudo bash -lc 'set -a; . /etc/omnisight-agent/agent.env; set +a; printf "{\"id\":\"%s\"}" "$OMNISIGHT_AGENT_ID" > /tmp/os-ping.json; curl -k -sS -w "\nhttp=%{http_code} time=%{time_total}s\n" -H "X-Agent-Token: $OMNISIGHT_TOKEN" -H "Content-Type: application/json" --data-binary @/tmp/os-ping.json "$OMNISIGHT_URL/api/agent/ping"'
+```
+
+Kontrol edin:
+
+- Token doğru mu?
+- URL doğru mu?
+- TLS CA sorunu var mı?
+- DNS çözümleme çalışıyor mu?
+- Panel pod/container yeniden başlıyor mu?
+- İşletim sistemi yeniden kurulup ajan env dosyası kayboldu mu?
+
+### Eksik Proxmox Metrikleri
+
+- API token izinlerini kontrol edin.
+- Proxmox API'nin ilgili metriği sunduğunu doğrulayın.
+- NVMe/SMART/CPU sıcaklığı için ajan veya SSH fallback kurun.
+- Ceph için node üzerinde `ceph status` ve `ceph df` çalıştırın.
+
+### Eksik Docker Verisi
+
+- Ajan modunda Docker socket mount edildi mi?
+- Ajan containerında Docker CLI var mı?
+- API modunda TLS ve insecure ayarları doğru mu?
+- SSH modunda kullanıcı Docker komutlarını çalıştırabiliyor mu?
+
+### Eksik Kubernetes Verisi
+
+- Kubeconfig yolu doğru mu?
+- Hesabın namespace ve kaynak izinleri var mı?
+- Metrics API yoksa CPU/RAM metrikleri görünmeyebilir.
+
+### Dağıtımdan Sonra Eski Arayüz
+
+- Yeni image'ın cache düzeltmelerini içerdiğini doğrulayın.
+- Eski service workerın yeni `sw.js` sürümüne güncellendiğini kontrol edin.
+- Reverse proxy'nin HTML'i cache edip etmediğine bakın.
+- Ingress/CDN HTML cache kurallarını kontrol edin.
+
+### Zorla Çıkış Çalışmıyor
+
+- Ayarlar sayfasının güncel olduğunu doğrulayın.
+- Tarayıcı Network ekranında `DELETE /api/sessions/<token>` isteği 200 dönmelidir.
+- Admin olmayan kullanıcı 403 alır.
+- Token silindikten sonra hedef kullanıcı sonraki kimlik doğrulamalı istekte giriş sayfasına yönlendirilir.
+
+### Tekrarlanan Bildirimler
+
+- Bildirim key/imzası kararlı mı?
+- Cooldown environment değeri nedir?
+- Bildirim geçmişi yeniden başlatmalar arasında kalıcı mı?
+- Sorun düzeldikten sonra yeniden oluştuysa yeni olay olarak değerlendirilir.
+
+## 15. Operasyon Kontrol Listesi
+
+### Üretim Öncesi
+
+- `data/` volume kalıcı.
+- `data/secret.key` yedeklendi.
+- `/healthz` container içinden yanıt veriyor.
+- Data volume sağlıklıyken `/readyz` container içinden yanıt veriyor.
+- TLS/CA doğru.
+- Ajan tokenı mevcut.
+- Yapılandırma veya tam yedek mevcut.
+- Reverse proxy HTML'i cache etmiyor.
+- Public IP allowlist açıksa mevcut admin IP'si listede.
+
+### Yeni Platform Ekleme
+
+1. Platformu Ayarlar'dan etkinleştirin.
+2. Kimlik bilgileri, TLS ve ikon ayarlarını girin.
+3. Kaydet ve Uygula'ya basın.
+4. Paneldeki durum noktasını kontrol edin.
+5. Olay Merkezi çalışma zamanı kayıtlarını kontrol edin.
+6. Bildirimler yapılandırılmışsa test bildirimi gönderin.
+
+### Geri Yükleme Sonrası
+
+1. Giriş ekranına dönün.
+2. Admin olarak giriş yapın.
+3. Ayarlar'ı kontrol edin.
+4. Ajanların çevrimiçi durumunu kontrol edin.
+5. Olay Merkezi'nde hata olup olmadığına bakın.
+6. Çalışma zamanı durumu eski görünüyorsa uygulamayı veya podu yeniden başlatın.
+
+### Ajan Bakımı
+
+- Ajanlar sayfasındaki sürümleri kontrol edin.
+- Eski ajanlar için Güncelle'yi kullanın.
+- Çevrimdışı ajanlarda önce Ajanı kontrol et komutunu çalıştırın.
+- İşletim sistemi yeniden kurulduysa ajanı yeniden kurun; eski kimliğin korunması gerekiyorsa `OMNISIGHT_AGENT_ID` sağlayın.

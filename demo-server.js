@@ -28,9 +28,33 @@ function demoAppVersion() {
   }
   catch { return '1.0.0'; }
 }
+const demoAssetVersionCache = new Map();
+function demoAssetVersion(relativePath) {
+  const normalized = String(relativePath || '').replace(/\\/g, '/').replace(/^\/+/, '');
+  const publicRoot = path.resolve(DEMO_PUBLIC_DIR);
+  const filePath = path.resolve(DEMO_PUBLIC_DIR, normalized);
+  if (!normalized || !filePath.startsWith(publicRoot + path.sep)) return demoAppVersion();
+  try {
+    const stat = fs.statSync(filePath);
+    const signature = `${stat.size}:${Math.round(stat.mtimeMs)}`;
+    const cached = demoAssetVersionCache.get(normalized);
+    if (cached?.signature === signature) return cached.version;
+    const digest = crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex').slice(0, 12);
+    const version = `${demoAppVersion()}-${digest}`;
+    demoAssetVersionCache.set(normalized, { signature, version });
+    return version;
+  } catch {
+    return demoAppVersion();
+  }
+}
+function demoVersionedRequestAssetPath(req) {
+  const requestPath = String(req?.path || '').replace(/\/+$/, '') || '/';
+  if (requestPath === '/') return '/index.html';
+  return path.posix.extname(requestPath) ? requestPath : `${requestPath}.html`;
+}
 function demoVersionedStaticRequest(req) {
   const raw = String(req?.query?.v || '').trim();
-  return raw && raw === demoAppVersion();
+  return !!raw && (raw === demoAppVersion() || raw === demoAssetVersion(req?.path) || raw === demoAssetVersion(demoVersionedRequestAssetPath(req)));
 }
 function setDemoStaticCacheHeaders(res, filePath = '', req = null) {
   if (String(filePath).endsWith('sw.js')) {
@@ -59,6 +83,18 @@ function setDemoStaticCacheHeaders(res, filePath = '', req = null) {
   }
 }
 const DEMO_PUBLIC_DIR = path.join(__dirname, 'public');
+const DEMO_EMBED_PAGE_FILES = Object.freeze({
+  '/topology': '/topology.html',
+  '/agents': '/agents.html',
+  '/settings': '/settings.html',
+  '/event-center': '/event-center.html',
+  '/profile': '/profile.html',
+  '/docs': '/docs.html',
+  '/about': '/about.html',
+});
+function demoEmbedVersions() {
+  return Object.fromEntries(Object.entries(DEMO_EMBED_PAGE_FILES).map(([route, file]) => [route, demoAssetVersion(file)]));
+}
 const DEMO_GZIP_TYPES = new Map([
   ['.html', 'text/html; charset=utf-8'],
   ['.js', 'application/javascript; charset=utf-8'],
@@ -69,13 +105,16 @@ const DEMO_GZIP_TYPES = new Map([
 const demoGzipCache = new Map();
 const demoHtmlCache = new Map();
 function injectDemoRuntimeConstants(html) {
-  return String(html).replace(/__OMNISIGHT_VERSION_JSON__/g, JSON.stringify(demoAppVersion()));
+  return String(html)
+    .replace(/__OMNISIGHT_VERSION_JSON__/g, JSON.stringify(demoAppVersion()))
+    .replace(/__OMNISIGHT_EMBED_VERSIONS_JSON__/g, JSON.stringify(demoEmbedVersions()));
 }
 function injectDemoAssetVersion(html) {
-  const v = encodeURIComponent(demoAppVersion());
+  const i18nVersion = encodeURIComponent(demoAssetVersion('/i18n.js'));
+  const logoVersion = encodeURIComponent(demoAssetVersion('/assets/omnisight-logo.svg'));
   return String(html)
-    .replace(/(<script\b[^>]*\bsrc=["'])\/i18n\.js(["'][^>]*>)/gi, `$1/i18n.js?v=${v}$2`)
-    .replace(/(["'])\/assets\/omnisight-logo\.svg(\?v=[^"']*)?(["'])/gi, `$1/assets/omnisight-logo.svg?v=${v}$3`);
+    .replace(/(<script\b[^>]*\bsrc=["'])\/i18n\.js(["'][^>]*>)/gi, `$1/i18n.js?v=${i18nVersion}$2`)
+    .replace(/(["'])\/assets\/omnisight-logo\.svg(\?v=[^"']*)?(["'])/gi, `$1/assets/omnisight-logo.svg?v=${logoVersion}$3`);
 }
 function renderDemoHtml(filePath, stat = null) {
   const cacheKey = stat ? `${filePath}:${stat.size}:${Math.round(stat.mtimeMs)}:${demoAppVersion()}` : '';
@@ -931,7 +970,7 @@ function demoStatus() {
     targets: prometheusTargets,
   };
 
-  const containers = ['nginx', 'api', 'postgres', 'redis', 'prometheus', 'node-exporter'].map((name, i) => ({
+  const containers = ['nginx', 'api', 'postgres', 'redis', 'prometheus', 'iperf3-client'].map((name, i) => ({
     id: crypto.createHash('sha1').update(name).digest('hex').slice(0, 12),
     name,
     image: `${name}:demo`,
@@ -939,21 +978,21 @@ function demoStatus() {
     imageUpdate: i === 1 || i === 4
       ? { status: 'update', checkedAt: nowIso(-300_000) }
       : { status: 'current', checkedAt: nowIso(-300_000) },
-    state: 'running',
-    status: 'running',
-    color: 'green',
-    cpu: Number((2 + i * 1.7).toFixed(1)),
-    mem: Number((1.2 + i * 0.8).toFixed(1)),
-    memPercent: Number((1.2 + i * 0.8).toFixed(1)),
-    netIO: `${(i + 1) * 12} MB / ${(i + 1) * 8} MB`,
-    blockIO: `${i * 3} MB / ${i * 2} MB`,
+    state: i === 5 ? 'created' : 'running',
+    status: i === 5 ? 'created' : 'running',
+    color: i === 5 ? 'yellow' : 'green',
+    cpu: i === 5 ? 0 : Number((2 + i * 1.7).toFixed(1)),
+    mem: i === 5 ? 0 : Number((1.2 + i * 0.8).toFixed(1)),
+    memPercent: i === 5 ? 0 : Number((1.2 + i * 0.8).toFixed(1)),
+    netIO: i === 5 ? '' : `${(i + 1) * 12} MB / ${(i + 1) * 8} MB`,
+    blockIO: i === 5 ? '' : `${i * 3} MB / ${i * 2} MB`,
     ports: i === 0 ? ['443:443'] : [],
   }));
   data.docker = [{
     name: 'demo-docker',
     host: 'demo@192.0.2.30:22',
     online: true,
-    summary: { total: containers.length, running: containers.length, stopped: 0, cpu: hDockerNow.cpu || 22, memPercent: hDockerNow.mem || 18, updates: 2, unused: 3 },
+    summary: { total: containers.length, running: containers.filter(c => c.state === 'running').length, stopped: 0, pending: containers.filter(c => c.state === 'created').length, cpu: hDockerNow.cpu || 22, memPercent: hDockerNow.mem || 18, updates: 2, unused: 3 },
     history: hDocker,
     containers,
   }];
@@ -963,6 +1002,9 @@ function demoStatus() {
     instances: [{ name: 'dockhand-demo', url: 'https://dockhand.example.invalid', online: true, summary: { total: containers.length, running: containers.length, stopped: 0 } }],
     containers: containers.map((c, i) => ({
       ...c,
+      state: 'running',
+      status: 'running',
+      color: 'green',
       sourceName: 'dockhand-demo',
       sourceUrl: 'https://dockhand.example.invalid',
       environmentId: 'demo-env',
@@ -1311,6 +1353,11 @@ function publicSummary(data = demoStatus()) {
         const down = Number(sm.down || 0);
         return down > 0 && down >= up ? 'down' : (down > 0 || Number(sm.grace || 0) > 0 ? 'degraded' : 'healthy');
       }
+      if (id === 'docker') {
+        const total = data.docker.reduce((sum, host) => sum + Number(host.summary?.total || 0), 0);
+        const running = data.docker.reduce((sum, host) => sum + Number(host.summary?.running || 0), 0);
+        return running < total ? 'degraded' : 'healthy';
+      }
       return id === 'uptimekuma' ? 'degraded' : 'healthy';
     })();
     return { id, name: names[id] || id, status, detail, ...platformAvailability(data, id) };
@@ -1625,10 +1672,6 @@ self.addEventListener('activate', event => {
 
 app.use(requireDemoPageAuth);
 app.use(compressedDemoStatic);
-app.get('/docs.md', (req, res) => {
-  res.setHeader('Cache-Control', 'no-cache, must-revalidate');
-  res.type('text/markdown; charset=utf-8').sendFile(path.join(__dirname, 'DOCUMENTATION.md'));
-});
 app.use(express.static(path.join(__dirname, 'public'), {
   extensions: ['html'],
   setHeaders: (res, filePath) => setDemoStaticCacheHeaders(res, filePath, res.req),

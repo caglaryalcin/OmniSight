@@ -6,8 +6,26 @@ const assert = require('assert');
 
 async function main() {
   // 1) Core modules load
-  const { dispatchAlert } = require('../src/alerts');
+  const { dispatchAlert, serverUpdateNotificationsEnabled, buildServerUpdateDetections } = require('../src/alerts');
   const { encryptConfigValue, isEncrypted, decryptConfig } = require('../src/crypto');
+
+  assert.strictEqual(serverUpdateNotificationsEnabled({}), false);
+  assert.strictEqual(serverUpdateNotificationsEnabled({ detections: { serverUpdates: true } }), true);
+  const updateDetections = buildServerUpdateDetections({
+    linux: [
+      { name: 'deb01', online: true, updates: { count: 2 } },
+      { name: 'offline-linux', online: false, updates: { count: 5 } },
+      { name: 'unknown-linux', online: true, updates: null },
+    ],
+    windows: [
+      { name: 'win01', online: true, updates: { count: 0 } },
+      { name: 'connecting-windows', online: true, _connecting: true, updates: { count: 3 } },
+    ],
+  });
+  assert.deepStrictEqual(updateDetections.map(d => [d.key, d.ok, d.severity, d.value]), [
+    ['lx:deb01:updates', false, 'warning', 2],
+    ['win:win01:updates', true, 'normal', 0],
+  ]);
 
   // 2) Crypto round-trip for a sensitive key
   const enc = encryptConfigValue('password', 's3cret');

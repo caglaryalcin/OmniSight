@@ -173,6 +173,8 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 .arr-item:last-child{margin-bottom:0}
 .arr-hdr{display:flex;align-items:center;gap:8px;padding:10px 14px;cursor:pointer;background:var(--row);transition:background .1s;user-select:none}
 .arr-hdr:hover{background:rgba(255,255,255,.05)}
+.arr-hdr-static{cursor:default}
+.arr-hdr-static:hover{background:var(--row)}
 .arr-hdr-name{font-size:13px;font-weight:600;flex:1}
 .arr-hdr-name.with-info{display:flex;align-items:center;gap:7px;min-width:0}
 .arr-body{padding:14px;border-top:1px solid var(--border)}
@@ -371,9 +373,10 @@ html[data-theme="light"] .ci-help{color:#53657c}
     <button class="settings-nav-btn" type="button" data-nav-parent="general" data-target="certificates" onclick="showSettingsSection('certificates')"><span class="settings-nav-dot" data-nav-dot="certificates"></span><span>Certificates</span></button>
     <button class="settings-nav-btn" type="button" data-nav-parent="general" data-target="alerts" onclick="showSettingsSection('alerts')"><span class="settings-nav-dot" data-nav-dot="alerts"></span><span>Alerts</span></button>
     <div class="settings-nav-group" data-nav-group="security"><span>Security</span></div>
-    <button class="settings-nav-btn" type="button" data-nav-parent="security" data-target="users" data-admin-section="1" onclick="showSettingsSection('users')"><span class="settings-nav-dot" data-nav-dot="users"></span><span>Users & roles</span></button>
-    <button class="settings-nav-btn" type="button" data-nav-parent="security" data-target="sessions" data-admin-section="1" onclick="showSettingsSection('sessions')"><span class="settings-nav-dot" data-nav-dot="sessions"></span><span>Sessions & access</span></button>
+    <button class="settings-nav-btn" type="button" data-nav-parent="security" data-target="users" data-admin-section="1" onclick="showSettingsSection('users')"><span class="settings-nav-dot" style="background:var(--blue)"></span><span>Users & roles</span></button>
+    <button class="settings-nav-btn" type="button" data-nav-parent="security" data-target="sessions" data-admin-section="1" onclick="showSettingsSection('sessions')"><span class="settings-nav-dot" style="background:var(--blue)"></span><span>Sessions & access</span></button>
     <div class="settings-nav-group" data-nav-group="docker"><span>Docker</span></div>
+    <button class="settings-nav-btn" type="button" data-nav-parent="docker" data-target="kubernetes" onclick="showSettingsSection('kubernetes')"><span class="settings-nav-dot" data-nav-dot="kubernetes"></span><span>Kubernetes</span></button>
     <button class="settings-nav-btn" type="button" data-nav-parent="docker" data-target="docker" onclick="showSettingsSection('docker')"><span class="settings-nav-dot" data-nav-dot="docker"></span><span>Host</span></button>
     <button class="settings-nav-btn" type="button" data-nav-parent="docker" data-target="dockhand" onclick="showSettingsSection('dockhand')"><span class="settings-nav-dot" data-nav-dot="dockhand"></span><span>Dockhand</span></button>
     <button class="settings-nav-btn" type="button" data-nav-parent="docker" data-target="portainer" onclick="showSettingsSection('portainer')"><span class="settings-nav-dot" data-nav-dot="portainer"></span><span>Portainer</span></button>
@@ -390,7 +393,6 @@ html[data-theme="light"] .ci-help{color:#53657c}
     <button class="settings-nav-btn" type="button" data-nav-parent="os" data-target="windows" onclick="showSettingsSection('windows')"><span class="settings-nav-dot" data-nav-dot="windows"></span><span>Windows Server</span></button>
     <div class="settings-nav-group" data-nav-group="infra"><span>Infrastructure</span></div>
     <button class="settings-nav-btn" type="button" data-nav-parent="infra" data-target="proxmox" onclick="showSettingsSection('proxmox')"><span class="settings-nav-dot" data-nav-dot="proxmox"></span><span>Proxmox</span></button>
-    <button class="settings-nav-btn" type="button" data-nav-parent="infra" data-target="kubernetes" onclick="showSettingsSection('kubernetes')"><span class="settings-nav-dot" data-nav-dot="kubernetes"></span><span>Kubernetes</span></button>
     <button class="settings-nav-btn" type="button" data-nav-parent="infra" data-target="healthchecks" onclick="showSettingsSection('healthchecks')"><span class="settings-nav-dot" data-nav-dot="healthchecks"></span><span>Healthchecks</span></button>
     <button class="settings-nav-btn" type="button" data-nav-parent="infra" data-target="uptimekuma" onclick="showSettingsSection('uptimekuma')"><span class="settings-nav-dot" data-nav-dot="uptimekuma"></span><span>Uptime Kuma</span></button>
     <button class="settings-nav-btn" type="button" data-nav-parent="infra" data-target="checks" onclick="showSettingsSection('checks')"><span class="settings-nav-dot" data-nav-dot="checks"></span><span>Service checks</span></button>
@@ -502,6 +504,7 @@ html[data-theme="light"] .ci-help{color:#53657c}
         <input id="restore-full-file" type="file" accept=".yaml,.yml,application/x-yaml,text/yaml,text/plain" style="display:none" onchange="importFullBackup(this)">
       </div>
     </div>
+
   </div>
 </div>
 
@@ -645,6 +648,34 @@ html[data-theme="light"] .ci-help{color:#53657c}
         <label class="check-chip"><input type="checkbox" value="veeam" checked> Veeam</label>
         <label class="check-chip"><input type="checkbox" value="portainer" checked> Portainer</label>
         <label class="check-chip"><input type="checkbox" value="database" checked> Databases</label>
+      </div>
+    </div>
+
+    <div class="arr-item">
+      <div class="arr-hdr arr-hdr-static">
+        <span class="arr-hdr-name with-info">Maintenance Mode <button type="button" class="info-btn" onclick="openAlertInfo(event,'maintenanceWindow')" aria-label="Maintenance Mode info">i</button></span>
+      </div>
+      <div class="arr-body">
+        <div class="form-grid g3">
+          <div class="form-group">
+            <label>Status</label>
+            <div class="inline-toggle"><span>Enabled</span><label class="toggle"><input type="checkbox" id="al-maint-en" onchange="saveConfig({ silent: true, reason: 'maintenance-toggle' })"><span class="toggle-t"></span></label></div>
+          </div>
+          <div class="form-group"><label>Maintenance start</label><input type="time" id="al-maint-start"></div>
+          <div class="form-group"><label>Maintenance end</label><input type="time" id="al-maint-end"></div>
+          <div class="form-group" style="grid-column:1/-1">
+            <label>Maintenance days</label>
+            <div class="day-grid" id="al-maint-days">
+              <label class="day-chip"><input type="checkbox" value="mon"><span>Mon</span></label>
+              <label class="day-chip"><input type="checkbox" value="tue"><span>Tue</span></label>
+              <label class="day-chip"><input type="checkbox" value="wed"><span>Wed</span></label>
+              <label class="day-chip"><input type="checkbox" value="thu"><span>Thu</span></label>
+              <label class="day-chip"><input type="checkbox" value="fri"><span>Fri</span></label>
+              <label class="day-chip"><input type="checkbox" value="sat"><span>Sat</span></label>
+              <label class="day-chip"><input type="checkbox" value="sun"><span>Sun</span></label>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -1376,6 +1407,7 @@ html[data-theme="light"] .ci-help{color:#53657c}
     <label class="toggle"><input type="checkbox" id="en-alerts" onchange="toggleCard('alerts')"><span class="toggle-t"></span></label>
   </div>
   <div class="card-body hidden" id="cb-alerts">
+    <div class="settings-section-label" style="margin-top:0">Detections</div>
     <div class="arr-item">
       <div class="arr-hdr">
         <span class="arr-hdr-name with-info">Resource thresholds <button type="button" class="info-btn" onclick="openAlertInfo(event,'resourceThresholds')" aria-label="Resource thresholds info">i</button></span>
@@ -1412,34 +1444,6 @@ html[data-theme="light"] .ci-help{color:#53657c}
 
     <div class="arr-item">
       <div class="arr-hdr">
-        <span class="arr-hdr-name with-info">Maintenance <button type="button" class="info-btn" onclick="openAlertInfo(event,'maintenanceWindow')" aria-label="Maintenance info">i</button></span>
-      </div>
-      <div class="arr-body">
-        <div class="form-grid g3">
-          <div class="form-group">
-            <label>Maintenance</label>
-            <div class="inline-toggle"><span>Enabled</span><label class="toggle"><input type="checkbox" id="al-maint-en" onchange="saveConfig({ silent: true, reason: 'maintenance-toggle' })"><span class="toggle-t"></span></label></div>
-          </div>
-          <div class="form-group"><label>Maintenance start</label><input type="time" id="al-maint-start"></div>
-          <div class="form-group"><label>Maintenance end</label><input type="time" id="al-maint-end"></div>
-          <div class="form-group" style="grid-column:1/-1">
-            <label>Maintenance days</label>
-            <div class="day-grid" id="al-maint-days">
-              <label class="day-chip"><input type="checkbox" value="mon"><span>Mon</span></label>
-              <label class="day-chip"><input type="checkbox" value="tue"><span>Tue</span></label>
-              <label class="day-chip"><input type="checkbox" value="wed"><span>Wed</span></label>
-              <label class="day-chip"><input type="checkbox" value="thu"><span>Thu</span></label>
-              <label class="day-chip"><input type="checkbox" value="fri"><span>Fri</span></label>
-              <label class="day-chip"><input type="checkbox" value="sat"><span>Sat</span></label>
-              <label class="day-chip"><input type="checkbox" value="sun"><span>Sun</span></label>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="arr-item">
-      <div class="arr-hdr">
         <span class="arr-hdr-name with-info">Anomaly detection <button type="button" class="info-btn" onclick="openAlertInfo(event,'anomalyDetection')" aria-label="Anomaly detection info">i</button></span>
       </div>
       <div class="arr-body">
@@ -1454,6 +1458,13 @@ html[data-theme="light"] .ci-help{color:#53657c}
           <div class="form-group"><label>Minimum increase %</label><input type="number" id="al-anomaly-min-increase" min="5" max="100" value="25"></div>
           <div class="form-group"><label>Sensitivity</label><input type="number" id="al-anomaly-sensitivity" min="1" max="6" step="0.1" value="2"></div>
         </div>
+      </div>
+    </div>
+
+    <div class="arr-item">
+      <div class="arr-hdr">
+        <span class="arr-hdr-name with-info">Server updates <button type="button" class="info-btn" onclick="openAlertInfo(event,'serverUpdates')" aria-label="Server updates info">i</button></span>
+        <label class="toggle"><input type="checkbox" id="al-server-updates-en" aria-label="Enable server update notifications"><span class="toggle-t"></span></label>
       </div>
     </div>
 
@@ -4409,6 +4420,7 @@ function populate(cfg) {
     document.getElementById('al-rule-container-duration').value = ruleDurationValue(a.rules, 'container', 60);
     document.getElementById('al-rule-target-duration').value = ruleDurationValue(a.rules, 'target', 60);
     document.getElementById('al-rule-snmp-duration').value = ruleDurationValue(a.rules, 'snmp', 120);
+    document.getElementById('al-server-updates-en').checked = a.detections?.serverUpdates === true;
     const an = a.anomaly || {};
     document.getElementById('al-anomaly-en').checked = an.enabled === true;
     document.getElementById('al-anomaly-samples').value = an.minSamples || 12;
@@ -5028,6 +5040,9 @@ function collect() {
         container: { durationSeconds: clampedSecondsInput('al-rule-container-duration', 60) },
         target: { durationSeconds: clampedSecondsInput('al-rule-target-duration', 60) },
         snmp: { durationSeconds: clampedSecondsInput('al-rule-snmp-duration', 120) },
+      },
+      detections: {
+        serverUpdates: document.getElementById('al-server-updates-en').checked,
       },
       anomaly: {
         enabled: document.getElementById('al-anomaly-en').checked,
@@ -5818,7 +5833,7 @@ async function performSaveConfig(opts = {}) {
       if (!silent) toast(userResult ? 'Saved and applied!' : 'Saved and applied!', 'ok');
       else if (opts.reason === 'delete') toast('Removed and saved', 'ok');
       else if (opts.reason === 'password-reset-toggle') toast(trText('Password reset setting saved'), 'ok');
-      else if (opts.reason === 'maintenance-toggle') toast(trText('Maintenance setting saved'), 'ok');
+      else if (opts.reason === 'maintenance-toggle') toast(trText('Maintenance Mode setting saved'), 'ok');
       else if (opts.reason === 'kubeconfig-path') toast(trText('Kubernetes config path saved'), 'ok');
       refreshDots(cfgPayload);
       return;
@@ -5840,7 +5855,7 @@ async function performSaveConfig(opts = {}) {
     if (!silent) toast('Saved and applied!', 'ok');
     else if (opts.reason === 'delete') toast('Removed and saved', 'ok');
     else if (opts.reason === 'password-reset-toggle') toast(trText('Password reset setting saved'), 'ok');
-    else if (opts.reason === 'maintenance-toggle') toast(trText('Maintenance setting saved'), 'ok');
+    else if (opts.reason === 'maintenance-toggle') toast(trText('Maintenance Mode setting saved'), 'ok');
     else if (opts.reason === 'kubeconfig-path') toast(trText('Kubernetes config path saved'), 'ok');
     refreshDots(cfgPayload, body.data);
     try {
@@ -5906,7 +5921,7 @@ const SETTINGS_INFO_CONTENT = {
     copy: 'Control how many seconds a condition must remain active before a notification is sent. Deployment values are loaded into settings, and the latest saved setting is the active value.',
   },
   maintenanceWindow: {
-    title: 'Maintenance',
+    title: 'Maintenance Mode',
     copy: {
       en: 'Suppress alert notifications during planned maintenance. Use start and end times, then select the days when the window should run.',
       tr: 'Planlı bakım sırasında alert bildirimlerini bastırır. Başlangıç ve bitiş saatlerini kullanın, ardından pencerenin çalışacağı günleri seçin.',
@@ -5915,6 +5930,13 @@ const SETTINGS_INFO_CONTENT = {
   anomalyDetection: {
     title: 'Anomaly detection',
     copy: 'Detect CPU or RAM values that move outside the recent normal range. Minimum samples, duration and sensitivity help prevent noisy one-off spikes.',
+  },
+  serverUpdates: {
+    title: 'Server updates',
+    copy: {
+      en: 'Send a warning when an online Linux or Windows server reports pending operating system updates. OmniSight sends a recovery when no pending updates remain.',
+      tr: 'Çevrimiçi bir Linux veya Windows sunucusu bekleyen işletim sistemi güncellemeleri bildirdiğinde uyarı gönderir. Bekleyen güncelleme kalmadığında OmniSight düzelme bildirimi gönderir.',
+    },
   },
 };
 
@@ -6185,6 +6207,7 @@ refreshSettingsSectionVisibility();
     await rolePromise;
     applySettingsCardOpen();
     applyRolePermissions();
+    loadSettingsSectionData(activeSettingsSection);
     document.querySelectorAll('#cb-alerts .arr-body').forEach(el => el.classList.add('hidden'));
     document.querySelectorAll('.card-hdr .toggle input[type=checkbox]').forEach(en => en.closest('.card').classList.toggle('card-off', !en.checked));
     applyLanguage(document.getElementById('cfg-language')?.value || currentLang());
