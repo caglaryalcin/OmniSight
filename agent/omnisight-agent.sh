@@ -9,7 +9,7 @@ URL="${URL%/}"
 TOKEN="${OMNISIGHT_TOKEN:?OMNISIGHT_TOKEN required}"
 INTERVAL="${OMNISIGHT_INTERVAL:-15}"
 AGENT_ROLE="${OMNISIGHT_AGENT_ROLE:-auto}"
-VERSION="1.3.0"
+VERSION="1.3.1"
 HOST_ROOT="${OMNISIGHT_HOST_ROOT:-/}"
 INSECURE_TLS="${OMNISIGHT_INSECURE_TLS:-}"
 CURL_TLS_ARGS=""
@@ -30,6 +30,10 @@ json_escape() { printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' | tr -d '
 UPDATES_JSON_CACHE=""
 UPDATES_CHECKED_AT=0
 
+count_apt_update_lines() {
+  awk '$1 ~ /^[^[:space:]]+\/[^[:space:]]+$/ && NF >= 3 { count++ } END { print count+0 }'
+}
+
 updates_json() {
   local now count source reboot rc output
   now=$(date +%s 2>/dev/null || echo 0)
@@ -40,11 +44,11 @@ updates_json() {
 
   count=null
   source=unavailable
-  if command -v apt-get >/dev/null 2>&1; then
-    output=$(apt-get -s -o Debug::NoLocking=1 upgrade 2>/dev/null)
+  if command -v apt >/dev/null 2>&1; then
+    output=$(LC_ALL=C apt list --upgradable 2>/dev/null)
     rc=$?
     if [ "$rc" -eq 0 ]; then
-      count=$(printf '%s\n' "$output" | awk '/^Inst /{c++} END{print c+0}')
+      count=$(printf '%s\n' "$output" | count_apt_update_lines)
       source=apt
     fi
   elif command -v dnf >/dev/null 2>&1; then

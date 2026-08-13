@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 const assert = require('assert');
+const { execFileSync } = require('child_process');
 const fs = require('fs');
 const http = require('http');
 const path = require('path');
@@ -360,7 +361,24 @@ function testStaticRegressions() {
   assert.ok(windowsDownloadLines.length >= 5);
   assert.ok(windowsDownloadLines.every(line => /psTLS12|WINDOWS_TLS12_BOOTSTRAP|SecurityProtocolType\]::Tls12/.test(line)), 'every generated Windows download must enable TLS 1.2 before iwr runs');
   assert.ok(windowsAgent.includes('Get-UpdateStatus') && linuxAgent.includes('updates_json'));
-  for (const manager of ['apt-get', 'dnf', 'yum', 'zypper', 'apk', 'pacman']) {
+  assert.ok(linuxAgent.includes('output=$(LC_ALL=C apt list --upgradable'), 'APT must list every available update, including kept-back packages');
+  assert.ok(!linuxAgent.includes('apt-get -s -o Debug::NoLocking=1 upgrade'), 'APT update counts must not omit kept-back packages');
+  const aptCounter = linuxAgent.match(/count_apt_update_lines\(\) \{[\s\S]*?\r?\n\}/);
+  assert.ok(aptCounter, 'APT update counter must be defined');
+  if (process.platform !== 'win32') {
+    const aptFixture = [
+      'Listing...',
+      'kubectl/kubernetes-xenial 1.34.0-1.1 amd64 [upgradable from: 1.33.0-1.1]',
+      'kubelet/kubernetes-xenial 1.34.0-1.1 amd64 [upgradable from: 1.33.0-1.1]',
+      '',
+    ].join('\n');
+    const count = execFileSync('bash', ['-c', `${aptCounter[0]}\ncount_apt_update_lines`], { input: aptFixture, encoding: 'utf8' }).trim();
+    assert.strictEqual(count, '2', 'APT update counter must include kept-back packages');
+  }
+  const linuxAgentVersion = (linuxAgent.match(/^VERSION="([^"]+)"/m) || [])[1];
+  const windowsAgentVersion = (windowsAgent.match(/^\$Version = "([^"]+)"/m) || [])[1];
+  assert.strictEqual(linuxAgentVersion, windowsAgentVersion, 'Linux and Windows agent versions must stay synchronized');
+  for (const manager of ['dnf', 'yum', 'zypper', 'apk', 'pacman']) {
     assert.ok(linuxAgent.includes(`output=$(${manager}`), `${manager} update output must be captured before it is counted`);
     assert.ok(!linuxAgent.includes(`count=$(${manager}`), `${manager} failures must not be converted to zero updates by a pipeline`);
   }

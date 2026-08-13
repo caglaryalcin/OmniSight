@@ -1,7 +1,7 @@
 Set-StrictMode -Version 2.0
 $ErrorActionPreference = "SilentlyContinue"
 
-$Version = "1.3.0"
+$Version = "1.3.1"
 $Url = [string]$env:OMNISIGHT_URL
 $Url = $Url.TrimEnd("/")
 $Token = $env:OMNISIGHT_TOKEN
