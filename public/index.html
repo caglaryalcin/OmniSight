@@ -1856,6 +1856,26 @@ function tempHistoryKey(label){
 }
 function dc(ok){ return ok?'md-green':'md-red' }
 function bdg(cls,txt){ return `<span class="badge bg-${cls}">${txt}</span>` }
+/* ci-extract:begin offlineRatioLabel */
+function offlineRatioLabel(offline, total, online){
+  const offlineCount = Math.max(0, Math.floor(Number(offline) || 0));
+  const totalCount = Math.max(offlineCount, Math.floor(Number(total) || 0));
+  const onlineCount = online == null
+    ? Math.max(0, totalCount - offlineCount)
+    : Math.max(0, Math.min(totalCount, Math.floor(Number(online) || 0)));
+  return totalCount > 1 ? `${onlineCount}/${totalCount} Online` : 'Offline';
+}
+/* ci-extract:end offlineRatioLabel */
+/* ci-extract:begin offlineRatioBadgeClass */
+function offlineRatioBadgeClass(offline, total, online){
+  const offlineCount = Math.max(0, Math.floor(Number(offline) || 0));
+  const totalCount = Math.max(offlineCount, Math.floor(Number(total) || 0));
+  const onlineCount = online == null
+    ? Math.max(0, totalCount - offlineCount)
+    : Math.max(0, Math.min(totalCount, Math.floor(Number(online) || 0)));
+  return totalCount > 0 && onlineCount === 0 ? 'red' : 'yellow';
+}
+/* ci-extract:end offlineRatioBadgeClass */
 function hasNum(v){ return v !== null && v !== undefined && v !== '' && Number.isFinite(Number(v)); }
 function boundedPct(v){
   if(!hasNum(v)) return null;
@@ -2690,6 +2710,7 @@ function buildProxmox(px){
   const upSvcs  = allSvcs.filter(s=>s.active).length;
   const failedSvcs = allSvcs.filter(s=>!s.active && !s.excluded);
   const svcsFailed = failedSvcs.length;
+  const offlineNodes = px.nodes.filter(n=>!n._connecting && !n.node?.online).length;
   const allOk = px.nodes.every(n=>n.node?.online);
   const allVms = px.nodes.flatMap(n=>n.vms||[]);
   const vmRunning = allVms.filter(v=>v.running).length;
@@ -2936,8 +2957,8 @@ function buildProxmox(px){
     color: 'var(--blue)',
     meta: `${online}/${total} online`,
     badge: bdg(
-      allOk && svcsFailed===0 && !cephBad ? 'green' : (svcsFailed>0 || online===0 || cephErr) ? 'red' : 'yellow',
-      allOk && svcsFailed===0 && !cephBad ? 'healthy' : cephBad ? `Ceph ${ceph.health.replace('HEALTH_','')}` : svcsFailed>0 ? `${svcsFailed} services failed` : online>0 ? `${online}/${total} online` : 'offline'
+      allOk && svcsFailed===0 && !cephBad ? 'green' : offlineNodes ? offlineRatioBadgeClass(offlineNodes, total || px.nodes.length, online) : (svcsFailed>0 || online===0 || cephErr) ? 'red' : 'yellow',
+      allOk && svcsFailed===0 && !cephBad ? 'healthy' : offlineNodes ? offlineRatioLabel(offlineNodes, total || px.nodes.length, online) : cephBad ? `Ceph ${ceph.health.replace('HEALTH_','')}` : svcsFailed>0 ? `${svcsFailed} services failed` : online>0 ? `${online}/${total} online` : offlineRatioLabel(total || px.nodes.length, total || px.nodes.length, online)
     ),
     detailBadge: '',
     sbSummary: sbSummaryHtml,
@@ -2959,6 +2980,7 @@ function buildLinux(linux){
   const totalSvcs = allServices.length;
   const upSvcs = allServices.filter(s=>s.active).length;
   const reachable = linux.filter(s=>s.online).length;
+  const offlineServers = realLinux.filter(s=>!s.online).length;
   const cpuVals = linux.filter(s=>s.online&&s.cpu!=null).map(s=>s.cpu);
   const ramVals = linux.filter(s=>s.online&&s.ram).map(s=>s.ram.percent);
   const lmetric = (vals, limit) => {
@@ -3143,8 +3165,8 @@ function buildLinux(linux){
     color: 'var(--green)',
     meta: `${reachable}/${linux.length} reachable`,
     badge: bdg(
-      connecting && !realLinux.length ? 'gray' : allOk && !connecting ? 'green' : (failed || reachable === 0) ? 'red' : 'yellow',
-      connecting ? 'connecting…' : allOk ? 'healthy' : failed ? `${failed} services failed` : reachable === 0 ? 'offline' : rebootCount ? `${rebootCount} reboot required` : updateCount ? `${updateCount} updates` : `${reachable}/${linux.length} reachable`
+      connecting && !realLinux.length ? 'gray' : allOk && !connecting ? 'green' : offlineServers ? offlineRatioBadgeClass(offlineServers, linux.length, reachable) : (failed || reachable === 0) ? 'red' : 'yellow',
+      connecting && !realLinux.length ? 'connecting…' : allOk && !connecting ? 'healthy' : offlineServers ? offlineRatioLabel(offlineServers, linux.length, reachable) : failed ? `${failed} services failed` : rebootCount ? `${rebootCount} reboot required` : updateCount ? `${updateCount} updates` : `${reachable}/${linux.length} reachable`
     ),
     sbSummary: sbSummaryHtml,
     summary: summaryHtml,
@@ -3158,6 +3180,7 @@ function buildWindows(windows){
   const connecting = windows.filter(s=>s._connecting).length;
   const real = windows.filter(s=>!s._connecting);
   const reachable = windows.filter(s=>s.online).length;
+  const offlineServers = real.filter(s=>!s.online).length;
   const allServices = windows.flatMap(s=>s.services||[]);
   const failed = allServices.filter(s=>!s.active&&s.state!=='unknown'&&!s.excluded).length;
   const totalSvcs = allServices.length;
@@ -3290,7 +3313,7 @@ function buildWindows(windows){
     iconKey: 'windows',
     color: 'var(--blue)',
     meta: `${reachable}/${windows.length} reachable`,
-    badge: bdg(connecting && !real.length ? 'gray' : allOk && !connecting ? 'green' : (failed || reachable === 0) ? 'red' : 'yellow', connecting ? 'connecting...' : allOk ? 'healthy' : failed ? `${failed} services failed` : reachable === 0 ? 'offline' : rebootCount ? `${rebootCount} reboot required` : updateCount ? `${updateCount} updates` : `${reachable}/${windows.length} reachable`),
+    badge: bdg(connecting && !real.length ? 'gray' : allOk && !connecting ? 'green' : offlineServers ? offlineRatioBadgeClass(offlineServers, windows.length, reachable) : (failed || reachable === 0) ? 'red' : 'yellow', connecting && !real.length ? 'connecting...' : allOk && !connecting ? 'healthy' : offlineServers ? offlineRatioLabel(offlineServers, windows.length, reachable) : failed ? `${failed} services failed` : rebootCount ? `${rebootCount} reboot required` : updateCount ? `${updateCount} updates` : `${reachable}/${windows.length} reachable`),
     sbSummary: sbSummaryHtml,
     summary: summaryHtml,
     body,
@@ -3331,7 +3354,7 @@ function buildKubernetes(k8s){
     iconKey: 'kubernetes',
     color: 'var(--purple,#9b59b6)',
     meta: '',
-    badge: bdg('red','unreachable'),
+    badge: bdg('red',offlineRatioLabel(1, 1, 0)),
     sbSummary: `<div class="sb-csum"><div class="sb-csum-item"><div class="sb-csum-val" style="color:var(--red)">✕</div><div class="sb-csum-lbl">Unreachable</div></div></div>`,
     summary: '',
     body: `<div class="offline-row">
@@ -3727,7 +3750,7 @@ function buildSynology(syn, opts = {}){
     iconKey: panelIcon,
     color: panelColor,
     meta: `${onlineDevs.length}/${syn.length} online`,
-    badge: bdg(isConnecting ? 'gray' : (allOk ? 'green' : (onlineDevs.length > 0 ? 'yellow' : 'red')), isConnecting ? 'connecting…' : (allOk ? 'healthy' : 'offline')),
+    badge: bdg(isConnecting ? 'gray' : (allOk ? 'green' : offline ? offlineRatioBadgeClass(offline, syn.length, onlineDevs.length) : 'yellow'), isConnecting ? 'connecting…' : (allOk ? 'healthy' : offlineRatioLabel(offline, syn.length, onlineDevs.length))),
     sbSummary: sbSummaryHtml,
     summary: summaryHtml,
     body,
@@ -3755,24 +3778,27 @@ function buildUnifi(data){
   devices.forEach(d => devKeys(d).forEach(k => ctrlKeys.add(k)));
   const matchOf = d => snmpRows.find(s => (s.host && (s.host === d.ip || (d.aliases || []).includes(s.host))) || (s.name && d.name && String(s.name).toLowerCase() === String(d.name).toLowerCase()));
   const unmatchedSnmp = snmpRows.filter(s => !ctrlKeys.has(s.host) && !ctrlKeys.has(String(s.name || '').toLowerCase()));
+  const onlineCount = devices.filter(d => d.online).length + unmatchedSnmp.filter(s => s.online).length;
+  const totalCount = devices.length + unmatchedSnmp.length;
 
   // Badge precedence law (design spec 1): WAN DOWN > N OFFLINE > DEGRADED > ok.
   const wanDown = instances.some(i => i.wan && i.wan.state === 'down');
   const offlineDevs = devices.filter(d => d.alertable);
+  const offlineSnmp = unmatchedSnmp.filter(s => !s.online && !s._connecting);
+  const offlineCount = offlineDevs.length + offlineSnmp.length;
   const warnDevs = devices.filter(d => d.warn);
   const ctrlDown = instances.filter(i => !i.online && !i._connecting);
-  const degraded = warnDevs.length || instances.some(i => i.wanQualityError || (i.wan && i.wan.state === 'degraded') || i.stale) || unmatchedSnmp.some(s => !s.online && !s._connecting);
+  const degraded = warnDevs.length || instances.some(i => i.wanQualityError || (i.wan && i.wan.state === 'degraded') || i.stale);
   const badge = connecting ? bdg('gray','connecting…')
     : wanDown ? bdg('red','WAN DOWN')
-    : (offlineDevs.length || ctrlDown.length === instances.length && instances.length) ? bdg('red', offlineDevs.length ? `${offlineDevs.length} DEVICE${offlineDevs.length>1?'S':''} OFFLINE` : 'controller unreachable')
+    : offlineCount ? bdg(offlineRatioBadgeClass(offlineCount, totalCount, onlineCount), offlineRatioLabel(offlineCount, totalCount, onlineCount))
+    : ctrlDown.length ? bdg(offlineRatioBadgeClass(ctrlDown.length, instances.length, instances.filter(i => i.online).length), offlineRatioLabel(ctrlDown.length, instances.length, instances.filter(i => i.online).length))
     : degraded ? bdg('yellow','degraded')
     : bdg('green','healthy');
 
   // Summary strip: device counts + conditional WAN items (specs 3-4).
   const inst0 = instances[0];
   const wan = instances.map(i => i.wan).find(Boolean) || null;
-  const onlineCount = devices.filter(d => d.online).length + unmatchedSnmp.filter(s => s.online).length;
-  const totalCount = devices.length + unmatchedSnmp.length;
   const wanQuality = instances.map(i => i.wanQuality).find(q => q === 'ok') || inst0.wanQuality;
   const wanQualityError = instances.map(i => i.wanQualityError).find(Boolean);
   const csumCell = (val, lbl, color) => `<div class="csum-item"><div class="csum-val"${color?` style="color:${color}"`:''}>${val}</div><div class="csum-lbl">${lbl}</div></div>`;
@@ -3958,7 +3984,6 @@ function buildHealthchecks(hc){
   const down = s.down??0;
   const grace = s.grace??0;
   const total = Number(s.total ?? checks.length ?? 0);
-  const downMajority = total > 0 && down > total / 2;
 
   const sbSummaryHtml = connecting ? `<div class="sb-csum"><div class="sb-csum-item"><div class="sb-csum-val" style="color:var(--muted)">…</div><div class="sb-csum-lbl">Connecting</div></div></div>` : online ? `<div class="sb-csum">
     <div class="sb-csum-item"><div class="sb-csum-val">${s.total??0}</div><div class="sb-csum-lbl">Total</div></div>
@@ -4032,7 +4057,7 @@ function buildHealthchecks(hc){
     iconKey: 'healthchecks',
     color: 'var(--green)',
     meta: connecting ? 'connecting...' : online?`${s.up??0}/${s.total??0} up`:'',
-    badge: connecting ? bdg('gray','connecting...') : bdg(online?(downMajority?'red':(down>0||grace>0?'yellow':'green')):'red', online?(downMajority?`${down} down`:(down>0||grace>0?'degraded':'healthy')):'unreachable'),
+    badge: connecting ? bdg('gray','connecting...') : !online ? bdg('red', offlineRatioLabel(1, 1, 0)) : down > 0 ? bdg(offlineRatioBadgeClass(down, total, Number(s.up || 0)), offlineRatioLabel(down, total, Number(s.up || 0))) : grace > 0 ? bdg('yellow','degraded') : bdg('green','healthy'),
     sbSummary: sbSummaryHtml,
     summary: '',
     body,
@@ -4150,15 +4175,16 @@ function uptimeBars(history, currentStatus, options = {}){
 function uptimeKumaHealth(uk){
   if(!uk) return { state:'unknown', badgeCls:'gray', label:'unknown' };
   if(uk._connecting) return { state:'connecting', badgeCls:'gray', label:'connecting...' };
-  if(!uk.online) return { state:'down', badgeCls:'red', label:'unreachable' };
+  if(!uk.online) return { state:'down', badgeCls:'red', label:offlineRatioLabel(1, 1, 0) };
   const s = uk.summary || {};
   const up = Number(s.up || 0);
   const down = Number(s.down || 0);
   const warn = Number(s.pending || 0) + Number(s.unknown || 0);
+  const total = Number(s.total || up + down + warn + Number(s.maintenance || 0));
   if(down > 0) return {
     state: up > 0 ? 'degraded' : 'down',
-    badgeCls: up > 0 ? 'yellow' : 'red',
-    label: `${down} down`,
+    badgeCls: offlineRatioBadgeClass(down, total, up),
+    label: offlineRatioLabel(down, total, up),
   };
   if(warn > 0) return { state:'degraded', badgeCls:'yellow', label:'degraded' };
   return { state:'ok', badgeCls:'green', label:'healthy' };
@@ -4300,7 +4326,7 @@ function buildChecks(chk){
     iconKey: 'checks',
     color: 'var(--green)',
     meta: connecting && !up && !down ? 'connecting...' : `${up}/${total} up`,
-    badge: bdg(connecting && !up && !down ? 'gray' : healthy ? 'green' : down > 0 ? (up > 0 ? 'yellow' : 'red') : 'green', connecting && !up && !down ? 'connecting...' : healthy ? 'healthy' : down > 0 ? `${down} down` : 'healthy'),
+    badge: bdg(connecting && !up && !down ? 'gray' : healthy ? 'green' : down > 0 ? offlineRatioBadgeClass(down, total, up) : 'green', connecting && !up && !down ? 'connecting...' : healthy ? 'healthy' : down > 0 ? offlineRatioLabel(down, total, up) : 'healthy'),
     sbSummary: sbSummaryHtml,
     summary: summaryHtml,
     body,
@@ -4312,16 +4338,25 @@ function prometheusHealth(prom){
   if(!prom) return { state:'unknown', badgeCls:'gray', label:'unknown' };
   const instances = prom.instances || [];
   if(prom._connecting || instances.some(i => i._connecting)) return { state:'connecting', badgeCls:'gray', label:'connecting...' };
-  if(!prom.online) return { state:'down', badgeCls:'red', label:'unreachable' };
+  if(!prom.online) {
+    const totalInstances = instances.length || 1;
+    const offlineInstances = instances.filter(i => !i.online && !i._connecting).length || 1;
+    const onlineInstances = instances.filter(i => i.online).length;
+    return { state:'down', badgeCls:offlineRatioBadgeClass(offlineInstances, totalInstances, onlineInstances), label:offlineRatioLabel(offlineInstances, totalInstances, onlineInstances) };
+  }
   const s = prom.summary || {};
   const up = Number(s.up || 0);
   const down = Number(s.down || 0);
   const unknown = Number(s.unknown || 0);
   const instanceDown = Number(s.instanceDown || 0);
-  if(down > 0) return up > 0
-    ? { state:'degraded', badgeCls:'yellow', label:'degraded' }
-    : { state:'down', badgeCls:'red', label:`${down} down` };
-  if(unknown > 0 || instanceDown > 0) return { state:'degraded', badgeCls:'yellow', label:'degraded' };
+  const total = Number(s.total || up + down + unknown);
+  if(down > 0) return { state:up > 0 ? 'degraded' : 'down', badgeCls:offlineRatioBadgeClass(down, total, up), label:offlineRatioLabel(down, total, up) };
+  if(instanceDown > 0) {
+    const instanceTotal = Number(s.instances || instances.length || instanceDown);
+    const instanceUp = Number(s.instanceUp || instances.filter(i => i.online).length || 0);
+    return { state:'degraded', badgeCls:offlineRatioBadgeClass(instanceDown, instanceTotal, instanceUp), label:offlineRatioLabel(instanceDown, instanceTotal, instanceUp) };
+  }
+  if(unknown > 0) return { state:'degraded', badgeCls:'yellow', label:'degraded' };
   return { state:'ok', badgeCls:'green', label:'healthy' };
 }
 function prometheusTargetState(t = {}){
@@ -4483,6 +4518,7 @@ function buildDocker(docker){
   const connectingHosts = docker.filter(isConnectingHost).length;
   const allOk = docker.every(h=>h.online);
   const onlineHosts = docker.filter(h=>h.online).length;
+  const offlineHosts = docker.filter(h=>!h.online && !isConnectingHost(h)).length;
   const totalRunning = docker.reduce((a,h)=>a+(h.summary?.running||0),0);
   const totalStopped = docker.reduce((a,h)=>a+(h.summary?.stopped||0),0);
   const totalAll     = docker.reduce((a,h)=>a+(h.summary?.total||0),0);
@@ -4591,10 +4627,12 @@ function buildDocker(docker){
     iconKey: 'docker',
     color: '#2496ed',
     meta: anyConnecting ? (onlineHosts ? `${onlineHosts}/${docker.length} hosts · ${connectingHosts} connecting` : 'connecting...') : (noContainersReported ? `${onlineHosts}/${docker.length} hosts online · no containers` : `${totalRunning}/${totalAll} containers`),
-    badge: anyConnecting
+    badge: offlineHosts
+      ? bdg(offlineRatioBadgeClass(offlineHosts, docker.length, onlineHosts), offlineRatioLabel(offlineHosts, docker.length, onlineHosts))
+      : anyConnecting
       ? bdg(onlineHosts ? 'yellow' : 'gray', onlineHosts ? `${connectingHosts} connecting` : 'connecting...')
       : bdg(noContainersReported?'gray':allOk&&totalStopped===0?'green':onlineHosts===0?'red':totalStopped>0?'yellow':'red',
-            noContainersReported?'no containers':allOk&&totalStopped===0?'healthy':onlineHosts===0?'offline':`${totalStopped} stopped`),
+            noContainersReported?'no containers':allOk&&totalStopped===0?'healthy':onlineHosts===0?offlineRatioLabel(docker.length, docker.length, onlineHosts):`${totalStopped} stopped`),
     sbSummary: sbSummaryHtml,
     summary: '',
     body,
@@ -4625,9 +4663,10 @@ function buildDockhand(dockhand){
   const stopped = s.stopped ?? containers.filter(c=>['exited','dead'].includes(c.state)).length;
   const pending = s.pending ?? containers.filter(c=>['paused','restarting'].includes(c.state)).length;
   const connecting = instances.filter(i=>i._connecting && !i.online).length;
+  const offlineServers = Math.max(instances.filter(i=>!i.online && !i._connecting).length, Number(totalServers) - Number(onlineServers) - connecting, 0);
   const noContainers = onlineServers > 0 && total === 0 && !connecting;
-  const healthCls = connecting && !onlineServers ? 'gray' : noContainers ? 'gray' : onlineServers === 0 ? 'red' : (onlineServers < totalServers || stopped > 0 || pending > 0 || connecting ? 'yellow' : 'green');
-  const healthTxt = connecting && !onlineServers ? 'connecting...' : noContainers ? 'no containers' : onlineServers === 0 ? 'offline' : (stopped > 0 ? `${stopped} stopped` : pending > 0 ? `${pending} pending` : 'healthy');
+  const healthCls = connecting && !onlineServers && !offlineServers ? 'gray' : offlineServers ? offlineRatioBadgeClass(offlineServers, totalServers, onlineServers) : noContainers ? 'gray' : (stopped > 0 || pending > 0 || connecting ? 'yellow' : 'green');
+  const healthTxt = connecting && !onlineServers && !offlineServers ? 'connecting...' : offlineServers ? offlineRatioLabel(offlineServers, totalServers, onlineServers) : noContainers ? 'no containers' : (stopped > 0 ? `${stopped} stopped` : pending > 0 ? `${pending} pending` : 'healthy');
   const sbSummaryHtml = `<div class="sb-csum">
     <div class="sb-csum-item"><div class="sb-csum-val">${onlineServers}/${totalServers}</div><div class="sb-csum-lbl">Servers</div></div>
     <div class="sb-csum-item"><div class="sb-csum-val" style="color:var(--green)">${running}</div><div class="sb-csum-lbl">Running</div></div>
@@ -4710,12 +4749,12 @@ function buildFirewall(fw){
   const sm = fw.summary || {};
   const up = Number(sm.up || 0);
   const total = Number(sm.instances || instances.length || 0);
-  const down = Number(sm.down || Math.max(0, total - up));
+  const down = sm.down != null ? Number(sm.down) : instances.filter(i => !i.online && !i._connecting).length;
   const updates = Number(sm.updates || 0);
   const reboot = Number(sm.rebootRequired || 0);
   const connecting = !!fw._connecting || instances.some(i => i._connecting && !i.online);
-  const healthCls = connecting && !up ? 'gray' : up === 0 ? 'red' : (down > 0 || updates > 0 || reboot > 0 ? 'yellow' : 'green');
-  const healthTxt = connecting && !up ? 'connecting...' : up === 0 ? 'offline' : (down > 0 ? `${up}/${total} online` : updates > 0 || reboot > 0 ? 'attention' : 'healthy');
+  const healthCls = connecting && !up ? 'gray' : down > 0 ? offlineRatioBadgeClass(down, total, up) : (updates > 0 || reboot > 0 ? 'yellow' : 'green');
+  const healthTxt = connecting && !up ? 'connecting...' : down > 0 ? offlineRatioLabel(down, total, up) : updates > 0 || reboot > 0 ? 'attention' : 'healthy';
   const firewallWarnText = row => {
     const s = row?.summary || {};
     const sys = row?.system || {};
@@ -4876,11 +4915,11 @@ function buildTrueNas(tn){
   const sm = tn.summary || {};
   const up = Number(sm.up || 0);
   const total = Number(sm.instances || instances.length || 0);
-  const down = Number(sm.down || Math.max(0, total - up));
+  const down = sm.down != null ? Number(sm.down) : instances.filter(i => !i.online && !i._connecting).length;
   const warnCount = Number(sm.poolsWarn || 0) + Number(sm.disksWarn || 0) + Number(sm.alertsCritical || 0) + Number(sm.alertsWarning || 0);
   const connecting = !!tn._connecting || instances.some(i => i._connecting && !i.online);
-  const healthCls = connecting && !up ? 'gray' : up === 0 ? 'red' : (down > 0 || warnCount > 0 || instances.some(i => i.partial) ? 'yellow' : 'green');
-  const healthTxt = connecting && !up ? 'connecting...' : up === 0 ? 'offline' : warnCount > 0 ? 'attention' : 'healthy';
+  const healthCls = connecting && !up ? 'gray' : down > 0 ? offlineRatioBadgeClass(down, total, up) : (warnCount > 0 || instances.some(i => i.partial) ? 'yellow' : 'green');
+  const healthTxt = connecting && !up ? 'connecting...' : down > 0 ? offlineRatioLabel(down, total, up) : warnCount > 0 ? 'attention' : 'healthy';
   const onlineInstances = instances.filter(i => i.online);
   const sysVals = (key) => onlineInstances.map(i => i.system?.[key]).filter(hasNum).map(Number);
   const cpuAvg = avgPct(sysVals('cpuPercent'));
@@ -4972,9 +5011,11 @@ function buildSimpleNasPanel(value, opts){
   const up = Number(sm.up || 0);
   const total = Number(sm.instances || instances.length || 0);
   const connecting = !!value._connecting || instances.some(i => i._connecting && !i.online);
+  const connectingCount = instances.filter(i => i._connecting && !i.online).length;
+  const offline = Math.max(instances.filter(i => !i.online && !i._connecting).length, total - up - connectingCount, 0);
   const partial = instances.some(i => i.partial);
-  const healthCls = connecting && !up ? 'gray' : up === 0 ? 'red' : (up < total || partial) ? 'yellow' : 'green';
-  const healthTxt = connecting && !up ? 'connecting...' : up === 0 ? 'offline' : (up < total || partial) ? 'partial' : 'online';
+  const healthCls = connecting && !up && !offline ? 'gray' : offline ? offlineRatioBadgeClass(offline, total, up) : (connecting || partial) ? 'yellow' : 'green';
+  const healthTxt = connecting && !up && !offline ? 'connecting...' : offline ? offlineRatioLabel(offline, total, up) : partial ? 'partial' : connecting ? 'connecting...' : 'healthy';
   const onlineInstances = instances.filter(i => i.online);
   const sysVals = (key) => onlineInstances.map(i => i.system?.[key]).filter(hasNum).map(Number);
   const cpuAvg = avgPct(sysVals('cpuPercent'));
@@ -5084,9 +5125,10 @@ function buildPbs(pbs){
   const sm = pbs.summary || {};
   const up = Number(sm.up || 0);
   const total = Number(sm.instances || instances.length || 0);
+  const down = sm.down != null ? Number(sm.down) : instances.filter(i => !i.online && !i._connecting).length;
   const warnCount = Number(sm.datastoresWarn || 0) + Number(sm.failedTasks || 0);
   const connecting = !!pbs._connecting || instances.some(i => i._connecting && !i.online);
-  const healthCls = connecting && !up ? 'gray' : up === 0 ? 'red' : warnCount > 0 || instances.some(i => i.partial) ? 'yellow' : 'green';
+  const healthCls = connecting && !up && !down ? 'gray' : down > 0 ? offlineRatioBadgeClass(down, total, up) : warnCount > 0 || instances.some(i => i.partial) ? 'yellow' : 'green';
   const pbsWarnText = row => {
     const s = row?.summary || {};
     const failedTasks = Number(s.failedTasks || 0);
@@ -5096,7 +5138,7 @@ function buildPbs(pbs){
     if (row?.partial) return 'partial';
     return 'attention';
   };
-  const healthTxt = connecting && !up ? 'connecting...' : up === 0 ? 'offline' : warnCount > 0 ? 'attention' : 'healthy';
+  const healthTxt = connecting && !up && !down ? 'connecting...' : down > 0 ? offlineRatioLabel(down, total, up) : warnCount > 0 ? 'attention' : 'healthy';
   const sbSummaryHtml = `<div class="sb-csum">
     <div class="sb-csum-item"><div class="sb-csum-val">${up}/${total}</div><div class="sb-csum-lbl">Servers</div></div>
     <div class="sb-csum-item"><div class="sb-csum-val">${sm.datastores || 0}</div><div class="sb-csum-lbl">Stores</div></div>
@@ -5184,11 +5226,15 @@ function buildCloudflare(cf){
   const domains = cf.domains || [];
   const active = Number(sm.zonesActive || zones.filter(z=>z.online).length || 0);
   const total = Number(sm.zones || zones.length || 0);
+  const offlineZones = zones.filter(z => !z.online && !z._connecting).length;
+  const tunnelsDown = Number(sm.tunnelsDown || tunnels.filter(t => !t.online).length || 0);
+  const tunnelTotal = Number(sm.tunnels || tunnels.length || 0);
+  const tunnelsHealthy = Number(sm.tunnelsHealthy || tunnels.filter(t => t.online).length || 0);
   const domainWarn = Number(sm.domainsExpiring || 0) + Number(sm.domainsExpired || 0);
-  const warnCount = Number(sm.zonesWarn || 0) + Number(sm.tunnelsDown || 0) + domainWarn + Number(sm.errors || 0);
+  const warnCount = Number(sm.zonesWarn || 0) + tunnelsDown + domainWarn + Number(sm.errors || 0);
   const connecting = !!cf._connecting;
-  const healthCls = connecting && !cf.online ? 'gray' : !cf.online ? 'red' : warnCount > 0 || cf.partial ? 'yellow' : 'green';
-  const healthTxt = connecting && !cf.online ? 'connecting...' : !cf.online ? 'offline' : warnCount > 0 || cf.partial ? 'attention' : 'healthy';
+  const healthCls = connecting && !cf.online ? 'gray' : !cf.online ? 'red' : offlineZones > 0 ? offlineRatioBadgeClass(offlineZones, total, active) : tunnelsDown > 0 ? offlineRatioBadgeClass(tunnelsDown, tunnelTotal, tunnelsHealthy) : warnCount > 0 || cf.partial ? 'yellow' : 'green';
+  const healthTxt = connecting && !cf.online ? 'connecting...' : !cf.online ? offlineRatioLabel(1, 1, 0) : offlineZones > 0 ? offlineRatioLabel(offlineZones, total, active) : tunnelsDown > 0 ? offlineRatioLabel(tunnelsDown, tunnelTotal, tunnelsHealthy) : warnCount > 0 || cf.partial ? 'attention' : 'healthy';
   const sbSummaryHtml = `<div class="sb-csum">
     <div class="sb-csum-item"><div class="sb-csum-val">${active}/${total}</div><div class="sb-csum-lbl">Zones</div></div>
     <div class="sb-csum-item"><div class="sb-csum-val">${sm.tunnelsHealthy || 0}/${sm.tunnels || 0}</div><div class="sb-csum-lbl">Tunnels</div></div>
@@ -5255,8 +5301,10 @@ function buildCiCd(ci){
   const running = Number(sm.running || 0) + Number(sm.jobsRunning || 0);
   const partial = Number(sm.partial || 0) > 0 || projects.some(p=>p.partial);
   const connecting = !!ci._connecting || projects.some(p=>p._connecting && !p.online);
-  const healthCls = connecting && !up ? 'gray' : up === 0 ? 'red' : failed > 0 || partial ? 'yellow' : 'green';
-  const healthTxt = connecting && !up ? 'connecting...' : up === 0 ? 'offline' : failed > 0 ? 'failing' : partial ? 'partial' : 'healthy';
+  const connectingCount = projects.filter(p=>p._connecting && !p.online).length;
+  const offlineProjects = Math.max(projects.filter(p=>!p.online && !p._connecting).length, total - up - connectingCount, 0);
+  const healthCls = connecting && !up && !offlineProjects ? 'gray' : offlineProjects ? offlineRatioBadgeClass(offlineProjects, total, up) : failed > 0 || partial ? 'yellow' : 'green';
+  const healthTxt = connecting && !up && !offlineProjects ? 'connecting...' : offlineProjects ? offlineRatioLabel(offlineProjects, total, up) : failed > 0 ? 'failing' : partial ? 'partial' : 'healthy';
   const sbSummaryHtml = `<div class="sb-csum">
     <div class="sb-csum-item"><div class="sb-csum-val">${up}/${total}</div><div class="sb-csum-lbl">Projects</div></div>
     <div class="sb-csum-item"><div class="sb-csum-val" style="color:var(--green)">${sm.success || 0}</div><div class="sb-csum-lbl">Green</div></div>
@@ -5309,9 +5357,11 @@ function buildVeeam(veeam){
   const warnings = Number(sm.warningSessions || 0);
   const repoWarn = Number(sm.repositoriesWarn || 0);
   const connecting = !!veeam._connecting || instances.some(i => i._connecting && !i.online);
+  const connectingCount = instances.filter(i => i._connecting && !i.online).length;
+  const offlineServers = Math.max(instances.filter(i=>!i.online && !i._connecting).length, total - up - connectingCount, 0);
   const partial = Number(sm.partial || 0) > 0 || instances.some(i => i.partial);
-  const healthCls = connecting && !up ? 'gray' : up === 0 ? 'red' : failed || warnings || repoWarn || partial ? 'yellow' : 'green';
-  const healthTxt = connecting && !up ? 'connecting...' : up === 0 ? 'offline' : failed ? 'failing' : warnings || repoWarn || partial ? 'attention' : 'healthy';
+  const healthCls = connecting && !up && !offlineServers ? 'gray' : offlineServers ? offlineRatioBadgeClass(offlineServers, total, up) : failed || warnings || repoWarn || partial ? 'yellow' : 'green';
+  const healthTxt = connecting && !up && !offlineServers ? 'connecting...' : offlineServers ? offlineRatioLabel(offlineServers, total, up) : failed ? 'failing' : warnings || repoWarn || partial ? 'attention' : 'healthy';
   const sbSummaryHtml = `<div class="sb-csum">
     <div class="sb-csum-item"><div class="sb-csum-val">${up}/${total}</div><div class="sb-csum-lbl">Servers</div></div>
     <div class="sb-csum-item"><div class="sb-csum-val">${sm.jobs || 0}</div><div class="sb-csum-lbl">Jobs</div></div>
@@ -5386,8 +5436,13 @@ function buildPortainer(pt){
   const total = Number(sm.instances || instances.length || 0);
   const warnCount = Number(sm.environmentsDown || 0) + Number(sm.stacksWarn || 0);
   const connecting = !!pt._connecting || instances.some(i => i._connecting && !i.online);
-  const healthCls = connecting && !up ? 'gray' : up === 0 ? 'red' : warnCount > 0 || instances.some(i => i.partial) ? 'yellow' : 'green';
-  const healthTxt = connecting && !up ? 'connecting...' : up === 0 ? 'offline' : warnCount > 0 ? 'attention' : 'healthy';
+  const connectingCount = instances.filter(i => i._connecting && !i.online).length;
+  const offlineServers = Math.max(instances.filter(i=>!i.online && !i._connecting).length, total - up - connectingCount, 0);
+  const environmentsDown = Number(sm.environmentsDown || 0);
+  const environmentTotal = Number(sm.environments || 0);
+  const environmentsUp = Number(sm.environmentsUp || 0);
+  const healthCls = connecting && !up && !offlineServers ? 'gray' : offlineServers ? offlineRatioBadgeClass(offlineServers, total, up) : environmentsDown > 0 ? offlineRatioBadgeClass(environmentsDown, environmentTotal, environmentsUp) : warnCount > 0 || instances.some(i => i.partial) ? 'yellow' : 'green';
+  const healthTxt = connecting && !up && !offlineServers ? 'connecting...' : offlineServers ? offlineRatioLabel(offlineServers, total, up) : environmentsDown > 0 ? offlineRatioLabel(environmentsDown, environmentTotal, environmentsUp) : warnCount > 0 ? 'attention' : 'healthy';
   const sbSummaryHtml = `<div class="sb-csum">
     <div class="sb-csum-item"><div class="sb-csum-val">${up}/${total}</div><div class="sb-csum-lbl">Servers</div></div>
     <div class="sb-csum-item"><div class="sb-csum-val" style="color:var(--green)">${sm.environmentsUp || 0}</div><div class="sb-csum-lbl">Env up</div></div>
@@ -5558,8 +5613,8 @@ function buildDatabase(dbs){
     iconKey: 'database',
     color: 'var(--blue)',
     meta: `${online}/${dbs.length} online`,
-    badge: bdg(isConnecting ? 'gray' : (allOk ? 'green' : (online > 0 ? 'yellow' : 'red')), 
-               isConnecting ? 'connecting…' : (allOk ? 'healthy' : (online > 0 ? `${online}/${dbs.length} online` : 'offline'))),
+    badge: bdg(isConnecting ? 'gray' : (allOk ? 'green' : offlineRatioBadgeClass(offline, dbs.length, online)),
+               isConnecting ? 'connecting…' : (allOk ? 'healthy' : offlineRatioLabel(offline, dbs.length, online))),
     sbSummary: sbSummaryHtml,
     summary: '',
     body,
@@ -9145,6 +9200,12 @@ function shellSummaryMeta(item, base){
   return detail || base?.meta || '';
 }
 function shellSummaryBadgeForItem(item, lang){
+  const offline = Math.max(0, Math.floor(Number(item?.offline) || 0));
+  const total = Math.max(offline, Math.floor(Number(item?.total) || 0));
+  if(offline > 0 && total > 0){
+    const online = Math.max(0, Math.floor(Number(item?.online) || 0));
+    return { cls:offlineRatioBadgeClass(offline, total, online), txt:offlineRatioLabel(offline, total, online) };
+  }
   if(item?.id === 'proxmox'){
     const detail = String(item.detail || '');
     const ceph = detail.match(/\bCeph\s+(?:HEALTH_)?([A-Z_]+)/i);

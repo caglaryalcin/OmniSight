@@ -11,7 +11,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-const BLOCKS = ['fmtChartValue'];
+const BLOCKS = ['fmtChartValue', 'offlineRatioLabel', 'offlineRatioBadgeClass'];
 
 function extract(source, name) {
   const begin = `/* ci-extract:begin ${name} */`;
@@ -28,7 +28,19 @@ function run() {
   const ctx = {};
   vm.createContext(ctx);
   vm.runInContext(BLOCKS.map(name => extract(html, name)).join('\n'), ctx);
-  const { fmtChartValue } = ctx;
+  const { fmtChartValue, offlineRatioLabel, offlineRatioBadgeClass } = ctx;
+
+  assert.strictEqual(offlineRatioLabel(1, 1), 'Offline');
+  assert.strictEqual(offlineRatioLabel(1, 2), '1/2 Online');
+  assert.strictEqual(offlineRatioLabel(1, 3), '2/3 Online');
+  assert.strictEqual(offlineRatioLabel(2, 3), '1/3 Online');
+  assert.strictEqual(offlineRatioLabel(2, 2), '0/2 Online');
+  assert.strictEqual(offlineRatioLabel(1, 0), 'Offline');
+  assert.strictEqual(offlineRatioLabel(1, 3, 1), '1/3 Online');
+  assert.strictEqual(offlineRatioBadgeClass(1, 1), 'red');
+  assert.strictEqual(offlineRatioBadgeClass(1, 3), 'yellow');
+  assert.strictEqual(offlineRatioBadgeClass(3, 3), 'red');
+  assert.strictEqual(offlineRatioBadgeClass(1, 3, 0), 'red');
 
   // Agrees with the card header: fmtPct(31.95…) renders "32%", so must the tooltip.
   assert.strictEqual(fmtChartValue(31.950000779339398), '32');
@@ -64,7 +76,7 @@ function run() {
     assert.strictEqual(fmtChartValue(bad), '--', `non-numeric ${String(bad)} -> --`);
   }
 
-  console.log('smoke ok — client helpers: fmtChartValue');
+  console.log('smoke ok — client helpers: fmtChartValue, offlineRatioLabel');
 }
 
 module.exports = { run };

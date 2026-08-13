@@ -37,6 +37,7 @@ const { mergePreservingSecrets } = require('./src/config-merge');
 const { loadHistoryMap, scheduleSaveHistoryMap, setHistorySaveDelay, flushHistorySaves, cancelHistorySaves } = require('./src/historyStore');
 const { semverCompare, highestStableVersion } = require('./src/version');
 const { normalizeLegacyEmptyBase64Blocks, fullBackupContentHeader } = require('./src/fullBackupFormat');
+const { platformAvailability } = require('./src/platformAvailability');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -6517,6 +6518,9 @@ app.get('/api/status/summary', async (req, res) => {
         name: s.name || s.title,
         status: s.status,
         detail: s.detail || s.meta || '',
+        offline: s.offline,
+        online: s.online,
+        total: s.total,
       })),
     }));
     const role = sessionRole(req);
@@ -8952,7 +8956,7 @@ function buildPublicSummary(data) {
     const meta = portainer._connecting && !portainer.online ? 'connecting...' : portainer.online ? `${up}/${sm.instances || 0} servers · ${sm.environmentsUp || 0}/${sm.environments || 0} env` : 'unreachable';
     out.push({ id: 'portainer', title: 'Portainer', status, meta });
   }
-  return out;
+  return out.map(item => ({ ...item, ...platformAvailability(data, item.id) }));
 }
 
 app.get('/api/public/status', (req, res) => {

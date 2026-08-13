@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const zlib = require('zlib');
 const { buildUnifiTopology } = require('./src/unifiTopology');
+const { platformAvailability } = require('./src/platformAvailability');
 
 const app = express();
 const PORT = Number(process.env.PORT || 4000);
@@ -1312,7 +1313,7 @@ function publicSummary(data = demoStatus()) {
       }
       return id === 'uptimekuma' ? 'degraded' : 'healthy';
     })();
-    return { id, name: names[id] || id, status, detail };
+    return { id, name: names[id] || id, status, detail, ...platformAvailability(data, id) };
   });
 }
 

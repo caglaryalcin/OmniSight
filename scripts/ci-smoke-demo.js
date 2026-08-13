@@ -65,6 +65,12 @@ async function run() {
       assert.strictEqual(response.statusCode, 200);
       assert.strictEqual(JSON.parse(response.body).version, packageVersion);
     }
+
+    const summaryResponse = await request(server, { pathname: '/api/status/summary', headers: { Cookie: sessionCookie } });
+    assert.strictEqual(summaryResponse.statusCode, 200);
+    const summaryById = Object.fromEntries(JSON.parse(summaryResponse.body).health.map(item => [item.id, item]));
+    assert.deepStrictEqual({ offline: summaryById.unifi.offline, online: summaryById.unifi.online, total: summaryById.unifi.total }, { offline: 1, online: 3, total: 5 });
+    assert.deepStrictEqual({ offline: summaryById.uptimekuma.offline, online: summaryById.uptimekuma.online, total: summaryById.uptimekuma.total }, { offline: 1, online: 3, total: 4 });
   } finally {
     await close(server);
   }

@@ -319,6 +319,27 @@ function testFullBackupEmptyFileCompatibility() {
   assert.strictEqual(fullBackupContentHeader(3), '    content: |-\n');
 }
 
+function testPlatformAvailability() {
+  const { availabilityCounts, rowAvailability, platformAvailability } = require('../src/platformAvailability');
+  assert.deepStrictEqual(availabilityCounts(1, 2), { offline: 1, online: 1, total: 2 });
+  assert.deepStrictEqual(rowAvailability([{ online: true }, { online: false }, { online: false, _connecting: true }]), { offline: 1, online: 1, total: 3 });
+  const data = {
+    unifi: { instances: [{ online: true, devices: [
+      { name: 'gateway', ip: '192.0.2.1', online: true },
+      { name: 'office-ap', ip: '192.0.2.2', online: false, alertable: true },
+    ] }] },
+    snmp: [
+      { name: 'office-ap', host: '192.0.2.2', profile: 'unifi', online: false },
+      { name: 'yard-ap', host: '192.0.2.3', profile: 'unifi', online: false },
+    ],
+    uptimekuma: { online: true, summary: { up: 3, down: 1, total: 4 } },
+    portainer: { online: true, instances: [{ online: true }], summary: { environments: 3, environmentsDown: 1 } },
+  };
+  assert.deepStrictEqual(platformAvailability(data, 'unifi'), { offline: 2, online: 1, total: 3 });
+  assert.deepStrictEqual(platformAvailability(data, 'uptimekuma'), { offline: 1, online: 3, total: 4 });
+  assert.deepStrictEqual(platformAvailability(data, 'portainer'), { offline: 1, online: 2, total: 3 });
+}
+
 function testStaticRegressions() {
   const root = path.join(__dirname, '..');
   const windowsAgent = fs.readFileSync(path.join(root, 'agent', 'omnisight-agent.ps1'), 'utf8');
@@ -359,7 +380,20 @@ function testStaticRegressions() {
   assert.ok(dashboard.includes('flex:1 1 max-content'), 'overview summary widths must adapt to their content');
   assert.ok(dashboard.includes('overviewResponsiveLayoutKey') && dashboard.includes('stableOverviewIds'), 'responsive resizing must preserve the dashboard card order');
   const uptimeKumaHealthSource = dashboard.slice(dashboard.indexOf('function uptimeKumaHealth'), dashboard.indexOf('function buildUptimeKuma'));
-  assert.ok(uptimeKumaHealthSource.includes("label: `${down} down`"), 'Uptime Kuma degradation badges must show the number of down monitors');
+  assert.ok(uptimeKumaHealthSource.includes('label: offlineRatioLabel(down, total, up)'), 'Uptime Kuma degradation badges must show available and total monitors');
+  assert.ok(dashboard.includes("const offlineCount = offlineDevs.length + offlineSnmp.length"), 'UniFi offline badges must count controller and unmatched SNMP devices');
+  assert.ok(dashboard.includes('bdg(offlineRatioBadgeClass(offlineCount, totalCount, onlineCount), offlineRatioLabel(offlineCount, totalCount, onlineCount))'), 'UniFi availability badges must use shared counts and severity');
+  assert.ok(!dashboard.includes("DEVICE${offlineDevs.length>1?'S':''} OFFLINE"), 'UniFi offline badges must not repeat the platform context');
+  const simpleNasPanelSource = dashboard.slice(dashboard.indexOf('function buildSimpleNasPanel'), dashboard.indexOf('\nfunction ', dashboard.indexOf('function buildSimpleNasPanel') + 10));
+  assert.ok(simpleNasPanelSource.includes(": 'healthy'"), 'QNAP and Ugreen platform badges must use healthy when all systems are available');
+  const ratioFunctions = ['buildProxmox', 'buildLinux', 'buildWindows', 'buildKubernetes', 'buildSynology', 'buildUnifi', 'buildHealthchecks', 'uptimeKumaHealth', 'buildChecks', 'prometheusHealth', 'buildDocker', 'buildDockhand', 'buildFirewall', 'buildTrueNas', 'buildSimpleNasPanel', 'buildPbs', 'buildCloudflare', 'buildCiCd', 'buildVeeam', 'buildPortainer', 'buildDatabase'];
+  for (const functionName of ratioFunctions) {
+    const start = dashboard.indexOf(`function ${functionName}`);
+    const end = dashboard.indexOf('\nfunction ', start + 10);
+    assert.ok(start >= 0 && dashboard.slice(start, end > start ? end : undefined).includes('offlineRatioLabel('), `${functionName} must use the shared availability label`);
+  }
+  assert.ok(server.includes('offline: s.offline') && server.includes('online: s.online') && server.includes('...platformAvailability(data, item.id)'), 'production summaries must retain platform availability ratios');
+  assert.ok(demoServer.includes('...platformAvailability(data, id)'), 'demo summaries must retain platform offline ratios');
   assert.ok(dashboard.includes("const storageKnown = inst.available?.storage !== false"), 'unavailable QNAP storage metrics must not be displayed as zero');
   assert.ok(dashboard.includes("const disksKnown = inst.available?.disks !== false"), 'unavailable QNAP disk metrics must not be displayed as zero');
   assert.ok(settings.includes('The monitoring account must belong to the QNAP administrators group'), 'QNAP metric permissions must be documented in settings');
@@ -400,6 +434,7 @@ async function run() {
   testProxmoxInstances();
   testLatestStableVersion();
   testFullBackupEmptyFileCompatibility();
+  testPlatformAvailability();
   testStaticRegressions();
   console.log('smoke ok — issue regressions: #4 #5 #6 #7 #9 #10 #12 #18 #20 #22 #23 #24 #25');
 }
