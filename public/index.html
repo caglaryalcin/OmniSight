@@ -457,7 +457,7 @@ html[data-theme="light"] .shell .sb-csum-item{background:#eef1f6;border-color:#c
 html[data-theme="light"] .k8s-stat{background:#eef1f6;border-color:#c9d5e5}
 html[data-theme="light"] .topbar{background:rgba(255,255,255,.78)}
 
-.ghealth{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:650;padding:6px 13px;border-radius:20px;border:1px solid var(--border);background:var(--row)}
+.ghealth{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:650;padding:6px 13px;border-radius:20px;border:1px solid var(--border);background:var(--row);white-space:nowrap;flex:0 0 auto;line-height:1}
 #rbtn svg,#pbtn svg,.menu-btn svg,#thbtn svg{width:15px;height:15px}
 .ghealth .gh-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 .gh-green{color:var(--green);border-color:rgba(52,211,153,.3)} .gh-green .gh-dot{background:var(--green);animation:pg 2.5s infinite}
@@ -682,6 +682,7 @@ html.nav-collapsed .nav-wrap .nav{max-height:0;opacity:0;padding-top:0;pointer-e
 .top-action svg,.icon-btn svg{width:16px;height:16px}
 .topbar{height:68px;position:relative;top:auto;z-index:3000;justify-content:flex-start}
 .topbar .pubstatus{height:36px;border-radius:8px;background:var(--panel);padding:0 12px}
+.topbar .ghealth{height:36px;border-radius:8px;padding:0 12px;justify-content:center}
 .topbar #pbtn,.topbar #rbtn{width:36px;height:36px;border-radius:8px;background:var(--panel);padding:0;display:inline-flex;align-items:center;justify-content:center;gap:0}
 .topbar #thbtn{width:36px;height:36px;border-radius:8px;background:var(--panel);display:grid;place-items:center;flex-shrink:0}
 .topbar .menu-btn{width:36px;height:36px;border-radius:8px;background:var(--panel);display:grid;place-items:center;padding:0}
@@ -904,6 +905,8 @@ html[data-theme="light"] .overview-card .sb-csum-item{background:transparent!imp
   .shell{grid-template-columns:78px 1fr}
   .brand{justify-content:center;padding:0}
   .brand > div:nth-child(2),.nav span,.rail-section,.rail-foot{display:none}
+  .nav-wrap{padding:8px 0 6px}
+  .nav-toggle{display:none}
   .rail-toggle{display:none}
   .rail-resizer{display:none}
   .nav{padding-left:0;padding-right:0;align-items:center}
@@ -925,6 +928,17 @@ html[data-theme="light"] .overview-card .sb-csum-item{background:transparent!imp
   .overview-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   .overview-layout.no-side .overview-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
+@media (max-width:900px){
+  .topbar{padding:0 12px;gap:8px}
+  .search{width:min(320px,34vw);min-width:118px}
+  #lupd{display:none}
+  .profile-chip{width:36px;padding:0;justify-content:center}
+  .profile-chip-copy{display:none}
+  .top-spacer{min-width:0}
+  .det-hdr{gap:8px;padding:12px 14px}
+  .det-title{flex:0 1 auto;min-width:104px;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .det-summary{gap:8px;margin-right:0;flex-shrink:0}
+}
 @media (max-width:760px){
   html,body{height:100%;overflow:hidden}
   .shell{grid-template-columns:64px minmax(0,1fr)}
@@ -942,14 +956,28 @@ html[data-theme="light"] .overview-card .sb-csum-item{background:transparent!imp
   .overview-layout.no-side .overview-grid{grid-template-columns:1fr}
   .overview-side{grid-row:auto}
   .overview-kpi{min-height:128px}
-  .det-hdr{position:sticky;top:0;z-index:50;gap:8px;padding:12px;overflow-x:auto}
-  .det-platform-summary{min-width:100%}
+  .det-hdr{position:sticky;top:0;z-index:50;display:grid;grid-template-columns:34px minmax(0,1fr);gap:8px;padding:12px;overflow:visible}
+  .det-icon{grid-column:1;grid-row:1}
+  .det-title{grid-column:2;grid-row:1;min-width:0;max-width:none}
+  .det-platform-summary{grid-column:1 / -1;grid-row:2;min-width:0;width:100%;margin:0}
+  .det-summary{grid-column:1 / -1;grid-row:3;min-width:0;margin:0;justify-content:flex-end;flex-wrap:wrap}
+  .hc-check-row{overflow-x:auto}
+  .hc-check-top,.hc-ping-url{min-width:630px}
   .k8s-grp,.prom-instance,.node-card{overflow-x:auto}
   .k8s-colhdr.k8s-pod-row,.mon-row.k8s-pod-row{min-width:900px}
   .k8s-colhdr.k8s-deploy-row,.mon-row.k8s-deploy-row{min-width:820px}
   .k8s-colhdr.k8s-service-row,.mon-row.k8s-service-row{min-width:940px}
   .docker-row,.docker-head-row{min-width:980px}
   .pve-node-hdr,.snmp-node-hdr,.docker-host-hdr,.db-row{min-width:760px}
+}
+@media (max-width:520px){
+  .topbar{padding:0 8px;gap:6px}
+  .topbar #pbtn{display:none}
+  .topbar .ghealth{padding:0 9px;font-size:11.5px}
+  .shell .det-platform-summary .sb-csum{grid-auto-columns:minmax(0,1fr);gap:3px}
+  .shell .det-platform-summary .sb-csum-item{padding:0 2px}
+  .shell .det-platform-summary .sb-csum-val{font-size:14px}
+  .shell .det-platform-summary .sb-csum-lbl{font-size:7px;letter-spacing:.02em}
 }
 @media (display-mode:standalone){
   .topbar{padding-top:env(safe-area-inset-top)}
@@ -1560,7 +1588,8 @@ function dockerContainerStateCounts(containers) {
   return {
     running: states.filter(state => state === 'running').length,
     stopped: states.filter(state => state === 'exited').length,
-    pending: states.filter(state => ['created','restarting','paused','removing'].includes(state)).length,
+    created: states.filter(state => state === 'created').length,
+    pending: states.filter(state => ['restarting','paused','removing'].includes(state)).length,
     failed: states.filter(state => state === 'dead').length,
   };
 }
@@ -1568,6 +1597,10 @@ function dockerContainerIssueLabel(counts) {
   if((counts?.failed || 0) > 0) return `${counts.failed} ${trText('failed')}`;
   if((counts?.stopped || 0) > 0) return `${counts.stopped} ${trText('stopped')}`;
   if((counts?.pending || 0) > 0) return `${counts.pending} ${trText('pending')}`;
+  return '';
+}
+function dockerContainerInfoLabel(counts) {
+  if((counts?.created || 0) > 0) return `${counts.created} ${trText('created')}`;
   return '';
 }
 function dockerSortButton(mode, label) {
@@ -4607,6 +4640,7 @@ function buildDocker(docker){
   const totalDockerMem = Math.round(docker.reduce((a,h)=>a+(h.summary?.memPercent||0),0) * 10) / 10;
   const containerCounts = dockerContainerStateCounts(docker.filter(h=>h.online).flatMap(h=>h.containers||[]));
   const cStopped = containerCounts.stopped;
+  const cCreated = containerCounts.created;
   const cPending = containerCounts.pending;
   const cFailed  = containerCounts.failed;
   const containerIssueLabel = dockerContainerIssueLabel(containerCounts);
@@ -4616,6 +4650,7 @@ function buildDocker(docker){
     <div class="sb-csum-item"><div class="sb-csum-val">${docker.length}</div><div class="sb-csum-lbl">Hosts</div></div>
     <div class="sb-csum-item"><div class="sb-csum-val" style="color:var(--green)">${totalRunning}</div><div class="sb-csum-lbl">Running</div></div>
     ${cStopped>0?`<div class="sb-csum-item"><div class="sb-csum-val" style="color:var(--red)">${cStopped}</div><div class="sb-csum-lbl">Stopped</div></div>`:''}
+    ${cCreated>0?`<div class="sb-csum-item"><div class="sb-csum-val" style="color:var(--muted)">${cCreated}</div><div class="sb-csum-lbl">Created</div></div>`:''}
     ${cPending>0?`<div class="sb-csum-item"><div class="sb-csum-val" style="color:var(--yellow)">${cPending}</div><div class="sb-csum-lbl">Pending</div></div>`:''}
     ${cFailed>0?`<div class="sb-csum-item"><div class="sb-csum-val" style="color:var(--red)">${cFailed}</div><div class="sb-csum-lbl">Failed</div></div>`:''}
     ${totalDockerCpu?`<div class="sb-csum-item"><div class="sb-csum-val">${totalDockerCpu}%</div><div class="sb-csum-lbl">CPU</div></div>`:''}
@@ -4655,6 +4690,7 @@ function buildDocker(docker){
     const hostContainers = host.containers || [];
     const hostContainerCounts = dockerContainerStateCounts(hostContainers);
     const hostIssueLabel = dockerContainerIssueLabel(hostContainerCounts);
+    const hostInfoLabel = dockerContainerInfoLabel(hostContainerCounts);
     const hostHasIssue = !!hostIssueLabel;
     const hostHasFailed = hostContainerCounts.failed > 0;
     const containers = sortDockerContainers(hostContainers);
@@ -4679,7 +4715,7 @@ function buildDocker(docker){
           </div>
           ${dockerStats}
         </div>
-        ${bdg(hostHasFailed?'red':hostHasIssue?'yellow':hostContainers.length?'green':'gray', hostIssueLabel || (hostContainers.length?'all running':'no containers'))}
+        ${bdg(hostHasFailed?'red':hostHasIssue?'yellow':hostInfoLabel?'gray':hostContainers.length?'green':'gray', hostIssueLabel || hostInfoLabel || (hostContainers.length?'all running':'no containers'))}
         ${notifyBell('dk:'+host.name)}
       </div>
       <div class="node-body ${isOpen?'open':''}" id="dk-${dkey}">
@@ -6699,12 +6735,13 @@ function overviewRows(id, data){
       const connecting = host._connecting && !host.online;
       const containerCounts = dockerContainerStateCounts(host.containers || []);
       const issueLabel = dockerContainerIssueLabel(containerCounts);
+      const infoLabel = dockerContainerInfoLabel(containerCounts);
       const hasFailed = containerCounts.failed > 0;
       const noContainers = host.online && Number(host.summary?.total || 0) === 0;
       const sub = connecting ? (host.host||'Connecting') :
         host.online ? [`${host.summary?.running||0} running`, `${host.summary?.total||0} total`, hasNum(host.summary?.cpu)?`CPU ${host.summary.cpu}%`:'', hasNum(host.summary?.memPercent)?`Mem ${host.summary.memPercent}%`:'' ].filter(Boolean).join(' · ') :
         (host.error || 'Connection failed');
-      return overviewRow('docker', host.name, sub, connecting||noContainers?'gray':!host.online||hasFailed?'red':issueLabel?'yellow':'green', connecting?'connecting':!host.online?'offline':noContainers?'no containers':issueLabel||'healthy', connecting||noContainers?'md-gray':!host.online||hasFailed?'md-red':issueLabel?'md-yellow':'md-green');
+      return overviewRow('docker', host.name, sub, connecting||noContainers||infoLabel?'gray':!host.online||hasFailed?'red':issueLabel?'yellow':'green', connecting?'connecting':!host.online?'offline':noContainers?'no containers':issueLabel||infoLabel||'healthy', connecting||noContainers?'md-gray':!host.online||hasFailed?'md-red':issueLabel?'md-yellow':'md-green');
     }).join('');
     const stateOrder = { running: 0, restarting: 1, paused: 2, created: 3, exited: 4, dead: 5 };
     const containerRows = hosts.filter(host => host.online).map(host => {
@@ -7856,7 +7893,11 @@ function render(data, opts = {}){
     if(dockerConnecting && !realDocker.length) platforms.push('connecting');
     else {
       const o=realDocker.filter(h=>h.online).length;
-      const containerIssue=realDocker.some(h=>h.online&&Number(h.summary?.total||0)>Number(h.summary?.running||0));
+      const containerIssue=realDocker.some(h=>{
+        if(!h.online) return false;
+        const counts = dockerContainerStateCounts(h.containers || []);
+        return counts.failed > 0 || counts.stopped > 0 || counts.pending > 0;
+      });
       platforms.push(o===0?'down':(o<realDocker.length||dockerConnecting||containerIssue)?'degraded':'ok');
     }
   }

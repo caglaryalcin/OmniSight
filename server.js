@@ -8890,10 +8890,15 @@ function buildPublicSummary(data) {
     const up = dockerRows.filter(h => h.online).length;
     const running = dockerRows.reduce((a, h) => a + (h.summary?.running || 0), 0);
     const total = dockerRows.reduce((a, h) => a + (h.summary?.total || 0), 0);
-    const stopped = dockerRows.reduce((a, h) => a + (h.summary?.stopped || 0), 0);
-    const pending = Math.max(0, total - running - stopped);
-    const status = !dockerRows.length && connecting ? 'connecting' : up < dockerRows.length ? (up > 0 ? 'warn' : 'down') : (connecting || stopped > 0 || pending > 0 ? 'warn' : 'ok');
-    const meta = stopped > 0 ? `${running}/${total} running\n${stopped} stopped` : pending > 0 ? `${running}/${total} running\n${pending} pending` : `${running}/${total} containers`;
+    const containers = dockerRows.flatMap(h => h.containers || []);
+    const states = containers.map(container => String(container.state || '').toLowerCase());
+    const stopped = containers.length ? states.filter(state => state === 'exited').length : dockerRows.reduce((a, h) => a + (h.summary?.stopped || 0), 0);
+    const failed = states.filter(state => state === 'dead').length;
+    const pending = states.filter(state => ['restarting', 'paused', 'removing'].includes(state)).length;
+    const created = states.filter(state => state === 'created').length;
+    const containerIssues = stopped + failed + pending;
+    const status = !dockerRows.length && connecting ? 'connecting' : up < dockerRows.length ? (up > 0 ? 'warn' : 'down') : (connecting || containerIssues > 0 ? 'warn' : 'ok');
+    const meta = failed > 0 ? `${running}/${total} running\n${failed} failed` : stopped > 0 ? `${running}/${total} running\n${stopped} stopped` : pending > 0 ? `${running}/${total} running\n${pending} pending` : created > 0 ? `${running}/${total} running\n${created} created` : `${running}/${total} containers`;
     out.push({ id: 'docker', title: 'Docker', status, meta: dockerRows.length ? meta : 'connecting...' });
   }
   const dh = data.dockhand;

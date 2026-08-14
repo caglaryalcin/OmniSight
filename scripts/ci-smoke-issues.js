@@ -429,12 +429,12 @@ function testStaticRegressions() {
     assert.ok(start >= 0 && dashboard.slice(start, end > start ? end : undefined).includes('offlineRatioLabel('), `${functionName} must use the shared availability label`);
   }
   const dockerPanelSource = dashboard.slice(dashboard.indexOf('function buildDocker'), dashboard.indexOf('\nfunction ', dashboard.indexOf('function buildDocker') + 10));
-  assert.ok(dashboard.includes('function dockerContainerStateCounts(containers)') && dashboard.includes("['created','restarting','paused','removing'].includes(state)"), 'Docker pending states must share one classification');
-  assert.ok(dockerPanelSource.includes('containerIssueLabel') && dockerPanelSource.includes('hostIssueLabel') && dashboard.includes("return `${counts.pending} ${trText('pending')}`"), 'Docker pending containers must make platform and host badges degraded instead of healthy');
-  assert.ok(dashboard.includes('Number(h.summary?.total||0)>Number(h.summary?.running||0)'), 'global Docker health must include every non-running container state');
-  assert.ok(server.includes('const pending = Math.max(0, total - running - stopped)') && server.includes('${pending} pending'), 'compact production health must report pending Docker containers');
-  assert.ok(demoServer.includes("state: i === 5 ? 'created' : 'running'") && demoServer.includes("pending: containers.filter(c => c.state === 'created').length"), 'demo Docker data must include a visible pending container example');
-  assert.ok(demoServer.includes("if (id === 'docker')") && demoServer.includes("return running < total ? 'degraded' : 'healthy'"), 'demo compact health must mark Docker pending state degraded');
+  assert.ok(dashboard.includes('function dockerContainerStateCounts(containers)') && dashboard.includes("created: states.filter(state => state === 'created').length") && dashboard.includes("['restarting','paused','removing'].includes(state)"), 'Docker created containers must be classified separately from actionable pending states');
+  assert.ok(dockerPanelSource.includes('containerIssueLabel') && dockerPanelSource.includes('hostInfoLabel') && dashboard.includes("return `${counts.created} ${trText('created')}`"), 'Docker created containers must remain visible without degrading platform health');
+  assert.ok(dashboard.includes('return counts.failed > 0 || counts.stopped > 0 || counts.pending > 0'), 'global Docker health must ignore created containers and include actionable states');
+  assert.ok(server.includes('const containerIssues = stopped + failed + pending') && server.includes('${created} created'), 'compact production health must report created containers without warning');
+  assert.ok(demoServer.includes("state: i === 5 ? 'created' : 'running'") && demoServer.includes("created: containers.filter(c => c.state === 'created').length") && demoServer.includes("color: i === 5 ? 'gray' : 'green'"), 'demo Docker data must include a neutral created container example');
+  assert.ok(demoServer.includes("const issueStates = new Set(['exited', 'dead', 'restarting', 'paused', 'removing'])") && demoServer.includes("return hasIssue ? 'degraded' : 'healthy'"), 'demo compact health must keep created-only Docker hosts healthy');
   assert.ok(server.includes('offline: s.offline') && server.includes('online: s.online') && server.includes('...platformAvailability(data, item.id)'), 'production summaries must retain platform availability ratios');
   assert.ok(demoServer.includes('...platformAvailability(data, id)'), 'demo summaries must retain platform offline ratios');
   assert.ok(dashboard.includes("const storageKnown = inst.available?.storage !== false"), 'unavailable QNAP storage metrics must not be displayed as zero');

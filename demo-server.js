@@ -980,7 +980,7 @@ function demoStatus() {
       : { status: 'current', checkedAt: nowIso(-300_000) },
     state: i === 5 ? 'created' : 'running',
     status: i === 5 ? 'created' : 'running',
-    color: i === 5 ? 'yellow' : 'green',
+    color: i === 5 ? 'gray' : 'green',
     cpu: i === 5 ? 0 : Number((2 + i * 1.7).toFixed(1)),
     mem: i === 5 ? 0 : Number((1.2 + i * 0.8).toFixed(1)),
     memPercent: i === 5 ? 0 : Number((1.2 + i * 0.8).toFixed(1)),
@@ -992,7 +992,7 @@ function demoStatus() {
     name: 'demo-docker',
     host: 'demo@192.0.2.30:22',
     online: true,
-    summary: { total: containers.length, running: containers.filter(c => c.state === 'running').length, stopped: 0, pending: containers.filter(c => c.state === 'created').length, cpu: hDockerNow.cpu || 22, memPercent: hDockerNow.mem || 18, updates: 2, unused: 3 },
+    summary: { total: containers.length, running: containers.filter(c => c.state === 'running').length, stopped: 0, created: containers.filter(c => c.state === 'created').length, pending: 0, cpu: hDockerNow.cpu || 22, memPercent: hDockerNow.mem || 18, updates: 2, unused: 3 },
     history: hDocker,
     containers,
   }];
@@ -1354,9 +1354,9 @@ function publicSummary(data = demoStatus()) {
         return down > 0 && down >= up ? 'down' : (down > 0 || Number(sm.grace || 0) > 0 ? 'degraded' : 'healthy');
       }
       if (id === 'docker') {
-        const total = data.docker.reduce((sum, host) => sum + Number(host.summary?.total || 0), 0);
-        const running = data.docker.reduce((sum, host) => sum + Number(host.summary?.running || 0), 0);
-        return running < total ? 'degraded' : 'healthy';
+        const issueStates = new Set(['exited', 'dead', 'restarting', 'paused', 'removing']);
+        const hasIssue = data.docker.some(host => (host.containers || []).some(container => issueStates.has(String(container.state || '').toLowerCase())));
+        return hasIssue ? 'degraded' : 'healthy';
       }
       return id === 'uptimekuma' ? 'degraded' : 'healthy';
     })();

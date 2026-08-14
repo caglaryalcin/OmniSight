@@ -385,7 +385,7 @@ async function getDockerSshHost(host) {
         state,
         status: String(c.Status || ''),
         ports: parsePortsText(c.Ports),
-        color: state === 'running' ? 'green' : (state === 'exited' || state === 'dead') ? 'red' : 'yellow',
+        color: state === 'running' ? 'green' : state === 'created' ? 'gray' : (state === 'exited' || state === 'dead') ? 'red' : 'yellow',
         cpu: pct(st.CPUPerc) == null ? null : Math.min(100, Math.round((pct(st.CPUPerc) / hostCpus) * 10) / 10),
         memPercent: memory.percent ?? pct(st.MemPerc),
         memUsageBytes: memory.usage,
@@ -419,6 +419,8 @@ async function getDockerSshHost(host) {
     containers.forEach(c => { c.imageUpdate = imageUpdates.get(c.image) || { status: 'unknown', label: 'unknown' }; });
     const running = containers.filter(c => c.state === 'running').length;
     const stopped = containers.filter(c => c.state === 'exited' || c.state === 'dead').length;
+    const created = containers.filter(c => c.state === 'created').length;
+    const pending = containers.filter(c => ['restarting', 'paused', 'removing'].includes(c.state)).length;
     const updates = containers.filter(c => c.imageUpdate?.status === 'update').length;
     const resources = resourceSummary(containers, hostMemoryBytes);
     return {
@@ -430,6 +432,8 @@ async function getDockerSshHost(host) {
         total: containers.length,
         running,
         stopped,
+        created,
+        pending,
         unused: Number(unusedImages) || 0,
         updates,
         cpu: resources.cpu,
@@ -470,7 +474,7 @@ async function getDockerHost(host) {
         status: c.Status || '',
         labels: cleanLabels(c.Labels),
         ports: ports(c.Ports),
-        color: c.State === 'running' ? 'green' : (c.State === 'exited' || c.State === 'dead') ? 'red' : 'yellow',
+        color: c.State === 'running' ? 'green' : c.State === 'created' ? 'gray' : (c.State === 'exited' || c.State === 'dead') ? 'red' : 'yellow',
         cpu: stats ? cpuPercent(stats) : null,
         memPercent: memory?.percent ?? null,
         memUsageBytes: memory?.usage ?? null,
@@ -488,6 +492,8 @@ async function getDockerHost(host) {
     detailed.forEach(c => { c.imageUpdate = imageUpdates.get(c.image) || { status: 'unknown', label: 'unknown' }; });
     const running = detailed.filter(c => c.state === 'running').length;
     const stopped = detailed.filter(c => c.state === 'exited' || c.state === 'dead').length;
+    const created = detailed.filter(c => c.state === 'created').length;
+    const pending = detailed.filter(c => ['restarting', 'paused', 'removing'].includes(c.state)).length;
     const updates = detailed.filter(c => c.imageUpdate?.status === 'update').length;
     const resources = resourceSummary(detailed, info?.MemTotal);
     return {
@@ -499,6 +505,8 @@ async function getDockerHost(host) {
         total: detailed.length,
         running,
         stopped,
+        created,
+        pending,
         unused: unusedImageCount(images, containers, apiImageRefs),
         updates,
         cpu: resources.cpu,
