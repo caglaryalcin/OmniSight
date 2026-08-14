@@ -3056,7 +3056,7 @@ function buildLinux(linux){
   const updateCount = linux.reduce((sum,s)=>sum+(s.online ? Number(s.updates?.count || 0) : 0),0);
   const rebootCount = linux.filter(s=>s.online && s.updates?.rebootRequired).length;
   const updateAttention = updateCount > 0 || rebootCount > 0;
-  const allOk = realLinux.length > 0 && realLinux.every(s=>s.online && s.services?.every(sv=>sv.active || sv.excluded) && !Number(s.updates?.count || 0) && !s.updates?.rebootRequired);
+  const allOk = realLinux.length > 0 && realLinux.every(s=>s.online && (s.services || []).every(sv=>sv.active || sv.excluded));
   const allServices = linux.flatMap(s=>s.services||[]);
   const failed = allServices.filter(s=>!s.active&&s.state!=='unknown'&&!s.excluded).length;
   const totalSvcs = allServices.length;
