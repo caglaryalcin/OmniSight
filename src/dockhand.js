@@ -304,7 +304,8 @@ function stateOf(c) {
 
 function colorOf(state) {
   if (state === 'running') return 'green';
-  if (['restarting', 'paused', 'created'].includes(state)) return 'yellow';
+  if (state === 'created') return 'gray';
+  if (['restarting', 'paused'].includes(state)) return 'yellow';
   if (['dead', 'exited'].includes(state)) return 'red';
   return 'gray';
 }

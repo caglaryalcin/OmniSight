@@ -7209,8 +7209,8 @@ const CONFIG_AUDIT_LABELS = {
   performance: 'performance',
   security: 'security',
   proxmox: 'Proxmox',
-  linux: 'Linux Server',
-  windows: 'Windows Server',
+  linux: 'Linux Servers',
+  windows: 'Windows Servers',
   kubernetes: 'Kubernetes',
   snmp: 'SNMP',
   unifi: 'UniFi',
@@ -8776,7 +8776,7 @@ function buildPublicSummary(data) {
     const svcUp = linuxRows.reduce((a, l) => a + (l.services || []).filter(x => x.active && !x.excluded).length, 0);
     const failedSvcs = svcTotal - svcUp;
     const status = !linuxRows.length && connecting ? 'connecting' : up === 0 ? 'down' : (up < linuxRows.length || connecting || failedSvcs > 0 ? 'warn' : 'ok');
-    out.push({ id: 'linux', title: 'Linux Server', status, meta: linuxRows.length ? `${up}/${linuxRows.length} servers\n${svcUp}/${svcTotal} services` : 'connecting...' });
+    out.push({ id: 'linux', title: 'Linux Servers', status, meta: linuxRows.length ? `${up}/${linuxRows.length} servers\n${svcUp}/${svcTotal} services` : 'connecting...' });
   }
   if ((data.windows || []).length) {
     const rows = data.windows.filter(w => !w._connecting);
@@ -8786,7 +8786,7 @@ function buildPublicSummary(data) {
     const svcUp = rows.reduce((a, w) => a + (w.services || []).filter(x => x.active && !x.excluded).length, 0);
     const failedSvcs = rows.reduce((a, w) => a + (w.services || []).filter(x => !x.active && !x.excluded && x.state !== 'unknown').length, 0);
     const status = !rows.length && connecting ? 'connecting' : up === 0 ? 'down' : (up < rows.length || connecting || failedSvcs > 0 ? 'warn' : 'ok');
-    out.push({ id: 'windows', title: 'Windows Server', status, meta: rows.length ? `${up}/${rows.length} servers\n${svcUp}/${svcTotal} services` : 'connecting...' });
+    out.push({ id: 'windows', title: 'Windows Servers', status, meta: rows.length ? `${up}/${rows.length} servers\n${svcUp}/${svcTotal} services` : 'connecting...' });
   }
   const k = data.kubernetes;
   if (k && k.online !== undefined && (k.online || k.summary)) {
@@ -9032,7 +9032,7 @@ app.get('/api/public/status', (req, res) => {
     : null;
   const services = buildPublicSummary(data).filter(s => !visible || visible.has(s.id));
   const present = new Set(services.map(s => s.id));
-  const titles = { proxmox: 'Proxmox', linux: 'Linux Server', windows: 'Windows Server', kubernetes: 'Kubernetes', synology: 'Synology', mikrotik: 'MikroTik', unifi: 'UniFi', snmp: 'SNMP', healthchecks: 'Healthchecks', uptimekuma: 'Uptime Kuma', checks: 'Service checks', prometheus: 'Prometheus', docker: 'Docker', dockhand: 'Dockhand', database: 'Databases', firewall: 'Firewalls', truenas: 'TrueNAS', qnap: 'QNAP', ugreen: 'Ugreen', pbs: 'Proxmox Backup', cloudflare: 'Cloudflare', cicd: 'GitHub/GitLab CI', veeam: 'Veeam', portainer: 'Portainer' };
+  const titles = { proxmox: 'Proxmox', linux: 'Linux Servers', windows: 'Windows Servers', kubernetes: 'Kubernetes', synology: 'Synology', mikrotik: 'MikroTik', unifi: 'UniFi', snmp: 'SNMP', healthchecks: 'Healthchecks', uptimekuma: 'Uptime Kuma', checks: 'Service checks', prometheus: 'Prometheus', docker: 'Docker', dockhand: 'Dockhand', database: 'Databases', firewall: 'Firewalls', truenas: 'TrueNAS', qnap: 'QNAP', ugreen: 'Ugreen', pbs: 'Proxmox Backup', cloudflare: 'Cloudflare', cicd: 'GitHub/GitLab CI', veeam: 'Veeam', portainer: 'Portainer' };
   configuredList().forEach(id => {
     if (visible && !visible.has(id)) return;
     if (!present.has(id)) services.push({ id, title: titles[id] || id, status: 'connecting', meta: 'connecting…' });

@@ -37,6 +37,12 @@ function run() {
   assert.strictEqual(localizeOperationalText('16/16 up', 'tr', translateText), '16/16 aktif');
   assert.strictEqual(localizeOperationalText('2/2 servers', 'tr', translateText), '2/2 sunucu');
   assert.strictEqual(localizeOperationalText('1 reboot required', 'tr', translateText), '1 yeniden başlatma gerekli');
+  assert.strictEqual(localizeOperationalText('4/4 services up', 'tr', translateText), '4/4 aktif servisler');
+  assert.strictEqual(localizeOperationalText('7 reporting sources', 'tr', translateText), '7 raporlama kaynağı');
+  assert.strictEqual(localizeOperationalText('CPU temperature · last known', 'tr', translateText), 'CPU sıcaklığı · son bilinen');
+  assert.strictEqual(localizeOperationalText('2/2 pools', 'tr', translateText), '2/2 havuz');
+  assert.strictEqual(localizeOperationalText('3/5 green', 'tr', translateText), '3/5 başarılı');
+  assert.strictEqual(localizeOperationalText('Read 287 KB/s / Write 179 KB/s', 'tr', translateText), 'okuma 287 KB/s / yazma 179 KB/s');
   assert.strictEqual(localizeOperationalText('3/3 online', 'en', translateText), '3/3 online');
   assert.strictEqual(localizeOperationalText('download', 'tr', translateText), 'download');
 

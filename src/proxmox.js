@@ -5,6 +5,7 @@ const os = require('os');
 const { Client } = require('ssh2');
 const { loadHistoryMap, scheduleSaveHistoryMap } = require('./historyStore');
 const { mapLimit } = require('./concurrency');
+const { normalizeCephStatus } = require('./ceph');
 
 const PVE_HISTORY_MAX = 5760;
 const pveHistory = loadHistoryMap('proxmox-history', PVE_HISTORY_MAX);
@@ -575,81 +576,21 @@ async function nodeData(cfg, node, excluded, resource = null) {
   }
 }
 
-function numAny(...values) {
-  for (const value of values) {
-    const n = Number(value);
-    if (Number.isFinite(n)) return n;
-  }
-  return null;
-}
-
-function cephHealthStatus(...values) {
-  for (const value of values) {
-    if (value === null || value === undefined) continue;
-    if (typeof value === 'object') {
-      const nested = cephHealthStatus(value.status, value.health, value.health_status, value.overall_status);
-      if (nested) return nested;
-      continue;
-    }
-    const raw = String(value).trim().toUpperCase();
-    if (!raw) continue;
-    if (raw === 'OK') return 'HEALTH_OK';
-    if (raw === 'WARN' || raw === 'WARNING') return 'HEALTH_WARN';
-    if (raw === 'ERR' || raw === 'ERROR') return 'HEALTH_ERR';
-    const match = raw.match(/\bHEALTH_(OK|WARN|ERR)\b/);
-    if (match) return `HEALTH_${match[1]}`;
-  }
-  return '';
-}
-
-function normalizeCephStatus(raw, dfRaw = null) {
-  if (!raw || typeof raw !== 'object') return null;
-  const statusData = raw.statusData || raw.cephStatus || raw.status_data || raw;
-  const dfData = raw.df || raw.dfData || raw.cephDf || dfRaw || null;
-  const health = statusData.health || statusData.health_status || statusData.status || statusData;
-  const status = cephHealthStatus(health, statusData.health, statusData.health_status, statusData.status, raw.health, raw.status);
-  if (!status) return null;
-  const checks = [];
-  const src = health.checks || statusData.checks || {};
-  if (Array.isArray(src)) {
-    src.forEach(c => {
-      const msg = c?.summary?.message || c?.message || c?.summary || c?.name;
-      if (msg) checks.push(String(msg).slice(0, 300));
-    });
-  } else if (src && typeof src === 'object') {
-    for (const k of Object.keys(src)) {
-      const c = src[k];
-      const msg = c?.summary?.message || c?.message || c?.summary || k;
-      if (msg) checks.push(String(msg).slice(0, 300));
-    }
-  }
-  const osdmap = statusData.osdmap?.osdmap || statusData.osdmap || {};
-  const osd = {
-    total: numAny(osdmap.num_osds, osdmap.num_osd, osdmap.osd_count),
-    up: numAny(osdmap.num_up_osds, osdmap.num_up_osd, osdmap.up),
-    in: numAny(osdmap.num_in_osds, osdmap.num_in_osd, osdmap.in),
-  };
-  const stats = dfData?.stats || statusData.pgmap || {};
-  const totalBytes = numAny(stats.total_bytes, stats.bytes_total, statusData.pgmap?.bytes_total);
-  const usedBytes = numAny(stats.total_used_bytes, stats.bytes_used, statusData.pgmap?.bytes_used);
-  const availBytes = numAny(stats.total_avail_bytes, stats.bytes_avail, statusData.pgmap?.bytes_avail);
-  const usage = totalBytes ? {
-    totalBytes,
-    usedBytes: usedBytes || 0,
-    availBytes: availBytes ?? Math.max(0, totalBytes - (usedBytes || 0)),
-    percent: Math.round(((usedBytes || 0) / totalBytes) * 1000) / 10,
-  } : null;
-  return { health: status, checks, osd, usage };
-}
-
 async function getProxmoxApiData(cfg = {}) {
   if (!cfg.url || !cfg.tokenId || !cfg.tokenSecret) return { clusterSummary: null, nodes: [], ceph: null };
   const excluded = cfg.excludedServices?.proxmox || {};
-  const [nodesRaw, resourcesRaw, cephRaw, cephDfRaw] = await Promise.all([
-    pveFetch(cfg, '/api2/json/nodes'),
+  const nodesPromise = pveFetch(cfg, '/api2/json/nodes');
+  const cephOsdPromise = nodesPromise.then(rawNodes => {
+    const node = (rawNodes || []).find(item => String(item.status || '').toLowerCase() !== 'offline') || (rawNodes || [])[0];
+    if (!node?.node) return null;
+    return pveFetch(cfg, `/api2/json/nodes/${encodeURIComponent(node.node)}/ceph/osd`).catch(() => null);
+  }).catch(() => null);
+  const [nodesRaw, resourcesRaw, cephRaw, cephDfRaw, cephOsdRaw] = await Promise.all([
+    nodesPromise,
     pveFetch(cfg, '/api2/json/cluster/resources').catch(() => []),
     pveFetch(cfg, '/api2/json/cluster/ceph/status').catch(() => null),
     pveFetch(cfg, '/api2/json/cluster/ceph/df').catch(() => null),
+    cephOsdPromise,
   ]);
   const resourcesByNode = new Map((resourcesRaw || [])
     .filter(r => r.type === 'node' && (r.node || r.id))
@@ -665,7 +606,7 @@ async function getProxmoxApiData(cfg = {}) {
     totalRAM: nodes.reduce((s, n) => s + (n.node.ram?.total || 0), 0),
     usedRAM: onlineNodes.reduce((s, n) => s + (n.node.ram?.used || 0), 0),
   };
-  return { clusterSummary, nodes, ceph: normalizeCephStatus(cephRaw, cephDfRaw) };
+  return { clusterSummary, nodes, ceph: normalizeCephStatus(cephRaw, cephDfRaw, cephOsdRaw) };
 }
 
 function configuredInstances(config = {}) {

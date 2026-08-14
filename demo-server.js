@@ -696,6 +696,8 @@ function demoStatus() {
       health: 'HEALTH_OK',
       checks: [],
       osd: { total: 6, up: 6, in: 6 },
+      latency: { averageMs: 1.5, applyMs: 1.3, commitMs: 1.7, osds: 6 },
+      mon: { total: 3, inQuorum: 3, names: ['px-demo-01', 'px-demo-02', 'px-demo-03'], quorate: true, status: 'healthy' },
       usage: { usedBytes: 18.4 * 1024 ** 4, totalBytes: 48 * 1024 ** 4, availBytes: 29.6 * 1024 ** 4, percent: 38.3 },
     },
     nodes: [
@@ -914,7 +916,7 @@ function demoStatus() {
   const hUnifiNow = hUnifi[hUnifi.length - 1] || {};
   const hNasNow = hNas[hNas.length - 1] || {};
   data.snmp = [
-    { name: 'core-switch', host: '192.0.2.2', online: true, profile: 'mikrotik', vendor: 'MikroTik', model: 'CRS', cpu: hSwitchNow.cpu || 9, ram: { percent: hSwitchNow.mem || 28, used: 0.3, total: 1 }, systemTemp: hSwitchNow.tempSystem || 42, metrics: { bandwidth: { rxBps: hSwitchNow.bandwidthRxBps || 3_200_000, txBps: hSwitchNow.bandwidthTxBps || 2_000_000 }, diskIO: { readBps: hSwitchNow.diskReadBps || 0, writeBps: hSwitchNow.diskWriteBps || 0 } }, history: hSwitch },
+    { name: 'core-switch', host: '192.0.2.2', online: true, profile: 'mikrotik', vendor: 'MikroTik', model: 'CRS', cpu: hSwitchNow.cpu || 9, ram: { percent: hSwitchNow.mem || 28, used: 0.3, total: 1 }, uptimeSeconds: uptimeSeconds(26, 8, 17), systemTemp: hSwitchNow.tempSystem || 42, metrics: { bandwidth: { rxBps: hSwitchNow.bandwidthRxBps || 3_200_000, txBps: hSwitchNow.bandwidthTxBps || 2_000_000 }, diskIO: { readBps: hSwitchNow.diskReadBps || 0, writeBps: hSwitchNow.diskWriteBps || 0 } }, history: hSwitch },
     { name: 'demo-ap', host: '192.0.2.5', online: true, profile: 'unifi', vendor: 'Ubiquiti', model: 'UniFi U6 Pro', cpu: hUnifiNow.cpu || 13, ram: { percent: hUnifiNow.mem || 41, used: 0.42, total: 1 }, systemTemp: hUnifiNow.tempSystem || 39, fanSpeeds: [], metrics: { bandwidth: { rxBps: hUnifiNow.bandwidthRxBps || 2_400_000, txBps: hUnifiNow.bandwidthTxBps || 1_300_000 }, diskIO: { readBps: hUnifiNow.diskReadBps || 0, writeBps: hUnifiNow.diskWriteBps || 0 } }, history: hUnifi },
     { name: 'demo-ap-legacy', host: '192.0.2.9', online: true, profile: 'unifi', vendor: 'Ubiquiti', model: 'UniFi U6 Pro', cpu: hUnifiNow.cpu || 13, ram: { percent: hUnifiNow.mem || 41, used: 0.42, total: 1 }, systemTemp: hUnifiNow.tempSystem || 39, fanSpeeds: [], metrics: { bandwidth: { rxBps: hUnifiNow.bandwidthRxBps || 2_400_000, txBps: hUnifiNow.bandwidthTxBps || 1_300_000 }, diskIO: { readBps: hUnifiNow.diskReadBps || 0, writeBps: hUnifiNow.diskWriteBps || 0 } }, history: hUnifi },
     { name: 'demo-nas', host: '192.0.2.20', online: true, profile: 'synology', vendor: 'Synology', model: 'DS Demo', cpu: hNasNow.cpu || 17, ram: { percent: hNasNow.mem || 36, used: 5.8, total: 16 }, systemTemp: hNasNow.tempSystem || 45, metrics: { bandwidth: { rxBps: hNasNow.bandwidthRxBps || 4_200_000, txBps: hNasNow.bandwidthTxBps || 2_600_000 }, diskIO: { readBps: hNasNow.diskReadBps || 1_600_000, writeBps: hNasNow.diskWriteBps || 840_000 } }, history: hNas },
@@ -998,13 +1000,10 @@ function demoStatus() {
   }];
   data.dockhand = {
     online: true,
-    summary: { servers: 1, serverUp: 1, serverDown: 0, total: containers.length, running: containers.length, stopped: 0, pending: 0 },
-    instances: [{ name: 'dockhand-demo', url: 'https://dockhand.example.invalid', online: true, summary: { total: containers.length, running: containers.length, stopped: 0 } }],
+    summary: { servers: 1, serverUp: 1, serverDown: 0, total: containers.length, running: containers.filter(c => c.state === 'running').length, stopped: 0, created: containers.filter(c => c.state === 'created').length, pending: 0 },
+    instances: [{ name: 'dockhand-demo', url: 'https://dockhand.example.invalid', online: true, summary: { total: containers.length, running: containers.filter(c => c.state === 'running').length, stopped: 0, created: containers.filter(c => c.state === 'created').length } }],
     containers: containers.map((c, i) => ({
       ...c,
-      state: 'running',
-      status: 'running',
-      color: 'green',
       sourceName: 'dockhand-demo',
       sourceUrl: 'https://dockhand.example.invalid',
       environmentId: 'demo-env',
@@ -1309,7 +1308,7 @@ function demoStatus() {
 function publicSummary(data = demoStatus()) {
   return data.configured.map(id => {
     const names = {
-      proxmox: 'Proxmox', linux: 'Linux Server', windows: 'Windows Server', kubernetes: 'Kubernetes', synology: 'Synology', mikrotik: 'MikroTik', unifi: 'UniFi', snmp: 'SNMP',
+      proxmox: 'Proxmox', linux: 'Linux Servers', windows: 'Windows Servers', kubernetes: 'Kubernetes', synology: 'Synology', mikrotik: 'MikroTik', unifi: 'UniFi', snmp: 'SNMP',
       healthchecks: 'Healthchecks', uptimekuma: 'Uptime Kuma', checks: 'Service checks',
       prometheus: 'Prometheus', docker: 'Docker', dockhand: 'Dockhand', firewall: 'Firewalls',
       truenas: 'TrueNAS', qnap: 'QNAP', ugreen: 'Ugreen', pbs: 'Proxmox Backup',

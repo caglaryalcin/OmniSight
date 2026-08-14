@@ -210,6 +210,12 @@ function abortTopologyFetch(){
 }
 window.addEventListener('message', event => {
   if(event.origin !== window.location.origin) return;
+  if(event.data?.type === 'omnisight-language'){
+    window.OmniI18n?.setLang?.(event.data.lang || 'en');
+    if(lastData) renderTopology(lastData);
+    else applyTopologyLanguage();
+    return;
+  }
   if(event.data?.type !== 'omnisight-embed-visibility') return;
   embedPaused = event.data.visible === false;
   if(embedPaused) {
@@ -280,6 +286,38 @@ async function readJsonResponse(r){
 }
 function lang(){return window.OmniI18n?OmniI18n.currentLang('en'):'en'}
 function tr(s){return window.OmniI18n?OmniI18n.t(s,lang()):s}
+function localizeTopologyText(text, selectedLang = lang()){
+  const raw = String(text ?? '');
+  if(String(selectedLang || '').toLowerCase() !== 'tr') return raw;
+  const direct = tr(raw);
+  if(direct !== raw) return direct;
+  const replacements = [
+    [/\bhidden in compact view\b/gi, 'kompakt görünümde gizli'],
+    [/\baccess points?\b/gi, 'erişim noktası'],
+    [/\bgateways?\b/gi, 'ağ geçidi'],
+    [/\bguests?\b/gi, 'misafir'],
+    [/\bpods?\b/gi, 'pod'],
+    [/\bcontainers?\b/gi, 'container'],
+    [/\brunning\b/gi, 'çalışıyor'],
+    [/\bonline\b/gi, 'çevrimiçi'],
+    [/\boffline\b/gi, 'çevrimdışı'],
+    [/\bmore\b/gi, 'daha'],
+  ];
+  return replacements.reduce((value, [pattern, replacement]) => value.replace(pattern, replacement), direct);
+}
+function applyTopologyLanguage(selectedLang = lang()){
+  if(window.OmniI18n) OmniI18n.apply(document, selectedLang);
+  document.querySelectorAll('.node-meta').forEach(root => {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    let node;
+    while((node = walker.nextNode())){
+      const original = node._osOrigText ?? node.nodeValue;
+      const trimmed = original.trim();
+      if(!trimmed) continue;
+      node.nodeValue = original.replace(trimmed, localizeTopologyText(trimmed, selectedLang));
+    }
+  });
+}
 function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 function safeId(s){return String(s||'node').toLowerCase().replace(/[^a-z0-9_-]+/g,'-').replace(/^-+|-+$/g,'') || 'node'}
 function cssEscapeValue(v){return window.CSS?.escape ? CSS.escape(String(v ?? '')) : String(v ?? '').replace(/["\\]/g,'\\$&')}
@@ -1056,7 +1094,7 @@ function renderTopology(d){
   syncTopologySpacingUi();
   applyTopologyStaticState(d);
   const nodes = buildGraph(d);
-  if(!nodes.length){currentNodes = []; topologyRenderSignature = ''; buildSummary(d, []); map.innerHTML = '<div class="empty">No topology data yet</div>';return}
+  if(!nodes.length){currentNodes = []; topologyRenderSignature = ''; buildSummary(d, []); map.innerHTML = '<div class="empty">No topology data yet</div>';applyTopologyLanguage();return}
   currentNodes = nodes;
   const shell = map.parentElement;
   const size = layoutNodes(nodes, shell.clientWidth - 2, shell.clientHeight - 2);
@@ -1078,6 +1116,7 @@ function renderTopology(d){
     if(patchTopologyNodes(nodes)){
       refreshTopologyEdges();
       updateLinkPanel();
+      applyTopologyLanguage();
       return;
     }
   }
@@ -1118,6 +1157,7 @@ function renderTopology(d){
   map.innerHTML = `<div class="map-inner" style="width:${size.width}px;height:${size.height}px"><svg class="edge-layer" width="${size.width}" height="${size.height}" viewBox="0 0 ${size.width} ${size.height}" aria-hidden="true">${edges}${customEdges}</svg>${customEdgeActions}${nodeHtml}</div>`;
   applyTopologyTransform();
   updateLinkPanel();
+  applyTopologyLanguage();
 }
 function buildSummary(d, nodes = currentNodes){
   const platformCount = new Set(nodes.map(n => topologyPlatformId(n)).filter(Boolean)).size;
@@ -1173,7 +1213,7 @@ async function load(){
     renderTopology(data);
     writeTopologyCache(data);
     topologyLastLoadedAt = Date.now();
-    if(window.OmniI18n) OmniI18n.apply(document,lang());
+    applyTopologyLanguage();
   }catch(e){
     if(e.name === 'AbortError') return;
     if(!lastData) document.getElementById('map').innerHTML = `<div class="empty">${esc(e.message)}</div>`;
@@ -1453,7 +1493,7 @@ window.addEventListener('resize',()=>{if(!topoView.userMoved) topoView.initializ
 const cachedTopology = readTopologyCache();
 if(cachedTopology) {
   renderTopology(cachedTopology);
-  if(window.OmniI18n) OmniI18n.apply(document,lang());
+  applyTopologyLanguage();
 }
 load();
 scheduleTopologyPoll(15000);

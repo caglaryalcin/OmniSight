@@ -205,7 +205,7 @@ Notes:
 - If a Proxmox agent exists, that host is filtered out of the Linux card to avoid duplicate display.
 - Mini charts intentionally stay compact; detailed disk and health data is available in the detail view.
 
-### Linux Server
+### Linux Servers
 
 Linux data comes from push agent reports.
 
@@ -562,7 +562,7 @@ The agent is a small bash script that runs on a target system. It does not requi
 
 Use one of these Settings actions:
 
-- Linux Server -> Add System.
+- Linux Servers -> Add System.
 - Proxmox -> Add Node.
 - Docker -> Add Host.
 

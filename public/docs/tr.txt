@@ -205,7 +205,7 @@ Notlar:
 - Proxmox ajanı bulunan sunucu, tekrarlı görünümü önlemek için Linux kartından çıkarılır.
 - Mini grafikler bilerek kompakt tutulur; ayrıntılı disk ve sağlık verileri detay görünümündedir.
 
-### Linux Server
+### Linux Servers
 
 Linux verileri push ajan raporlarından gelir.
 
@@ -490,7 +490,7 @@ Ajan, hedef sistemde çalışan küçük bir bash veya PowerShell scriptidir. Ge
 
 Ayarlar'daki uygun işlemi kullanın:
 
-- Linux Server → Sistem Ekle.
+- Linux Servers → Sistem Ekle.
 - Proxmox → Node Ekle.
 - Docker → Host Ekle.
 

@@ -389,8 +389,8 @@ html[data-theme="light"] .ci-help{color:#53657c}
     <button class="settings-nav-btn" type="button" data-nav-parent="nas" data-target="ugreen" onclick="showSettingsSection('ugreen')"><span class="settings-nav-dot" data-nav-dot="ugreen"></span><span>Ugreen</span></button>
     <button class="settings-nav-btn" type="button" data-nav-parent="nas" data-target="qnap" onclick="showSettingsSection('qnap')"><span class="settings-nav-dot" data-nav-dot="qnap"></span><span>QNAP</span></button>
     <div class="settings-nav-group" data-nav-group="os"><span>OS Servers</span></div>
-    <button class="settings-nav-btn" type="button" data-nav-parent="os" data-target="linux" onclick="showSettingsSection('linux')"><span class="settings-nav-dot" data-nav-dot="linux"></span><span>Linux Server</span></button>
-    <button class="settings-nav-btn" type="button" data-nav-parent="os" data-target="windows" onclick="showSettingsSection('windows')"><span class="settings-nav-dot" data-nav-dot="windows"></span><span>Windows Server</span></button>
+    <button class="settings-nav-btn" type="button" data-nav-parent="os" data-target="linux" onclick="showSettingsSection('linux')"><span class="settings-nav-dot" data-nav-dot="linux"></span><span>Linux Servers</span></button>
+    <button class="settings-nav-btn" type="button" data-nav-parent="os" data-target="windows" onclick="showSettingsSection('windows')"><span class="settings-nav-dot" data-nav-dot="windows"></span><span>Windows Servers</span></button>
     <div class="settings-nav-group" data-nav-group="infra"><span>Infrastructure</span></div>
     <button class="settings-nav-btn" type="button" data-nav-parent="infra" data-target="proxmox" onclick="showSettingsSection('proxmox')"><span class="settings-nav-dot" data-nav-dot="proxmox"></span><span>Proxmox</span></button>
     <button class="settings-nav-btn" type="button" data-nav-parent="infra" data-target="healthchecks" onclick="showSettingsSection('healthchecks')"><span class="settings-nav-dot" data-nav-dot="healthchecks"></span><span>Healthchecks</span></button>
@@ -625,8 +625,8 @@ html[data-theme="light"] .ci-help{color:#53657c}
       <label>Visible platforms</label>
       <div class="check-grid" id="public-platforms">
         <label class="check-chip"><input type="checkbox" value="proxmox" checked> Proxmox</label>
-        <label class="check-chip"><input type="checkbox" value="linux" checked> Linux Server</label>
-        <label class="check-chip"><input type="checkbox" value="windows" checked> Windows Server</label>
+        <label class="check-chip"><input type="checkbox" value="linux" checked> Linux Servers</label>
+        <label class="check-chip"><input type="checkbox" value="windows" checked> Windows Servers</label>
         <label class="check-chip"><input type="checkbox" value="kubernetes" checked> Kubernetes</label>
         <label class="check-chip"><input type="checkbox" value="synology" checked> Synology</label>
         <label class="check-chip"><input type="checkbox" value="mikrotik" checked> MikroTik</label>
@@ -725,12 +725,12 @@ html[data-theme="light"] .ci-help{color:#53657c}
   </div>
 </div>
 
-<!-- Linux Server -->
+<!-- Linux Servers -->
 <div class="card" data-settings-section="linux">
   <div class="card-hdr">
     <div class="card-left">
       <div class="card-icon" id="dot-linux" style="background:var(--muted)"></div>
-      <span class="card-title">Linux Server</span>
+      <span class="card-title">Linux Servers</span>
     </div>
     <label class="toggle"><input type="checkbox" id="en-linux" onchange="toggleCard('linux')"><span class="toggle-t"></span></label>
   </div>
@@ -761,12 +761,12 @@ html[data-theme="light"] .ci-help{color:#53657c}
   </div>
 </div>
 
-<!-- Windows Server -->
+<!-- Windows Servers -->
 <div class="card" data-settings-section="windows">
   <div class="card-hdr">
     <div class="card-left">
       <div class="card-icon" id="dot-windows" style="background:var(--muted)"></div>
-      <span class="card-title">Windows Server</span>
+      <span class="card-title">Windows Servers</span>
     </div>
     <label class="toggle"><input type="checkbox" id="en-windows" onchange="toggleCard('windows')"><span class="toggle-t"></span></label>
   </div>
@@ -780,7 +780,7 @@ html[data-theme="light"] .ci-help{color:#53657c}
     </div>
     <div class="form-group">
       <label>Agent Token</label>
-      <div id="windows-agent-token-desc" style="font-size:12px;color:var(--muted)">Windows uses the same shared token as Linux, Proxmox and Docker agents. Regenerate it from Linux Server if needed.</div>
+      <div id="windows-agent-token-desc" style="font-size:12px;color:var(--muted)">Windows uses the same shared token as Linux, Proxmox and Docker agents. Regenerate it from Linux Servers if needed.</div>
     </div>
     <div class="form-group" style="margin-bottom:0">
       <div class="sys-hdr">
@@ -2217,8 +2217,8 @@ function renderLocalizedBlocks(lang = currentLang()) {
       tr: 'Tüm ajanlar için tek ortak token (Linux, Proxmox, Docker). Yeniden üretmek kurulu ajanları geçersiz kılar.',
     },
     'windows-agent-token-desc': {
-      en: 'Windows uses the same shared token as Linux, Proxmox and Docker agents. Regenerate it from Linux Server if needed.',
-      tr: 'Windows, Linux, Proxmox ve Docker ajanlarıyla aynı ortak tokenı kullanır. Gerekirse Linux Server üzerinden yeniden üretin.',
+      en: 'Windows uses the same shared token as Linux, Proxmox and Docker agents. Regenerate it from Linux Servers if needed.',
+      tr: 'Windows, Linux, Proxmox ve Docker ajanlarıyla aynı ortak tokenı kullanır. Gerekirse Linux Servers üzerinden yeniden üretin.',
     },
     'truenas-section-title': { en: 'Storage systems', tr: 'Depolama sistemleri' },
     'truenas-section-desc': {

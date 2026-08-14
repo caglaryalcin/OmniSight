@@ -215,7 +215,7 @@ async function testDockhandEnvironments() {
     if (url.pathname === '/api/containers') {
       const env = url.searchParams.get('env');
       if (env === '1') return res.end(JSON.stringify([{ id: 'prod12345678', name: 'web', image: 'nginx:latest', state: 'running', updateAvailable: false }]));
-      if (env === '2') return res.end(JSON.stringify([{ id: 'lab123456789', name: 'worker', image: 'alpine:latest', state: 'running', updateAvailable: false }]));
+      if (env === '2') return res.end(JSON.stringify([{ id: 'lab123456789', name: 'worker', image: 'alpine:latest', state: 'created', updateAvailable: false }]));
       return res.end('[]');
     }
     if (url.pathname === '/api/images') {
@@ -235,6 +235,7 @@ async function testDockhandEnvironments() {
     assert.strictEqual(data.containers.length, 2);
     assert.deepStrictEqual(data.containers.map(container => container.environmentId).sort(), ['1', '2']);
     assert.deepStrictEqual(data.containers.map(container => container.environment).sort(), ['lab', 'production']);
+    assert.strictEqual(data.containers.find(container => container.state === 'created')?.color, 'gray');
     assert.ok(requests.includes('/api/containers?env=1'));
     assert.ok(requests.includes('/api/containers?env=2'));
   } finally {
@@ -281,6 +282,39 @@ function testProxmoxInstances() {
     { name: 'b', url: 'https://pve-b:8006', tokenId: 'b', tokenSecret: 'y' },
   ] });
   assert.deepStrictEqual(rows.map(row => row.name), ['a', 'b']);
+}
+
+function testCephNormalization() {
+  const { normalizeCephStatus } = require('../src/ceph');
+  const normalized = normalizeCephStatus({
+    health: { status: 'HEALTH_OK', checks: {} },
+    osdmap: { osdmap: { num_osds: 3, num_up_osds: 3, num_in_osds: 3 } },
+    monmap: {
+      num_mons: 3,
+      mons: [
+        { rank: 0, name: 'pve-a' },
+        { rank: 1, name: 'pve-b' },
+        { rank: 2, name: 'pve-c' },
+      ],
+    },
+    quorum: [0, 1, 2],
+    quorum_names: ['pve-a', 'pve-b', 'pve-c'],
+    pgmap: { bytes_total: 1000, bytes_used: 400, bytes_avail: 600 },
+  }, null, {
+    root: {
+      type: 'root',
+      children: [{
+        type: 'host',
+        children: [
+          { type: 'osd', name: 'osd.0', status: 'up', apply_latency_ms: 1, commit_latency_ms: 3 },
+          { type: 'osd', name: 'osd.1', status: 'up', apply_latency_ms: 2, commit_latency_ms: 4 },
+          { type: 'osd', name: 'osd.2', status: 'down', apply_latency_ms: 99, commit_latency_ms: 99 },
+        ],
+      }],
+    },
+  });
+  assert.deepStrictEqual(normalized.latency, { averageMs: 2.5, applyMs: 1.5, commitMs: 3.5, osds: 2 });
+  assert.deepStrictEqual(normalized.mon, { total: 3, inQuorum: 3, names: ['pve-a', 'pve-b', 'pve-c'], quorate: true, status: 'healthy' });
 }
 
 function testLatestStableVersion() {
@@ -353,6 +387,7 @@ function testStaticRegressions() {
   const docsEnglish = fs.readFileSync(path.join(root, 'public', 'docs', 'en.txt'), 'utf8');
   const docsTurkish = fs.readFileSync(path.join(root, 'public', 'docs', 'tr.txt'), 'utf8');
   const settings = fs.readFileSync(path.join(root, 'public', 'settings.html'), 'utf8');
+  const topology = fs.readFileSync(path.join(root, 'public', 'topology.html'), 'utf8');
   const i18n = fs.readFileSync(path.join(root, 'public', 'i18n.js'), 'utf8');
   const readme = fs.readFileSync(path.join(root, 'README.md'), 'utf8');
   const demoServer = fs.readFileSync(path.join(root, 'demo-server.js'), 'utf8');
@@ -390,8 +425,9 @@ function testStaticRegressions() {
   }
   assert.ok(server.includes("synology: 'Synology'"), 'public status title must say Synology');
   assert.ok(dashboard.includes('/api/status/history?points='));
-  assert.ok(dashboard.includes("const clusterLabel = /^https?:\\/\\//i"), 'Proxmox node subtitle must hide a URL-shaped cluster fallback');
-  assert.ok(dashboard.includes('min-width:140px;display:grid;grid-template-columns:minmax(72px,max-content)'), 'Proxmox metric values must keep enough visible width');
+  assert.ok(!dashboard.includes("const clusterLabel = /^https?:\\/\\//i"), 'Proxmox node subtitle must not include cluster metadata');
+  assert.ok(dashboard.includes("replace(/:8006\\/?$/i, '')"), 'Proxmox host summaries must hide the default 8006 port');
+  assert.ok(dashboard.includes('min-width:140px;display:grid;grid-template-columns:max-content minmax(32px,1fr)'), 'header history charts must begin immediately after their metric text');
   assert.ok(dashboard.includes("pveHeadStat('Bandwidth'"), 'Proxmox bandwidth label must not use an unclear abbreviation');
   assert.ok(dashboard.includes('title="${escAttr(`${label}: ${value}`)}"'), 'header metrics must expose their complete value as a tooltip');
   assert.ok(dashboard.includes("os_app_update_footer_v3") && dashboard.includes("cache:'no-store'"), 'app update check must bypass stale browser responses');
@@ -402,17 +438,53 @@ function testStaticRegressions() {
   assert.ok(dashboard.includes('.overview-meta{flex-direction:column;align-items:flex-start'), 'narrow overview metadata must wrap each metric onto its own line');
   assert.ok(dashboard.includes('.overview-card .sb-csum{display:flex;flex-wrap:nowrap'), 'overview summary metrics must remain on one row');
   assert.ok(dashboard.includes('flex:1 1 max-content'), 'overview summary widths must adapt to their content');
+  assert.ok(dashboard.includes('function overviewGaugeSegments(raw)') && dashboard.includes('const count = 30') && dashboard.includes('const innerRadius = 70') && dashboard.includes('const outerRadius = 80') && dashboard.includes('M8.12 104.55 A87 87 0 1 1 181.88 104.55'), 'overview gauge outer arc must extend slightly below the tick endpoints while retaining a constant radial gap');
+  assert.ok(dashboard.includes('.ov-gauge-center{position:absolute;left:50%;top:calc(61% + 5px)'), 'overview gauge values must sit five pixels lower inside the ring');
+  assert.ok(dashboard.includes('.ov-gauge{position:relative;width:100%;height:118px') && dashboard.includes('overflow:hidden;transform:translateY(-3px)'), 'the complete overview gauge must sit slightly higher without changing its internal alignment');
+  assert.ok(dashboard.includes('transform:translateY(8px) scale(1.15);transform-origin:center bottom'), 'overview CPU and RAM gauge rings must retain the original width and height');
+  assert.ok(dashboard.includes('function overviewPercentHistory') && dashboard.includes('class="ov-gauge-trend"'), 'overview CPU and RAM gauges must use real metric history for their trend line');
   assert.ok(dashboard.includes('overviewResponsiveLayoutKey') && dashboard.includes('stableOverviewIds'), 'responsive resizing must preserve the dashboard card order');
   const proxmoxOverviewSource = dashboard.slice(dashboard.indexOf('function buildProxmox'), dashboard.indexOf('function buildLinux'));
   assert.ok(!proxmoxOverviewSource.includes('<div class="sb-csum-lbl">Ceph</div>'), 'Proxmox overview must not repeat the Ceph header badge in its summary metrics');
   assert.ok(proxmoxOverviewSource.includes('cephBad') && proxmoxOverviewSource.includes('Ceph ${ceph.health'), 'Proxmox overview must retain its Ceph header badge');
+  assert.ok(proxmoxOverviewSource.includes('<div class="pve-head-main proxmox-head-main">') && dashboard.includes('.proxmox-head-main{flex-wrap:nowrap}') && dashboard.includes('.proxmox-head-main .pve-head-stat.has-spark{min-width:0}'), 'wide Proxmox node summaries must keep all metrics on one row');
+  assert.ok(proxmoxOverviewSource.includes("<div class=\"pve-head-sub\">${node.online ? 'online' : 'offline'}</div>"), 'Proxmox node subtitle must show only its online state');
+  assert.ok(proxmoxOverviewSource.includes('ceph-osd-metrics') && proxmoxOverviewSource.includes('OSDs Up') && proxmoxOverviewSource.includes('Total OSDs'), 'Ceph health must show separate Proxmox-style OSD counters');
+  assert.ok(proxmoxOverviewSource.includes('latency.averageMs') && proxmoxOverviewSource.includes('AVG Latency') && proxmoxOverviewSource.includes('MON Quorum Status'), 'Ceph health must show average OSD latency and MON quorum status');
+  assert.ok(proxmoxOverviewSource.includes("value < 1 ? '&lt;1 ms'"), 'sub-millisecond Ceph latency must be displayed as less than one millisecond');
+  assert.ok(proxmoxOverviewSource.includes('ceph-gauge-fill') && proxmoxOverviewSource.includes('Cluster Capacity Used'), 'Ceph capacity must use a Proxmox-style gauge');
+  assert.ok(dashboard.includes('.ceph-gauge-fill.is-ok{stroke:#3cb78a}') && dashboard.includes('M17 128 A113 113') && proxmoxOverviewSource.includes("usagePct >= 90 ? 'is-critical'"), 'Ceph gauge colors and arc spacing must preserve Proxmox-style threshold severity');
+  assert.ok(dashboard.includes('.ceph-health-grid{display:grid') && dashboard.includes('.ceph-health-grid{grid-template-columns:1fr}'), 'Ceph health cards must stack on narrow screens');
+  assert.ok(i18n.includes("'Ceph Storage Health':'Ceph Depolama Sağlığı'") && i18n.includes("'Cluster Capacity Used':'Kullanılan Küme Kapasitesi'") && i18n.includes("'No active warnings or errors':'Aktif uyarı veya hata yok'"), 'Ceph health labels must follow the selected language');
+  assert.ok(linuxAgent.includes('pvesh get "/nodes/$HOSTNAME_S/ceph/osd"'), 'Proxmox agents must report per-OSD latency data');
   const linuxOverviewSource = dashboard.slice(dashboard.indexOf('function buildLinux'), dashboard.indexOf('function buildWindows'));
   assert.ok(!linuxOverviewSource.includes('<div class="sb-csum-lbl">Updates</div>'), 'Linux overview must not repeat the updates header badge in its summary metrics');
   assert.ok(linuxOverviewSource.includes('agentUpdateState: { count: updateCount, visible: updateAttention }'), 'Linux overview must retain its updates header badge');
+  assert.ok(linuxOverviewSource.includes("pveHeadStat('Disk', `${srv.disk.percent}%`, bc(srv.disk.percent), '', 'is-disk-usage')"), 'Linux disk usage must remain visible as a compact percentage');
+  assert.ok(linuxOverviewSource.indexOf("pveHeadStat('Disk I/O'") < linuxOverviewSource.indexOf("pveHeadStat('Disk',"), 'Linux disk usage must appear immediately after Disk I/O');
+  assert.ok(!linuxOverviewSource.includes("miniSparkline(srv.history, 'disk'") && !linuxOverviewSource.includes("histChart(srv.history,'disk'"), 'Linux disk usage history charts must stay removed');
+  assert.ok(dashboard.includes("title:'Linux Servers'") && dashboard.includes("title: 'Linux Servers'") && server.includes("title: 'Linux Servers'") && settings.includes('>Linux Servers</span>') && docsEnglish.includes('### Linux Servers') && docsTurkish.includes('### Linux Servers'), 'Linux platform naming must stay plural across product surfaces');
+  const windowsOverviewSource = dashboard.slice(dashboard.indexOf('function buildWindows'), dashboard.indexOf('function buildKubernetes'));
+  assert.ok(windowsOverviewSource.includes("pveHeadStat('Disk', `${srv.disk.percent}%`, bc(srv.disk.percent), '', 'is-disk-usage')"), 'Windows disk usage must remain visible as a compact percentage');
+  assert.ok(windowsOverviewSource.indexOf("pveHeadStat('Disk I/O'") < windowsOverviewSource.indexOf("pveHeadStat('Disk',"), 'Windows disk usage must appear immediately after Disk I/O');
+  assert.ok(!windowsOverviewSource.includes("miniSparkline(srv.history, 'disk'") && !windowsOverviewSource.includes("histChart(srv.history,'disk'"), 'Windows disk usage history charts must stay removed');
+  assert.ok(dashboard.includes('.pve-head-stat.is-disk-usage{flex:0 0 auto;width:max-content;min-width:76px}'), 'Linux and Windows disk percentage cells must retain their slightly wider layout');
+  assert.ok(dashboard.includes("title:'Windows Servers'") && dashboard.includes("title: 'Windows Servers'") && server.includes("title: 'Windows Servers'") && demoServer.includes("windows: 'Windows Servers'") && settings.includes('>Windows Servers</span>') && i18n.includes("'Windows Servers':'Windows Servers'"), 'Windows platform naming must stay plural across product surfaces');
+  const synologySource = dashboard.slice(dashboard.indexOf('function buildSynology'), dashboard.indexOf('function buildUnifi'));
+  const synologyStatsSource = synologySource.slice(synologySource.indexOf('const snmpStatsArr = ['), synologySource.indexOf('].filter(Boolean)', synologySource.indexOf('const snmpStatsArr = [')));
+  assert.ok(synologySource.includes('const uptimeStat = dev.uptimeSeconds != null') && synologyStatsSource.indexOf("pveHeadStat('Bandwidth'") < synologyStatsSource.indexOf('uptimeStat'), 'SNMP uptime must always remain the rightmost visible metric');
+  assert.ok(synologySource.includes("const snmpHeadClass = snmpStatsArr.length >= 8 ? ' snmp-head-8' : ''") && synologySource.includes('snmp-head-main${snmpHeadClass}') && dashboard.includes('.snmp-head-main.snmp-head-8{grid-template-columns:'), 'MikroTik rows must accommodate uptime alongside temperature and fan metrics');
+  assert.ok(demoServer.includes("profile: 'mikrotik'") && demoServer.includes('uptimeSeconds: uptimeSeconds(26, 8, 17)'), 'demo MikroTik data must include uptime');
+  assert.ok(dashboard.includes('.snmp-head-main>.pve-head-stat:last-child{width:auto}'), 'Synology summary rows must fill the complete metric grid width');
+  const databaseSource = dashboard.slice(dashboard.indexOf('function buildDatabase'), dashboard.indexOf('function toggleDocker'));
+  assert.ok(databaseSource.indexOf("pveHeadStat('Version'") < databaseSource.indexOf("pveHeadStat('Uptime', fmtUptime(d.uptimeSeconds)"), 'database uptime must remain the rightmost metric');
   assert.ok(!dashboard.includes("prefetchRouteResource(href, 'document')") && !dashboard.includes("cache: 'force-cache'"), 'nonce-protected HTML documents must not be prefetched into the browser cache');
   assert.ok(dashboard.includes('function scheduleEmbedPrefetch(opts = {})'), 'embed prefetch scheduling options must remain defined');
   assert.ok(dashboard.includes("visible:ifr.classList.contains('active')"), 'loaded embeds must receive their current visibility state after their scripts are ready');
   assert.ok(dashboard.includes('localizeSidebarOperationalText(lang);'), 'sidebar status phrases must use the selected language');
+  assert.ok(dashboard.includes("'#detail .det-meta'") && dashboard.includes("'#detail .pve-head-sub'") && dashboard.includes("'#detail .ov-gauge-sub'") && dashboard.includes("'#detail .prom-instance-meta'") && dashboard.includes("'#detail .chart-hdr .nb-pct'"), 'dynamic detail, metric and overview status text must use operational localization');
+  const selectPanelSource = dashboard.slice(dashboard.indexOf('function selectPanel(id, opts = {})'), dashboard.indexOf('function selectPanelGroup'));
+  assert.ok(selectPanelSource.includes('applyLanguage(currentLang(data));'), 'platform details must reapply the selected language after navigation');
   const configuredSidebarSource = dashboard.slice(dashboard.indexOf('function renderConfiguredSidebarShell'), dashboard.indexOf('\nfunction ', dashboard.indexOf('function renderConfiguredSidebarShell') + 10));
   assert.ok(configuredSidebarSource.includes('applyLanguage(currentLang())'), 'embedded pages must preserve the selected language after rebuilding the sidebar');
   const uptimeKumaHealthSource = dashboard.slice(dashboard.indexOf('function uptimeKumaHealth'), dashboard.indexOf('function buildUptimeKuma'));
@@ -479,11 +551,21 @@ function testStaticRegressions() {
   assert.strictEqual(turkish.down, 'kapalı');
   assert.strictEqual(turkish.pending, 'bekleyen');
   assert.strictEqual(turkish.created, 'oluşturuldu');
+  assert.strictEqual(turkish.Uptime, 'Çalışma süresi');
+  assert.strictEqual(turkish['Services up'], 'Aktif servisler');
+  assert.strictEqual(turkish['reporting sources'], 'raporlama kaynağı');
+  assert.strictEqual(turkish['Sys temp'], 'Sistem sıcaklığı');
+  assert.strictEqual(turkish.VMs, 'VM’ler');
   assert.strictEqual(turkish.Documentation, 'Dokümantasyon');
   assert.ok(docsPage.includes('`/docs/${encodeURIComponent(candidate)}.txt`') && docsPage.includes("[requested, base, 'en']"), 'Documentation must load locale packs with English fallback');
   assert.ok(docsPage.includes("event.data?.type === 'omnisight-language'") && docsPage.includes("event.key === 'os_lang'"), 'Open documentation must react to language changes');
   assert.ok(!docsPage.includes("fetch('/docs.md'"), 'Documentation UI must not depend on Markdown files excluded from the image');
   assert.ok(docsPage.includes('function documentationUiLang(lang)') && docsPage.includes('window.OmniI18n?.locales?.[base]'), 'Documentation chrome must support regional language fallback');
+  assert.ok(topology.includes('function localizeTopologyText(text, selectedLang = lang())') && topology.includes("document.querySelectorAll('.node-meta')"), 'topology node metadata must localize composite operational text');
+  assert.ok(topology.includes("event.data?.type === 'omnisight-language'") && topology.includes('applyTopologyLanguage();'), 'open topology views must react to language changes');
+  assert.strictEqual(turkish.Platforms, 'Platformlar');
+  assert.strictEqual(turkish.Workloads, 'İş yükleri');
+  assert.strictEqual(turkish.Links, 'Bağlantılar');
   assert.strictEqual((docsEnglish.match(/^## \d+\./gm) || []).length, 15, 'English documentation pack must contain all numbered sections');
   assert.strictEqual((docsTurkish.match(/^## \d+\./gm) || []).length, 15, 'Turkish documentation pack must contain all numbered sections');
   assert.ok(docsTurkish.startsWith('# OmniSight Dokümantasyonu') && docsTurkish.includes('## 14. Sorun Giderme'), 'Turkish documentation pack must contain localized content');
@@ -544,6 +626,7 @@ async function run() {
   await testDockhandEnvironments();
   testSynologyCpuCounters();
   testProxmoxInstances();
+  testCephNormalization();
   testLatestStableVersion();
   testFullBackupEmptyFileCompatibility();
   testPlatformAvailability();

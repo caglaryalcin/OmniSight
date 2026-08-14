@@ -9,7 +9,7 @@ URL="${URL%/}"
 TOKEN="${OMNISIGHT_TOKEN:?OMNISIGHT_TOKEN required}"
 INTERVAL="${OMNISIGHT_INTERVAL:-15}"
 AGENT_ROLE="${OMNISIGHT_AGENT_ROLE:-auto}"
-VERSION="1.3.1"
+VERSION="1.3.2"
 HOST_ROOT="${OMNISIGHT_HOST_ROOT:-/}"
 INSECURE_TLS="${OMNISIGHT_INSECURE_TLS:-}"
 CURL_TLS_ARGS=""
@@ -393,7 +393,7 @@ docker_json() {
 
 pve_json() {
   command -v pvesh >/dev/null 2>&1 || return 0
-  local res ceph cephdf task
+  local res ceph cephdf cephosd task
   res=$(timeout 12 pvesh get /cluster/resources --output-format json 2>/dev/null)
   [ -n "$res" ] || return 0
   ceph=$(timeout 8 pvesh get /cluster/ceph/status --output-format json 2>/dev/null)
@@ -401,12 +401,14 @@ pve_json() {
   [ -z "$ceph" ] && ceph=$(timeout 8 pvesh get "/nodes/$HOSTNAME_S/ceph/status" --output-format json 2>/dev/null)
   cephdf=$(timeout 8 pvesh get /cluster/ceph/df --output-format json 2>/dev/null)
   [ -z "$cephdf" ] && cephdf=$(timeout 8 pvesh get /ceph/df --output-format json 2>/dev/null)
+  cephosd=$(timeout 8 pvesh get "/nodes/$HOSTNAME_S/ceph/osd" --output-format json 2>/dev/null)
   task=$(timeout 8 pvesh get "/nodes/$HOSTNAME_S/tasks" --typefilter vzdump --limit 1 --output-format json 2>/dev/null)
   printf '"pve":{"node":"%s","resources":%s' "$(json_escape "$HOSTNAME_S")" "$res"
-  if [ -n "$cephdf" ]; then
-    [ -n "$ceph" ] && printf ',"ceph":{"statusData":%s,"df":%s}' "$ceph" "$cephdf"
-  else
-    [ -n "$ceph" ] && printf ',"ceph":%s' "$ceph"
+  if [ -n "$ceph" ]; then
+    printf ',"ceph":{"statusData":%s' "$ceph"
+    [ -n "$cephdf" ] && printf ',"df":%s' "$cephdf"
+    [ -n "$cephosd" ] && printf ',"osdData":%s' "$cephosd"
+    printf '}'
   fi
   [ -n "$task" ] && printf ',"backup":%s' "$task"
   printf '},'

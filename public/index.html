@@ -328,6 +328,56 @@ html[data-theme="light"] #os-hover-dot{box-shadow:0 0 0 3px rgba(255,255,255,.9)
 .k8s-grp-body{display:none;background:rgba(0,0,0,.16)}
 .k8s-grp-body.open{display:block;border-top:1px solid var(--border)}
 .k8s-grp-body .mon-row{padding-left:34px}
+.ceph-health-body{padding:14px!important}
+.ceph-health-grid{display:grid;grid-template-columns:minmax(250px,.9fr) minmax(190px,.7fr) minmax(210px,.75fr) minmax(300px,1.15fr);gap:12px}
+.ceph-health-card{position:relative;min-width:0;min-height:188px;padding:16px;border:1px solid var(--border);border-radius:12px;background:linear-gradient(145deg,rgba(255,255,255,.035),rgba(255,255,255,.008));overflow:hidden}
+.ceph-health-card::after{content:"";position:absolute;inset:auto -56px -74px auto;width:150px;height:150px;border-radius:50%;background:radial-gradient(circle,rgba(52,211,153,.09),transparent 68%);pointer-events:none}
+.ceph-card-title{font-size:12px;font-weight:750;color:var(--text);letter-spacing:.01em}
+.ceph-osd-metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:stretch;margin-top:14px}
+.ceph-osd-metric{min-width:0;padding:5px 12px 8px;text-align:center}
+.ceph-osd-metric+.ceph-osd-metric{border-left:1px solid var(--border)}
+.ceph-osd-label{font-size:11px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+.ceph-osd-value{margin-top:7px;font-size:clamp(44px,5vw,64px);font-weight:500;line-height:1;color:var(--green);font-variant-numeric:tabular-nums;letter-spacing:-.045em}
+.ceph-osd-foot{display:flex;align-items:center;justify-content:center;gap:7px;min-height:25px;margin-top:8px;padding-top:11px;border-top:1px solid var(--border);font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.ceph-osd-foot strong{color:var(--text);font-weight:750}
+.ceph-status-card{display:flex;flex-direction:column}
+.ceph-status-main{display:flex;flex:1;min-height:80px;flex-direction:column;align-items:center;justify-content:center;padding:8px 0 5px;text-align:center}
+.ceph-status-value{font-size:42px;font-weight:550;line-height:1;color:var(--cyan);font-variant-numeric:tabular-nums;letter-spacing:-.035em}
+.ceph-status-value small{margin-left:3px;font-size:15px;font-weight:700;letter-spacing:0;color:var(--muted)}
+.ceph-status-label{margin-top:7px;font-size:10px;font-weight:800;letter-spacing:.055em;text-transform:uppercase;color:var(--muted)}
+.ceph-status-split{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%;margin-top:3px;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.ceph-status-split span{min-width:0;padding:8px 5px;text-align:center;font-size:10px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.ceph-status-split span+span{border-left:1px solid var(--border)}
+.ceph-status-split strong{display:block;margin-top:3px;font-size:12px;letter-spacing:0;text-transform:none;color:var(--text);font-variant-numeric:tabular-nums}
+.ceph-status-foot{display:flex;align-items:center;justify-content:center;gap:7px;min-height:23px;margin-top:8px;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.ceph-status-foot strong{color:var(--text);font-weight:750}
+.ceph-mon-names{max-width:100%;margin-top:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:var(--muted)}
+.ceph-capacity-card{display:flex;flex-direction:column}
+.ceph-gauge-wrap{position:relative;width:min(100%,360px);height:142px;margin:2px auto 0}
+.ceph-gauge{display:block;width:100%;height:100%;overflow:visible}
+.ceph-gauge-track,.ceph-gauge-fill,.ceph-gauge-zone{fill:none}
+.ceph-gauge-track{stroke:rgba(148,163,184,.22);stroke-width:20}
+.ceph-gauge-fill{stroke-width:20;stroke-linecap:butt;transition:stroke-dasharray .35s ease}
+.ceph-gauge-fill.is-ok{stroke:#3cb78a}
+.ceph-gauge-fill.is-warn{stroke:#d4a835}
+.ceph-gauge-fill.is-critical{stroke:#d8686c}
+.ceph-gauge-fill.is-unknown{stroke:rgba(148,163,184,.38)}
+.ceph-gauge-zone{stroke-width:4;stroke-linecap:butt;opacity:.86}
+.ceph-gauge-zone.is-ok{stroke:#4cbd94}
+.ceph-gauge-zone.is-warn{stroke:#d1ac45}
+.ceph-gauge-zone.is-critical{stroke:#dd7278}
+.ceph-gauge-percent{fill:var(--text);font-size:34px;font-weight:500;font-variant-numeric:tabular-nums}
+.ceph-capacity-meta{display:flex;align-items:center;justify-content:center;gap:7px;margin-top:-3px;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.ceph-capacity-meta strong{color:var(--text);font-weight:750}
+.ceph-health-details{display:flex;align-items:flex-start;gap:10px;margin-top:12px;padding:11px 12px;border:1px solid var(--border);border-radius:10px;background:rgba(0,0,0,.12)}
+.ceph-health-details-title{flex:0 0 auto;padding-top:1px;font-size:10px;font-weight:850;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+.ceph-health-checks{min-width:0;display:flex;flex:1;flex-direction:column;gap:5px}
+.ceph-health-check{display:flex;align-items:flex-start;gap:7px;font-size:12.5px;line-height:1.35;color:var(--text)}
+.ceph-health-check.is-clear{color:var(--muted)}
+.ceph-health-check .mon-dot{flex:0 0 auto;margin-top:5px;width:6px;height:6px}
+html[data-theme="light"] .ceph-health-card{background:linear-gradient(145deg,rgba(255,255,255,.94),rgba(238,244,255,.54))}
+html[data-theme="light"] .ceph-health-details{background:rgba(16,24,40,.025)}
+html[data-theme="light"] .ceph-gauge-track{stroke:rgba(100,116,139,.22)}
 .k8s-colhdr{display:flex;align-items:center;gap:10px;padding:7px 16px 7px 34px;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);border-bottom:1px solid var(--border)}
 .k8s-colhdr.k8s-pod-row,.mon-row.k8s-pod-row{display:grid;grid-template-columns:10px minmax(360px,2.25fr) minmax(160px,1fr) minmax(96px,.55fr) minmax(110px,.6fr) minmax(130px,.72fr) minmax(120px,.65fr);align-items:center;gap:22px}
 .k8s-grp-body .mon-row.k8s-pod-row{padding-left:34px;padding-right:16px}
@@ -551,8 +601,9 @@ html[data-theme="light"] .topbar{background:rgba(255,255,255,.78)}
 .pve-head-stat{flex:1 1 86px}
 .pve-head-stat.is-host{flex:0 1 auto;width:max-content;max-width:min(230px,22vw)}
 .pve-head-stat.is-vms,.pve-head-stat.is-uptime{flex:0 0 auto;width:max-content}
+.pve-head-stat.is-disk-usage{flex:0 0 auto;width:max-content;min-width:76px}
 .pve-head-stat.is-version-wrap{flex:1.35 1 150px}
-.pve-head-stat.has-spark{flex:1.55 1 150px;min-width:140px;display:grid;grid-template-columns:minmax(72px,max-content) minmax(32px,1fr);align-items:center;column-gap:8px}
+.pve-head-stat.has-spark{flex:1.55 1 150px;min-width:140px;display:grid;grid-template-columns:max-content minmax(32px,1fr);align-items:center;column-gap:8px}
 .pve-head-stat.is-temp.has-spark{flex:1.28 1 136px;min-width:120px;grid-template-columns:minmax(48px,max-content) minmax(32px,1fr);column-gap:7px}
 .pve-node-hdr .badge + .nbell{margin-left:-3px}
 .pve-head-text{min-width:0}
@@ -564,6 +615,8 @@ html[data-theme="light"] .topbar{background:rgba(255,255,255,.78)}
 .mini-hist-bg{fill:rgba(255,255,255,.025)}
 html[data-theme="light"] .mini-hist-bg{fill:rgba(15,23,42,.035)}
 .snmp-head-main{display:grid;grid-template-columns:fit-content(220px) minmax(128px,.64fr) repeat(6,minmax(118px,1fr))}
+.snmp-head-main.snmp-head-8{grid-template-columns:fit-content(200px) minmax(112px,.58fr) repeat(7,minmax(104px,1fr))}
+.snmp-head-main>.pve-head-stat:last-child{width:auto}
 .docker-head-main{display:grid;grid-template-columns:fit-content(220px) minmax(220px,1.1fr) minmax(82px,.36fr) minmax(156px,.74fr) minmax(156px,.74fr) minmax(108px,.48fr);grid-auto-flow:column;grid-auto-columns:minmax(82px,.42fr);align-items:stretch;overflow:hidden}
 .docker-head-main.docker-head-7{grid-template-columns:fit-content(190px) minmax(210px,1.05fr) minmax(74px,.34fr) minmax(136px,.7fr) minmax(136px,.7fr) minmax(104px,.46fr) minmax(72px,.34fr)}
 .docker-head-main .pve-head-title,.docker-head-main .pve-head-stat{margin:0}
@@ -593,9 +646,14 @@ html[data-theme="light"] .db-node-hdr.online,html[data-theme="light"] .service-n
 html[data-theme="light"] .db-node-hdr.offline,html[data-theme="light"] .service-node-hdr.offline{background:linear-gradient(180deg,rgba(254,242,242,.94),rgba(255,247,247,.66));box-shadow:inset 3px 0 0 rgba(220,47,47,.65),inset 0 0 0 1px rgba(220,47,47,.12)}
 html[data-theme="light"] .service-node-hdr.warn{background:linear-gradient(180deg,rgba(255,251,235,.96),rgba(239,246,255,.56));box-shadow:inset 3px 0 0 rgba(183,121,31,.68),inset 0 0 0 1px rgba(183,121,31,.12)}
 html[data-theme="light"] .db-head-main .pve-head-title,html[data-theme="light"] .db-head-main .pve-head-stat,html[data-theme="light"] .service-head-main .pve-head-title,html[data-theme="light"] .service-head-main .pve-head-stat{background:rgba(255,255,255,.42)}
+@media (min-width:1201px){
+  .proxmox-head-main{flex-wrap:nowrap}
+  .proxmox-head-main .pve-head-stat.has-spark{min-width:0}
+}
 @media (max-width:1200px){
   .docker-row{grid-template-columns:9px minmax(130px,1.2fr) minmax(140px,1fr) 62px 70px minmax(110px,1fr) minmax(90px,1fr) minmax(110px,1fr) 106px 86px}
   .snmp-head-main{grid-template-columns:fit-content(180px) minmax(112px,.64fr) repeat(6,minmax(104px,1fr))}
+  .snmp-head-main.snmp-head-8{grid-template-columns:fit-content(160px) minmax(96px,.56fr) repeat(7,minmax(88px,1fr))}
   .docker-head-main{grid-template-columns:fit-content(190px) minmax(200px,1fr) minmax(74px,.35fr) minmax(122px,.66fr) minmax(122px,.66fr) minmax(92px,.45fr)}
   .docker-head-main.docker-head-7{grid-template-columns:fit-content(160px) minmax(180px,.95fr) minmax(68px,.34fr) minmax(112px,.62fr) minmax(112px,.62fr) minmax(86px,.42fr) minmax(66px,.34fr)}
   .db-head-main{grid-template-columns:fit-content(180px) minmax(76px,.38fr) minmax(148px,.9fr)}
@@ -756,20 +814,29 @@ html[data-theme="light"] body.rail-collapsed .shell .sb-card.active{background:#
 .overview-kpi-body{min-height:54px}
 .overview-kpi-value{font-size:28px;font-weight:800;letter-spacing:0;margin-top:12px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .overview-kpi-sub{font-size:12px;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.overview-kpi-gauge .overview-kpi-body{display:flex;justify-content:center;align-items:center;padding-top:2px;width:100%}
-.ov-gauge{position:relative;width:100%;height:118px;display:grid;place-items:center;margin:3px auto -20px;overflow:hidden}
-.ov-gauge svg{width:100%;height:100%;display:block;transform:translateY(8px) scale(1.15);transform-origin:center bottom}
+.overview-kpi-gauge .overview-kpi-body{display:flex;justify-content:center;align-items:center;padding-top:0;width:100%}
+.ov-gauge{position:relative;width:100%;height:118px;display:grid;place-items:center;margin:3px auto -20px;overflow:hidden;transform:translateY(-3px)}
+.ov-gauge>svg{width:100%;height:100%;display:block;transform:translateY(8px) scale(1.15);transform-origin:center bottom}
 .ov-gauge path{fill:none;stroke-linecap:butt}
-.ov-gauge-rail{stroke:rgba(148,163,184,.16);stroke-width:8}
-.ov-gauge-seg{stroke-width:3}
-.ov-gauge-seg-green{stroke:#22C55E}
-.ov-gauge-seg-yellow{stroke:#F59E0B}
-.ov-gauge-seg-red{stroke:#EF4444}
-.ov-gauge-fill{stroke-width:8;filter:drop-shadow(0 0 7px rgba(52,211,153,.2))}
-.ov-gauge-center{position:absolute;left:50%;top:56%;transform:translate(-50%,-50%);text-align:center;line-height:1.12;pointer-events:none}
-.ov-gauge-value{font-size:21px;font-weight:500;color:var(--text);font-variant-numeric:tabular-nums;letter-spacing:0}
-.ov-gauge-label{font-size:14px;color:var(--muted);margin-top:4px;max-width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ov-gauge-sub{font-size:12.5px;line-height:1.25;color:var(--muted);opacity:.78;margin-top:4px;max-width:170px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ov-gauge-zone{stroke-width:4;opacity:.96}
+.ov-gauge-zone.is-green{stroke:#73bf69}
+.ov-gauge-zone.is-yellow{stroke:#eab839}
+.ov-gauge-zone.is-red{stroke:#e85d68}
+.ov-gauge-tick{stroke-width:3.4;stroke-linecap:butt}
+.ov-gauge-tick.is-inactive{stroke:rgba(148,163,184,.28)}
+.ov-gauge-tick.is-active.is-green{stroke:#73bf69}
+.ov-gauge-tick.is-active.is-yellow{stroke:#eab839}
+.ov-gauge-tick.is-active.is-red{stroke:#e85d68}
+.ov-gauge-center{position:absolute;left:50%;top:calc(61% + 5px);width:min(72%,170px);transform:translate(-50%,-50%);text-align:center;line-height:1.08;pointer-events:none}
+.ov-gauge-value{font-size:23px;font-weight:500;color:var(--text);font-variant-numeric:tabular-nums;letter-spacing:0;white-space:nowrap}
+.ov-gauge-label{font-size:13px;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ov-gauge-sub{font-size:11.5px;line-height:1.2;color:var(--muted);opacity:.82;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ov-gauge-trend{position:absolute;left:50%;top:78%;transform:translateX(-50%);display:block;width:88px;height:18px;margin:0;overflow:visible;pointer-events:none}
+.ov-gauge-trend-base{stroke:rgba(148,163,184,.18);stroke-width:1}
+.ov-gauge-trend-line{fill:none;stroke-width:1.3;stroke-linecap:round;stroke-linejoin:round;opacity:.9}
+.ov-gauge-trend-dot{stroke:var(--panel);stroke-width:1.2}
+html[data-theme="light"] .ov-gauge-tick.is-inactive{stroke:rgba(71,85,105,.24)}
+html[data-theme="light"] .ov-gauge-trend-base{stroke:rgba(71,85,105,.2)}
 .overview-kpi-rate .overview-kpi-body{padding-top:5px}
 .ov-rate-row{display:block;margin-top:7px}
 .ov-rate-row .overview-kpi-value{margin-top:0}
@@ -901,6 +968,9 @@ html[data-theme="light"] .overview-card .sb-csum-item{background:transparent!imp
 .cmdk-badge{font-size:10px;font-weight:850;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);border:1px solid var(--border);border-radius:999px;padding:4px 7px;white-space:nowrap}
 .cmdk-empty{padding:26px 14px;color:var(--muted);font-size:13px;text-align:center}
 
+@media (max-width:1250px){
+  .ceph-health-grid{grid-template-columns:repeat(2,minmax(240px,1fr))}
+}
 @media (max-width:1100px){
   .shell{grid-template-columns:78px 1fr}
   .brand{justify-content:center;padding:0}
@@ -964,6 +1034,8 @@ html[data-theme="light"] .overview-card .sb-csum-item{background:transparent!imp
   .hc-check-row{overflow-x:auto}
   .hc-check-top,.hc-ping-url{min-width:630px}
   .k8s-grp,.prom-instance,.node-card{overflow-x:auto}
+  .k8s-grp.ceph-health-group{overflow:hidden}
+  .ceph-health-grid{grid-template-columns:1fr}
   .k8s-colhdr.k8s-pod-row,.mon-row.k8s-pod-row{min-width:900px}
   .k8s-colhdr.k8s-deploy-row,.mon-row.k8s-deploy-row{min-width:820px}
   .k8s-colhdr.k8s-service-row,.mon-row.k8s-service-row{min-width:940px}
@@ -978,6 +1050,13 @@ html[data-theme="light"] .overview-card .sb-csum-item{background:transparent!imp
   .shell .det-platform-summary .sb-csum-item{padding:0 2px}
   .shell .det-platform-summary .sb-csum-val{font-size:14px}
   .shell .det-platform-summary .sb-csum-lbl{font-size:7px;letter-spacing:.02em}
+  .ceph-health-body{padding:10px!important}
+  .ceph-health-card{min-height:170px;padding:13px}
+  .ceph-osd-metric{padding-left:6px;padding-right:6px}
+  .ceph-osd-value{font-size:44px}
+  .ceph-gauge-wrap{height:128px}
+  .ceph-gauge-percent{font-size:30px}
+  .ceph-health-details{flex-direction:column;gap:7px}
 }
 @media (display-mode:standalone){
   .topbar{padding-top:env(safe-area-inset-top)}
@@ -1264,7 +1343,18 @@ function localizeOperationalText(text, lang = 'en', translateText = null) {
   if (direct !== raw) return direct;
   const replacements = [
     [/\breboot required\b/gi, 'yeniden başlatma gerekli'],
+    [/\breporting sources?\b/gi, 'raporlama kaynağı'],
+    [/\bservices up\b/gi, 'aktif servisler'],
+    [/\bCPU temperature\b/gi, 'CPU sıcaklığı'],
+    [/\blast known\b/gi, 'son bilinen'],
+    [/\bpartial API data\b/gi, 'kısmi API verisi'],
+    [/\bpartial data\b/gi, 'kısmi veri'],
+    [/\bAPI reachable\b/gi, 'API erişilebilir'],
+    [/\bwaiting for first check\b/gi, 'ilk kontrol bekleniyor'],
+    [/\bno containers\b/gi, 'container yok'],
+    [/\ball running\b/gi, 'tümü çalışıyor'],
     [/\ball ok\b/gi, 'tümü iyi'],
+    [/\bdisk warns?\b/gi, 'disk uyarısı'],
     [/\bunreachable\b/gi, 'erişilemiyor'],
     [/\breachable\b/gi, 'erişilebilir'],
     [/\bconnecting\b/gi, 'bağlanıyor'],
@@ -1283,6 +1373,15 @@ function localizeOperationalText(text, lang = 'en', translateText = null) {
     [/\bup\b/gi, 'aktif'],
     [/\bdown\b/gi, 'kapalı'],
     [/\bupdates?\b/gi, 'güncelleme'],
+    [/\bpools?\b/gi, 'havuz'],
+    [/\bgreen\b/gi, 'başarılı'],
+    [/\bjobs?\b/gi, 'iş'],
+    [/\btasks?\b/gi, 'görev'],
+    [/\bstates?\b/gi, 'durum'],
+    [/\bdisks?\b/gi, 'disk'],
+    [/\bused\b/gi, 'kullanım'],
+    [/\bread\b/gi, 'okuma'],
+    [/\bwrite\b/gi, 'yazma'],
     [/\bservers?\b/gi, 'sunucu'],
     [/\bsystems?\b/gi, 'sistem'],
     [/\bdevices?\b/gi, 'cihaz'],
@@ -1304,7 +1403,22 @@ function localizeOperationalText(text, lang = 'en', translateText = null) {
 }
 /* ci-extract:end localizeOperationalText */
 function localizeSidebarOperationalText(lang = currentLang()) {
-  document.querySelectorAll('#sidebar .sb-meta, #sidebar .sb-badge-wrap, #sidebar .sb-summary').forEach(root => {
+  const selectors = [
+    '#sidebar .sb-meta',
+    '#sidebar .sb-badge-wrap',
+    '#sidebar .sb-summary',
+    '#detail .det-meta',
+    '#detail .badge',
+    '#detail .pve-head-sub',
+    '#detail .overview-meta',
+    '#detail .overview-row-sub',
+    '#detail .ov-gauge-sub',
+    '#detail .prom-instance-meta',
+    '#detail .syn-section',
+    '#detail .chart-hdr .nb-label',
+    '#detail .chart-hdr .nb-pct',
+  ];
+  document.querySelectorAll(selectors.join(',')).forEach(root => {
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
     let node;
     while((node = walker.nextNode())) {
@@ -2049,8 +2163,8 @@ function sortSvcs(svcs) {
 const PLATFORM_META = {
   proxmox:     { title:'Proxmox',       iconKey:'proxmox',     color:'var(--blue)' },
   kubernetes:  { title:'Kubernetes',    iconKey:'kubernetes',  color:'var(--purple,#9b59b6)' },
-  linux:       { title:'Linux Server', iconKey:'linux',       color:'var(--green)' },
-  windows:     { title:'Windows Server', iconKey:'windows',   color:'var(--blue)' },
+  linux:       { title:'Linux Servers', iconKey:'linux',       color:'var(--green)' },
+  windows:     { title:'Windows Servers', iconKey:'windows',  color:'var(--blue)' },
   synology:    { title:'Synology',      iconKey:'synology',    color:'var(--blue)' },
   mikrotik:    { title:'MikroTik',      iconKey:'mikrotik',    color:'var(--yellow)' },
   unifi:       { title:'UniFi',         iconKey:'unifi',       color:'var(--green)' },
@@ -2095,7 +2209,7 @@ function placeholderPanel(id){
     const waitBody = `<div style="display:flex;flex-direction:column;align-items:center;gap:10px;padding:60px;color:var(--muted);font-size:14px;text-align:center">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
       Waiting for agents to report…
-      <span style="font-size:12px">Install the agent from <a href="#" onclick="openEmbed('/settings');return false" style="color:var(--blue)">Settings → Linux Server</a></span>
+      <span style="font-size:12px">Install the agent from <a href="#" onclick="openEmbed('/settings');return false" style="color:var(--blue)">Settings → Linux Servers</a></span>
     </div>`;
     return { id, loading:true, title:m.title, iconKey:m.iconKey, color:m.color, meta:'', badge:bdg('gray','no agents'), sbSummary:'', summary:'', body:waitBody };
   }
@@ -2758,7 +2872,7 @@ function pveTempHistorySource(history, temp, index = 0) {
   return { key: 'temp', data: history };
 }
 function displayPveHost(host) {
-  return String(host || '').replace(/^https?:\/\//i, '');
+  return String(host || '').replace(/^https?:\/\//i, '').replace(/:8006\/?$/i, '').replace(/\/$/, '');
 }
 function rateColor(){ return '#22D3EE'; }
 function rateSparkMax(data, key, current) {
@@ -2860,44 +2974,136 @@ function buildProxmox(px){
 
   let cephHtml = '';
   if (ceph) {
-    const clr = ceph.health === 'HEALTH_ERR' ? 'var(--red)' : ceph.health === 'HEALTH_WARN' ? 'var(--yellow)' : 'var(--green)';
     const cls = ceph.health === 'HEALTH_ERR' ? 'red' : ceph.health === 'HEALTH_WARN' ? 'yellow' : 'green';
     const isCephOpen = userOverride['pve:ceph'] !== undefined ? userOverride['pve:ceph'] : false;
     const osd = ceph.osd || {};
     const usage = ceph.usage || null;
-    const osdText = hasNum(osd.total)
-      ? `${hasNum(osd.up) ? osd.up : '-'}/${osd.total} up${hasNum(osd.in) ? `, ${osd.in} in` : ''}`
-      : '';
-    const usageText = usage && hasNum(usage.totalBytes)
-      ? `${fmtBytes(usage.usedBytes || 0)} / ${fmtBytes(usage.totalBytes)}${hasNum(usage.percent) ? ` (${usage.percent}%)` : ''}`
-      : '';
-    const cephStatsHtml = (osdText || usageText) ? `
-      <div class="csum" style="border-bottom:0;padding:0 0 10px;background:transparent">
-        ${osdText ? `<div class="csum-item"><div class="csum-val">${escHtml(osdText)}</div><div class="csum-lbl">OSDs</div></div>` : ''}
-        ${usageText ? `<div class="csum-item"><div class="csum-val" style="color:${bc(usage.percent || 0)}">${escHtml(usageText)}</div><div class="csum-lbl">Used</div></div>` : ''}
-      </div>` : '';
+    const latency = ceph.latency || null;
+    const mon = ceph.mon || null;
+    const osdTotal = hasNum(osd.total) ? Math.max(0, Math.floor(Number(osd.total))) : null;
+    const osdUp = hasNum(osd.up) ? Math.max(0, Math.floor(Number(osd.up))) : null;
+    const osdIn = hasNum(osd.in) ? Math.max(0, Math.floor(Number(osd.in))) : null;
+    const osdUpColor = osdUp === null || osdTotal === null || osdTotal === 0
+      ? 'var(--muted)'
+      : osdUp >= osdTotal
+        ? 'var(--green)'
+        : osdUp > 0
+          ? 'var(--yellow)'
+          : 'var(--red)';
+    const usagePct = usage && hasNum(usage.percent)
+      ? boundedPct(usage.percent)
+      : usage && hasNum(usage.usedBytes) && hasNum(usage.totalBytes) && Number(usage.totalBytes) > 0
+        ? boundedPct(Number(usage.usedBytes) / Number(usage.totalBytes) * 100)
+        : null;
+    const usageClass = usagePct === null ? 'is-unknown' : usagePct >= 90 ? 'is-critical' : usagePct >= 70 ? 'is-warn' : 'is-ok';
+    const latencyAverage = latency && hasNum(latency.averageMs) ? Math.max(0, Number(latency.averageMs)) : null;
+    const latencyApply = latency && hasNum(latency.applyMs) ? Math.max(0, Number(latency.applyMs)) : null;
+    const latencyCommit = latency && hasNum(latency.commitMs) ? Math.max(0, Number(latency.commitMs)) : null;
+    const latencyOsds = latency && hasNum(latency.osds) ? Math.max(0, Math.floor(Number(latency.osds))) : null;
+    const formatCephLatency = value => value === null ? '—' : value < 1 ? '&lt;1 ms' : `${escHtml(fmtChartValue(value))} ms`;
+    const monTotal = mon && hasNum(mon.total) ? Math.max(0, Math.floor(Number(mon.total))) : null;
+    const monInQuorum = mon && hasNum(mon.inQuorum) ? Math.max(0, Math.floor(Number(mon.inQuorum))) : null;
+    const monStatus = String(mon?.status || (
+      monTotal === null || monInQuorum === null || monTotal <= 0
+        ? 'unknown'
+        : monInQuorum >= monTotal
+          ? 'healthy'
+          : monInQuorum > monTotal / 2
+            ? 'degraded'
+            : 'lost'
+    )).toLowerCase();
+    const monStatusText = monStatus === 'healthy' ? 'Full quorum' : monStatus === 'degraded' ? 'Quorum available' : monStatus === 'lost' ? 'Quorum lost' : 'Unknown';
+    const monDotClass = monStatus === 'healthy' ? 'md-green' : monStatus === 'degraded' ? 'md-yellow' : monStatus === 'lost' ? 'md-red' : 'md-gray';
+    const monColor = monStatus === 'healthy' ? 'var(--green)' : monStatus === 'degraded' ? 'var(--yellow)' : monStatus === 'lost' ? 'var(--red)' : 'var(--muted)';
+    const monNames = Array.isArray(mon?.names) ? mon.names.map(String).filter(Boolean) : [];
+    const osdCardHtml = osdTotal !== null || osdUp !== null ? `
+      <section class="ceph-health-card" aria-label="Ceph OSD status">
+        <div class="ceph-card-title">OSD Status</div>
+        <div class="ceph-osd-metrics">
+          <div class="ceph-osd-metric">
+            <div class="ceph-osd-label">OSDs Up</div>
+            <div class="ceph-osd-value" style="color:${osdUpColor}">${osdUp === null ? '—' : osdUp}</div>
+          </div>
+          <div class="ceph-osd-metric">
+            <div class="ceph-osd-label">Total OSDs</div>
+            <div class="ceph-osd-value" style="color:${osdTotal === null || osdTotal === 0 ? 'var(--muted)' : 'var(--green)'}">${osdTotal === null ? '—' : osdTotal}</div>
+          </div>
+        </div>
+        <div class="ceph-osd-foot">
+          <span class="mon-dot ${osdIn === null || osdTotal === null || osdTotal === 0 ? 'md-gray' : osdIn >= osdTotal ? 'md-green' : osdIn > 0 ? 'md-yellow' : 'md-red'}" style="width:7px;height:7px"></span>
+          <span><strong>${osdIn === null ? '—' : osdIn}${osdTotal === null ? '' : `/${osdTotal}`}</strong> OSDs in</span>
+        </div>
+      </section>` : '';
+    const latencyCardHtml = `
+      <section class="ceph-health-card ceph-status-card" aria-label="Ceph average latency">
+        <div class="ceph-card-title">AVG Latency</div>
+        <div class="ceph-status-main">
+          <div class="ceph-status-value" style="color:${latencyAverage === null ? 'var(--muted)' : 'var(--cyan)'}">${latencyAverage === null ? '—' : latencyAverage < 1 ? '&lt;1<small>ms</small>' : `${escHtml(fmtChartValue(latencyAverage))}<small>ms</small>`}</div>
+        </div>
+        <div class="ceph-status-split">
+          <span>Apply<strong>${formatCephLatency(latencyApply)}</strong></span>
+          <span>Commit<strong>${formatCephLatency(latencyCommit)}</strong></span>
+        </div>
+        <div class="ceph-status-foot">
+          <span class="mon-dot ${latencyOsds === null ? 'md-gray' : 'md-green'}" style="width:7px;height:7px"></span>
+          <span><strong>${latencyOsds === null ? '—' : latencyOsds}</strong> OSDs sampled</span>
+        </div>
+      </section>`;
+    const quorumCardHtml = `
+      <section class="ceph-health-card ceph-status-card" aria-label="Ceph MON quorum status">
+        <div class="ceph-card-title">MON Quorum Status</div>
+        <div class="ceph-status-main">
+          <div class="ceph-status-value" style="color:${monColor}">${monInQuorum === null ? '—' : monInQuorum}${monTotal === null ? '' : `/${monTotal}`}</div>
+          <div class="ceph-status-label">MONs in quorum</div>
+          <div class="ceph-mon-names" title="${escAttr(monNames.join(', '))}">${monNames.length ? escHtml(monNames.join(', ')) : 'Monitor names unavailable'}</div>
+        </div>
+        <div class="ceph-status-foot">
+          <span class="mon-dot ${monDotClass}" style="width:7px;height:7px"></span>
+          <strong>${monStatusText}</strong>
+        </div>
+      </section>`;
+    const capacityCardHtml = usage ? `
+      <section class="ceph-health-card ceph-capacity-card" aria-label="Ceph cluster capacity">
+        <div class="ceph-card-title">Cluster Capacity Used</div>
+        <div class="ceph-gauge-wrap">
+          <svg class="ceph-gauge" viewBox="0 0 260 145" role="img" aria-label="${escAttr(`${trText('Cluster Capacity Used')} ${fmtPct(usagePct)}`)}">
+            <path class="ceph-gauge-track" pathLength="100" d="M35 128 A95 95 0 0 1 225 128"></path>
+            ${usagePct !== null && usagePct > 0 ? `<path class="ceph-gauge-fill ${usageClass}" pathLength="100" d="M35 128 A95 95 0 0 1 225 128" style="stroke-dasharray:${usagePct} 100"></path>` : ''}
+            <path class="ceph-gauge-zone is-ok" pathLength="100" d="M17 128 A113 113 0 0 1 243 128" style="stroke-dasharray:69 31"></path>
+            <path class="ceph-gauge-zone is-warn" pathLength="100" d="M17 128 A113 113 0 0 1 243 128" style="stroke-dasharray:19 81;stroke-dashoffset:-70"></path>
+            <path class="ceph-gauge-zone is-critical" pathLength="100" d="M17 128 A113 113 0 0 1 243 128" style="stroke-dasharray:9 91;stroke-dashoffset:-91"></path>
+            <text class="ceph-gauge-percent" x="130" y="119" text-anchor="middle">${escHtml(fmtPct(usagePct))}</text>
+          </svg>
+        </div>
+        <div class="ceph-capacity-meta">
+          <strong>${hasNum(usage.usedBytes) ? fmtBytes(usage.usedBytes) : '—'}</strong>
+          <span>/ ${hasNum(usage.totalBytes) ? fmtBytes(usage.totalBytes) : '—'}</span>
+        </div>
+      </section>` : '';
     const checksHtml = ceph.checks && ceph.checks.length 
-      ? ceph.checks.map(c => `<div style="font-size:13px;color:var(--text);padding:4px 0 4px 16px;display:flex;align-items:center;gap:6px;"><div class="mon-dot md-yellow" style="width:6px;height:6px"></div>${escHtml(c)}</div>`).join('')
-      : `<div style="font-size:13px;color:var(--muted);padding-left:16px;">No active warnings or errors</div>`;
+      ? ceph.checks.map(c => `<div class="ceph-health-check"><span class="mon-dot ${ceph.health === 'HEALTH_ERR' ? 'md-red' : 'md-yellow'}"></span><span>${escHtml(c)}</span></div>`).join('')
+      : `<div class="ceph-health-check is-clear"><span class="mon-dot md-green"></span><span>No active warnings or errors</span></div>`;
       
     cephHtml = `
-    <div class="k8s-grp" style="margin:12px;">
+    <div class="k8s-grp ceph-health-group" style="margin:12px;">
       <div class="k8s-grp-hdr" id="kh-ceph" onclick="toggleCeph()" style="cursor:pointer">
         <div class="mon-dot ${ceph.health==='HEALTH_OK'?'md-green':ceph.health==='HEALTH_WARN'?'md-yellow':'md-red'}"></div>
         <span style="font-size:14px;font-weight:600;flex:1">Ceph Storage Health</span>
         ${bdg(cls, ceph.health === 'HEALTH_OK' ? 'OK' : ceph.health.replace('HEALTH_',''))}
         <span class="chevron ${isCephOpen?'open':''}" style="margin-left:4px">▼</span>
       </div>
-      <div class="k8s-grp-body ${isCephOpen?'open':''}" id="kg-ceph" style="padding:12px;border-top:1px solid var(--border)">
-        ${cephStatsHtml}
-        ${checksHtml}
+      <div class="k8s-grp-body ceph-health-body ${isCephOpen?'open':''}" id="kg-ceph">
+        ${(osdCardHtml || capacityCardHtml || latencyCardHtml || quorumCardHtml) ? `<div class="ceph-health-grid">${osdCardHtml}${latencyCardHtml}${quorumCardHtml}${capacityCardHtml}</div>` : ''}
+        <div class="ceph-health-details">
+          <div class="ceph-health-details-title">Health details</div>
+          <div class="ceph-health-checks">${checksHtml}</div>
+        </div>
       </div>
     </div>`;
   }
 
   const nodesHtml = px.nodes.map(({node,services=[],vms,history,host,backup,storage=[],metrics,metricsError,_connecting,clusterName})=>{
     const nodeKey = clusterName ? `${clusterName}:${node.name}` : node.name;
-    const clusterLabel = /^https?:\/\//i.test(String(clusterName || '').trim()) ? '' : clusterName;
     if(_connecting) return `
     <div class="node-hdr" style="cursor:default">
       <div class="mon-dot md-gray"></div>
@@ -2952,10 +3158,10 @@ function buildProxmox(px){
     return `
     <div class="node-hdr pve-node-hdr" onclick="toggleNode(${jsStr(nodeKey)})">
       <div class="mon-dot ${dc(node.online)}"></div>
-      <div class="pve-head-main">
+      <div class="pve-head-main proxmox-head-main">
         <div class="pve-head-title">
           <div class="node-name">${escHtml(node.name)}</div>
-          <div class="pve-head-sub">${escHtml([clusterLabel, node.online ? 'online' : 'offline'].filter(Boolean).join(' · '))}</div>
+          <div class="pve-head-sub">${node.online ? 'online' : 'offline'}</div>
         </div>
         ${pveStats}
       </div>
@@ -3179,8 +3385,8 @@ function buildLinux(linux){
       pveHeadStat('Host', srv.ip || srv.host || '-', 'var(--text)', '', 'is-host'),
       cpuPct != null ? pveHeadStat('CPU', `${cpuPct}%`, bc(cpuPct), miniSparkline(srv.history, 'cpu', cpuPct)) : '',
       ramPct != null ? pveHeadStat('RAM', `${ramPct}%`, bc(ramPct), miniSparkline(srv.history, 'ram', ramPct)) : '',
-      srv.disk ? pveHeadStat('Disk', `${srv.disk.percent}%`, bc(srv.disk.percent), miniSparkline(srv.history, 'disk', srv.disk.percent)) : '',
       pveHeadStat('Disk I/O', diskIOTxt || '--', diskIOTxt ? 'var(--cyan)' : 'var(--muted)', diskIOMbps != null ? miniSparkline(diskIOHistory, 'diskIOMbps', diskIOMbps, rateColor, rateSparkMax(diskIOHistory, 'diskIOMbps', diskIOMbps), ' MB/s', 'Disk I/O') : ''),
+      srv.disk ? pveHeadStat('Disk', `${srv.disk.percent}%`, bc(srv.disk.percent), '', 'is-disk-usage') : '',
       srv.temp != null ? pveHeadStat('Temp', `${srv.temp}°C`, tempColor(srv.temp), miniSparkline(srv.history, 'temp', srv.temp, tempHex, 100, '°C', 'Temperature')) : '',
       srvSvcTotal ? pveHeadStat('Services', `${srvSvcUp}/${srvSvcTotal}`) : '',
       srv.updates ? pveHeadStat('Updates', srvUpdates, srvUpdates ? 'var(--yellow)' : 'var(--green)', '', 'agent-update-stat') : '',
@@ -3202,7 +3408,7 @@ function buildLinux(linux){
         <span class="chevron ${isOpen?'open':''}" style="margin-left:4px">▼</span>
       </div>
       <div class="node-body ${isOpen?'open':''}" id="lx-${lkey}">
-        ${(()=>{ const lim=historyLimitFor('lx:'+lkey); return (cpuPct!=null||srv.ram!=null||srv.disk!=null||srv.temp!=null||bwMbps!=null)?chartHeader('lx:'+lkey, lim):'' })()}
+        ${(()=>{ const lim=historyLimitFor('lx:'+lkey); return (cpuPct!=null||srv.ram!=null||srv.temp!=null||diskIOMbps!=null||bwMbps!=null)?chartHeader('lx:'+lkey, lim):'' })()}
         ${(()=>{ const lim=historyLimitFor('lx:'+lkey); return cpuPct!=null?`
           <div class="chart-row">
             <div class="chart-hdr"><span class="nb-label">CPU</span><span class="nb-pct" style="color:${bc(cpuPct)}">${cpuPct}%</span></div>
@@ -3216,15 +3422,6 @@ function buildLinux(linux){
             </div>
             ${histChart(srv.history,'ram',ramPct,lim)}
             <div class="chart-foot">${srv.ram.usedGB}/${srv.ram.totalGB} GB</div>
-          </div>` : '' })()}
-        ${(()=>{ const lim=historyLimitFor('lx:'+lkey); const diskPct=srv.disk?.percent ?? null; return srv.disk!=null?`
-          <div class="chart-row">
-            <div class="chart-hdr">
-              <span class="nb-label">Disk</span>
-              <span class="nb-pct" style="color:${bc(diskPct)}">${diskPct}%</span>
-            </div>
-            ${histChart(srv.history,'disk',diskPct,lim)}
-            <div class="chart-foot">${srv.disk.usedGB}/${srv.disk.totalGB} GB</div>
           </div>` : '' })()}
         ${(()=>{ const lim=historyLimitFor('lx:'+lkey); return diskIOMbps!=null?`
           <div class="chart-row">
@@ -3274,7 +3471,7 @@ function buildLinux(linux){
 
   return {
     id: 'linux',
-    title: 'Linux Server',
+    title: 'Linux Servers',
     iconKey: 'linux',
     color: 'var(--green)',
     meta: `${reachable}/${linux.length} reachable`,
@@ -3377,8 +3574,8 @@ function buildWindows(windows){
       pveHeadStat('Host', srv.ip || srv.host || '-', 'var(--text)', '', 'is-host'),
       cpuPct != null ? pveHeadStat('CPU', `${cpuPct}%`, bc(cpuPct), miniSparkline(srv.history, 'cpu', cpuPct)) : '',
       ramPct != null ? pveHeadStat('RAM', `${ramPct}%`, bc(ramPct), miniSparkline(srv.history, 'ram', ramPct)) : '',
-      srv.disk ? pveHeadStat('Disk', `${srv.disk.percent}%`, bc(srv.disk.percent), miniSparkline(srv.history, 'disk', srv.disk.percent)) : '',
       diskTotal != null ? pveHeadStat('Disk I/O', fmtRate(diskTotal), 'var(--cyan)', diskIOMbps != null ? miniSparkline(diskHistory.map(h=>({ time:h.time, diskIOMbps:(h.diskReadMBps||0)+(h.diskWriteMBps||0) })), 'diskIOMbps', diskIOMbps, rateColor, rateSparkMax(diskHistory, 'diskReadMBps', diskIOMbps), ' MB/s', 'Disk I/O') : '') : '',
+      srv.disk ? pveHeadStat('Disk', `${srv.disk.percent}%`, bc(srv.disk.percent), '', 'is-disk-usage') : '',
       bwTotal != null ? pveHeadStat('BW', fmtRate(bwTotal), 'var(--green)', bwMbps != null ? miniSparkline(bwHistory, 'bandwidthMbps', bwMbps, ()=>'#34D399', rateSparkMax(bwHistory, 'bandwidthMbps', bwMbps), ' MB/s', 'Bandwidth') : '') : '',
       svcTotal ? pveHeadStat('Services', `${svcUp}/${svcTotal}`) : '',
       srv.updates ? pveHeadStat('Updates', srvUpdates, srvUpdates ? 'var(--yellow)' : 'var(--green)', '', 'agent-update-stat') : '',
@@ -3400,10 +3597,9 @@ function buildWindows(windows){
         <span class="chevron ${isOpen?'open':''}" style="margin-left:4px">▼</span>
       </div>
       <div class="node-body ${isOpen?'open':''}" id="win-${key}">
-        ${(()=>{ const lim=historyLimitFor('win:'+key); return (cpuPct!=null||srv.ram!=null||srv.disk!=null||bwMbps!=null)?chartHeader('win:'+key, lim):'' })()}
+        ${(()=>{ const lim=historyLimitFor('win:'+key); return (cpuPct!=null||srv.ram!=null||diskIOMbps!=null||bwMbps!=null)?chartHeader('win:'+key, lim):'' })()}
         ${(()=>{ const lim=historyLimitFor('win:'+key); return cpuPct!=null?`<div class="chart-row"><div class="chart-hdr"><span class="nb-label">CPU</span><span class="nb-pct" style="color:${bc(cpuPct)}">${cpuPct}%</span></div>${histChart(srv.history,'cpu',cpuPct,lim)}</div>`:'' })()}
         ${(()=>{ const lim=historyLimitFor('win:'+key); return srv.ram?`<div class="chart-row"><div class="chart-hdr"><span class="nb-label">RAM</span><span class="nb-pct" style="color:${bc(ramPct)}">${ramPct}%</span></div>${histChart(srv.history,'ram',ramPct,lim)}<div class="chart-foot">${srv.ram.usedGB}/${srv.ram.totalGB} GB</div></div>`:'' })()}
-        ${(()=>{ const lim=historyLimitFor('win:'+key); const diskPct=srv.disk?.percent ?? null; return srv.disk?`<div class="chart-row"><div class="chart-hdr"><span class="nb-label">Disk</span><span class="nb-pct" style="color:${bc(diskPct)}">${diskPct}%</span></div>${histChart(srv.history,'disk',diskPct,lim)}<div class="chart-foot">${srv.disk.usedGB}/${srv.disk.totalGB} GB</div></div>`:'' })()}
         ${(()=>{ const lim=historyLimitFor('win:'+key); return diskIOMbps!=null?`<div class="chart-row"><div class="chart-hdr"><span class="nb-label">Disk I/O</span><span class="nb-pct"><span style="color:#22D3EE">Read ${diskRead != null ? fmtRate(diskRead) : '--'}</span> <span style="color:var(--muted)">/</span> <span style="color:#34D399">Write ${diskWrite != null ? fmtRate(diskWrite) : '--'}</span></span></div>${splitRateChart(diskHistory,'diskReadMBps','diskWriteMBps',diskRead,diskWrite,lim,'Disk I/O')}</div>`:'' })()}
         ${(()=>{ const lim=historyLimitFor('win:'+key); return bwMbps!=null?`<div class="chart-row"><div class="chart-hdr"><span class="nb-label">Bandwidth</span><span class="nb-pct" style="color:var(--green)">↓ ${bwRx != null ? fmtRate(bwRx) : '--'} / ↑ ${bwTx != null ? fmtRate(bwTx) : '--'}</span></div>${histChart(bwHistory,'bandwidthMbps',bwMbps,lim,()=>'#34D399',rateSparkMax(bwHistory,'bandwidthMbps',bwMbps),' MB/s','Bandwidth')}</div>`:'' })()}
         ${srv.os||srv.kernel||srv.agentVersion?`<div class="row" style="padding:8px 0;margin-top:6px;border-top:1px solid var(--border);flex-wrap:wrap;gap:14px">
@@ -3423,7 +3619,7 @@ function buildWindows(windows){
   }).join('');
   return {
     id: 'windows',
-    title: 'Windows Server',
+    title: 'Windows Servers',
     iconKey: 'windows',
     color: 'var(--blue)',
     meta: `${reachable}/${windows.length} reachable`,
@@ -3768,19 +3964,30 @@ function buildSynology(syn, opts = {}){
     const bandwidthTxt = bandwidthRate != null ? fmtRate(bandwidthRate) : (bandwidthHeaderMbps != null ? fmtRate(bandwidthHeaderMbps * 1024 * 1024) : '');
     const isOpen = panelOpenState(stateKey, snmpOpen[stateKey]);
     snmpOpen[stateKey] = isOpen;
-    const snmpStats = [
+    const auxiliaryStat = primaryFan
+      ? pveHeadStat(snmpFanLabel(primaryFan), `${primaryFan.value} RPM`, 'var(--text)')
+      : (systemTemperature != null
+          ? pveHeadStat('Sys temp', `${systemTemperature}°C${temperatureSuffix}`, pveTempColor(systemTemperature))
+          : (dev.uptimeSeconds == null ? pveHeadStat('Fan', '--', 'var(--muted)') : ''));
+    const uptimeStat = dev.uptimeSeconds != null
+      ? pveHeadStat('Uptime', fmtUptime(dev.uptimeSeconds), 'var(--text)', '', 'is-uptime')
+      : '';
+    const snmpStatsArr = [
       pveHeadStat('Host', dev.host || '-'),
       dev.cpu != null ? pveHeadStat('CPU', `${dev.cpu}%`, bc(dev.cpu), miniSparkline(dev.history, 'cpu', dev.cpu)) : pveHeadStat('CPU', '--', 'var(--muted)'),
       dev.ram ? pveHeadStat('RAM', `${dev.ram.percent}%`, bc(dev.ram.percent), miniSparkline(dev.history, 'ram', dev.ram.percent)) : pveHeadStat('RAM', '--', 'var(--muted)'),
       cpuTemp != null ? pveHeadStat('CPU temp', `${cpuTemp}°C${temperatureSuffix}`, pveTempColor(cpuTemp), miniSparkline(dev.history, 'temp', cpuTemp, pveTempHex, 100, '°C', 'CPU temp')) : pveHeadStat('CPU temp', '--', 'var(--muted)'),
-      primaryFan ? pveHeadStat(snmpFanLabel(primaryFan), `${primaryFan.value} RPM`, 'var(--text)') : (systemTemperature != null ? pveHeadStat('Sys temp', `${systemTemperature}°C${temperatureSuffix}`, pveTempColor(systemTemperature)) : (dev.uptimeSeconds != null ? pveHeadStat('Uptime', fmtUptime(dev.uptimeSeconds)) : pveHeadStat('Fan', '--', 'var(--muted)'))),
+      auxiliaryStat,
       pveHeadStat('Disk I/O', diskIOTxt || '--', diskIOTxt ? 'var(--cyan)' : 'var(--muted)', diskIOHeaderMbps != null ? miniSparkline(diskIOHistory, 'diskIOMbps', diskIOHeaderMbps, rateColor, rateSparkMax(diskIOHistory, 'diskIOMbps', diskIOHeaderMbps), ' MB/s', 'Disk I/O') : ''),
       pveHeadStat('Bandwidth', bandwidthTxt || '--', bandwidthTxt ? 'var(--green)' : 'var(--muted)', bandwidthHeaderMbps != null ? miniSparkline(bandwidthHistory, 'bandwidthMbps', bandwidthHeaderMbps, () => '#34D399', rateSparkMax(bandwidthHistory, 'bandwidthMbps', bandwidthHeaderMbps), ' MB/s', 'Bandwidth') : ''),
-    ].join('');
+      uptimeStat,
+    ].filter(Boolean);
+    const snmpStats = snmpStatsArr.join('');
+    const snmpHeadClass = snmpStatsArr.length >= 8 ? ' snmp-head-8' : '';
     return `
       <div class="node-hdr pve-node-hdr" onclick="toggleSnmp(${jsStr(skey)},${jsStr(stateKey)})">
         <div class="mon-dot md-green"></div>
-        <div class="pve-head-main snmp-head-main">
+        <div class="pve-head-main snmp-head-main${snmpHeadClass}">
           <div class="pve-head-title">
           <div class="node-name">${escHtml(dev.name)}</div>
             <div class="pve-head-sub">online</div>
@@ -5705,12 +5912,12 @@ function buildDatabase(dbs){
       d.activeConnections != null ? pveHeadStat('Active', d.activeConnections, 'var(--green)', '', 'is-db-primary') : '',
       d.idleConnections != null ? pveHeadStat('Idle', d.idleConnections) : '',
       d.sizeBytes != null ? pveHeadStat('Size', fmtBytes(d.sizeBytes), 'var(--cyan)', '', 'is-db-size') : '',
-      d.uptimeSeconds != null ? pveHeadStat('Uptime', fmtUptime(d.uptimeSeconds)) : '',
       d.databaseCount != null ? pveHeadStat('Databases', d.databaseCount) : '',
       (d.collectionCount ?? d.tableCount) != null ? pveHeadStat(d.type === 'mongodb' || d.type === 'mongo' ? 'Collections' : 'Tables', d.collectionCount ?? d.tableCount) : '',
       d.queryCount != null ? pveHeadStat('Queries', d.queryCount) : '',
       d.slowQueries != null ? pveHeadStat('Slow queries', d.slowQueries, d.slowQueries ? 'var(--yellow)' : 'var(--text)', '', d.slowQueries ? 'is-db-warn' : '') : '',
       d.version ? pveHeadStat('Version', d.version, 'var(--text)', '', 'is-version-wrap') : '',
+      d.uptimeSeconds != null ? pveHeadStat('Uptime', fmtUptime(d.uptimeSeconds), 'var(--text)', '', 'is-uptime') : '',
     ].filter(Boolean).join('');
     return `
       <div class="node-hdr pve-node-hdr db-node-hdr online" style="cursor:default">
@@ -6502,6 +6709,21 @@ function overviewKpiData(data){
       ugreen: ugreenOnline.map(inst => inst.name || inst.system?.hostname).filter(Boolean),
       pbs: pbsNodes.map(node => node.name || node.instanceName).filter(Boolean),
     },
+    percentRows: {
+      proxmox: pveRows,
+      linux: linuxOnline,
+      windows: windowsOnline,
+      synology: synologyOnline,
+      mikrotik: mikrotikOnline,
+      unifi: unifiOnline,
+      snmp: genericSnmpOnline,
+      docker: dockerOnline,
+      firewall: firewallOnline,
+      truenas: truenasOnline,
+      qnap: qnapOnline,
+      ugreen: ugreenOnline,
+      pbs: pbsNodes,
+    },
     rateRows: { proxmox: pveRows, linux: linuxOnline, windows: windowsOnline, synology: synologyOnline, mikrotik: mikrotikOnline, unifi: unifiOnline, snmp: genericSnmpOnline },
   };
 }
@@ -6596,13 +6818,39 @@ function overviewRateHistory(data, platform, metric){
   const series = Object.fromEntries(Object.entries(sources.rateRows).map(([id, rows]) => [id, mapRate(rows)]));
   return overviewBucketHistory(platform === 'all' ? Object.values(series).flat() : (series[platform] || []), 'sum');
 }
+function overviewPercentHistory(data, platform, metric){
+  const sources = overviewKpiData(data);
+  const keys = metric === 'cpu'
+    ? ['cpu','cpuPercent','cpuUsage','cpuUsagePercent']
+    : ['mem','ram','memory','memPercent','ramPercent','memoryPercent'];
+  const valueOf = point => {
+    for(const key of keys){
+      if(hasNum(point?.[key])) return Math.max(0, Math.min(100, Number(point[key])));
+    }
+    return null;
+  };
+  const series = Object.fromEntries(Object.entries(sources.percentRows || {}).map(([id, rows]) => [id,
+    (rows || []).map(row => {
+      const history = Array.isArray(row?.history) ? row.history : Array.isArray(row?.system?.history) ? row.system.history : [];
+      return history.map(point => ({ time:point?.time, value:valueOf(point) }));
+    })
+  ]));
+  return overviewBucketHistory(platform === 'all' ? Object.values(series).flat() : (series[platform] || []), 'avg');
+}
 function overviewKpiMetric(data, metric, platform){
   const sources = overviewKpiData(data);
   const { cpu, mem, disk, bandwidth, names } = sources;
   const allVals = obj => Object.values(obj).flat();
   const allNames = obj => Object.values(obj).flat();
-  if(metric === 'cpu') return { ...kpiPct('reporting source', platform === 'all' ? allVals(cpu) : (cpu[platform] || [])), names: platform === 'all' ? allNames(names) : (names[platform] || []) };
-  if(metric === 'mem') return { ...kpiPct('reporting source', platform === 'all' ? allVals(mem) : (mem[platform] || [])), names: platform === 'all' ? allNames(names) : (names[platform] || []) };
+  if(metric === 'cpu' || metric === 'mem') {
+    const values = metric === 'cpu' ? cpu : mem;
+    const stat = kpiPct('reporting source', platform === 'all' ? allVals(values) : (values[platform] || []));
+    return {
+      ...stat,
+      names: platform === 'all' ? allNames(names) : (names[platform] || []),
+      history: overviewPercentHistory(data, platform, metric),
+    };
+  }
   if(metric === 'disk') {
     const stat = { ...kpiRate(trText('Read and write combined'), platform === 'all' ? allVals(disk) : (disk[platform] || [])), color: 'var(--cyan)' };
     const history = overviewRateHistory(data, platform, 'disk');
@@ -6617,24 +6865,67 @@ function overviewKpiMetric(data, metric, platform){
   }
   return { value:'--', sub:'Not reported', color:'var(--muted)' };
 }
+function overviewGaugeZoneClass(value){
+  return value >= 90 ? 'is-red' : value >= 70 ? 'is-yellow' : 'is-green';
+}
+function overviewGaugeSegments(raw){
+  const count = 30;
+  const centerX = 95;
+  const centerY = 100;
+  const innerRadius = 70;
+  const outerRadius = 80;
+  return Array.from({length:count}, (_, index) => {
+    const percent = (index + .5) / count * 100;
+    const angle = (180 + index / (count - 1) * 180) * Math.PI / 180;
+    const x1 = centerX + Math.cos(angle) * innerRadius;
+    const y1 = centerY + Math.sin(angle) * innerRadius;
+    const x2 = centerX + Math.cos(angle) * outerRadius;
+    const y2 = centerY + Math.sin(angle) * outerRadius;
+    const active = raw !== null && percent <= raw;
+    const cls = active ? `is-active ${overviewGaugeZoneClass(percent)}` : 'is-inactive';
+    return `<line class="ov-gauge-tick ${cls}" x1="${x1.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${x2.toFixed(2)}" y2="${y2.toFixed(2)}"></line>`;
+  }).join('');
+}
+function overviewGaugeTrend(history, raw){
+  const values = (history || []).filter(point => hasNum(point?.value)).slice(-36).map(point => Number(point.value));
+  if(hasNum(raw) && (!values.length || Math.abs(values[values.length - 1] - Number(raw)) > .01)) values.push(Number(raw));
+  if(values.length < 2) return '';
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const padding = Math.max(1, (max - min) * .18);
+  const low = Math.max(0, min - padding);
+  const high = Math.min(100, max + padding);
+  const range = Math.max(1, high - low);
+  const points = values.map((value, index) => {
+    const x = values.length === 1 ? 44 : index / (values.length - 1) * 84 + 2;
+    const y = 15 - (value - low) / range * 11;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+  const [lastX,lastY] = points[points.length - 1].split(',');
+  const color = raw === null ? '#64748b' : raw >= 90 ? '#e85d68' : raw >= 70 ? '#eab839' : '#73bf69';
+  return `<svg class="ov-gauge-trend" viewBox="0 0 88 18" aria-hidden="true">
+    <line class="ov-gauge-trend-base" x1="2" y1="15.5" x2="86" y2="15.5"></line>
+    <polyline class="ov-gauge-trend-line" points="${points.join(' ')}" style="stroke:${color}"></polyline>
+    <circle class="ov-gauge-trend-dot" cx="${lastX}" cy="${lastY}" r="2.2" fill="${color}"></circle>
+  </svg>`;
+}
 function overviewGaugeBody(stat, current, panels){
   const raw = hasNum(stat.rawValue) ? Math.max(0, Math.min(100, Number(stat.rawValue))) : null;
-  const dash = raw == null ? 0 : raw.toFixed(2);
   const display = raw == null ? '--' : `${raw.toFixed(2)}%`;
   const sub = stat.sub || '';
-  const fill = raw == null ? 'var(--muted)' : bchex(raw);
+  const trend = overviewGaugeTrend(stat.history, raw);
   return `<div class="ov-gauge">
     <svg viewBox="0 0 190 122" aria-hidden="true">
-      <path class="ov-gauge-rail" d="M8 100 A87 87 0 0 1 182 100"/>
-      <path class="ov-gauge-seg ov-gauge-seg-green" pathLength="100" stroke-dasharray="70 100" d="M8 100 A87 87 0 0 1 182 100"/>
-      <path class="ov-gauge-seg ov-gauge-seg-yellow" pathLength="100" stroke-dasharray="15 100" stroke-dashoffset="-70" d="M8 100 A87 87 0 0 1 182 100"/>
-      <path class="ov-gauge-seg ov-gauge-seg-red" pathLength="100" stroke-dasharray="15 100" stroke-dashoffset="-85" d="M8 100 A87 87 0 0 1 182 100"/>
-      <path class="ov-gauge-fill" pathLength="100" stroke="${fill}" stroke-dasharray="${dash} 100" d="M8 100 A87 87 0 0 1 182 100"/>
+      <path class="ov-gauge-zone is-green" pathLength="100" stroke-dasharray="69 31" d="M8.12 104.55 A87 87 0 1 1 181.88 104.55"></path>
+      <path class="ov-gauge-zone is-yellow" pathLength="100" stroke-dasharray="19 81" stroke-dashoffset="-70" d="M8.12 104.55 A87 87 0 1 1 181.88 104.55"></path>
+      <path class="ov-gauge-zone is-red" pathLength="100" stroke-dasharray="10 90" stroke-dashoffset="-90" d="M8.12 104.55 A87 87 0 1 1 181.88 104.55"></path>
+      ${overviewGaugeSegments(raw)}
     </svg>
     <div class="ov-gauge-center">
       <div class="ov-gauge-value">${escHtml(display)}</div>
       ${sub ? `<div class="ov-gauge-sub" title="${escAttr(sub)}">${escHtml(sub)}</div>` : ''}
     </div>
+    ${trend}
   </div>`;
 }
 function overviewKpiBody(metric, stat, current, panels){
@@ -7374,7 +7665,7 @@ function renderDashboardOverview(data, ids, panels, opts = {}){
         : `<div class="overview-list ${['healthchecks','database','checks','dockhand','portainer'].includes(id)?'is-scroll':''}" data-scroll-key="overview-${id}"><div class="overview-empty">No rows to show yet</div></div>`;
     const collapsed = !!overviewCardCollapsed[id];
     return `<section class="overview-card ${collapsed?'collapsed':''}" data-id="${id}">
-      <div class="overview-card-h" style="cursor:pointer" title="${collapsed?'Expand':'Collapse'} ${escAttr(title)}">
+      <div class="overview-card-h" style="cursor:pointer" title="${escAttr(trText(collapsed?'Expand':'Collapse'))} ${escAttr(title)}">
         <div class="overview-icon">${iconSvg}</div>
         <div class="overview-head-main">
           <div class="overview-title">${title}</div>
@@ -7382,7 +7673,7 @@ function renderDashboardOverview(data, ids, panels, opts = {}){
         </div>
         ${panel.badge}
         <div class="overview-card-toggle"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></div>
-        <button class="overview-card-hide" type="button" onclick="hideDashboardPlatform('${id}',event)" title="Hide from dashboard" aria-label="Hide from dashboard">
+        <button class="overview-card-hide" type="button" onclick="hideDashboardPlatform('${id}',event)" title="${escAttr(trText('Hide from dashboard'))}" aria-label="${escAttr(trText('Hide from dashboard'))}">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
         </button>
       </div>
@@ -7399,7 +7690,7 @@ function renderDashboardOverview(data, ids, panels, opts = {}){
   const key = visibleIds.join('|') + '|hidden:' + hiddenIds.join('|') + '|side:' + (showSide ? '1' : '0');
   const scrollState = captureOverviewScroll(detail);
   const hiddenBar = hiddenIds.length
-    ? `<div class="overview-hidden-bar"><span>${hiddenIds.length} hidden dashboard platform${hiddenIds.length>1?'s':''}</span><button type="button" onclick="restoreDashboardPlatforms()">Restore hidden platforms</button></div>`
+    ? `<div class="overview-hidden-bar"><span>${hiddenIds.length} ${escHtml(trText(hiddenIds.length>1?'hidden dashboard platforms':'hidden dashboard platform'))}</span><button type="button" onclick="restoreDashboardPlatforms()">${escHtml(trText('Restore hidden platforms'))}</button></div>`
     : '';
   const html = `<section class="overview">
     ${hiddenBar}
@@ -7672,6 +7963,7 @@ function selectPanel(id, opts = {}){
       detail.dataset.panelHtml = '';
       detail.innerHTML = '<div class="empty" style="padding:48px">Loading platform details...</div>';
     }
+    applyLanguage(currentLang(window._lastData));
     const fullStatusPromise = pendingFullStatusPromise || fetchStatus({ detail: true, timeoutMs: 10000 }).catch(e => e);
     if(!pendingFullStatusPromise) pendingFullStatusPromise = fullStatusPromise;
     fullStatusPromise
@@ -7682,6 +7974,7 @@ function selectPanel(id, opts = {}){
       })
       .catch(err => {
         detail.innerHTML = `<div class="empty" style="padding:48px">Could not load platform details. ${escHtml(err?.message || '')}</div>`;
+        applyLanguage(currentLang(window._lastData));
       })
       .finally(() => {
         if(pendingFullStatusPromise === fullStatusPromise) pendingFullStatusPromise = null;
@@ -7692,6 +7985,7 @@ function selectPanel(id, opts = {}){
   const panel = window._panels?.[id];
   if(!panel){
     if(window._lastData) render(window._lastData);
+    applyLanguage(currentLang(window._lastData));
     return;
   }
   const detail = document.getElementById('detail');
@@ -7712,7 +8006,10 @@ function selectPanel(id, opts = {}){
     detail.dataset.panelHtml = html;
   }
   const data = window._lastData;
-  if(!data) return;
+  if(!data){
+    applyLanguage(currentLang());
+    return;
+  }
 
   function openEl(el){
     if(!el) return;
@@ -7798,6 +8095,7 @@ function selectPanel(id, opts = {}){
       }
     });
   }
+  applyLanguage(currentLang(data));
 }
 function selectPanelGroup(id, grpId){
   selectPanel(id);
@@ -8634,7 +8932,7 @@ function renderCommandPalette(){
       <span class="cmdk-icon">${item.icon}</span>
       <span style="min-width:0">
         <span class="cmdk-title">${escHtml(trText(item.title))}</span>
-        <span class="cmdk-sub">${escHtml(item.sub)}</span>
+        <span class="cmdk-sub">${escHtml(localizeOperationalText(item.sub, currentLang(), trText))}</span>
       </span>
       <span class="cmdk-badge">${escHtml(item.badge)}</span>
     </button>`).join('');

@@ -3,6 +3,7 @@ const path = require('path');
 const yaml = require('js-yaml');
 const crypto = require('crypto');
 const { loadHistoryMap, scheduleSaveHistoryMap, cancelHistorySaves } = require('./historyStore');
+const { normalizeCephStatus } = require('./ceph');
 
 const AGENTS_PATH = path.join(__dirname, '..', 'data', 'agents.yaml');
 const HISTORY_MAX = 5760;
@@ -129,73 +130,6 @@ function ratioValue(value) {
   const n = Number(value);
   if (!Number.isFinite(n) || n < 0) return 0;
   return Math.max(0, Math.min(1, n <= 1 ? n : n / 100));
-}
-
-function numAny(...values) {
-  for (const value of values) {
-    const n = Number(value);
-    if (Number.isFinite(n)) return n;
-  }
-  return null;
-}
-
-function cephHealthStatus(...values) {
-  for (const value of values) {
-    if (value === null || value === undefined) continue;
-    if (typeof value === 'object') {
-      const nested = cephHealthStatus(value.status, value.health, value.health_status, value.overall_status);
-      if (nested) return nested;
-      continue;
-    }
-    const raw = String(value).trim().toUpperCase();
-    if (!raw) continue;
-    if (raw === 'OK') return 'HEALTH_OK';
-    if (raw === 'WARN' || raw === 'WARNING') return 'HEALTH_WARN';
-    if (raw === 'ERR' || raw === 'ERROR') return 'HEALTH_ERR';
-    const match = raw.match(/\bHEALTH_(OK|WARN|ERR)\b/);
-    if (match) return `HEALTH_${match[1]}`;
-  }
-  return '';
-}
-
-function normalizeCephStatus(raw) {
-  if (!raw || typeof raw !== 'object') return null;
-  const statusData = raw.statusData || raw.cephStatus || raw.status_data || raw;
-  const dfData = raw.df || raw.dfData || raw.cephDf || null;
-  const health = statusData.health || statusData.health_status || statusData.status || statusData;
-  const status = cephHealthStatus(health, statusData.health, statusData.health_status, statusData.status);
-  if (!status) return null;
-  const checks = [];
-  const src = health.checks || statusData.checks || {};
-  if (Array.isArray(src)) {
-    src.forEach(c => {
-      const msg = c?.summary?.message || c?.message || c?.summary || c?.name;
-      if (msg) checks.push(String(msg).slice(0, 300));
-    });
-  } else if (src && typeof src === 'object') {
-    for (const k of Object.keys(src)) {
-      const c = src[k];
-      const msg = c?.summary?.message || c?.message || c?.summary || k;
-      if (msg) checks.push(String(msg).slice(0, 300));
-    }
-  }
-  const osdmap = statusData.osdmap?.osdmap || statusData.osdmap || {};
-  const osd = {
-    total: numAny(osdmap.num_osds, osdmap.num_osd, osdmap.osd_count),
-    up: numAny(osdmap.num_up_osds, osdmap.num_up_osd, osdmap.up),
-    in: numAny(osdmap.num_in_osds, osdmap.num_in_osd, osdmap.in),
-  };
-  const stats = dfData?.stats || statusData.pgmap || {};
-  const totalBytes = numAny(stats.total_bytes, stats.bytes_total, statusData.pgmap?.bytes_total);
-  const usedBytes = numAny(stats.total_used_bytes, stats.bytes_used, statusData.pgmap?.bytes_used);
-  const availBytes = numAny(stats.total_avail_bytes, stats.bytes_avail, statusData.pgmap?.bytes_avail);
-  const usage = totalBytes ? {
-    totalBytes,
-    usedBytes: usedBytes || 0,
-    availBytes: availBytes ?? Math.max(0, totalBytes - (usedBytes || 0)),
-    percent: Math.round(((usedBytes || 0) / totalBytes) * 1000) / 10,
-  } : null;
-  return { health: status, checks, osd, usage };
 }
 
 function tempHistoryKey(label) {
