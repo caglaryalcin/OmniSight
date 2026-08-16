@@ -695,17 +695,92 @@ function layoutNodes(nodes, viewportWidth, viewportHeight){
     });
   });
   packProxmoxClusters(nodes, width);
-  nodes.forEach(n => {
-    const pos = topologyPositions[n.ref];
-    if(pos && Number.isFinite(pos.x)) n.x = pos.x;
-    if(pos && Number.isFinite(pos.y)) n.y = pos.y;
-  });
-  packProxmoxClusters(nodes, width, true);
+  applySavedTopologyPositions(nodes);
   return {width,height};
 }
-function packProxmoxClusters(nodes, width, compactSaved = false){
+function hypervisorFamily(node){
+  const ref = String(node?.ref || '');
+  if(/^proxmox-(?:cluster|host|guest):/.test(ref)) return 'proxmox';
+  if(/^vmware-(?:endpoint|cluster|host|guest):/.test(ref)) return 'vmware';
+  return '';
+}
+function hypervisorTreeRoot(node, byId){
+  const family = hypervisorFamily(node);
+  if(!family) return node;
+  let root = node;
+  const seen = new Set();
+  while(root?.parent && byId.has(root.parent) && !seen.has(root.id)){
+    seen.add(root.id);
+    const parent = byId.get(root.parent);
+    if(hypervisorFamily(parent) !== family) break;
+    root = parent;
+  }
+  return root;
+}
+function hypervisorTreeNodes(nodes, node){
+  const family = hypervisorFamily(node);
+  if(!family) return [node];
+  const byId = new Map(nodes.map(item => [item.id, item]));
+  const root = hypervisorTreeRoot(node, byId);
+  return nodes.filter(item => hypervisorFamily(item) === family && hypervisorTreeRoot(item, byId)?.id === root?.id);
+}
+function centerHypervisorParents(nodes){
+  const childrenByParent = new Map();
+  nodes.forEach(node => {
+    if(!node.parent) return;
+    if(!childrenByParent.has(node.parent)) childrenByParent.set(node.parent, []);
+    childrenByParent.get(node.parent).push(node);
+  });
+  const descendants = parent => {
+    const out = [];
+    const pending = [...(childrenByParent.get(parent.id) || [])];
+    while(pending.length){
+      const child = pending.shift();
+      out.push(child);
+      pending.push(...(childrenByParent.get(child.id) || []));
+    }
+    return out;
+  };
+  nodes
+    .filter(node => hypervisorFamily(node) && (node.kind === 'cluster' || /^vmware-endpoint:/.test(String(node.ref || ''))))
+    .sort((a,b) => b.level - a.level)
+    .forEach(parent => {
+      const branch = descendants(parent);
+      if(!branch.length) return;
+      parent.x = Math.round((Math.min(...branch.map(node => node.x)) + Math.max(...branch.map(node => node.x))) / 2);
+    });
+}
+function applySavedTopologyPositions(nodes){
+  const byId = new Map(nodes.map(node => [node.id, node]));
+  const groups = new Map();
+  const groupedRefs = new Set();
+  nodes.forEach(node => {
+    if(!hypervisorFamily(node)) return;
+    const root = hypervisorTreeRoot(node, byId);
+    if(!root) return;
+    if(!groups.has(root.ref)) groups.set(root.ref, { root, nodes: [] });
+    groups.get(root.ref).nodes.push(node);
+    groupedRefs.add(node.ref);
+  });
+  groups.forEach(group => {
+    const savedRoot = topologyPositions[group.root.ref];
+    const dx = savedRoot && Number.isFinite(savedRoot.x) ? savedRoot.x - group.root.x : 0;
+    const dy = savedRoot && Number.isFinite(savedRoot.y) ? savedRoot.y - group.root.y : 0;
+    group.nodes.forEach(node => {
+      node.x += dx;
+      node.y += dy;
+    });
+  });
+  nodes.forEach(node => {
+    if(groupedRefs.has(node.ref)) return;
+    const pos = topologyPositions[node.ref];
+    if(pos && Number.isFinite(pos.x)) node.x = pos.x;
+    if(pos && Number.isFinite(pos.y)) node.y = pos.y;
+  });
+}
+function packProxmoxClusters(nodes, width){
   const hosts = nodes.filter(n => /^(?:proxmox|vmware)-host:/.test(String(n.ref || ''))).sort((a,b)=>a.x-b.x);
-  if(hosts.length < 2) return;
+  if(!hosts.length) return;
   const childGap = 154;
   const clusterGap = 18;
   const clusters = hosts.map(host => {
@@ -716,17 +791,13 @@ function packProxmoxClusters(nodes, width, compactSaved = false){
     return { host, children, width };
   });
   const totalWidth = clusters.reduce((sum,c)=>sum+c.width,0) + clusterGap * (clusters.length - 1);
-  const all = clusters.flatMap(c => [c.host, ...c.children]);
-  const currentCenter = compactSaved && all.length
-    ? (Math.min(...all.map(n => n.x)) + Math.max(...all.map(n => n.x))) / 2
-    : width / 2;
-  let left = Math.max(90, Math.round(currentCenter - totalWidth / 2));
+  let left = Math.max(90, Math.round((width - totalWidth) / 2));
   clusters.forEach(cluster => {
     const center = Math.round(left + cluster.width / 2);
     cluster.host.x = center;
     const children = cluster.children;
     if(children.length) {
-      const start = center - ((children.length - 1) * childGap) / 2;
+      const start = cluster.host.x - ((children.length - 1) * childGap) / 2;
       children.forEach((child, i) => {
         child.x = Math.round(start + i * childGap);
         child.y = Math.round(cluster.host.y + proxmoxVmGap());
@@ -734,6 +805,7 @@ function packProxmoxClusters(nodes, width, compactSaved = false){
     }
     left += cluster.width + clusterGap;
   });
+  centerHypervisorParents(nodes);
 }
 function edgePath(a,b){
   if(Math.abs(a.y - b.y) < 10){
@@ -831,7 +903,7 @@ function linkableNodes(){
   const merged = [...currentNodes, ...topologyCandidates];
   const seen = new Set();
   return merged
-    .filter(n => ['platform','host','guest'].includes(n.kind))
+    .filter(n => ['platform','cluster','host','guest'].includes(n.kind))
     .filter(n => {
       if(seen.has(n.ref)) return false;
       seen.add(n.ref);
@@ -846,7 +918,7 @@ function nodeTitle(ref){
   return n ? `${n.label}${n.meta ? ` (${n.meta})` : ''}` : ref;
 }
 function nodeKindLabel(kind){
-  return kind === 'guest' ? 'VM/LXC' : kind === 'platform' ? 'Platform' : 'Host';
+  return kind === 'guest' ? 'VM/LXC' : kind === 'platform' ? 'Platform' : kind === 'cluster' ? 'Cluster' : 'Host';
 }
 function updateLinkPanel(){
   const nodeAdd = document.getElementById('node-add');
@@ -977,7 +1049,7 @@ async function removeTopologyNode(index){
 }
 function canRemoveTopologyRef(ref){
   const node = currentNodes.find(n => n.ref === ref);
-  return !!node && ['platform','host','guest'].includes(node.kind);
+  return !!node && ['platform','cluster','host','guest'].includes(node.kind);
 }
 async function removeTopologyNodeByRef(ref){
   if(!ref || !canRemoveTopologyRef(ref)) return;
@@ -1387,21 +1459,11 @@ function initTopologyControls(){
       maxY: (shell.clientHeight - 35 - topoView.y) / topoView.scale,
     };
   }
-  function isProxmoxTopologyNode(node){
-    return /^proxmox-(cluster|host|guest):/.test(String(node?.ref || ''));
-  }
-  function isVmwareTopologyNode(node){
-    return /^vmware-(endpoint|cluster|host|guest):/.test(String(node?.ref || ''));
-  }
   function nodeElementByRef(ref){
     return [...shell.querySelectorAll('.topo-node')].find(el => el.dataset.ref === ref) || null;
   }
   function dragItemsForNode(node){
-    const group = isProxmoxTopologyNode(node)
-      ? currentNodes.filter(isProxmoxTopologyNode)
-      : isVmwareTopologyNode(node)
-        ? currentNodes.filter(isVmwareTopologyNode)
-        : [node];
+    const group = hypervisorFamily(node) ? hypervisorTreeNodes(currentNodes, node) : [node];
     return group.map(item => ({
       ref: item.ref,
       startX: item.x,
@@ -1413,9 +1475,14 @@ function initTopologyControls(){
     const b = visibleNodeBounds();
     const xs = items.map(item => item.startX);
     const ys = items.map(item => item.startY);
+    const overflow = Math.max(180, 240 / topoView.scale);
+    const minDx = b.minX - Math.min(...xs) - overflow;
+    const maxDx = b.maxX - Math.max(...xs) + overflow;
+    const minDy = b.minY - Math.min(...ys) - overflow;
+    const maxDy = b.maxY - Math.max(...ys) + overflow;
     return {
-      dx: clamp(dx, b.minX - Math.min(...xs), b.maxX - Math.max(...xs)),
-      dy: clamp(dy, b.minY - Math.min(...ys), b.maxY - Math.max(...ys)),
+      dx: clamp(dx, Math.min(minDx, maxDx), Math.max(minDx, maxDx)),
+      dy: clamp(dy, Math.min(minDy, maxDy), Math.max(minDy, maxDy)),
     };
   }
   shell.addEventListener('wheel', e => {

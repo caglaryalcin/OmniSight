@@ -1,9 +1,12 @@
 node_modules
 npm-debug.log*
 .git
+.github
 .gitignore
+.gitattributes
 .env
 .env.local
+.env.example
 config.yaml
 data
 .fuse_hidden*
@@ -12,6 +15,16 @@ data
 Dockerfile
 LICENSE
 **/*.md
+# Repository screenshots and raster release assets are not used by the app.
+**/*.gif
+**/*.png
+**/*.jpg
+**/*.jpeg
+**/*.webp
+# Text files are not runtime content except the in-app documentation page.
+**/*.txt
+!public/docs/en.txt
+!public/docs/tr.txt
 config.example.yaml
 docker-compose.yml
 docker-stack.yml

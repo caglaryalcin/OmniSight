@@ -3826,10 +3826,13 @@ function renderAgentList(elId, list, emptyMsg) {
 async function removeAgent(id, btn) {
   const agent = (window._agentData || []).find(item => item.id === id);
   const pendingInstall = !!agent?.connecting;
+  const removeRecordOnly = !pendingInstall && agent?.online === false;
   const confirmed = await showConfirmModal({
-    title: pendingInstall ? 'Cancel pending installation' : 'Uninstall agent',
+    title: pendingInstall ? 'Cancel pending installation' : removeRecordOnly ? 'Remove offline agent record' : 'Uninstall agent',
     message: pendingInstall
       ? 'Remove this pending installation from the dashboard?'
+      : removeRecordOnly
+      ? 'This agent is offline, so OmniSight cannot uninstall it remotely. Remove only its dashboard record? If the agent is still installed, remove it on the system first.'
       : 'This removes the OmniSight agent service, files and configuration from the selected system, then removes the system from the dashboard. The cleanup runs non-interactively on the system even if the dashboard connection closes.',
     target: agent?.name || id,
     confirmLabel: 'Yes',
@@ -3837,7 +3840,7 @@ async function removeAgent(id, btn) {
   if (!confirmed) return;
   if (btn) btn.disabled = true;
   try {
-    const endpoint = pendingInstall ? '/api/agent/remove' : '/api/agent/uninstall';
+    const endpoint = pendingInstall || removeRecordOnly ? '/api/agent/remove' : '/api/agent/uninstall';
     const r = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ id }) });
     const b = await r.json();
     if (!r.ok) throw new Error(b.error || r.statusText);
@@ -3846,7 +3849,7 @@ async function removeAgent(id, btn) {
     applySettingsAgents(remaining);
     settingsAgentsLast = 0;
     await loadAgents();
-    toast(trText(pendingInstall ? 'Pending installation removed' : 'Agent uninstall scheduled'), 'ok');
+    toast(trText(pendingInstall ? 'Pending installation removed' : removeRecordOnly ? 'Agent record removed' : 'Agent uninstall scheduled'), 'ok');
   } catch (e) { toast(trText(e.message), 'err'); }
   if (btn) btn.disabled = false;
 }

@@ -22,8 +22,8 @@ using Microsoft.Win32;
 [assembly: AssemblyDescription("OmniSight Windows monitoring service")]
 [assembly: AssemblyCompany("OmniSight")]
 [assembly: AssemblyProduct("OmniSight Agent")]
-[assembly: AssemblyVersion("1.4.1.0")]
-[assembly: AssemblyFileVersion("1.4.1.0")]
+[assembly: AssemblyVersion("1.4.2.0")]
+[assembly: AssemblyFileVersion("1.4.2.0")]
 
 namespace OmniSight.Agent
 {
@@ -31,7 +31,7 @@ namespace OmniSight.Agent
     {
         internal const string ServiceName = "OmniSightAgent";
         internal const string DisplayName = "OmniSight Agent";
-        internal const string Version = "1.4.1";
+        internal const string Version = "1.4.2";
         internal static readonly string DataDirectory = ResolveDirectory("OMNISIGHT_AGENT_DATA_DIR", Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "OmniSight"));
         internal static readonly string ConfigPath = Path.Combine(DataDirectory, "agent.json");
         internal static readonly string AgentIdPath = Path.Combine(DataDirectory, "agent.id");
@@ -426,6 +426,11 @@ namespace OmniSight.Agent
                 string target = parts[3];
                 string output = ExecuteCommand(action, target);
                 SendResult(commandId, output);
+                if (action == "agent_uninstall" && target == "self" && output.StartsWith("uninstall scheduled", StringComparison.OrdinalIgnoreCase))
+                {
+                    stopEvent.Set();
+                    break;
+                }
             }
         }
 

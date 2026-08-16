@@ -62,7 +62,7 @@ http.createServer((req, res) => {
   while (-not (Test-Path -LiteralPath $reportPath) -and [DateTime]::UtcNow -lt $deadline) { Start-Sleep -Milliseconds 500 }
   if (-not (Test-Path -LiteralPath $reportPath)) { throw "Windows service did not send a report" }
   $report = Get-Content -LiteralPath $reportPath -Raw | ConvertFrom-Json
-  if ($report.id -ne "windows-service-ci" -or $report.platform -ne "windows" -or $report.agentVersion -ne "1.4.1") { throw "Windows service report identity is invalid" }
+  if ($report.id -ne "windows-service-ci" -or $report.platform -ne "windows" -or $report.agentVersion -ne "1.4.2") { throw "Windows service report identity is invalid" }
   if ($null -eq $report.cpu -or $null -eq $report.mem -or $null -eq $report.disk -or $null -eq $report.services) { throw "Windows service report is missing required metrics" }
   Write-Host "Windows service lifecycle and report test passed"
 } finally {

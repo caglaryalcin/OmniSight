@@ -10,9 +10,47 @@ on:
     branches: [main, master]
     paths-ignore:
       - '**.md'
+      - 'README*'
+      - 'docs/**'
+      - 'screenshots/**'
+      - '**/*.gif'
+      - '**/*.png'
+      - '**/*.jpg'
+      - '**/*.jpeg'
+      - '**/*.webp'
+      - 'deploy/**'
+      - '*.txt'
+      - 'LICENSE'
+      - '.gitignore'
+      - '.dockerignore'
+      - '.gitattributes'
+      - '.env.example'
+      - 'config.example.yaml'
+      - 'docker-compose.yml'
+      - 'docker-stack.yml'
+      - '.github/workflows/deploy.yml'
   pull_request:
     paths-ignore:
       - '**.md'
+      - 'README*'
+      - 'docs/**'
+      - 'screenshots/**'
+      - '**/*.gif'
+      - '**/*.png'
+      - '**/*.jpg'
+      - '**/*.jpeg'
+      - '**/*.webp'
+      - 'deploy/**'
+      - '*.txt'
+      - 'LICENSE'
+      - '.gitignore'
+      - '.dockerignore'
+      - '.gitattributes'
+      - '.env.example'
+      - 'config.example.yaml'
+      - 'docker-compose.yml'
+      - 'docker-stack.yml'
+      - '.github/workflows/deploy.yml'
 
 jobs:
   check:
@@ -62,5 +100,5 @@ jobs:
           & (Join-Path $framework 'csc.exe') /nologo /target:winexe /optimize+ /platform:anycpu "/out:$output" @references $source
           if ($LASTEXITCODE -ne 0 -or -not (Test-Path $output)) { exit 1 }
           $version = [Reflection.AssemblyName]::GetAssemblyName($output).Version.ToString(3)
-          if ($version -ne '1.4.1') { throw "Unexpected Windows agent version: $version" }
+          if ($version -ne '1.4.2') { throw "Unexpected Windows agent version: $version" }
           & scripts/ci-windows-agent.ps1 -ExecutablePath $output

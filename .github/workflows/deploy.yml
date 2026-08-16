@@ -9,11 +9,22 @@ on:
       - 'README*'
       - 'docs/**'
       - 'screenshots/**'
+      - '**/*.gif'
+      - '**/*.png'
+      - '**/*.jpg'
+      - '**/*.jpeg'
+      - '**/*.webp'
       - 'deploy/**'
+      - '*.txt'
       - 'LICENSE'
       - '.gitignore'
       - '.dockerignore'
+      - '.gitattributes'
+      - '.env.example'
       - 'config.example.yaml'
+      - 'docker-compose.yml'
+      - 'docker-stack.yml'
+      - '.github/workflows/ci.yml'
   workflow_dispatch:
 
 permissions:

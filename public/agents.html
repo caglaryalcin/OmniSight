@@ -253,7 +253,7 @@ function copyText(text, btn){
   navigator.clipboard?.writeText(text).then(()=>{ const o=btn.textContent; btn.textContent=t('Copied'); setTimeout(()=>btn.textContent=o,1200); });
 }
 const REMOTE_UNINSTALL_VERSION = '1.3.3';
-const LATEST_AGENT_VERSION = '1.4.1';
+const LATEST_AGENT_VERSION = '1.4.2';
 const demoUninstalledAgentIds = new Set();
 let uninstallAgentModalResolver = null;
 function showUninstallAgentModal(name){

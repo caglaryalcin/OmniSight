@@ -210,7 +210,7 @@ const demoUser = {
   twoFactorEnabled: false,
 };
 const demoSessions = new Map();
-const DEMO_PLATFORM_IDS = ['proxmox', 'vmware', 'kubernetes', 'linux', 'windows', 'synology', 'mikrotik', 'unifi', 'healthchecks', 'uptimekuma', 'checks', 'prometheus', 'docker', 'dockhand', 'firewall', 'truenas', 'qnap', 'ugreen', 'pbs', 'cloudflare', 'cicd', 'veeam', 'portainer', 'database'];
+const DEMO_PLATFORM_IDS = ['proxmox', 'vmware', 'kubernetes', 'linux', 'windows', 'synology', 'mikrotik', 'unifi', 'snmp', 'healthchecks', 'uptimekuma', 'checks', 'prometheus', 'docker', 'dockhand', 'firewall', 'truenas', 'qnap', 'ugreen', 'pbs', 'cloudflare', 'cicd', 'veeam', 'portainer', 'database'];
 const DEMO_OVERVIEW_COLLAPSED = Object.fromEntries(DEMO_PLATFORM_IDS.map(id => [id, true]));
 
 let demoTopology = {
@@ -595,6 +595,7 @@ function demoConfig() {
       { name: 'core-switch', host: '192.0.2.2', profile: 'mikrotik', method: 'snmp', community: 'public' },
       { name: 'demo-ap', host: '192.0.2.3', profile: 'unifi', method: 'snmp', community: 'public' },
       { name: 'demo-nas', host: '192.0.2.20', profile: 'synology', method: 'snmp', community: 'public' },
+      { name: 'edge-switch', host: '192.0.2.4', profile: 'generic', method: 'snmp', community: 'public' },
     ] }),
     healthchecks: platform('healthchecks', { url: 'https://healthchecks.example.invalid' }),
     uptimekuma: platform('uptimekuma', { url: 'https://kuma.example.invalid', historyHours: demoPrefs.uptimekuma.historyHours }),
@@ -651,7 +652,7 @@ function demoStatus() {
       ['proxmox', 'proxmox'], ['linux', 'linux'], ['windows', 'windows'],
       ['vmware', 'vmware'],
       ['kubernetes', 'kubernetes'], ['synology', 'snmp'], ['mikrotik', 'snmp'],
-      ['unifi', 'snmp'], ['healthchecks', 'healthchecks'], ['uptimekuma', 'uptimekuma'],
+      ['unifi', 'snmp'], ['snmp', 'snmp'], ['healthchecks', 'healthchecks'], ['uptimekuma', 'uptimekuma'],
       ['checks', 'checks'], ['prometheus', 'prometheus'], ['docker', 'docker'],
       ['dockhand', 'dockhand'], ['firewall', 'firewall'], ['truenas', 'truenas'],
       ['qnap', 'qnap'], ['ugreen', 'ugreen'], ['pbs', 'pbs'],
@@ -995,13 +996,16 @@ function demoStatus() {
   };
 
   const hSwitch = history(96, 9, 2, { rxBase: 3_600_000, txBase: 2_100_000, readBase: 20_000, writeBase: 12_000 });
+  const hGenericSnmp = history(96, 21, 5, { rxBase: 5_200_000, txBase: 3_100_000, readBase: 32_000, writeBase: 18_000 });
   const hUnifi = history(96, 13, 4, { rxBase: 2_600_000, txBase: 1_500_000, readBase: 8_000, writeBase: 5_000 });
   const hNas = history(96, 17, 4, { rxBase: 4_400_000, txBase: 2_700_000, readBase: 1_400_000, writeBase: 760_000 });
   const hSwitchNow = hSwitch[hSwitch.length - 1] || {};
+  const hGenericSnmpNow = hGenericSnmp[hGenericSnmp.length - 1] || {};
   const hUnifiNow = hUnifi[hUnifi.length - 1] || {};
   const hNasNow = hNas[hNas.length - 1] || {};
   data.snmp = [
     { name: 'core-switch', host: '192.0.2.2', online: true, profile: 'mikrotik', vendor: 'MikroTik', model: 'CRS', cpu: hSwitchNow.cpu || 9, ram: { percent: hSwitchNow.mem || 28, used: 0.3, total: 1 }, uptimeSeconds: uptimeSeconds(26, 8, 17), systemTemp: hSwitchNow.tempSystem || 42, metrics: { bandwidth: { rxBps: hSwitchNow.bandwidthRxBps || 3_200_000, txBps: hSwitchNow.bandwidthTxBps || 2_000_000 }, diskIO: { readBps: hSwitchNow.diskReadBps || 0, writeBps: hSwitchNow.diskWriteBps || 0 } }, history: hSwitch },
+    { name: 'edge-switch', host: '192.0.2.4', online: true, profile: 'generic', vendor: 'Cisco', model: 'CBS350-24T-4G', cpu: hGenericSnmpNow.cpu || 21, ram: { percent: hGenericSnmpNow.mem || 44, used: 0.44, total: 1 }, uptimeSeconds: uptimeSeconds(41, 3, 12), systemTemp: hGenericSnmpNow.tempSystem || 38, fanSpeeds: [{ label: 'Fan 1', value: 3180 }], metrics: { bandwidth: { rxBps: hGenericSnmpNow.bandwidthRxBps || 5_000_000, txBps: hGenericSnmpNow.bandwidthTxBps || 2_900_000 }, diskIO: { readBps: hGenericSnmpNow.diskReadBps || 0, writeBps: hGenericSnmpNow.diskWriteBps || 0 } }, history: hGenericSnmp },
     { name: 'demo-ap', host: '192.0.2.5', online: true, profile: 'unifi', vendor: 'Ubiquiti', model: 'UniFi U6 Pro', cpu: hUnifiNow.cpu || 13, ram: { percent: hUnifiNow.mem || 41, used: 0.42, total: 1 }, systemTemp: hUnifiNow.tempSystem || 39, fanSpeeds: [], metrics: { bandwidth: { rxBps: hUnifiNow.bandwidthRxBps || 2_400_000, txBps: hUnifiNow.bandwidthTxBps || 1_300_000 }, diskIO: { readBps: hUnifiNow.diskReadBps || 0, writeBps: hUnifiNow.diskWriteBps || 0 } }, history: hUnifi },
     { name: 'demo-ap-legacy', host: '192.0.2.9', online: true, profile: 'unifi', vendor: 'Ubiquiti', model: 'UniFi U6 Pro', cpu: hUnifiNow.cpu || 13, ram: { percent: hUnifiNow.mem || 41, used: 0.42, total: 1 }, systemTemp: hUnifiNow.tempSystem || 39, fanSpeeds: [], metrics: { bandwidth: { rxBps: hUnifiNow.bandwidthRxBps || 2_400_000, txBps: hUnifiNow.bandwidthTxBps || 1_300_000 }, diskIO: { readBps: hUnifiNow.diskReadBps || 0, writeBps: hUnifiNow.diskWriteBps || 0 } }, history: hUnifi },
     { name: 'demo-nas', host: '192.0.2.20', online: true, profile: 'synology', vendor: 'Synology', model: 'DS Demo', cpu: hNasNow.cpu || 17, ram: { percent: hNasNow.mem || 36, used: 5.8, total: 16 }, systemTemp: hNasNow.tempSystem || 45, metrics: { bandwidth: { rxBps: hNasNow.bandwidthRxBps || 4_200_000, txBps: hNasNow.bandwidthTxBps || 2_600_000 }, diskIO: { readBps: hNasNow.diskReadBps || 1_600_000, writeBps: hNasNow.diskWriteBps || 840_000 } }, history: hNas },
@@ -1498,8 +1502,22 @@ function topologyData() {
     topologyView: demoTopology.view,
     unifiTopology: buildUnifiTopology(d.unifi?.instances || [], d.snmp || []),
     proxmox: {
+      clusters: (d.proxmox.clusters || []).map(cluster => ({
+        name: cluster.name,
+        online: cluster.online !== false,
+        isCluster: !!cluster.isCluster,
+        quorate: typeof cluster.quorate === 'boolean' ? cluster.quorate : null,
+        nodesOnline: Number(cluster.nodesOnline) || 0,
+        totalNodes: Number(cluster.totalNodes) || 0,
+        members: (cluster.members || []).map(member => ({
+          name: member.name,
+          online: typeof member.online === 'boolean' ? member.online : null,
+          local: !!member.local,
+        })),
+      })),
       nodes: d.proxmox.nodes.map(n => ({
         name: n.name,
+        clusterName: n.clusterName || '',
         online: true,
         node: { name: n.name, online: true },
         vms: n.vms.map(v => ({ id: v.id, name: v.name, status: v.status, type: v.type, os: v.os })),
@@ -1605,7 +1623,7 @@ app.get('/api/settings/status', (req, res) => res.json(demoStatus()));
 const demoRemovedAgentIds = new Set();
 function demoAgentRows() {
   return [
-    { id: 'demo-agent', name: 'demo-linux-01', ip: '192.0.2.50', online: true, agentVersion: '1.4.1', updateAvailable: false, platform: 'linux', role: 'linux' },
+    { id: 'demo-agent', name: 'demo-linux-01', ip: '192.0.2.50', online: true, agentVersion: '1.4.2', updateAvailable: false, platform: 'linux', role: 'linux' },
     { id: 'demo-offline', name: 'demo-offline-01', ip: '192.0.2.51', online: false, agentVersion: '1.1.0', lastSeen: Date.now() - 3600_000, platform: 'linux', role: 'linux' },
   ].filter(agent => !demoRemovedAgentIds.has(agent.id));
 }
@@ -1618,7 +1636,7 @@ app.get('/api/settings/agents', (req, res) => res.json({ agents: demoAgentRows()
   online: agent.online,
   agentVersion: agent.agentVersion,
 })) }));
-app.get('/api/agents', (req, res) => res.json({ latestVersion: '1.4.1', agents: demoAgentRows() }));
+app.get('/api/agents', (req, res) => res.json({ latestVersion: '1.4.2', agents: demoAgentRows() }));
 app.post('/api/agent/uninstall', (req, res) => {
   demoRemovedAgentIds.add(String(req.body?.id || ''));
   res.json({ ok: true, demo: true, output: 'uninstall scheduled' });

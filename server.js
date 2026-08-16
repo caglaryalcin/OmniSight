@@ -8721,12 +8721,12 @@ app.post('/api/agent/uninstall', async (req, res) => {
       output = String(await agents.queueCommand(id, 'agent_uninstall', 'self') || '').trim();
     } catch (err) {
       if (!err.commandDelivered) throw err;
-      const current = agents.findAgent(agent.id);
-      if (Number(current?.lastSeen || 0) > Number(err.commandDeliveredAt || 0)) {
+      const current = agents.listAgents().find(item => item.id === agent.id);
+      if (current?.online) {
         auditEvent('agent.uninstall.failed', { id: agent.id, error: 'agent continued reporting after command delivery' }, req);
         return res.status(502).json({ error: 'The agent continued reporting after the uninstall command, so it was not removed.' });
       }
-      const ok = agents.removeAgent(agent.id);
+      const ok = agents.retireAgent(agent.id);
       refreshAgentCacheAfterRemoval();
       auditEvent('agent.uninstall.delivery_unconfirmed', { id: agent.id, version: agent.agentVersion, ok }, req);
       return res.status(202).json({
@@ -8740,7 +8740,7 @@ app.post('/api/agent/uninstall', async (req, res) => {
       auditEvent('agent.uninstall.failed', { id, output }, req);
       return res.status(502).json({ error: output || 'The agent could not schedule its uninstall.' });
     }
-    const ok = agents.removeAgent(agent.id);
+    const ok = agents.retireAgent(agent.id);
     refreshAgentCacheAfterRemoval();
     auditEvent('agent.uninstall.scheduled', { id: agent.id, version: agent.agentVersion, ok }, req);
     res.json({ ok, output, data: cache.data });
@@ -8788,6 +8788,7 @@ app.post('/api/agent/pending', (req, res) => {
 
 app.post('/api/agent/remove', (req, res) => {
   try {
+    if (sessionRole(req) !== 'admin') return res.status(403).json({ error: 'Forbidden' });
     const { id } = req.body || {};
     if (!id) return res.status(400).json({ error: 'id required' });
     const ok = agents.removeAgent(id);

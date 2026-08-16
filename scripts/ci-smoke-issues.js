@@ -3,6 +3,7 @@ const assert = require('assert');
 const { execFileSync } = require('child_process');
 const fs = require('fs');
 const http = require('http');
+const os = require('os');
 const path = require('path');
 const vm = require('vm');
 
@@ -581,7 +582,9 @@ function testStaticRegressions() {
   const packageJson = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
   const vmwareCollector = fs.readFileSync(path.join(root, 'src', 'vmware.js'), 'utf8');
   const server = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
+  const ci = fs.readFileSync(path.join(root, '.github', 'workflows', 'ci.yml'), 'utf8');
   const deploy = fs.readFileSync(path.join(root, '.github', 'workflows', 'deploy.yml'), 'utf8');
+  const dockerIgnore = fs.readFileSync(path.join(root, '.dockerignore'), 'utf8');
   const docker = fs.readFileSync(path.join(root, 'src', 'docker.js'), 'utf8');
   const snmp = fs.readFileSync(path.join(root, 'src', 'snmp.js'), 'utf8');
   assert.ok(!windowsAgent.includes('Get-Counter') && !windowsService.includes('Get-Counter'), 'localized Windows counters must not return');
@@ -610,7 +613,7 @@ function testStaticRegressions() {
   const windowsServiceVersion = (windowsService.match(/internal const string Version = "([^"]+)"/) || [])[1];
   assert.strictEqual(linuxAgentVersion, windowsAgentVersion, 'Linux and Windows agent versions must stay synchronized');
   assert.strictEqual(linuxAgentVersion, windowsServiceVersion, 'Linux and Windows service agent versions must stay synchronized');
-  assert.strictEqual(linuxAgentVersion, '1.4.1', 'cluster-aware agents must advertise the 1.4.1 protocol');
+  assert.strictEqual(linuxAgentVersion, '1.4.2', 'agents must advertise the uninstall-safe 1.4.2 protocol');
   assert.ok(server.includes("const WINDOWS_SERVICE_AGENT_VERSION = '1.4.0'") && server.includes('versionCompare(agent.agentVersion, WINDOWS_SERVICE_AGENT_VERSION) < 0'), 'legacy Windows agents must receive a one-time service migration command instead of a remote update that can stop the scheduled task');
   assert.ok(windowsInstaller.includes('New-Service -Name $script:ServiceName') && windowsInstaller.includes('failureflag') && !windowsInstaller.includes('Register-ScheduledTask'), 'Windows installs must use Service Control Manager rather than a persistent scheduled task');
   assert.ok(windowsInstaller.includes('Repair-AgentDataAccess') && windowsInstaller.includes('Protect-AgentDataAcl') && windowsInstaller.lastIndexOf('    Protect-AgentDataAcl') < windowsInstaller.lastIndexOf('    Start-OmniSightService'), 'Windows agent ACL hardening must be recoverable and complete before the service starts writing logs');
@@ -620,6 +623,7 @@ function testStaticRegressions() {
   assert.ok(windowsInstaller.includes('Stop-ScheduledTask -TaskName $script:TaskName') && windowsService.includes('class LegacyTaskCleanup') && windowsService.includes('/End /TN') && windowsService.includes('/Delete /TN'), 'a successful Windows service migration must stop and remove every running legacy scheduled-task instance');
   assert.ok(windowsService.includes('service start failed:') && windowsService.includes('OmniSightAgent-startup.log') && windowsInstaller.includes('Windows service installation failed:') && windowsInstaller.includes('Agent log:') && windowsInstaller.includes('Startup diagnostic:'), 'Windows service startup failures must include actionable primary and fallback diagnostics');
   assert.ok(windowsService.includes('ScheduleHelper("--update-helper"') && windowsService.includes('ScheduleHelper("--uninstall-helper"') && windowsService.includes('RunUninstall()'), 'the Windows service must update and uninstall through detached native helpers');
+  assert.ok(windowsService.includes('output.StartsWith("uninstall scheduled"') && windowsService.includes('stopEvent.Set();'), 'the Windows service must stop reporting after acknowledging a scheduled uninstall');
   assert.ok(server.includes("app.get('/agent/OmniSight.Agent.cs'") && windowsInstaller.includes('/agent/OmniSight.Agent.cs'), 'the dashboard must distribute the Windows service source used by the installer');
   assert.ok(agentStore.includes("'agent_uninstall'") && server.includes("agents.queueCommand(id, 'agent_uninstall', 'self')"), 'remote uninstall must use one agent command');
   assert.ok(linuxAgent.includes('schedule_agent_uninstall()') && linuxAgent.includes('systemd-run --quiet --collect') && linuxAgent.includes('docker rm -f') && linuxAgent.includes("printf 'uninstall scheduled'"), 'Linux remote uninstall must schedule independent systemd and Docker cleanup');
@@ -629,9 +633,10 @@ function testStaticRegressions() {
   assert.ok(windowsAgent.includes('if ($script:UninstallAfterCommand)') && windowsAgent.includes('Start-Sleep -Seconds 120'), 'the legacy Windows agent must stop reporting while detached cleanup completes');
   const uninstallEndpoint = server.slice(server.indexOf("app.post('/api/agent/uninstall'"), server.indexOf("app.post('/api/agent/token'"));
   assert.ok(uninstallEndpoint.includes("versionCompare(agent.agentVersion, REMOTE_AGENT_UNINSTALL_VERSION) < 0") && uninstallEndpoint.includes('if (!live?.online)'), 'remote uninstall must require a current online agent');
-  assert.ok(uninstallEndpoint.indexOf("agents.queueCommand(id, 'agent_uninstall', 'self')") < uninstallEndpoint.indexOf('agents.removeAgent(agent.id)'), 'the dashboard record must be removed only after the agent schedules cleanup');
+  assert.ok(uninstallEndpoint.indexOf("agents.queueCommand(id, 'agent_uninstall', 'self')") < uninstallEndpoint.indexOf('agents.retireAgent(agent.id)'), 'the dashboard record must be retired only after the agent schedules cleanup');
+  assert.ok(agentStore.includes('UNINSTALL_REPORT_SUPPRESSION_MS') && agentStore.includes("throw new Error('agent uninstall is in progress')") && agentStore.includes('function retireAgent(id)'), 'a final Windows service report must not recreate a retired dashboard agent');
   assert.ok(agentStore.includes('waiter.delivered = true') && agentStore.includes('error.commandDelivered = waiter.delivered') && agentStore.includes('error.commandDeliveredAt = waiter.deliveredAt') && uninstallEndpoint.includes('agent.uninstall.delivery_unconfirmed'), 'a dropped result connection must still finish a delivered uninstall without leaving a stale dashboard record');
-  assert.ok(uninstallEndpoint.includes("current?.lastSeen") && uninstallEndpoint.includes('agent continued reporting after command delivery'), 'an agent that keeps reporting after a failed uninstall must not be removed by the timeout fallback');
+  assert.ok(uninstallEndpoint.includes('const current = agents.listAgents()') && uninstallEndpoint.includes('if (current?.online)') && uninstallEndpoint.includes('agent continued reporting after command delivery'), 'a final shutdown report may expire, but an agent that remains online after uninstall delivery must not be removed');
   for (const manager of ['dnf', 'yum', 'zypper', 'apk', 'pacman']) {
     assert.ok(linuxAgent.includes(`output=$(${manager}`), `${manager} update output must be captured before it is counted`);
     assert.ok(!linuxAgent.includes(`count=$(${manager}`), `${manager} failures must not be converted to zero updates by a pipeline`);
@@ -731,9 +736,12 @@ function testStaticRegressions() {
   assert.ok(proxmoxOverviewSource.includes('pve-cluster-status') && proxmoxOverviewSource.includes('clusterQuorumLost') && proxmoxOverviewSource.includes('Cluster quorum lost'), 'Proxmox details must show detected cluster membership and surface quorum loss');
   assert.ok(proxmoxOverviewSource.includes('body: cephHtml + clusterHtml + nodesHtml'), 'Proxmox details must be ordered Ceph health, cluster, then hosts');
   assert.ok(topology.includes('proxmox-cluster:') && topology.includes('clusterNodeIds.set(clusterName, clusterId)') && topology.includes("clusterNodeIds.get(n.clusterName || '')"), 'Proxmox topology must group hosts under their detected cluster');
+  assert.ok(topology.includes("['platform','cluster','host','guest'].includes(node.kind)") && topology.includes("['platform','cluster','host','guest'].includes(n.kind)") && topology.includes("kind === 'cluster' ? 'Cluster'"), 'automatically discovered cluster nodes must be removable and available to add back to topology');
+  assert.ok(topology.includes('function hypervisorTreeNodes(nodes, node){') && topology.includes('const group = hypervisorFamily(node) ? hypervisorTreeNodes(currentNodes, node) : [node];') && topology.includes('centerHypervisorParents(nodes);') && topology.includes('applySavedTopologyPositions(nodes);'), 'hypervisor topology must use a centered family-tree layout and move each cluster hierarchy as one group');
+  assert.ok(topology.includes('Math.min(minDx, maxDx)') && topology.includes('Math.max(minDx, maxDx)'), 'wide topology groups must remain horizontally draggable when they exceed the visible viewport');
   assert.ok(server.includes('px:cluster:${name}:quorum') && server.includes('quorumLost.length > 0'), 'cluster quorum loss must enter alerts and public health');
   assert.ok(linuxAgent.includes('pvesh get /cluster/status --output-format json') && linuxAgent.includes('\"clusterStatus\"'), 'Proxmox agents must report cluster identity, membership and quorum');
-  assert.ok(demoServer.includes("name: 'demo-cluster'") && docsEnglish.includes('real Proxmox cluster name, member nodes and quorum state'), 'demo data and documentation must cover automatic Proxmox cluster detection');
+  assert.ok(demoServer.includes("name: 'demo-cluster'") && demoServer.includes('clusters: (d.proxmox.clusters || []).map') && demoServer.includes("clusterName: n.clusterName || ''") && docsEnglish.includes('real Proxmox cluster name, member nodes and quorum state'), 'demo topology data and documentation must cover automatic Proxmox cluster detection');
   assert.ok(proxmoxOverviewSource.includes('ceph-osd-metrics') && proxmoxOverviewSource.includes('OSDs Up') && proxmoxOverviewSource.includes('Total OSDs'), 'Ceph health must show separate Proxmox-style OSD counters');
   assert.ok(proxmoxOverviewSource.includes('latency.averageMs') && proxmoxOverviewSource.includes('AVG Latency') && proxmoxOverviewSource.includes('MON Quorum Status'), 'Ceph health must show average OSD latency and MON quorum status');
   assert.ok(proxmoxOverviewSource.includes("value < 1 ? '&lt;1 ms'"), 'sub-millisecond Ceph latency must be displayed as less than one millisecond');
@@ -854,9 +862,10 @@ function testStaticRegressions() {
   assert.ok(server.includes("agentVersion: agent.agentVersion || ''") && server.includes('role: agentInstallRole(agent)'), 'repair command responses must include the selected agent version and role');
   assert.ok(agentsPage.includes("${t('Check / repair')}") && agentsPage.includes("t('Run on affected host')"), 'offline agent action must direct users to check before repairing');
   assert.ok(agentsPage.includes('showUninstallAgentModal') && agentsPage.includes("closeUninstallAgentModal(true)") && agentsPage.includes("fetch('/api/agent/uninstall'"), 'Agents must provide an explicit Yes-confirmed uninstall action');
-  assert.ok(settings.includes("const endpoint = pendingInstall ? '/api/agent/remove' : '/api/agent/uninstall'") && settings.includes("confirmLabel: 'Yes'"), 'Settings agent removal must remotely uninstall installed agents while retaining pending-install cancellation');
+  assert.ok(settings.includes("const endpoint = pendingInstall || removeRecordOnly ? '/api/agent/remove' : '/api/agent/uninstall'") && settings.includes("const removeRecordOnly = !pendingInstall && agent?.online === false") && settings.includes("confirmLabel: 'Yes'"), 'Settings must remotely uninstall online agents and safely remove stale offline records or pending installs');
   assert.ok(docsEnglish.includes('### Remote Uninstall') && docsTurkish.includes('### Uzaktan Kaldırma') && docsEnglish.includes('independent local helper'), 'both documentation languages must explain connection-independent remote uninstall');
-  assert.ok(demoServer.includes("app.post('/api/agent/uninstall'") && demoServer.includes("latestVersion: '1.4.1'"), 'the demo must mirror remote uninstall and current agent protocol behavior');
+  assert.ok(demoServer.includes("app.post('/api/agent/uninstall'") && demoServer.includes("latestVersion: '1.4.2'"), 'the demo must mirror remote uninstall and current agent protocol behavior');
+  assert.ok(demoServer.includes("{ name: 'edge-switch', host: '192.0.2.4', profile: 'generic'") && demoServer.includes("['unifi', 'snmp'], ['snmp', 'snmp']") && demoServer.includes("'unifi', 'snmp', 'healthchecks'"), 'the demo dashboard must include a visible generic SNMP platform card');
   const i18nContext = { window: {} };
   vm.createContext(i18nContext);
   vm.runInContext(i18n, i18nContext);
@@ -910,6 +919,14 @@ function testStaticRegressions() {
   assert.ok(demoServer.includes("'/docs': '/docs.html'") && demoServer.includes('__OMNISIGHT_EMBED_VERSIONS_JSON__') && !demoServer.includes("app.get('/docs.md'"), 'demo documentation must use an injected content version without a Markdown route');
   assert.ok(server.includes('Number.isFinite(requested) && requested > 0'), 'invalid history point requests must use the safe dashboard default');
   assert.match(deploy, /linux\/amd64,linux\/arm64/);
+  assert.strictEqual((ci.match(/screenshots\/\*\*/g) || []).length, 2, 'README screenshots and media-only pushes must skip both CI push and pull-request runs');
+  for (const pattern of ['**/*.gif', '**/*.png', '**/*.jpg', '**/*.jpeg', '**/*.webp']) {
+    assert.strictEqual((ci.match(new RegExp(pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || []).length, 2, `${pattern} must be ignored by CI push and pull-request runs`);
+    assert.ok(deploy.includes(`'${pattern}'`), `${pattern} must not publish a Docker image`);
+    assert.ok(dockerIgnore.includes(pattern), `${pattern} must not enter the Docker build context`);
+  }
+  assert.ok(deploy.includes("'screenshots/**'") && deploy.includes("'.github/workflows/ci.yml'"), 'non-runtime media and CI-only workflow changes must not publish a Docker image');
+  assert.ok(ci.includes("if ($version -ne '1.4.2')") && dockerIgnore.includes('**/*.txt') && dockerIgnore.includes('!public/docs/en.txt') && dockerIgnore.includes('!public/docs/tr.txt'), 'CI must validate agent 1.4.2 while Docker keeps only runtime documentation text files');
   assert.ok(docker.includes("reqJson(host, '/info')") && docker.includes("info --format '{{.MemTotal}}'"), 'Docker collectors must read host memory totals');
   assert.ok(fs.existsSync(path.join(root, 'src', 'unifi.js')));
   assert.ok(snmp.includes('session.subtree(oid, 20'), 'SNMP reads must stop at the requested OID subtree');
@@ -937,6 +954,36 @@ function testStaticRegressions() {
   assert.ok((settings.match(/class="btn-sm platform-add"/g) || []).length >= 5, 'non-standard platform add buttons must participate in the lock');
 }
 
+function testAgentRetirement() {
+  const root = path.join(__dirname, '..');
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'omnisight-agent-retire-'));
+  const agentsPath = path.join(tempDir, 'agents.yaml');
+  const script = `
+    const assert = require('assert');
+    const fs = require('fs');
+    const yaml = require('js-yaml');
+    const agents = require(${JSON.stringify(path.join(__dirname, '..', 'src', 'agents.js'))});
+    const report = { id: 'retire-test', hostname: 'retire-test', platform: 'windows', role: 'windows', agentVersion: '1.4.1', interval: 15 };
+    agents.handleReport(report);
+    assert.ok(agents.findAgent('retire-test'));
+    assert.strictEqual(agents.retireAgent('retire-test'), true);
+    assert.strictEqual(agents.findAgent('retire-test'), null);
+    assert.throws(() => agents.handleReport(report), /uninstall is in progress/);
+    const saved = yaml.load(fs.readFileSync(process.env.OMNISIGHT_AGENTS_PATH, 'utf8')) || {};
+    assert.strictEqual(saved['retire-test'], undefined);
+  `;
+  try {
+    execFileSync(process.execPath, ['-e', script], {
+      cwd: root,
+      env: { ...process.env, OMNISIGHT_AGENTS_PATH: agentsPath },
+      stdio: 'pipe',
+    });
+  } finally {
+    try { fs.unlinkSync(agentsPath); } catch {}
+    try { fs.rmdirSync(tempDir); } catch {}
+  }
+}
+
 async function run() {
   await testQnap();
   await testPbs();
@@ -951,6 +998,7 @@ async function run() {
   testLatestStableVersion();
   testFullBackupEmptyFileCompatibility();
   testPlatformAvailability();
+  testAgentRetirement();
   testStaticRegressions();
   console.log('smoke ok — issue regressions: #4 #5 #6 #7 #9 #10 #12 #18 #20 #22 #23 #24 #25');
 }

@@ -6,10 +6,13 @@ const { loadHistoryMap, scheduleSaveHistoryMap, cancelHistorySaves } = require('
 const { normalizeCephStatus } = require('./ceph');
 const { normalizeClusterStatus } = require('./proxmox');
 
-const AGENTS_PATH = path.join(__dirname, '..', 'data', 'agents.yaml');
+const AGENTS_PATH = process.env.OMNISIGHT_AGENTS_PATH
+  ? path.resolve(process.env.OMNISIGHT_AGENTS_PATH)
+  : path.join(__dirname, '..', 'data', 'agents.yaml');
 const HISTORY_MAX = 5760;
 const CMD_TIMEOUT = 60000;
 const INSTALL_PENDING_TTL = 5 * 60 * 1000;
+const UNINSTALL_REPORT_SUPPRESSION_MS = Math.max(60000, Number(process.env.OMNISIGHT_AGENT_UNINSTALL_SUPPRESSION_MS) || 10 * 60 * 1000);
 const SVC_NAME = /^[a-zA-Z0-9@._:-]+$/;
 const STARTUP_CONNECTING_MS = Math.max(30000, Number(process.env.OMNISIGHT_AGENT_STARTUP_CONNECTING_MS || 90000));
 
@@ -19,6 +22,7 @@ const pending = new Map();
 const pendingInstalls = new Map();
 const waiters = new Map();
 const pollWaiters = new Map();
+const retiringAgents = new Map();
 
 let saveTimer = null;
 let saveDelay = 2000;
@@ -67,6 +71,7 @@ function reload() {
   pending.clear();
   pendingInstalls.clear();
   pollWaiters.clear();
+  retiringAgents.clear();
   rejectWaiters('agent registry reloaded');
   history = loadHistoryMap('agent-history', HISTORY_MAX);
   loadAgents();
@@ -241,9 +246,17 @@ function listPendingInstalls() {
   return [...pendingInstalls.values()];
 }
 
+function cleanupRetiringAgents(now = Date.now()) {
+  for (const [id, expiresAt] of retiringAgents) {
+    if (expiresAt <= now) retiringAgents.delete(id);
+  }
+}
+
 function handleReport(r) {
   const id = String(r.id || r.hostname || '').replace(/[^\w.-]/g, '').slice(0, 128);
   if (!id) throw new Error('missing agent id');
+  cleanupRetiringAgents();
+  if (retiringAgents.has(id)) throw new Error('agent uninstall is in progress');
   const hostname = String(r.hostname || id).slice(0, 128);
 
   const services = Array.isArray(r.services) ? r.services.slice(0, 500).map(s => ({
@@ -913,4 +926,13 @@ function removeAgent(id) {
   return true;
 }
 
-module.exports = { handleReport, getAllAgentData, getWindowsData, getDockerData, getProxmoxData, hasPve, hasDocker, hasLinux, hasWindows, queueCommand, takeCommands, waitForCommands, handleResult, removeAgent, findAgent, listAgents, commandLines, addPendingInstall, listPendingInstalls, setSaveDelay, flushSaves, reload, revision };
+function retireAgent(id) {
+  const a = findAgent(id);
+  if (!a) return false;
+  retiringAgents.set(a.id, Date.now() + UNINSTALL_REPORT_SUPPRESSION_MS);
+  const ok = removeAgent(a.id);
+  if (ok) flushSaves();
+  return ok;
+}
+
+module.exports = { handleReport, getAllAgentData, getWindowsData, getDockerData, getProxmoxData, hasPve, hasDocker, hasLinux, hasWindows, queueCommand, takeCommands, waitForCommands, handleResult, removeAgent, retireAgent, findAgent, listAgents, commandLines, addPendingInstall, listPendingInstalls, setSaveDelay, flushSaves, reload, revision };
