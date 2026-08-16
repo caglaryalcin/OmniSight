@@ -210,7 +210,7 @@ const demoUser = {
   twoFactorEnabled: false,
 };
 const demoSessions = new Map();
-const DEMO_PLATFORM_IDS = ['proxmox', 'kubernetes', 'linux', 'windows', 'synology', 'mikrotik', 'unifi', 'healthchecks', 'uptimekuma', 'checks', 'prometheus', 'docker', 'dockhand', 'firewall', 'truenas', 'qnap', 'ugreen', 'pbs', 'cloudflare', 'cicd', 'veeam', 'portainer', 'database'];
+const DEMO_PLATFORM_IDS = ['proxmox', 'vmware', 'kubernetes', 'linux', 'windows', 'synology', 'mikrotik', 'unifi', 'healthchecks', 'uptimekuma', 'checks', 'prometheus', 'docker', 'dockhand', 'firewall', 'truenas', 'qnap', 'ugreen', 'pbs', 'cloudflare', 'cicd', 'veeam', 'portainer', 'database'];
 const DEMO_OVERVIEW_COLLAPSED = Object.fromEntries(DEMO_PLATFORM_IDS.map(id => [id, true]));
 
 let demoTopology = {
@@ -308,7 +308,7 @@ function demoConfigFlag(value, fallback = false) {
 }
 
 const DEMO_PLATFORM_CONFIG_KEYS = [
-  'proxmox', 'linux', 'windows', 'kubernetes', 'snmp', 'healthchecks',
+  'proxmox', 'vmware', 'linux', 'windows', 'kubernetes', 'snmp', 'healthchecks',
   'uptimekuma', 'checks', 'prometheus', 'docker', 'dockhand', 'firewall',
   'truenas', 'qnap', 'ugreen', 'pbs', 'cloudflare', 'cicd', 'veeam',
   'portainer', 'database',
@@ -587,6 +587,7 @@ function demoConfig() {
     performance: { lowIoMode: true },
     security: { passwordResetEnabled: true },
     proxmox: platform('proxmox', { url: 'https://192.0.2.10:8006', tokenId: '__demo__', tokenSecret: '__demo__', tls: 'verify', sshMetrics: [] }),
+    vmware: platform('vmware', { instances: [{ name: 'vcenter-demo', url: 'https://vcenter.example.invalid', username: 'monitoring@vsphere.local', password: '__demo__', insecureTLS: false }] }),
     linux: platform('linux', { agentToken: '__demo_agent_token__' }),
     windows: platform('windows', { icon: 'windows' }),
     kubernetes: platform('kubernetes', { kubeconfig: '__demo_kubeconfig__' }),
@@ -648,6 +649,7 @@ function demoStatus() {
     publicStatus: cfg.publicStatus !== false,
     configured: [
       ['proxmox', 'proxmox'], ['linux', 'linux'], ['windows', 'windows'],
+      ['vmware', 'vmware'],
       ['kubernetes', 'kubernetes'], ['synology', 'snmp'], ['mikrotik', 'snmp'],
       ['unifi', 'snmp'], ['healthchecks', 'healthchecks'], ['uptimekuma', 'uptimekuma'],
       ['checks', 'checks'], ['prometheus', 'prometheus'], ['docker', 'docker'],
@@ -692,6 +694,24 @@ function demoStatus() {
       cpu: pxCpu,
       memPct: pxMem,
     },
+    clusters: [{
+      name: 'demo-cluster',
+      configuredName: 'Proxmox',
+      url: 'https://192.0.2.10:8006',
+      online: true,
+      isCluster: true,
+      detected: true,
+      quorate: true,
+      version: 9,
+      nodesOnline: 3,
+      totalNodes: 3,
+      localNode: 'px-demo-01',
+      members: [
+        { name: 'px-demo-01', online: true, local: true, nodeId: 1 },
+        { name: 'px-demo-02', online: true, local: false, nodeId: 2 },
+        { name: 'px-demo-03', online: true, local: false, nodeId: 3 },
+      ],
+    }],
     ceph: {
       health: 'HEALTH_OK',
       checks: [],
@@ -703,6 +723,7 @@ function demoStatus() {
     nodes: [
       {
         name: 'px-demo-01',
+        clusterName: 'demo-cluster',
         host: '192.0.2.10:8006',
         online: true,
         node: {
@@ -737,6 +758,7 @@ function demoStatus() {
       },
       {
         name: 'px-demo-02',
+        clusterName: 'demo-cluster',
         host: '192.0.2.11:8006',
         online: true,
         node: {
@@ -771,6 +793,7 @@ function demoStatus() {
       },
       {
         name: 'px-demo-03',
+        clusterName: 'demo-cluster',
         host: '192.0.2.12:8006',
         online: true,
         node: {
@@ -804,6 +827,68 @@ function demoStatus() {
         services: [],
       },
     ],
+  };
+
+  const vmwareHosts = [
+    {
+      id: 'host-21', name: 'esxi-demo-01', online: true, connectionState: 'connected', powerState: 'poweredon', maintenance: false, health: 'green',
+      clusterId: 'domain-c7', clusterName: 'production', cpuCores: 24, cpuThreads: 48, cpuSockets: 2,
+      cpuUsedMhz: 12800, cpuTotalMhz: 62400, cpuPercent: 20.5,
+      memoryUsedBytes: 70 * 1024 ** 3, memoryTotalBytes: 128 * 1024 ** 3, memoryPercent: 54.7,
+      uptimeSeconds: uptimeSeconds(34, 9, 20), version: '8.0.3', build: '24280767', productName: 'VMware ESXi 8.0.3', vmRefs: ['vm-101', 'vm-102', 'vm-103'], history: history(96, 20, 35),
+    },
+    {
+      id: 'host-22', name: 'esxi-demo-02', online: true, connectionState: 'connected', powerState: 'poweredon', maintenance: false, health: 'green',
+      clusterId: 'domain-c7', clusterName: 'production', cpuCores: 24, cpuThreads: 48, cpuSockets: 2,
+      cpuUsedMhz: 16400, cpuTotalMhz: 62400, cpuPercent: 26.3,
+      memoryUsedBytes: 82 * 1024 ** 3, memoryTotalBytes: 128 * 1024 ** 3, memoryPercent: 64.1,
+      uptimeSeconds: uptimeSeconds(33, 22, 8), version: '8.0.3', build: '24280767', productName: 'VMware ESXi 8.0.3', vmRefs: ['vm-201', 'vm-202'], history: history(96, 26, 38),
+    },
+  ];
+  const vmwareVms = [
+    { id: 'vm-101', name: 'erp-app-01', hostId: 'host-21', hostName: 'esxi-demo-01', clusterName: 'production', powerState: 'poweredon', running: true, health: 'green', cpuCount: 4, memoryMb: 8192, guestOs: 'Ubuntu Linux (64-bit)', ipAddress: '192.0.2.101', toolsStatus: 'guestToolsRunning', uptimeSeconds: uptimeSeconds(12, 4, 2) },
+    { id: 'vm-102', name: 'sql-prod-01', hostId: 'host-21', hostName: 'esxi-demo-01', clusterName: 'production', powerState: 'poweredon', running: true, health: 'green', cpuCount: 8, memoryMb: 32768, guestOs: 'Microsoft Windows Server 2022 (64-bit)', ipAddress: '192.0.2.102', toolsStatus: 'guestToolsRunning', uptimeSeconds: uptimeSeconds(28, 7, 14) },
+    { id: 'vm-103', name: 'legacy-test', hostId: 'host-21', hostName: 'esxi-demo-01', clusterName: 'production', powerState: 'poweredoff', running: false, health: 'gray', cpuCount: 2, memoryMb: 4096, guestOs: 'Debian GNU/Linux 12 (64-bit)', ipAddress: '', toolsStatus: 'guestToolsNotRunning', uptimeSeconds: 0 },
+    { id: 'vm-201', name: 'web-prod-01', hostId: 'host-22', hostName: 'esxi-demo-02', clusterName: 'production', powerState: 'poweredon', running: true, health: 'green', cpuCount: 4, memoryMb: 8192, guestOs: 'Ubuntu Linux (64-bit)', ipAddress: '192.0.2.111', toolsStatus: 'guestToolsRunning', uptimeSeconds: uptimeSeconds(19, 2, 45) },
+    { id: 'vm-202', name: 'monitoring-01', hostId: 'host-22', hostName: 'esxi-demo-02', clusterName: 'production', powerState: 'poweredon', running: true, health: 'green', cpuCount: 4, memoryMb: 12288, guestOs: 'Debian GNU/Linux 12 (64-bit)', ipAddress: '192.0.2.112', toolsStatus: 'guestToolsRunning', uptimeSeconds: uptimeSeconds(22, 11, 30) },
+  ];
+  [
+    [820, 3210, 3650, 58, 80],
+    [1680, 19420, 20900, 230, 320],
+    [0, 0, 0, 14, 24],
+    [610, 2860, 3180, 44, 64],
+    [740, 5220, 5790, 72, 96],
+  ].forEach(([cpuUsedMhz, guestMemoryMb, hostMemoryMb, storageCommittedGb, storageProvisionedGb], index) => Object.assign(vmwareVms[index], {
+    cpuUsedMhz,
+    guestMemoryMb,
+    hostMemoryMb,
+    storageCommittedBytes: storageCommittedGb * 1024 ** 3,
+    storageUncommittedBytes: (storageProvisionedGb - storageCommittedGb) * 1024 ** 3,
+    storageUnsharedBytes: storageCommittedGb * 1024 ** 3,
+    storageProvisionedBytes: storageProvisionedGb * 1024 ** 3,
+  }));
+  const vmwareDatastores = [
+    { id: 'datastore-31', name: 'vsanDatastore', type: 'vsan', url: 'ds:///vmfs/volumes/vsan:demo/', accessible: true, multipleHostAccess: true, health: 'green', capacityBytes: 12 * 1024 ** 4, usedBytes: 6.2 * 1024 ** 4, freeBytes: 5.8 * 1024 ** 4, usedPercent: 51.7, hostRefs: ['host-21', 'host-22'] },
+    { id: 'datastore-32', name: 'nfs-backup', type: 'NFS', url: 'netfs://192.0.2.25/backups', accessible: true, multipleHostAccess: true, health: 'green', capacityBytes: 8 * 1024 ** 4, usedBytes: 3.1 * 1024 ** 4, freeBytes: 4.9 * 1024 ** 4, usedPercent: 38.8, hostRefs: ['host-21', 'host-22'] },
+  ];
+  const vmwareSummary = {
+    instances: 1, up: 1, down: 0, datacenters: 1, clusters: 1, hosts: 2, hostsOnline: 2, hostsMaintenance: 0, hostsWarning: 0,
+    vms: 5, runningVms: 4, vmsWarning: 0, templates: 0, datastores: 2, datastoresWarning: 0,
+    cpuUsedMhz: 29200, cpuTotalMhz: 124800, cpuUsedCores: 11.2, cpuCores: 48, cpuPercent: 23.4,
+    memoryUsedBytes: 152 * 1024 ** 3, memoryTotalBytes: 256 * 1024 ** 3, memoryPercent: 59.4,
+    storageUsedBytes: 9.3 * 1024 ** 4, storageTotalBytes: 20 * 1024 ** 4, storagePercent: 46.5,
+  };
+  data.vmware = {
+    online: true,
+    summary: vmwareSummary,
+    instances: [{
+      name: 'vcenter-demo', type: 'vcenter', product: 'VMware vCenter Server 8.0.3', version: '8.0.3', build: '24305161', apiVersion: '8.0.3.0',
+      online: true, url: 'https://vcenter.example.invalid', error: '',
+      datacenters: [{ id: 'datacenter-2', name: 'Demo Datacenter', health: 'green' }],
+      clusters: [{ id: 'domain-c7', name: 'production', health: 'green', hostRefs: ['host-21', 'host-22'], totalHosts: 2, effectiveHosts: 2, totalCpuMhz: 124800, effectiveCpuMhz: 95600, totalMemoryBytes: 256 * 1024 ** 3, effectiveMemoryBytes: 104 * 1024 ** 3, cpuCores: 48, cpuThreads: 96 }],
+      hosts: vmwareHosts, vms: vmwareVms, templates: [], datastores: vmwareDatastores,
+      summary: { datacenters: 1, clusters: 1, hosts: 2, hostsOnline: 2, hostsMaintenance: 0, hostsWarning: 0, vms: 5, runningVms: 4, vmsWarning: 0, templates: 0, datastores: 2, datastoresWarning: 0, cpuUsedMhz: 29200, cpuTotalMhz: 124800, cpuUsedCores: 11.2, cpuCores: 48, cpuPercent: 23.4, memoryUsedBytes: 152 * 1024 ** 3, memoryTotalBytes: 256 * 1024 ** 3, memoryPercent: 59.4, storageUsedBytes: 9.3 * 1024 ** 4, storageTotalBytes: 20 * 1024 ** 4, storagePercent: 46.5 },
+    }],
   };
 
   data.linux = [
@@ -1308,7 +1393,7 @@ function demoStatus() {
 function publicSummary(data = demoStatus()) {
   return data.configured.map(id => {
     const names = {
-      proxmox: 'Proxmox', linux: 'Linux Servers', windows: 'Windows Servers', kubernetes: 'Kubernetes', synology: 'Synology', mikrotik: 'MikroTik', unifi: 'UniFi', snmp: 'SNMP',
+      proxmox: 'Proxmox', vmware: 'VMware ESXi', linux: 'Linux Servers', windows: 'Windows Servers', kubernetes: 'Kubernetes', synology: 'Synology', mikrotik: 'MikroTik', unifi: 'UniFi', snmp: 'SNMP',
       healthchecks: 'Healthchecks', uptimekuma: 'Uptime Kuma', checks: 'Service checks',
       prometheus: 'Prometheus', docker: 'Docker', dockhand: 'Dockhand', firewall: 'Firewalls',
       truenas: 'TrueNAS', qnap: 'QNAP', ugreen: 'Ugreen', pbs: 'Proxmox Backup',
@@ -1317,6 +1402,7 @@ function publicSummary(data = demoStatus()) {
     };
     const detail = (() => {
       if (id === 'proxmox') return `${data.proxmox.nodes.filter(n => n.online).length}/${data.proxmox.nodes.length} nodes up`;
+      if (id === 'vmware') return `${data.vmware.summary.hostsOnline}/${data.vmware.summary.hosts} hosts\n${data.vmware.summary.runningVms}/${data.vmware.summary.vms} VMs running`;
       if (id === 'linux') return `${data.linux.filter(n => n.online).length}/${data.linux.length} servers\n${data.linux.reduce((n, h) => n + (h.services || []).filter(s => s.active).length, 0)}/${data.linux.reduce((n, h) => n + (h.services || []).length, 0)} services`;
       if (id === 'windows') return `${data.windows.filter(n => n.online).length}/${data.windows.length} servers\n${data.windows.reduce((n, h) => n + (h.services || []).filter(s => s.active).length, 0)}/${data.windows.reduce((n, h) => n + (h.services || []).length, 0)} services`;
       if (id === 'kubernetes') return `${data.kubernetes.summary.running}/${data.kubernetes.summary.pods} pods`;
@@ -1331,8 +1417,8 @@ function publicSummary(data = demoStatus()) {
       if (id === 'uptimekuma') return `${data.uptimekuma.summary.up}/${data.uptimekuma.summary.total} up`;
       if (id === 'checks') return `${data.checks.summary.up}/${data.checks.summary.total} up`;
       if (id === 'prometheus') return `${data.prometheus.summary.up}/${data.prometheus.summary.total} up`;
-      if (id === 'docker') return `${data.docker.reduce((n, h) => n + (h.summary?.running || 0), 0)}/${data.docker.reduce((n, h) => n + (h.summary?.total || 0), 0)} containers`;
-      if (id === 'dockhand') return `${data.dockhand.summary.running}/${data.dockhand.summary.total} running`;
+      if (id === 'docker') return `${data.docker.reduce((n, h) => n + (h.summary?.running || 0), 0)}/${data.docker.reduce((n, h) => n + (h.summary?.total || 0), 0)} containers · ${data.docker.filter(h => h.online).length}/${data.docker.length} hosts`;
+      if (id === 'dockhand') return `${data.dockhand.summary.running}/${data.dockhand.summary.total} containers · ${data.dockhand.summary.serverUp}/${data.dockhand.summary.servers} hosts`;
       if (id === 'firewall') return `${data.firewall.summary.interfacesUp}/${data.firewall.summary.interfaces} interfaces up`;
       if (id === 'truenas') return `${data.truenas.summary.poolsHealthy}/${data.truenas.summary.pools} pools healthy`;
       if (id === 'qnap') return `${data.qnap.summary.up}/${data.qnap.summary.instances} systems up\n${data.qnap.summary.disks || 0} disks`;
@@ -1417,6 +1503,16 @@ function topologyData() {
         online: true,
         node: { name: n.name, online: true },
         vms: n.vms.map(v => ({ id: v.id, name: v.name, status: v.status, type: v.type, os: v.os })),
+      })),
+    },
+    vmware: {
+      instances: (d.vmware?.instances || []).map(instance => ({
+        name: instance.name,
+        type: instance.type,
+        online: instance.online,
+        clusters: (instance.clusters || []).map(cluster => ({ id: cluster.id, name: cluster.name, health: cluster.health, hostRefs: cluster.hostRefs || [] })),
+        hosts: (instance.hosts || []).map(host => ({ id: host.id, name: host.name, online: host.online, maintenance: host.maintenance, health: host.health, clusterId: host.clusterId, clusterName: host.clusterName })),
+        vms: (instance.vms || []).map(vm => ({ id: vm.id, name: vm.name, hostId: vm.hostId, hostName: vm.hostName, clusterName: vm.clusterName, powerState: vm.powerState, running: vm.running, guestOs: vm.guestOs })),
       })),
     },
     linux: d.linux.map(s => ({ name: s.name, host: s.host, online: s.online, services: s.services })),
@@ -1506,18 +1602,40 @@ app.post('/api/config', (req, res) => {
   res.json({ ok: true, fullData: false, data: demoStatus(), demo: true });
 });
 app.get('/api/settings/status', (req, res) => res.json(demoStatus()));
-app.get('/api/settings/agents', (req, res) => res.json({ agents: [{ key: 'linux:demo-agent', kind: 'linux', id: 'demo-agent', name: 'demo-linux-01', ip: '192.0.2.50', online: true, version: 'demo', latest: true }] }));
-app.get('/api/agents', (req, res) => res.json({ agents: [
-  { id: 'demo-agent', name: 'demo-linux-01', ip: '192.0.2.50', online: true, agentVersion: 'demo', latestVersion: 'demo', updateAvailable: false },
-  { id: 'demo-offline', name: 'demo-offline-01', ip: '192.0.2.51', online: false, agentVersion: '1.1.0', lastSeen: Date.now() - 3600_000, platform: 'linux' },
-] }));
+const demoRemovedAgentIds = new Set();
+function demoAgentRows() {
+  return [
+    { id: 'demo-agent', name: 'demo-linux-01', ip: '192.0.2.50', online: true, agentVersion: '1.4.1', updateAvailable: false, platform: 'linux', role: 'linux' },
+    { id: 'demo-offline', name: 'demo-offline-01', ip: '192.0.2.51', online: false, agentVersion: '1.1.0', lastSeen: Date.now() - 3600_000, platform: 'linux', role: 'linux' },
+  ].filter(agent => !demoRemovedAgentIds.has(agent.id));
+}
+app.get('/api/settings/agents', (req, res) => res.json({ agents: demoAgentRows().map(agent => ({
+  key: `linux:${agent.id}`,
+  kind: 'linux',
+  id: agent.id,
+  name: agent.name,
+  ip: agent.ip,
+  online: agent.online,
+  agentVersion: agent.agentVersion,
+})) }));
+app.get('/api/agents', (req, res) => res.json({ latestVersion: '1.4.1', agents: demoAgentRows() }));
+app.post('/api/agent/uninstall', (req, res) => {
+  demoRemovedAgentIds.add(String(req.body?.id || ''));
+  res.json({ ok: true, demo: true, output: 'uninstall scheduled' });
+});
+app.post('/api/agent/remove', (req, res) => {
+  demoRemovedAgentIds.add(String(req.body?.id || ''));
+  res.json({ ok: true, demo: true });
+});
 app.get('/api/agent/repair-commands', (req, res) => res.json({
   ok: true,
   id: req.query.id || 'demo-offline',
   name: req.query.id || 'demo-offline',
+  agentVersion: demoAgentRows().find(agent => agent.id === (req.query.id || 'demo-offline'))?.agentVersion || '',
+  role: demoAgentRows().find(agent => agent.id === (req.query.id || 'demo-offline'))?.role || 'linux',
   commands: [
-    { title: 'Query agent', description: 'Checks service state, recent logs and dashboard reachability on the offline host.', command: 'sudo bash -lc \'systemctl status omnisight-agent --no-pager -l || true\njournalctl -u omnisight-agent -n 120 --no-pager || true\nprintf "{\"id\":\"demo-offline\"}" > /tmp/omnisight-agent-ping-body.json\ncurl -sS -m 20 -w "http=%{http_code} time=%{time_total}s\\n" http://demo.local/api/agent/ping -o /tmp/omnisight-agent-ping.out -X POST -H "X-Agent-Token: demo-token" -H "Content-Type: application/json" --data-binary @/tmp/omnisight-agent-ping-body.json\ncat /tmp/omnisight-agent-ping.out\'' },
-    { title: 'Repair systemd agent', description: 'Reinstalls the agent with the current dashboard token, keeps the same agent identity and restarts the service.', command: 'curl -fsSL http://demo.local/agent/install.sh | sudo OMNISIGHT_URL=http://demo.local OMNISIGHT_TOKEN=demo-token OMNISIGHT_AGENT_ID=demo-offline bash' },
+    { title: 'Query agent', description: 'Run first and check the service state and HTTP result.', command: 'sudo bash -lc \'systemctl status omnisight-agent --no-pager -l || true\njournalctl -u omnisight-agent -n 120 --no-pager || true\nprintf "{\"id\":\"demo-offline\"}" > /tmp/omnisight-agent-ping-body.json\ncurl -sS -m 20 -w "http=%{http_code} time=%{time_total}s\\n" http://demo.local/api/agent/ping -o /tmp/omnisight-agent-ping.out -X POST -H "X-Agent-Token: demo-token" -H "Content-Type: application/json" --data-binary @/tmp/omnisight-agent-ping-body.json\ncat /tmp/omnisight-agent-ping.out\'' },
+    { title: 'Repair systemd agent', description: 'Use for a failed or missing service, or HTTP 401/403.', command: 'curl -fsSL http://demo.local/agent/install.sh | sudo OMNISIGHT_URL=http://demo.local OMNISIGHT_TOKEN=demo-token OMNISIGHT_AGENT_ID=demo-offline bash' },
   ],
 }));
 app.post('/api/agent/ping', (req, res) => res.json({ ok: true, demo: true, id: req.body?.id || '' }));

@@ -393,6 +393,7 @@ html[data-theme="light"] .ci-help{color:#53657c}
     <button class="settings-nav-btn" type="button" data-nav-parent="os" data-target="windows" onclick="showSettingsSection('windows')"><span class="settings-nav-dot" data-nav-dot="windows"></span><span>Windows Servers</span></button>
     <div class="settings-nav-group" data-nav-group="infra"><span>Infrastructure</span></div>
     <button class="settings-nav-btn" type="button" data-nav-parent="infra" data-target="proxmox" onclick="showSettingsSection('proxmox')"><span class="settings-nav-dot" data-nav-dot="proxmox"></span><span>Proxmox</span></button>
+    <button class="settings-nav-btn" type="button" data-nav-parent="infra" data-target="vmware" onclick="showSettingsSection('vmware')"><span class="settings-nav-dot" data-nav-dot="vmware"></span><span>VMware ESXi</span></button>
     <button class="settings-nav-btn" type="button" data-nav-parent="infra" data-target="healthchecks" onclick="showSettingsSection('healthchecks')"><span class="settings-nav-dot" data-nav-dot="healthchecks"></span><span>Healthchecks</span></button>
     <button class="settings-nav-btn" type="button" data-nav-parent="infra" data-target="uptimekuma" onclick="showSettingsSection('uptimekuma')"><span class="settings-nav-dot" data-nav-dot="uptimekuma"></span><span>Uptime Kuma</span></button>
     <button class="settings-nav-btn" type="button" data-nav-parent="infra" data-target="checks" onclick="showSettingsSection('checks')"><span class="settings-nav-dot" data-nav-dot="checks"></span><span>Service checks</span></button>
@@ -625,6 +626,7 @@ html[data-theme="light"] .ci-help{color:#53657c}
       <label>Visible platforms</label>
       <div class="check-grid" id="public-platforms">
         <label class="check-chip"><input type="checkbox" value="proxmox" checked> Proxmox</label>
+        <label class="check-chip"><input type="checkbox" value="vmware" checked> VMware ESXi</label>
         <label class="check-chip"><input type="checkbox" value="linux" checked> Linux Servers</label>
         <label class="check-chip"><input type="checkbox" value="windows" checked> Windows Servers</label>
         <label class="check-chip"><input type="checkbox" value="kubernetes" checked> Kubernetes</label>
@@ -721,6 +723,34 @@ html[data-theme="light"] .ci-help{color:#53657c}
       </div>
       <div style="font-size:12px;color:var(--muted);margin-bottom:8px">This is live agent inventory, not API configuration. Installed agents remain listed offline when they stop reporting.</div>
       <div class="sys-list" id="px-agents"><div class="sys-empty">No agents yet — click “+ Install Agent”, run the command on a Proxmox node and it appears here automatically.</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- VMware ESXi -->
+<div class="card" data-settings-section="vmware">
+  <div class="card-hdr">
+    <div class="card-left">
+      <div class="card-icon" id="dot-vmware" style="background:var(--muted)"></div>
+      <span class="card-title">VMware ESXi</span>
+    </div>
+    <label class="toggle"><input type="checkbox" id="en-vmware" onchange="toggleCard('vmware')"><span class="toggle-t"></span></label>
+  </div>
+  <div class="card-body hidden" id="cb-vmware">
+    <div class="form-group"><label>Icon (optional)</label>
+      <div class="path-row">
+        <input type="text" id="icon-vmware" placeholder="e.g. vmware-esxi — from dashboard-icons">
+        <button type="button" class="btn-sm" onclick="document.getElementById('icon-vmware-f').click()">Browse…</button>
+        <input type="file" id="icon-vmware-f" accept="image/*,.svg" style="display:none" onchange="uploadIcon(this,'icon-vmware')">
+      </div>
+    </div>
+    <div class="section mini-section">
+      <div class="sec-head">
+        <h3>VMware endpoints</h3>
+        <button class="btn-add" type="button" onclick="addVmwareInstance()">+ Add VMware Endpoint</button>
+      </div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.35;margin-bottom:10px">Add a standalone ESXi host or a vCenter Server. vCenter automatically discovers its clusters, hosts, virtual machines and datastores through the vSphere API.</div>
+      <div id="vmware-list"></div>
     </div>
   </div>
 </div>
@@ -1728,7 +1758,7 @@ html[data-theme="light"] .ci-help{color:#53657c}
 
 <script src="/i18n.js"></script>
 <script>
-let lCount = 0, sCount = 0, dCount = 0, dbCount = 0, dkApiCount = 0, dkSshCount = 0, pveApiCount = 0, pveSshCount = 0, promCount = 0, dockhandCount = 0, firewallCount = 0, trueNasCount = 0, unifiCtrlCount = 0, qnapCount = 0, ugreenCount = 0, pbsCount = 0, cicdCount = 0, veeamCount = 0, portainerCount = 0, checkCount = 0;
+let lCount = 0, sCount = 0, dCount = 0, dbCount = 0, dkApiCount = 0, dkSshCount = 0, pveApiCount = 0, pveSshCount = 0, vmwareCount = 0, promCount = 0, dockhandCount = 0, firewallCount = 0, trueNasCount = 0, unifiCtrlCount = 0, qnapCount = 0, ugreenCount = 0, pbsCount = 0, cicdCount = 0, veeamCount = 0, portainerCount = 0, checkCount = 0;
 const SETTINGS_CARD_OPEN_KEY = 'os_settings_card_open';
 const SETTINGS_ACTIVE_SECTION_KEY = 'os_settings_active_section';
 const DEFAULT_SETTINGS_SECTION = 'appearance';
@@ -2304,6 +2334,7 @@ function previewConfiguredIds(cfg = {}) {
   const hasInstances = c => !!(c && (c.url || (Array.isArray(c.instances) && c.instances.length)));
   const ids = [];
   if (en(cfg.proxmox) && (cfg.proxmox?.url || (cfg.proxmox?.instances || []).length || (cfg.proxmox?.nodes || []).length)) ids.push('proxmox');
+  if (en(cfg.vmware) && hasInstances(cfg.vmware)) ids.push('vmware');
   if (en(cfg.kubernetes) && cfg.kubernetes?.kubeconfig) ids.push('kubernetes');
   if (en(cfg.linux) && cfg.linux?.agentToken) ids.push('linux');
   if (en(cfg.windows) && cfg.linux?.agentToken) ids.push('windows');
@@ -2349,6 +2380,9 @@ function previewConnectingPlatform(data, id, cfg = {}) {
   } else if (id === 'firewall') {
     const instances = Array.isArray(cfg.firewall?.instances) ? cfg.firewall.instances : (cfg.firewall?.url ? [cfg.firewall] : []);
     data.firewall = { _connecting: true, online: false, summary: { instances: instances.length, up: 0, down: 0, interfaces: 0, interfacesUp: 0, interfacesDown: 0, updates: 0, rebootRequired: 0 }, instances: instances.map((inst, idx) => ({ name: inst.name || inst.url || `Firewall ${idx + 1}`, type: inst.type || 'opnsense', url: inst.url || '', online: false, _connecting: true, summary: { interfaces: 0, interfacesUp: 0, interfacesDown: 0 } })) };
+  } else if (id === 'vmware') {
+    const instances = Array.isArray(cfg.vmware?.instances) ? cfg.vmware.instances : (cfg.vmware?.url ? [cfg.vmware] : []);
+    data.vmware = { _connecting: true, online: false, summary: { instances: instances.length, up: 0, down: 0, datacenters: 0, clusters: 0, hosts: 0, hostsOnline: 0, vms: 0, runningVms: 0, templates: 0, datastores: 0 }, instances: instances.map((inst, idx) => ({ name: inst.name || inst.url || `VMware ${idx + 1}`, url: inst.url || '', online: false, _connecting: true, datacenters: [], clusters: [], hosts: [], vms: [], templates: [], datastores: [] })) };
   } else if (id === 'truenas') {
     const instances = Array.isArray(cfg.truenas?.instances) ? cfg.truenas.instances : (cfg.truenas?.url ? [cfg.truenas] : []);
     data.truenas = { _connecting: true, online: false, summary: { instances: instances.length, up: 0, down: 0, pools: 0, poolsHealthy: 0, poolsWarn: 0, disks: 0, disksWarn: 0, alertsCritical: 0, alertsWarning: 0 }, instances: instances.map((inst, idx) => ({ name: inst.name || inst.url || `TrueNAS ${idx + 1}`, url: inst.url || '', apiMode: inst.apiMode || 'auto', online: false, _connecting: true, summary: { pools: 0, poolsHealthy: 0, poolsWarn: 0, disks: 0, disksWarn: 0 } })) };
@@ -2533,7 +2567,7 @@ function configBool(value, fallback = false) {
   if (['0', 'false', 'no', 'off'].includes(text)) return false;
   return fallback;
 }
-const PLATFORM_CONFIG_KEYS = ['proxmox','linux','windows','kubernetes','snmp','healthchecks','uptimekuma','checks','prometheus','docker','dockhand','firewall','truenas','unifi','qnap','ugreen','pbs','cloudflare','cicd','veeam','portainer','database'];
+const PLATFORM_CONFIG_KEYS = ['proxmox','vmware','linux','windows','kubernetes','snmp','healthchecks','uptimekuma','checks','prometheus','docker','dockhand','firewall','truenas','unifi','qnap','ugreen','pbs','cloudflare','cicd','veeam','portainer','database'];
 function hasPlatformConfig(cfg) {
   return !!(cfg && PLATFORM_CONFIG_KEYS.some(key => Object.prototype.hasOwnProperty.call(cfg, key)));
 }
@@ -2709,6 +2743,31 @@ function addPveApiInstance(data = {}) {
     </div>`;
   document.getElementById('px-api-list').appendChild(item);
   if (data.tokenSecret) secVal(data.tokenSecret, item.querySelector('.pveapi-token-secret'));
+  applyLanguageFragment(item);
+}
+
+function addVmwareInstance(data = {}) {
+  const idx = vmwareCount++;
+  const id = `vmware-${idx}`;
+  const item = document.createElement('div');
+  item.className = 'arr-item';
+  item.innerHTML = `
+    <div class="arr-hdr" onclick="toggleArr('${id}')">
+      <span class="arr-hdr-name">${escHtml(data.name || data.url || 'VMware Endpoint')}</span>
+      <button class="btn-rm" type="button" onclick="event.stopPropagation();this.closest('.arr-item').remove()">✕</button>
+    </div>
+    <div class="arr-body" id="ab-${id}">
+      <div class="form-grid">
+        <div class="form-group"><label>Name</label><input type="text" class="vmware-name" value="${escHtml(data.name||'')}" placeholder="vcenter01" oninput="this.closest('.arr-item').querySelector('.arr-hdr-name').textContent=this.value||'VMware Endpoint'"></div>
+        <div class="form-group"><label>ESXi / vCenter URL</label><input type="text" class="vmware-url" value="${escHtml(data.url||'')}" placeholder="https://vcenter.example.local"></div>
+        <div class="form-group"><label>Username</label><input type="text" class="vmware-username" value="${escHtml(data.username||data.user||'')}" placeholder="monitoring@vsphere.local" autocomplete="username"></div>
+        <div class="form-group"><label>Password</label><input type="password" class="vmware-password" placeholder="leave blank to keep current password" autocomplete="new-password"></div>
+        <div class="form-group"><label>TLS</label><select class="vmware-insecure"><option value="false" ${!data.insecureTLS?'selected':''}>Verify certificate</option><option value="true" ${data.insecureTLS?'selected':''}>Allow self-signed</option></select></div>
+      </div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.35;overflow-wrap:anywhere">Use a read-only vSphere account. Enter the server address only; OmniSight automatically connects to the <code>/sdk</code> API endpoint.</div>
+    </div>`;
+  document.getElementById('vmware-list').appendChild(item);
+  if (data.password) secVal(data.password, item.querySelector('.vmware-password'));
   applyLanguageFragment(item);
 }
 
@@ -3519,7 +3578,7 @@ function agentCmds() {
       ? `${psTLS12} $env:OMNISIGHT_URL="${base}"; $env:OMNISIGHT_TOKEN="${token}"; $env:OMNISIGHT_AGENT_ROLE="windows"${psTLS}; iwr -UseBasicParsing "${base}/agent/install-windows.ps1" | iex`
       : `curl -fsSL${curlTLS} ${base}/agent/install.sh | sudo OMNISIGHT_URL=${base} OMNISIGHT_TOKEN=${token} OMNISIGHT_AGENT_ROLE=${role}${envTLS} bash`,
     uninstall: amKind === 'windows'
-      ? `${psTLS12} iwr -UseBasicParsing "${base}/agent/install-windows.ps1" | iex; Uninstall-OmniSightAgent`
+      ? `${psTLS12} $env:OMNISIGHT_ACTION="uninstall"; try { iwr -UseBasicParsing "${base}/agent/install-windows.ps1" | iex } finally { Remove-Item Env:OMNISIGHT_ACTION -ErrorAction SilentlyContinue }`
       : `curl -fsSL${curlTLS} ${base}/agent/install.sh | sudo${sudoTLS} bash -s uninstall`,
     docker: `${dockerBin} run -d --name omnisight-agent --restart unless-stopped \\
   --network host --pid host \\
@@ -3642,6 +3701,16 @@ const SETTINGS_STATUS_CACHE_KEY = 'os_settings_status_cache_v2';
 const SETTINGS_USERS_CACHE_KEY = 'os_settings_users_cache_v2';
 const SETTINGS_AGENTS_CACHE_KEY = 'os_settings_agents_cache_v2';
 const SETTINGS_CERTS_CACHE_KEY = 'os_settings_certs_cache_v2';
+const settingsShellStatusSignatures = new Map();
+
+function notifyShellStatusChanged(source, value) {
+  if (window.parent === window) return;
+  let signature = '';
+  try { signature = JSON.stringify(value); } catch { signature = String(Date.now()); }
+  if (settingsShellStatusSignatures.get(source) === signature) return;
+  settingsShellStatusSignatures.set(source, signature);
+  try { window.parent.postMessage({ type: 'omnisight-status-changed', source }, window.location.origin); } catch {}
+}
 
 function sessionCacheKey(base){
   const token = sessionStorage.getItem('os_token') || localStorage.getItem('os_token') || 'anon';
@@ -3724,6 +3793,7 @@ function applySettingsAgents(all) {
   renderAgentList('win-agents', visible.filter(a => a.kind === 'windows'), 'No hosts yet - click "+ Add Windows Host", run the PowerShell command and it appears here automatically.');
   renderAgentList('px-agents', visible.filter(a => a.kind === 'proxmox'), 'No agents yet — click “+ Install Agent”, run the command on a Proxmox node and it appears here automatically.');
   renderAgentList('dk-agents', visible.filter(a => a.kind === 'docker'), 'No hosts yet — click “+ Add Host”, run the command on a Docker host and it appears here automatically.');
+  notifyShellStatusChanged('agents', visible.map(a => [a.id, a.kind, a.connecting, a.online, a.lastSeen]));
 }
 
 function refreshWindowsDotFromAgents() {
@@ -3739,7 +3809,7 @@ function renderAgentList(elId, list, emptyMsg) {
     refreshWindowsDotFromAgents();
     return;
   }
-  const signature = JSON.stringify(list.map(a => [a.id, a.name, a.ip, a.os, a.meta, a.platform, a.connecting, a.online]));
+  const signature = JSON.stringify(list.map(a => [a.id, a.name, a.ip, a.os, a.meta, a.platform, a.connecting, a.online, a.agentVersion]));
   const html = list.map(a => `
     <div class="agent-row">
       <div style="width:9px;height:9px;border-radius:50%;background:${a.connecting ? 'var(--muted)' : a.online ? 'var(--green)' : 'var(--red)'};flex-shrink:0;${a.online ? 'box-shadow:0 0 8px rgba(52,211,153,.6)' : ''}"></div>
@@ -3747,22 +3817,37 @@ function renderAgentList(elId, list, emptyMsg) {
       <span style="color:var(--muted);font-size:12px">${escHtml(a.ip || '')}${a.os ? ' · ' + escHtml(a.os) : ''}${a.meta ? ' · ' + escHtml(a.meta) : ''}${a.platform === 'synology' ? ' · synology' : ''}</span>
       <span style="flex:1"></span>
       <span style="font-size:12px;font-weight:600;color:${a.connecting ? 'var(--muted)' : a.online ? 'var(--green)' : 'var(--red)'}">${escHtml(trText(a.connecting ? 'connecting...' : a.online ? 'online' : 'offline'))}</span>
-      <button class="btn-rm" type="button" title="${escHtml(trText('Remove'))}" onclick="removeAgent('${escHtml(a.id || '')}',this)">✕</button>
+      <button class="btn-rm" type="button" title="${escHtml(trText(a.connecting ? 'Cancel pending installation' : 'Uninstall'))}" onclick="removeAgent('${escHtml(a.id || '')}',this)">✕</button>
     </div>`).join('');
   setStableHtml(el, signature, html);
   refreshWindowsDotFromAgents();
 }
 
 async function removeAgent(id, btn) {
-  if (!confirm('Remove this system from the dashboard? (Run the uninstall command on the server to stop the agent.)')) return;
+  const agent = (window._agentData || []).find(item => item.id === id);
+  const pendingInstall = !!agent?.connecting;
+  const confirmed = await showConfirmModal({
+    title: pendingInstall ? 'Cancel pending installation' : 'Uninstall agent',
+    message: pendingInstall
+      ? 'Remove this pending installation from the dashboard?'
+      : 'This removes the OmniSight agent service, files and configuration from the selected system, then removes the system from the dashboard. The cleanup runs non-interactively on the system even if the dashboard connection closes.',
+    target: agent?.name || id,
+    confirmLabel: 'Yes',
+  });
+  if (!confirmed) return;
   if (btn) btn.disabled = true;
   try {
-    const r = await fetch('/api/agent/remove', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ id }) });
+    const endpoint = pendingInstall ? '/api/agent/remove' : '/api/agent/uninstall';
+    const r = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ id }) });
     const b = await r.json();
     if (!r.ok) throw new Error(b.error || r.statusText);
+    const remaining = (window._agentData || []).filter(item => item.id !== id);
+    writeSessionCache(SETTINGS_AGENTS_CACHE_KEY, remaining);
+    applySettingsAgents(remaining);
+    settingsAgentsLast = 0;
     await loadAgents();
-    toast('System removed', 'ok');
-  } catch (e) { toast(e.message, 'err'); }
+    toast(trText(pendingInstall ? 'Pending installation removed' : 'Agent uninstall scheduled'), 'ok');
+  } catch (e) { toast(trText(e.message), 'err'); }
   if (btn) btn.disabled = false;
 }
 
@@ -4024,6 +4109,7 @@ function closeConfirmModal(ok) {
 const DYNAMIC_CONFIG_LIST_IDS = [
   'px-api-list',
   'px-ssh-list',
+  'vmware-list',
   'syn-list',
   'mikrotik-list',
   'unifi-list',
@@ -4090,6 +4176,7 @@ function resetDynamicConfigLists() {
   dkSshCount = 0;
   pveApiCount = 0;
   pveSshCount = 0;
+  vmwareCount = 0;
   promCount = 0;
   dockhandCount = 0;
   firewallCount = 0;
@@ -4174,6 +4261,21 @@ function populate(cfg) {
         }] : []);
     uniqueConfigItems(instances, ['name', 'url']).forEach(addPveApiInstance);
     uniqueConfigItems(cfg.proxmox.sshMetrics || [], ['node', 'name', 'sshHost']).forEach(addPveSshMetricHost);
+  }
+  if (cfg.vmware) {
+    document.getElementById('en-vmware').checked = cfg.vmware.enabled !== false;
+    document.getElementById('cb-vmware').classList.remove('hidden');
+    document.getElementById('icon-vmware').value = cfg.vmware.icon || '';
+    const instances = Array.isArray(cfg.vmware.instances) && cfg.vmware.instances.length
+      ? cfg.vmware.instances
+      : (cfg.vmware.url ? [{
+          name: cfg.vmware.name || 'VMware',
+          url: cfg.vmware.url,
+          username: cfg.vmware.username || cfg.vmware.user,
+          password: cfg.vmware.password,
+          insecureTLS: cfg.vmware.insecureTLS,
+        }] : []);
+    uniqueConfigItems(instances, ['name', 'url']).forEach(addVmwareInstance);
   }
   if (cfg.linux) {
     document.getElementById('en-linux').checked = cfg.linux.enabled !== false;
@@ -4554,6 +4656,30 @@ function collect() {
       icon: document.getElementById('icon-proxmox').value.trim() || undefined,
       instances: uniqueInstances.length ? uniqueInstances : undefined,
       sshMetrics: uniqueSshMetrics.length ? uniqueSshMetrics : undefined,
+    };
+  }
+
+  {
+    const on = document.getElementById('en-vmware').checked;
+    const instances = [];
+    document.querySelectorAll('#vmware-list .arr-item').forEach(item => {
+      const url = item.querySelector('.vmware-url').value.trim();
+      const name = item.querySelector('.vmware-name').value.trim();
+      const username = item.querySelector('.vmware-username').value.trim();
+      const password = maskedVal(item.querySelector('.vmware-password'));
+      if (url || name) instances.push({
+        name: name || undefined,
+        url: url || undefined,
+        username: username || undefined,
+        password: password || undefined,
+        insecureTLS: item.querySelector('.vmware-insecure').value === 'true' || undefined,
+      });
+    });
+    const uniqueInstances = uniqueConfigItems(instances, ['name', 'url']);
+    if (on || uniqueInstances.length) cfg.vmware = {
+      enabled: on,
+      icon: document.getElementById('icon-vmware').value.trim() || undefined,
+      instances: uniqueInstances.length ? uniqueInstances : undefined,
     };
   }
 
@@ -5265,6 +5391,7 @@ function uploadIcon(input, targetId) {
 function previewUploadedIcon(targetId, path) {
   const map = {
     'icon-proxmox': 'proxmox',
+    'icon-vmware': 'vmware',
     'icon-linux': 'linux',
     'icon-windows': 'windows',
     'icon-kubernetes': 'kubernetes',
@@ -6017,9 +6144,22 @@ async function refreshDots(cfg, newData){
   }
   d = d || {};
   if (d && Object.keys(d).length) writeSessionCache(SETTINGS_STATUS_CACHE_KEY, d);
+  notifyShellStatusChanged('settings-status', d);
   const en=c=>!!(c && c.enabled!==false);
   const pxNodes = d.proxmox?.nodes || [];
-  setDot('dot-proxmox', platformDot(en(cfg.proxmox), pxNodes.length, pxNodes.filter(n=>n.node?.online).length, !!d.proxmox?._connecting || pxNodes.some(n=>n._connecting)));
+  const pxQuorumLost = (d.proxmox?.clusters || []).some(cluster=>cluster?.isCluster && cluster.quorate===false);
+  setDot('dot-proxmox', pxQuorumLost ? 'bad' : platformDot(en(cfg.proxmox), pxNodes.length, pxNodes.filter(n=>n.node?.online).length, !!d.proxmox?._connecting || pxNodes.some(n=>n._connecting)));
+  const vmwareInstances = d.vmware?.instances || [];
+  const vmwareConfigured = cfg.vmware?.instances?.length || (cfg.vmware?.url ? 1 : 0);
+  const vmwareTotal = Math.max(vmwareInstances.length, vmwareConfigured);
+  const vmwareOnline = vmwareInstances.filter(instance => instance.online).length;
+  const vmwareHosts = vmwareInstances.flatMap(instance => instance.hosts || []);
+  const vmwareConnecting = !!d.vmware?._connecting || vmwareInstances.some(instance => instance._connecting)
+    || (en(cfg.vmware) && vmwareConfigured > 0 && vmwareInstances.length < vmwareConfigured)
+    || (en(cfg.vmware) && vmwareConfigured > 0 && vmwareOnline === 0 && (d.loading || d.refreshing));
+  const vmwareBad = vmwareInstances.some(instance => instance.online === false && !instance._connecting)
+    || vmwareHosts.some(host => host.online === false || String(host.health || '').toLowerCase() === 'red');
+  setDot('dot-vmware', vmwareBad ? 'bad' : platformDot(en(cfg.vmware), vmwareTotal, vmwareOnline, vmwareConnecting));
   if (activeSettingsSection === 'proxmox') document.querySelectorAll('#px-ssh-list .arr-item').forEach(item => {
     const dot = item.querySelector('.pvessh-dot');
     if (!dot) return;

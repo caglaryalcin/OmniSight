@@ -296,6 +296,9 @@ html[data-theme="light"] #os-hover-dot{box-shadow:0 0 0 3px rgba(255,255,255,.9)
 .node-main .node-info{flex:none;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .node-body{display:none;border-bottom:1px solid var(--border);background:rgba(0,0,0,.16);padding:14px 18px}
 .node-body.open{display:block}
+.detail-system-draggable{cursor:grab!important}
+.detail-system-reordering,.detail-system-reordering *{user-select:none!important}
+.detail-system-draggable.dragging{cursor:grabbing!important;outline:1px dashed var(--blue);outline-offset:-2px;background:rgba(96,165,250,.08)!important;position:relative;z-index:8}
 .node-body .row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
 .node-body .row:last-child{margin-bottom:0}
 .nb-label{font-size:12px;color:var(--muted);font-weight:550}
@@ -328,6 +331,18 @@ html[data-theme="light"] #os-hover-dot{box-shadow:0 0 0 3px rgba(255,255,255,.9)
 .k8s-grp-body{display:none;background:rgba(0,0,0,.16)}
 .k8s-grp-body.open{display:block;border-top:1px solid var(--border)}
 .k8s-grp-body .mon-row{padding-left:34px}
+.pve-cluster-list{display:grid;gap:8px;margin:12px}
+.pve-cluster-status{display:flex;align-items:center;gap:12px;min-width:0;padding:11px 14px;border:1px solid var(--border);border-radius:11px;background:linear-gradient(145deg,rgba(96,165,250,.055),rgba(255,255,255,.008));box-shadow:inset 3px 0 0 rgba(96,165,250,.42)}
+.pve-cluster-status.is-warn{background:linear-gradient(145deg,rgba(245,158,11,.075),rgba(255,255,255,.008));box-shadow:inset 3px 0 0 rgba(245,158,11,.72)}
+.pve-cluster-status.is-bad{background:linear-gradient(145deg,rgba(248,113,113,.08),rgba(255,255,255,.008));box-shadow:inset 3px 0 0 rgba(248,113,113,.78)}
+.pve-cluster-main{min-width:150px;display:flex;flex-direction:column;gap:2px}
+.pve-cluster-title{display:flex;align-items:baseline;gap:7px;min-width:0;font-size:14px}
+.pve-cluster-title strong{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pve-cluster-kicker{font-size:9.5px;font-weight:850;text-transform:uppercase;letter-spacing:.075em;color:var(--blue)}
+.pve-cluster-meta{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.pve-cluster-members{display:flex;align-items:center;gap:6px;min-width:0;flex:1;flex-wrap:wrap}
+.pve-cluster-member{display:inline-flex;align-items:center;gap:5px;min-width:0;padding:4px 7px;border:1px solid var(--border);border-radius:999px;background:rgba(0,0,0,.12);font-size:10.5px;color:var(--muted)}
+.pve-cluster-member .mon-dot{width:6px;height:6px}
 .ceph-health-body{padding:14px!important}
 .ceph-health-grid{display:grid;grid-template-columns:minmax(250px,.9fr) minmax(190px,.7fr) minmax(210px,.75fr) minmax(300px,1.15fr);gap:12px}
 .ceph-health-card{position:relative;min-width:0;min-height:188px;padding:16px;border:1px solid var(--border);border-radius:12px;background:linear-gradient(145deg,rgba(255,255,255,.035),rgba(255,255,255,.008));overflow:hidden}
@@ -369,6 +384,12 @@ html[data-theme="light"] #os-hover-dot{box-shadow:0 0 0 3px rgba(255,255,255,.9)
 .ceph-gauge-percent{fill:var(--text);font-size:34px;font-weight:500;font-variant-numeric:tabular-nums}
 .ceph-capacity-meta{display:flex;align-items:center;justify-content:center;gap:7px;margin-top:-3px;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
 .ceph-capacity-meta strong{color:var(--text);font-weight:750}
+.capacity-card-title-row{display:flex;align-items:center;gap:8px;min-width:0}
+.capacity-card-title-row>span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.capacity-card-title-row>.badge{flex:0 0 auto;margin-left:auto}
+.capacity-card-meta-suffix{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ceph-capacity-meta>.badge{flex:0 0 auto;margin-left:3px}
+.vmware-datastore-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;padding:12px}
 .ceph-health-details{display:flex;align-items:flex-start;gap:10px;margin-top:12px;padding:11px 12px;border:1px solid var(--border);border-radius:10px;background:rgba(0,0,0,.12)}
 .ceph-health-details-title{flex:0 0 auto;padding-top:1px;font-size:10px;font-weight:850;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
 .ceph-health-checks{min-width:0;display:flex;flex:1;flex-direction:column;gap:5px}
@@ -649,6 +670,9 @@ html[data-theme="light"] .db-head-main .pve-head-title,html[data-theme="light"] 
 @media (min-width:1201px){
   .proxmox-head-main{flex-wrap:nowrap}
   .proxmox-head-main .pve-head-stat.has-spark{min-width:0}
+  .vmware-head-main{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(min-content,1fr);align-items:stretch}
+  .vmware-head-main .pve-head-title,.vmware-head-main .pve-head-stat{width:auto;max-width:none;min-width:0}
+  .vmware-head-main .pve-head-stat.has-spark{min-width:0}
 }
 @media (max-width:1200px){
   .docker-row{grid-template-columns:9px minmax(130px,1.2fr) minmax(140px,1fr) 62px 70px minmax(110px,1fr) minmax(90px,1fr) minmax(110px,1fr) 106px 86px}
@@ -680,11 +704,18 @@ html[data-theme="light"] .db-head-main .pve-head-title,html[data-theme="light"] 
 .os-sel { position: relative; display: inline-block; font-size: 13px; font-weight: 500; cursor: pointer; }
 .os-sel-btn { background: var(--row); border: 1px solid var(--border); color: var(--text); padding: 4px 10px; border-radius: 8px; display: flex; align-items: center; gap: 6px; transition: border-color 0.15s, background-color 0.15s; }
 .os-sel-btn:hover { border-color: var(--border2); background: var(--panel2); }
-.os-sel-menu { display: none; position: absolute; right: 0; top: 100%; margin-top: 4px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow); z-index: 100; min-width: 110px; overflow: hidden; padding:4px; }
+.os-sel-menu { display: none; position: absolute; right: 0; top: 100%; margin-top: 4px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow); z-index: 100; min-width: 110px; overflow: visible; padding:4px; }
 .os-sel.open .os-sel-menu { display: block; }
 .os-sel-opt { padding: 7px 12px; color: var(--text); transition: background 0.1s; border-radius:6px; }
 .os-sel-opt:hover { background: rgba(255,255,255,.06); }
 .os-sel-opt.active { color: var(--green); font-weight: 600; }
+.os-sel-branch{position:relative;display:flex;align-items:center;justify-content:space-between;gap:18px;padding:7px 8px 7px 12px;color:var(--text);border-radius:6px;transition:background .1s}
+.os-sel-branch:hover,.os-sel-branch.open{background:rgba(255,255,255,.06)}
+.os-sel-branch.active>.os-sel-branch-label{color:var(--green);font-weight:600}
+.os-sel-branch-arrow{width:13px;height:13px;flex:0 0 auto;color:var(--muted)}
+.os-sel-submenu{display:none;position:absolute;left:calc(100% + 7px);top:-5px;min-width:175px;padding:4px;background:var(--panel);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow);z-index:110}
+.os-sel-submenu::before{content:'';position:absolute;top:0;bottom:0;left:-8px;width:8px}
+.os-sel-branch:hover>.os-sel-submenu,.os-sel-branch.open>.os-sel-submenu{display:block}
 
 .os-crosshair {
   cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='M8 0v5m0 6v5M0 8h5m6 0h5' stroke='%23888888' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E") 8 8, crosshair !important;
@@ -757,10 +788,8 @@ body.os-resizing .shell .sb-card{transition:none!important}
 .shell .sb-title{font-size:13px;font-weight:650;letter-spacing:0}
 .shell .sb-meta{max-height:28px}
 .shell .sb-summary{display:none}
-.shell.rail-narrow .sb-card{grid-template-columns:auto minmax(0,1fr);align-items:start}
-.shell.rail-narrow .sb-icon{grid-column:1;grid-row:1 / span 2}
-.shell.rail-narrow .sb-main{grid-column:2;grid-row:1;min-width:0}
-.shell.rail-narrow .sb-badge-wrap{grid-column:2;grid-row:2;justify-self:start;margin-left:0!important;margin-top:3px;max-width:100%;min-width:0}
+.shell .sb-badge-wrap{min-width:0}
+.shell .sb-card.sb-badge-priority .sb-badge-wrap>.badge{width:var(--sb-badge-width);min-width:0;padding-left:6px;padding-right:6px;white-space:normal;overflow-wrap:normal;word-break:normal;line-height:1.08;text-align:center;font-size:11px}
 .shell.rail-narrow .sb-meta{max-height:none;flex-direction:column;align-items:flex-start;gap:1px;line-height:1.2}
 .shell.rail-narrow .sb-meta-part{display:block;width:100%;max-width:100%}
 .shell .menu-btn{width:36px;height:36px;border-radius:8px}
@@ -804,13 +833,15 @@ html[data-theme="light"] body.rail-collapsed .shell .sb-card.active{background:#
 .overview-kpis.no-side{grid-template-columns:repeat(4,minmax(0,1fr))}
 .overview-kpi{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:12px 14px 10px;min-width:0;box-shadow:var(--shadow);overflow:visible}
 .overview-kpi-head{display:flex;align-items:center;justify-content:space-between;gap:8px;color:var(--muted);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.045em}
+.overview-kpi-filters{display:flex;align-items:center;justify-content:flex-end;gap:6px;min-width:0}
 .overview-kpi .os-sel{font-size:11px;font-weight:650;text-transform:none;letter-spacing:0;flex-shrink:0}
 .overview-kpi.sel-open,
 .overview-kpi:has(.os-sel.open){position:relative;z-index:2600}
 .overview-kpi .os-sel-btn{height:26px;padding:0 8px;border-radius:7px;gap:5px;background:var(--row);max-width:138px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.overview-kpi .overview-kpi-cascade .os-sel-btn{max-width:190px}
 .overview-kpi .os-sel-btn span{min-width:0;overflow:hidden;text-overflow:ellipsis}
 .overview-kpi .os-sel-menu{z-index:2500;min-width:140px;text-transform:none;letter-spacing:0}
-.overview-kpi .os-sel-opt{font-size:12px;text-transform:none;letter-spacing:0}
+.overview-kpi .os-sel-opt,.overview-kpi .os-sel-branch{font-size:12px;text-transform:none;letter-spacing:0}
 .overview-kpi-body{min-height:54px}
 .overview-kpi-value{font-size:28px;font-weight:800;letter-spacing:0;margin-top:12px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .overview-kpi-sub{font-size:12px;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -927,6 +958,25 @@ html[data-theme="light"] .overview-card .sb-csum-item{background:transparent!imp
 .overview-nested-title:first-child{border-top:0}
 .overview-nested-title .mon-dot{width:7px;height:7px;margin:0}
 .overview-nested-title span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@container (min-width:301px){
+  .overview-card-h{gap:8px}
+  .overview-card-h>.badge{font-size:11px;padding-left:8px;padding-right:8px}
+  .overview-title{display:block;white-space:nowrap;overflow-wrap:normal;text-overflow:ellipsis;-webkit-line-clamp:unset}
+}
+@container (min-width:341px){
+  .overview-card[data-id="windows"] .overview-card-h{grid-template-columns:28px minmax(0,1fr) 64px 18px 24px}
+  .overview-card[data-id="windows"] .overview-card-h>.badge{width:64px;padding-left:6px;padding-right:6px;white-space:normal;line-height:1.08;text-align:center}
+  .overview-card[data-id="windows"] .overview-title{overflow:visible;text-overflow:clip}
+}
+@container (min-width:301px) and (max-width:340px){
+  .overview-card[data-id="windows"] .overview-card-h{grid-template-columns:28px minmax(0,1fr) 18px 24px;grid-template-rows:auto auto;column-gap:8px}
+  .overview-card[data-id="windows"] .overview-card-h>.overview-icon{grid-column:1;grid-row:1 / span 2}
+  .overview-card[data-id="windows"] .overview-card-h>.overview-head-main{grid-column:2;grid-row:1}
+  .overview-card[data-id="windows"] .overview-card-h>.badge{grid-column:2;grid-row:2;justify-self:start;width:64px;padding-left:6px;padding-right:6px;white-space:normal;line-height:1.08;text-align:center}
+  .overview-card[data-id="windows"] .overview-card-h>.overview-card-toggle{grid-column:3;grid-row:1 / span 2}
+  .overview-card[data-id="windows"] .overview-card-h>.overview-card-hide{grid-column:4;grid-row:1 / span 2}
+  .overview-card[data-id="windows"] .overview-title{overflow:visible;text-overflow:clip}
+}
 @container (max-width:360px){
   .overview-card .sb-csum{padding-left:6px;padding-right:6px}
   .overview-card .sb-csum-item{padding-left:1px;padding-right:1px}
@@ -1035,6 +1085,9 @@ html[data-theme="light"] .overview-card .sb-csum-item{background:transparent!imp
   .hc-check-top,.hc-ping-url{min-width:630px}
   .k8s-grp,.prom-instance,.node-card{overflow-x:auto}
   .k8s-grp.ceph-health-group{overflow:hidden}
+  .pve-cluster-status{align-items:flex-start;flex-wrap:wrap}
+  .pve-cluster-members{order:3;flex-basis:100%;padding-left:18px}
+  .pve-cluster-status>.badge{margin-left:auto}
   .ceph-health-grid{grid-template-columns:1fr}
   .k8s-colhdr.k8s-pod-row,.mon-row.k8s-pod-row{min-width:900px}
   .k8s-colhdr.k8s-deploy-row,.mon-row.k8s-deploy-row{min-width:820px}
@@ -1208,6 +1261,7 @@ html[data-theme="light"] .overview-card .sb-csum-item{background:transparent!imp
 <script src="/i18n.js"></script>
 <script>
 const INTERVAL = 15000;
+const SHELL_SUMMARY_INTERVAL = 7000;
 const APP_VERSION = __OMNISIGHT_VERSION_JSON__;
 const EMBED_VERSIONS = Object.freeze(
   typeof __OMNISIGHT_EMBED_VERSIONS_JSON__ === 'undefined'
@@ -1310,15 +1364,46 @@ let sidebarPanelOrder = [];
 let dashboardPanelOrder = [];
 try { sidebarPanelOrder = JSON.parse(localStorage.getItem('os_sidebar_panel_order') || localStorage.getItem('os_panel_order') || '[]') || []; } catch {}
 try { dashboardPanelOrder = JSON.parse(localStorage.getItem('os_dashboard_panel_order') || localStorage.getItem('os_panel_order') || '[]') || []; } catch {}
+let sidebarOrderLocalEditUntil = 0;
+let sidebarOrderLocalEditRevision = 0;
+let sidebarOrderSavedRevision = 0;
+let dashboardOrderLocalEditUntil = 0;
+let dashboardOrderLocalEditRevision = 0;
+let dashboardOrderSavedRevision = 0;
+let detailSystemOrder = {};
+try { detailSystemOrder = JSON.parse(localStorage.getItem('os_detail_system_order') || '{}') || {}; } catch {}
+let detailSystemOrderLocalEditUntil = 0;
+let detailSystemOrderLocalEditRevision = 0;
+let detailSystemOrderSavedRevision = 0;
 let overviewLayouts = {};
 try { const v = JSON.parse(localStorage.getItem('os_overview_layout_side') || '[]'); if(Array.isArray(v) && v.length) overviewLayouts.side = v; } catch {}
 try { const v = JSON.parse(localStorage.getItem('os_overview_layout_wide') || '[]'); if(Array.isArray(v) && v.length) overviewLayouts.wide = v; } catch {}
 let railCollapsedPref = false;
 let navCollapsedPref = false;
-let railWidthPref = 0;
+function clampRailWidth(value){
+  const width = Math.round(Number(value));
+  return Number.isFinite(width) && width > 0 ? Math.max(238, Math.min(440, width)) : 0;
+}
+function readLocalRailWidthPref(){
+  try {
+    const value = localStorage.getItem('os_rail_width');
+    return value === null || !String(value).trim() ? 0 : clampRailWidth(value);
+  } catch {
+    return 0;
+  }
+}
+function applyRailWidth(width){
+  const value = clampRailWidth(width);
+  const shell = document.querySelector('.shell');
+  if(!shell || !value) return 0;
+  shell.style.setProperty('--rail-w', value + 'px');
+  shell.classList.toggle('rail-narrow', value <= 254);
+  scheduleSidebarBadgeWrapping();
+  return value;
+}
+let railWidthPref = readLocalRailWidthPref();
 try { railCollapsedPref = localStorage.getItem('os_rail_collapsed') === '1'; } catch {}
 try { navCollapsedPref = localStorage.getItem('os_nav_collapsed') === '1'; } catch {}
-try { railWidthPref = parseInt(localStorage.getItem('os_rail_width'), 10) || 0; } catch {}
 function hasLocalUiShellPref(key){ try { return localStorage.getItem(key) !== null; } catch { return false; } }
 function setLocalUiShellPref(key, value){ try { localStorage.setItem(key, value ? '1' : '0'); } catch {} }
 let recentLogsHtml = '<div class="overview-empty">Loading logs...</div>';
@@ -1342,10 +1427,23 @@ function localizeOperationalText(text, lang = 'en', translateText = null) {
   const direct = typeof translateText === 'function' ? String(translateText(raw, lang)) : raw;
   if (direct !== raw) return direct;
   const replacements = [
+    [/\bStandalone ESXi\b/gi, 'Bağımsız ESXi'],
+    [/\bpowered on\b/gi, 'açık'],
+    [/\bpowered off\b/gi, 'kapalı'],
+    [/\bhosts online\b/gi, 'host çevrimiçi'],
+    [/\bVMs running\b/gi, 'VM çalışıyor'],
+    [/\bvirtual machines\b/gi, 'sanal makineler'],
+    [/\bdatastores?\b/gi, 'datastore'],
+    [/\bclusters?\b/gi, 'cluster'],
+    [/\bhosts?\b/gi, 'host'],
+    [/\bVMs?\b/gi, 'VM'],
+    [/\bmaintenance\b/gi, 'bakımda'],
+    [/\bdisconnected\b/gi, 'bağlantı kesildi'],
     [/\breboot required\b/gi, 'yeniden başlatma gerekli'],
     [/\breporting sources?\b/gi, 'raporlama kaynağı'],
     [/\bservices up\b/gi, 'aktif servisler'],
     [/\bCPU temperature\b/gi, 'CPU sıcaklığı'],
+    [/\bstale data\b/gi, 'güncel değil'],
     [/\blast known\b/gi, 'son bilinen'],
     [/\bpartial API data\b/gi, 'kısmi API verisi'],
     [/\bpartial data\b/gi, 'kısmi veri'],
@@ -1414,6 +1512,11 @@ function localizeSidebarOperationalText(lang = currentLang()) {
     '#detail .overview-row-sub',
     '#detail .ov-gauge-sub',
     '#detail .prom-instance-meta',
+    '#detail .prom-instance-url',
+    '#detail .pve-cluster-meta',
+    '#detail .pve-cluster-kicker',
+    '#detail .overview-nested-title',
+    '#detail .pve-head-lbl',
     '#detail .syn-section',
     '#detail .chart-hdr .nb-label',
     '#detail .chart-hdr .nb-pct',
@@ -1432,6 +1535,7 @@ function localizeSidebarOperationalText(lang = currentLang()) {
 window.applyLanguage = function(lang = currentLang()) {
   if (window.OmniI18n?.apply) window.OmniI18n.apply(document, lang);
   localizeSidebarOperationalText(lang);
+  scheduleSidebarBadgeWrapping();
   document.querySelectorAll('#detail iframe.embed-frame,#embed-cache-bin iframe.embed-frame').forEach(ifr => {
     try{ ifr.contentWindow?.postMessage({ type:'omnisight-language', lang }, location.origin); }catch(e){}
   });
@@ -1478,6 +1582,7 @@ function closeOsSels(except = null) {
   document.querySelectorAll('.os-sel.open').forEach(d => {
     if (except && d === except) return;
     d.classList.remove('open');
+    d.querySelectorAll('.os-sel-branch.open').forEach(branch => branch.classList.remove('open'));
     d.closest('.overview-kpi')?.classList.remove('sel-open');
   });
 }
@@ -1491,6 +1596,17 @@ function openOsSel(el) {
   if (Date.now() < osSelPointerHandledUntil) return false;
   const wrap = el?.closest?.('.os-sel') || el?.parentElement;
   setOsSelOpen(wrap, !wrap?.classList.contains('open'));
+  return false;
+}
+function openOverviewKpiSubmenu(el, event) {
+  event?.preventDefault();
+  event?.stopPropagation();
+  const branch = el?.closest?.('.os-sel-branch');
+  const wrap = branch?.closest?.('.os-sel');
+  if (!branch || !wrap) return false;
+  const shouldOpen = !branch.classList.contains('open');
+  wrap.querySelectorAll('.os-sel-branch.open').forEach(item => item.classList.remove('open'));
+  branch.classList.toggle('open', shouldOpen);
   return false;
 }
 document.addEventListener('pointerdown', e => {
@@ -1834,11 +1950,36 @@ function fmtK8sMemory(bytes) {
 
 let overviewKpiPlatforms = {};
 try { overviewKpiPlatforms = JSON.parse(localStorage.getItem('os_overview_kpi_platforms') || '{}'); } catch {}
-window.setOverviewKpiPlatform = function(metric, platform) {
+let overviewKpiHosts = {};
+try { overviewKpiHosts = JSON.parse(localStorage.getItem('os_overview_kpi_hosts') || '{}'); } catch {}
+let overviewKpiLocalEditUntil = 0;
+let overviewKpiLocalEditRevision = 0;
+let overviewKpiSavedRevision = 0;
+function markOverviewKpiLocalEdit(){
+  overviewKpiLocalEditRevision += 1;
+  overviewKpiLocalEditUntil = Date.now() + 10000;
+}
+function overviewKpiLocalEditPending(){
+  return overviewKpiSavedRevision < overviewKpiLocalEditRevision || Date.now() < overviewKpiLocalEditUntil;
+}
+window.setOverviewKpiTarget = function(metric, platform, host = 'all') {
   overviewKpiPlatforms[metric] = platform || 'all';
+  overviewKpiHosts[metric] = overviewKpiPlatforms[metric] === 'all' ? 'all' : (host || 'all');
+  markOverviewKpiLocalEdit();
+  try {
+    localStorage.setItem('os_overview_kpi_platforms', JSON.stringify(overviewKpiPlatforms));
+    localStorage.setItem('os_overview_kpi_hosts', JSON.stringify(overviewKpiHosts));
+  } catch {}
   scheduleUiPreferencesSave();
+  closeOsSels();
   clearOverviewCache();
   if (window._lastData) render(window._lastData);
+};
+window.setOverviewKpiPlatform = function(metric, platform) {
+  window.setOverviewKpiTarget(metric, platform, 'all');
+};
+window.setOverviewKpiHost = function(metric, host) {
+  window.setOverviewKpiTarget(metric, overviewKpiPlatforms[metric] || 'all', host);
 };
 
 const UO_KEY = 'os_user_override';
@@ -1874,7 +2015,67 @@ let uiPrefsLastSignature = '';
 let uiPrefsSaveTimer = null;
 let uiPrefsSaveController = null;
 function validUiPlatform(id){ return ALL_IDS.includes(id); }
-function cleanUiOrder(list){ return Array.isArray(list) ? list.filter(validUiPlatform) : []; }
+function cleanUiOrder(list){
+  const seen = new Set();
+  return Array.isArray(list) ? list.filter(id => validUiPlatform(id) && !seen.has(id) && seen.add(id)) : [];
+}
+function cleanDetailSystemOrderList(value){
+  const seen = new Set();
+  return Array.isArray(value)
+    ? value.map(item => String(item || '').trim().slice(0, 180)).filter(item => item && !seen.has(item) && seen.add(item)).slice(0, 160)
+    : [];
+}
+function cleanDetailSystemOrderMap(value){
+  if(!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  const out = {};
+  Object.entries(value).forEach(([panelId, order]) => {
+    if(!validUiPlatform(panelId) || !Array.isArray(order)) return;
+    out[panelId] = cleanDetailSystemOrderList(order);
+  });
+  return out;
+}
+function mergeStableOrder(existing, visibleOrder, cleaner = value => value){
+  const base = cleaner(existing);
+  const visible = cleaner(visibleOrder);
+  const visibleSet = new Set(visible);
+  const queue = [...visible];
+  const merged = base.map(item => visibleSet.has(item) ? queue.shift() : item);
+  merged.push(...queue);
+  return cleaner(merged);
+}
+function mergeUiOrder(existing, visibleOrder){ return mergeStableOrder(existing, visibleOrder, cleanUiOrder); }
+function sameUiOrder(left, right){
+  const a = cleanUiOrder(left);
+  const b = cleanUiOrder(right);
+  return a.length === b.length && a.every((id, index) => id === b[index]);
+}
+function cleanUiStringMap(value){
+  if(!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  return Object.fromEntries(Object.entries(value).map(([key, item]) => [String(key), String(item || '')]).filter(([, item]) => item));
+}
+function sameUiStringMap(left, right){ return JSON.stringify(cleanUiStringMap(left)) === JSON.stringify(cleanUiStringMap(right)); }
+function sameDetailSystemOrder(left, right){ return JSON.stringify(cleanDetailSystemOrderMap(left)) === JSON.stringify(cleanDetailSystemOrderMap(right)); }
+function markDetailSystemOrderLocalEdit(){
+  detailSystemOrderLocalEditRevision += 1;
+  detailSystemOrderLocalEditUntil = Date.now() + 10000;
+}
+function detailSystemOrderLocalEditPending(){
+  return detailSystemOrderSavedRevision < detailSystemOrderLocalEditRevision || Date.now() < detailSystemOrderLocalEditUntil;
+}
+function markPanelOrderLocalEdit(kind){
+  if(kind === 'sidebar'){
+    sidebarOrderLocalEditRevision += 1;
+    sidebarOrderLocalEditUntil = Date.now() + 10000;
+  } else {
+    dashboardOrderLocalEditRevision += 1;
+    dashboardOrderLocalEditUntil = Date.now() + 10000;
+  }
+}
+function panelOrderLocalEditPending(kind){
+  return kind === 'sidebar'
+    ? sidebarOrderSavedRevision < sidebarOrderLocalEditRevision || Date.now() < sidebarOrderLocalEditUntil
+    : dashboardOrderSavedRevision < dashboardOrderLocalEditRevision || Date.now() < dashboardOrderLocalEditUntil;
+}
 function compactUiPreferences(ui){
   const keepEmptyArrays = new Set(['dashboardHiddenPlatforms', 'panelOrder', 'sidebarPanelOrder', 'dashboardPanelOrder']);
   return Object.fromEntries(Object.entries(ui || {}).filter(([key, value]) => {
@@ -1897,6 +2098,8 @@ function uiPreferencesSnapshot(){
     k8sPodSort,
     k8sNamespaceFilter,
     overviewKpiPlatforms: overviewKpiPlatforms || {},
+    overviewKpiHosts: overviewKpiHosts || {},
+    detailSystemOrder: cleanDetailSystemOrderMap(detailSystemOrder),
     userOverride: userOverride || {},
     railCollapsed: !!railCollapsedPref,
     navCollapsed: !!navCollapsedPref,
@@ -1932,6 +2135,22 @@ async function saveUiPreferences(){
       if(sameDashboardHiddenList(savedUi.dashboardHiddenPlatforms, dashboardHiddenPlatforms)) {
         dashboardHiddenSavedRevision = dashboardHiddenLocalEditRevision;
         dashboardHiddenLocalEditUntil = 0;
+      }
+      if(sameUiOrder(savedUi.sidebarPanelOrder, sidebarPanelOrder)) {
+        sidebarOrderSavedRevision = sidebarOrderLocalEditRevision;
+        sidebarOrderLocalEditUntil = 0;
+      }
+      if(sameUiOrder(savedUi.dashboardPanelOrder, dashboardPanelOrder)) {
+        dashboardOrderSavedRevision = dashboardOrderLocalEditRevision;
+        dashboardOrderLocalEditUntil = 0;
+      }
+      if(sameUiStringMap(savedUi.overviewKpiPlatforms, overviewKpiPlatforms) && sameUiStringMap(savedUi.overviewKpiHosts, overviewKpiHosts)) {
+        overviewKpiSavedRevision = overviewKpiLocalEditRevision;
+        overviewKpiLocalEditUntil = 0;
+      }
+      if(sameDetailSystemOrder(savedUi.detailSystemOrder, detailSystemOrder)) {
+        detailSystemOrderSavedRevision = detailSystemOrderLocalEditRevision;
+        detailSystemOrderLocalEditUntil = 0;
       }
     }
   }catch(e){
@@ -1970,16 +2189,63 @@ function applyServerUiPreferences(data = {}){
       }
     }
     const legacyPanelOrder = Array.isArray(ui.panelOrder) ? cleanUiOrder(ui.panelOrder) : [];
-    if(Array.isArray(ui.sidebarPanelOrder)) sidebarPanelOrder = cleanUiOrder(ui.sidebarPanelOrder);
-    else if(legacyPanelOrder.length) sidebarPanelOrder = legacyPanelOrder;
-    if(Array.isArray(ui.dashboardPanelOrder)) dashboardPanelOrder = cleanUiOrder(ui.dashboardPanelOrder);
-    else if(legacyPanelOrder.length) dashboardPanelOrder = legacyPanelOrder;
+    const serverSidebarOrder = Array.isArray(ui.sidebarPanelOrder) ? cleanUiOrder(ui.sidebarPanelOrder) : legacyPanelOrder;
+    const serverDashboardOrder = Array.isArray(ui.dashboardPanelOrder) ? cleanUiOrder(ui.dashboardPanelOrder) : legacyPanelOrder;
+    const mergedSidebarOrder = mergeUiOrder(sidebarPanelOrder, serverSidebarOrder);
+    const mergedDashboardOrder = mergeUiOrder(dashboardPanelOrder, serverDashboardOrder);
+    if(panelOrderLocalEditPending('sidebar') && !sameUiOrder(serverSidebarOrder, sidebarPanelOrder)) resaveAfterHydration = true;
+    else {
+      sidebarPanelOrder = mergedSidebarOrder;
+      sidebarOrderSavedRevision = sidebarOrderLocalEditRevision;
+      sidebarOrderLocalEditUntil = 0;
+    }
+    if(panelOrderLocalEditPending('dashboard') && !sameUiOrder(serverDashboardOrder, dashboardPanelOrder)) resaveAfterHydration = true;
+    else {
+      dashboardPanelOrder = mergedDashboardOrder;
+      dashboardOrderSavedRevision = dashboardOrderLocalEditRevision;
+      dashboardOrderLocalEditUntil = 0;
+    }
+    try {
+      localStorage.setItem('os_sidebar_panel_order', JSON.stringify(sidebarPanelOrder));
+      localStorage.setItem('os_dashboard_panel_order', JSON.stringify(dashboardPanelOrder));
+    } catch {}
     if(ui.overviewLayouts && typeof ui.overviewLayouts === 'object') overviewLayouts = ui.overviewLayouts;
     if(ui.timeLimits && typeof ui.timeLimits === 'object') timeLimits = { ...ui.timeLimits };
     if(typeof ui.dockerContainerSort === 'string') dockerContainerSort = ui.dockerContainerSort;
     if(typeof ui.k8sPodSort === 'string') k8sPodSort = ui.k8sPodSort;
     if(typeof ui.k8sNamespaceFilter === 'string') k8sNamespaceFilter = ui.k8sNamespaceFilter || 'all';
-    if(ui.overviewKpiPlatforms && typeof ui.overviewKpiPlatforms === 'object') overviewKpiPlatforms = { ...ui.overviewKpiPlatforms };
+    const serverKpiPlatforms = cleanUiStringMap(ui.overviewKpiPlatforms);
+    const serverKpiHosts = cleanUiStringMap(ui.overviewKpiHosts);
+    const hasServerKpiPreferences = ui.overviewKpiPlatforms && typeof ui.overviewKpiPlatforms === 'object'
+      || ui.overviewKpiHosts && typeof ui.overviewKpiHosts === 'object';
+    if(overviewKpiLocalEditPending() && (!sameUiStringMap(serverKpiPlatforms, overviewKpiPlatforms) || !sameUiStringMap(serverKpiHosts, overviewKpiHosts))) resaveAfterHydration = true;
+    else if(hasServerKpiPreferences) {
+      if(ui.overviewKpiPlatforms && typeof ui.overviewKpiPlatforms === 'object') overviewKpiPlatforms = serverKpiPlatforms;
+      if(ui.overviewKpiHosts && typeof ui.overviewKpiHosts === 'object') overviewKpiHosts = serverKpiHosts;
+      overviewKpiSavedRevision = overviewKpiLocalEditRevision;
+      overviewKpiLocalEditUntil = 0;
+    }
+    const hasServerDetailOrder = ui.detailSystemOrder && typeof ui.detailSystemOrder === 'object';
+    const incomingDetailOrder = hasServerDetailOrder ? cleanDetailSystemOrderMap(ui.detailSystemOrder) : {};
+    if(detailSystemOrderLocalEditPending() && !sameDetailSystemOrder(incomingDetailOrder, detailSystemOrder)) resaveAfterHydration = true;
+    else if(hasServerDetailOrder) {
+      const serverDetailOrder = incomingDetailOrder;
+      const localDetailOrder = cleanDetailSystemOrderMap(detailSystemOrder);
+      detailSystemOrder = { ...serverDetailOrder };
+      Object.entries(localDetailOrder).forEach(([panelId, order]) => {
+        detailSystemOrder[panelId] = mergeStableOrder(order, serverDetailOrder[panelId] || [], list => {
+          const seen = new Set();
+          return Array.isArray(list) ? list.filter(item => item && !seen.has(item) && seen.add(item)) : [];
+        });
+      });
+      detailSystemOrderSavedRevision = detailSystemOrderLocalEditRevision;
+      detailSystemOrderLocalEditUntil = 0;
+    }
+    try {
+      localStorage.setItem('os_overview_kpi_platforms', JSON.stringify(overviewKpiPlatforms));
+      localStorage.setItem('os_overview_kpi_hosts', JSON.stringify(overviewKpiHosts));
+      localStorage.setItem('os_detail_system_order', JSON.stringify(detailSystemOrder));
+    } catch {}
     const localUserOverride = readLocalUserOverride();
     if(ui.userOverride && typeof ui.userOverride === 'object') userOverride = { ...ui.userOverride, ...localUserOverride };
     else if(Object.keys(localUserOverride).length) userOverride = localUserOverride;
@@ -1990,12 +2256,14 @@ function applyServerUiPreferences(data = {}){
     if(ui.navCollapsed !== undefined && !hasLocalNavCollapsed) navCollapsedPref = !!ui.navCollapsed;
     setLocalUiShellPref('os_rail_collapsed', railCollapsedPref);
     setLocalUiShellPref('os_nav_collapsed', navCollapsedPref);
-    if(Number.isFinite(Number(ui.railWidth))) railWidthPref = Number(ui.railWidth) || railWidthPref;
-    const shell = document.querySelector('.shell');
-    if(shell && railWidthPref) {
-      const w = Math.max(238, Math.min(440, Math.round(railWidthPref)));
-      shell.style.setProperty('--rail-w', w + 'px');
-      shell.classList.toggle('rail-narrow', w <= 254);
+    if(!window._railResizing){
+      const localRailWidth = readLocalRailWidthPref();
+      if(localRailWidth) railWidthPref = localRailWidth;
+      else if(ui.railWidth !== undefined && ui.railWidth !== null && Number.isFinite(Number(ui.railWidth))) railWidthPref = clampRailWidth(ui.railWidth) || railWidthPref;
+      if(railWidthPref){
+        railWidthPref = applyRailWidth(railWidthPref) || railWidthPref;
+        try { localStorage.setItem('os_rail_width', String(railWidthPref)); } catch {}
+      }
     }
     applyRailCollapsed(railCollapsedPref);
     applyMainNavCollapsed(navCollapsedPref);
@@ -2011,7 +2279,7 @@ let activePanel = null;
 
 const SNMP_PANEL_IDS = ['synology','mikrotik','unifi','snmp'];
 const SNMP_BRAND_PANEL_IDS = ['synology','mikrotik','unifi'];
-const ALL_IDS = ['proxmox','kubernetes','linux','windows','synology','mikrotik','unifi','snmp','healthchecks','uptimekuma','checks','prometheus','docker','dockhand','firewall','truenas','qnap','ugreen','pbs','cloudflare','cicd','veeam','portainer','database'];
+const ALL_IDS = ['proxmox','vmware','kubernetes','linux','windows','synology','mikrotik','unifi','snmp','healthchecks','uptimekuma','checks','prometheus','docker','dockhand','firewall','truenas','qnap','ugreen','pbs','cloudflare','cicd','veeam','portainer','database'];
 const CONFIGURED_CACHE_KEY = 'os_configured_ids_v1';
 function platformTitle(id, title){
   return String(title || id || '');
@@ -2049,6 +2317,7 @@ function expandSnmpConfiguredIds(ids, source = {}){
 
 const SEC_ICONS = {
   proxmox:     () => `<span class="sec-glyph" style="font-size:15px">🖧</span>`,
+  vmware:      () => `<span class="sec-glyph" style="font-size:11px;font-weight:800;letter-spacing:-.5px">VM</span>`,
   linux:       (c) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>`,
   windows:     (c) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M3 5.5 10 4.5v7H3v-6Z" fill="${c}"/><path d="M11 4.35 21 3v8.5H11V4.35Z" fill="${c}" opacity=".82"/><path d="M3 12.5h7v7L3 18.5v-6Z" fill="${c}" opacity=".82"/><path d="M11 12.5h10V21l-10-1.35V12.5Z" fill="${c}"/></svg>`,
   kubernetes:  () => `<span class="sec-glyph" style="font-size:15px">⎈</span>`,
@@ -2116,6 +2385,32 @@ function fmtPct(v){
   if(n === null) return '--';
   return `${Number.isInteger(n) ? n : n.toFixed(1)}%`;
 }
+function capacityGaugeCard(title, percent, usedBytes, totalBytes, options = {}){
+  const usagePct = boundedPct(percent);
+  const usageClass = usagePct === null ? 'is-unknown' : usagePct >= 90 ? 'is-critical' : usagePct >= 70 ? 'is-warn' : 'is-ok';
+  const titleRowClass = options.badgeHtml ? ' capacity-card-title-row' : '';
+  const cardClass = options.cardClass ? ` ${escAttr(options.cardClass)}` : '';
+  const gaugeLabel = `${title} ${fmtPct(usagePct)}`;
+  return `<section class="ceph-health-card ceph-capacity-card${cardClass}" aria-label="${escAttr(options.ariaLabel || title)}">
+    ${options.hideTitle ? '' : `<div class="ceph-card-title${titleRowClass}"><span title="${escAttr(title)}">${escHtml(title)}</span>${options.badgeHtml || ''}</div>`}
+    <div class="ceph-gauge-wrap">
+      <svg class="ceph-gauge" viewBox="0 0 260 145" role="img" aria-label="${escAttr(gaugeLabel)}">
+        <path class="ceph-gauge-track" pathLength="100" d="M35 128 A95 95 0 0 1 225 128"></path>
+        ${usagePct !== null && usagePct > 0 ? `<path class="ceph-gauge-fill ${usageClass}" pathLength="100" d="M35 128 A95 95 0 0 1 225 128" style="stroke-dasharray:${usagePct} 100"></path>` : ''}
+        <path class="ceph-gauge-zone is-ok" pathLength="100" d="M17 128 A113 113 0 0 1 243 128" style="stroke-dasharray:69 31"></path>
+        <path class="ceph-gauge-zone is-warn" pathLength="100" d="M17 128 A113 113 0 0 1 243 128" style="stroke-dasharray:19 81;stroke-dashoffset:-70"></path>
+        <path class="ceph-gauge-zone is-critical" pathLength="100" d="M17 128 A113 113 0 0 1 243 128" style="stroke-dasharray:9 91;stroke-dashoffset:-91"></path>
+        <text class="ceph-gauge-percent" x="130" y="119" text-anchor="middle">${escHtml(fmtPct(usagePct))}</text>
+      </svg>
+    </div>
+    <div class="ceph-capacity-meta">
+      <strong>${hasNum(usedBytes) ? fmtBytes(usedBytes) : '—'}</strong>
+      <span>/ ${hasNum(totalBytes) ? fmtBytes(totalBytes) : '—'}</span>
+      ${options.metaSuffix ? `<span class="capacity-card-meta-suffix">· ${escHtml(options.metaSuffix)}</span>` : ''}
+      ${options.hideTitle ? options.badgeHtml || '' : ''}
+    </div>
+  </section>`;
+}
 /* ci-extract:begin fmtChartValue */
 // Chart tooltips follow the card-header rounding rule (see fmtPct): one decimal
 // at most, trailing .0 dropped, so a header reading "32%" and its tooltip never
@@ -2162,6 +2457,7 @@ function sortSvcs(svcs) {
 
 const PLATFORM_META = {
   proxmox:     { title:'Proxmox',       iconKey:'proxmox',     color:'var(--blue)' },
+  vmware:      { title:'VMware ESXi',   iconKey:'vmware',      color:'var(--blue)' },
   kubernetes:  { title:'Kubernetes',    iconKey:'kubernetes',  color:'var(--purple,#9b59b6)' },
   linux:       { title:'Linux Servers', iconKey:'linux',       color:'var(--green)' },
   windows:     { title:'Windows Servers', iconKey:'windows',  color:'var(--blue)' },
@@ -2219,9 +2515,10 @@ function placeholderPanel(id){
 function applyConfigured(ids, cfg){
   const nextIds = expandSnmpConfiguredIds(ids, cfg);
   setConfiguredIds(nextIds);
-  const d = window._lastData || { timestamp:new Date().toISOString(), proxmox:{nodes:[]}, linux:[], windows:[], kubernetes:null, snmp:[], healthchecks:null, uptimekuma:null, checks:null, prometheus:null, docker:[], dockhand:null, firewall:null, truenas:null, qnap:null, ugreen:null, pbs:null, cloudflare:null, cicd:null, veeam:null, portainer:null, database:[] };
+  const d = window._lastData || { timestamp:new Date().toISOString(), proxmox:{nodes:[]}, vmware:null, linux:[], windows:[], kubernetes:null, snmp:[], healthchecks:null, uptimekuma:null, checks:null, prometheus:null, docker:[], dockhand:null, firewall:null, truenas:null, qnap:null, ugreen:null, pbs:null, cloudflare:null, cicd:null, veeam:null, portainer:null, database:[] };
   d.configured = nextIds;
   if(!ids.includes('proxmox')) d.proxmox = { clusterSummary:null, nodes:[] };
+  if(!ids.includes('vmware')) d.vmware = null;
   if(!ids.includes('linux')) d.linux = [];
   if(!ids.includes('windows')) d.windows = [];
   if(!ids.includes('kubernetes')) d.kubernetes = null;
@@ -2261,6 +2558,15 @@ function applyConfigured(ids, cfg){
       const present = new Set(nodes.map(n=>n.node?.name));
       (cfg.proxmox?.nodes||[]).forEach(nm => { if(!present.has(nm)) nodes.push({ node:{ name:nm, online:false }, services:[], vms:[], history:[], _connecting:true }); });
       d.proxmox = { clusterSummary:(d.proxmox?.clusterSummary)||null, nodes };
+    }
+    if(ids.includes('vmware') && !d.vmware){
+      const instances = Array.isArray(cfg.vmware?.instances) ? cfg.vmware.instances : (cfg.vmware?.url ? [cfg.vmware] : []);
+      d.vmware = {
+        _connecting: true,
+        online: false,
+        summary: { instances: instances.length, up: 0, down: 0, clusters: 0, hosts: 0, hostsOnline: 0, vms: 0, runningVms: 0, datastores: 0 },
+        instances: instances.map((inst, idx) => ({ name: inst.name || inst.url || `VMware ${idx + 1}`, url: inst.url || '', online: false, _connecting: true, clusters: [], hosts: [], vms: [], datastores: [] })),
+      };
     }
 	if(ids.includes('kubernetes')){
       if(!d.kubernetes) {
@@ -2874,6 +3180,11 @@ function pveTempHistorySource(history, temp, index = 0) {
 function displayPveHost(host) {
   return String(host || '').replace(/^https?:\/\//i, '').replace(/:8006\/?$/i, '').replace(/\/$/, '');
 }
+function relabelDetailSummary(summaryHtml, fromLabel, toLabel) {
+  const from = `<div class="sb-csum-lbl">${escHtml(fromLabel)}</div>`;
+  const to = `<div class="sb-csum-lbl">${escHtml(toLabel)}</div>`;
+  return String(summaryHtml || '').replace(from, to);
+}
 function rateColor(){ return '#22D3EE'; }
 function rateSparkMax(data, key, current) {
   const vals = (Array.isArray(data) ? data.map(d => d?.[key]) : []).concat([current]).filter(hasNum).map(Number);
@@ -2934,6 +3245,8 @@ function pveHeaderLabel(label) {
 function buildProxmox(px){
   if(!px?.nodes?.length) return null;
   const cs = px.clusterSummary || {};
+  const clusters = (px.clusters || []).filter(cluster => cluster?.isCluster);
+  const clusterQuorumLost = clusters.some(cluster => cluster.quorate === false);
   const online = cs.nodesOnline ?? 0;
   const total  = cs.totalNodes  ?? 0;
   const allSvcs = px.nodes.flatMap(n=>n.services||[]);
@@ -2941,7 +3254,7 @@ function buildProxmox(px){
   const failedSvcs = allSvcs.filter(s=>!s.active && !s.excluded);
   const svcsFailed = failedSvcs.length;
   const offlineNodes = px.nodes.filter(n=>!n._connecting && !n.node?.online).length;
-  const allOk = px.nodes.every(n=>n.node?.online);
+  const allOk = px.nodes.every(n=>n.node?.online) && !clusterQuorumLost;
   const allVms = px.nodes.flatMap(n=>n.vms||[]);
   const vmRunning = allVms.filter(v=>v.running).length;
   const ceph = px.ceph;
@@ -2972,6 +3285,29 @@ function buildProxmox(px){
     ${allVms.length?`<div class="sb-csum-item"><div class="sb-csum-val">${vmRunning}/${allVms.length}</div><div class="sb-csum-lbl">VMs</div></div>`:''}
   </div>` : `...`;
 
+  const clusterRowsHtml = clusters.map(cluster => {
+    const members = Array.isArray(cluster.members) ? cluster.members : [];
+    const clusterOnline = cluster.online !== false;
+    const nodesOnline = hasNum(cluster.nodesOnline) ? Math.max(0, Math.floor(Number(cluster.nodesOnline))) : members.filter(member => member.online === true).length;
+    const totalNodes = hasNum(cluster.totalNodes) ? Math.max(0, Math.floor(Number(cluster.totalNodes))) : members.length;
+    const quorumKnown = typeof cluster.quorate === 'boolean';
+    const stateClass = !clusterOnline || cluster.quorate === false ? 'is-bad' : nodesOnline < totalNodes ? 'is-warn' : 'is-ok';
+    const dotClass = !clusterOnline || cluster.quorate === false ? 'md-red' : nodesOnline < totalNodes ? 'md-yellow' : 'md-green';
+    const quorumClass = !clusterOnline || cluster.quorate === false ? 'red' : quorumKnown ? 'green' : 'gray';
+    const quorumLabel = trText(!clusterOnline ? 'Cluster unreachable' : cluster.quorate === true ? 'Quorate' : cluster.quorate === false ? 'No quorum' : 'Quorum unknown');
+    const memberHtml = members.map(member => `<span class="pve-cluster-member"><span class="mon-dot ${member.online === true ? 'md-green' : member.online === false ? 'md-red' : 'md-gray'}"></span>${escHtml(member.name || 'node')}</span>`).join('');
+    return `<div class="pve-cluster-status ${stateClass}">
+      <span class="mon-dot ${dotClass}"></span>
+      <div class="pve-cluster-main">
+        <div class="pve-cluster-title"><span class="pve-cluster-kicker">${escHtml(trText('Cluster'))}</span><strong>${escHtml(cluster.name || 'Proxmox')}</strong></div>
+        <div class="pve-cluster-meta">${nodesOnline}/${totalNodes} ${escHtml(trText('nodes online'))}</div>
+      </div>
+      ${memberHtml ? `<div class="pve-cluster-members">${memberHtml}</div>` : '<div style="flex:1"></div>'}
+      ${bdg(quorumClass, quorumLabel)}
+    </div>`;
+  }).join('');
+  const clusterHtml = clusterRowsHtml ? `<div class="pve-cluster-list">${clusterRowsHtml}</div>` : '';
+
   let cephHtml = '';
   if (ceph) {
     const cls = ceph.health === 'HEALTH_ERR' ? 'red' : ceph.health === 'HEALTH_WARN' ? 'yellow' : 'green';
@@ -2995,7 +3331,6 @@ function buildProxmox(px){
       : usage && hasNum(usage.usedBytes) && hasNum(usage.totalBytes) && Number(usage.totalBytes) > 0
         ? boundedPct(Number(usage.usedBytes) / Number(usage.totalBytes) * 100)
         : null;
-    const usageClass = usagePct === null ? 'is-unknown' : usagePct >= 90 ? 'is-critical' : usagePct >= 70 ? 'is-warn' : 'is-ok';
     const latencyAverage = latency && hasNum(latency.averageMs) ? Math.max(0, Number(latency.averageMs)) : null;
     const latencyApply = latency && hasNum(latency.applyMs) ? Math.max(0, Number(latency.applyMs)) : null;
     const latencyCommit = latency && hasNum(latency.commitMs) ? Math.max(0, Number(latency.commitMs)) : null;
@@ -3062,24 +3397,9 @@ function buildProxmox(px){
           <strong>${monStatusText}</strong>
         </div>
       </section>`;
-    const capacityCardHtml = usage ? `
-      <section class="ceph-health-card ceph-capacity-card" aria-label="Ceph cluster capacity">
-        <div class="ceph-card-title">Cluster Capacity Used</div>
-        <div class="ceph-gauge-wrap">
-          <svg class="ceph-gauge" viewBox="0 0 260 145" role="img" aria-label="${escAttr(`${trText('Cluster Capacity Used')} ${fmtPct(usagePct)}`)}">
-            <path class="ceph-gauge-track" pathLength="100" d="M35 128 A95 95 0 0 1 225 128"></path>
-            ${usagePct !== null && usagePct > 0 ? `<path class="ceph-gauge-fill ${usageClass}" pathLength="100" d="M35 128 A95 95 0 0 1 225 128" style="stroke-dasharray:${usagePct} 100"></path>` : ''}
-            <path class="ceph-gauge-zone is-ok" pathLength="100" d="M17 128 A113 113 0 0 1 243 128" style="stroke-dasharray:69 31"></path>
-            <path class="ceph-gauge-zone is-warn" pathLength="100" d="M17 128 A113 113 0 0 1 243 128" style="stroke-dasharray:19 81;stroke-dashoffset:-70"></path>
-            <path class="ceph-gauge-zone is-critical" pathLength="100" d="M17 128 A113 113 0 0 1 243 128" style="stroke-dasharray:9 91;stroke-dashoffset:-91"></path>
-            <text class="ceph-gauge-percent" x="130" y="119" text-anchor="middle">${escHtml(fmtPct(usagePct))}</text>
-          </svg>
-        </div>
-        <div class="ceph-capacity-meta">
-          <strong>${hasNum(usage.usedBytes) ? fmtBytes(usage.usedBytes) : '—'}</strong>
-          <span>/ ${hasNum(usage.totalBytes) ? fmtBytes(usage.totalBytes) : '—'}</span>
-        </div>
-      </section>` : '';
+    const capacityCardHtml = usage
+      ? capacityGaugeCard('Cluster Capacity Used', usagePct, usage.usedBytes, usage.totalBytes, { ariaLabel: 'Ceph cluster capacity' })
+      : '';
     const checksHtml = ceph.checks && ceph.checks.length 
       ? ceph.checks.map(c => `<div class="ceph-health-check"><span class="mon-dot ${ceph.health === 'HEALTH_ERR' ? 'md-red' : 'md-yellow'}"></span><span>${escHtml(c)}</span></div>`).join('')
       : `<div class="ceph-health-check is-clear"><span class="mon-dot md-green"></span><span>No active warnings or errors</span></div>`;
@@ -3165,7 +3485,7 @@ function buildProxmox(px){
         </div>
         ${pveStats}
       </div>
-      ${bdg(node.online?'green':'red', node.online?'online':'offline')}
+      ${bdg(node.online ? (svcFailed ? 'red' : 'green') : 'red', node.online ? (svcFailed ? `${svcFailed} services failed` : 'online') : 'offline')}
       ${notifyBell('px:'+nodeKey)}
     </div>
     <div class="node-body ${isOpen?'open':''}" id="nd-${escAttr(nodeKey)}">
@@ -3277,14 +3597,16 @@ function buildProxmox(px){
     iconKey: 'proxmox',
     color: 'var(--blue)',
     meta: `${online}/${total} online`,
+    sbMeta: `${online}/${total} hosts · ${vmRunning}/${allVms.length} VMs`,
     badge: bdg(
-      allOk && svcsFailed===0 && !cephBad ? 'green' : offlineNodes ? offlineRatioBadgeClass(offlineNodes, total || px.nodes.length, online) : (svcsFailed>0 || online===0 || cephErr) ? 'red' : 'yellow',
-      allOk && svcsFailed===0 && !cephBad ? 'healthy' : offlineNodes ? offlineRatioLabel(offlineNodes, total || px.nodes.length, online) : cephBad ? `Ceph ${ceph.health.replace('HEALTH_','')}` : svcsFailed>0 ? `${svcsFailed} services failed` : online>0 ? `${online}/${total} online` : offlineRatioLabel(total || px.nodes.length, total || px.nodes.length, online)
+      allOk && svcsFailed===0 && !cephBad ? 'green' : offlineNodes ? offlineRatioBadgeClass(offlineNodes, total || px.nodes.length, online) : (clusterQuorumLost || svcsFailed>0 || online===0 || cephErr) ? 'red' : 'yellow',
+      allOk && svcsFailed===0 && !cephBad ? 'healthy' : offlineNodes ? offlineRatioLabel(offlineNodes, total || px.nodes.length, online) : clusterQuorumLost ? 'Cluster quorum lost' : cephBad ? `Ceph ${ceph.health.replace('HEALTH_','')}` : svcsFailed>0 ? `${svcsFailed} services failed` : online>0 ? `${online}/${total} online` : offlineRatioLabel(total || px.nodes.length, total || px.nodes.length, online)
     ),
-    detailBadge: '',
+    detailMeta: '',
+    detailSummary: relabelDetailSummary(sbSummaryHtml, 'Nodes', 'Hosts'),
     sbSummary: sbSummaryHtml,
     summary: summaryHtml,
-    body: cephHtml + nodesHtml,
+    body: cephHtml + clusterHtml + nodesHtml,
   };
 }
 
@@ -3403,7 +3725,7 @@ function buildLinux(linux){
           </div>
           ${linuxStats}
         </div>
-        ${bdg(svcFailed?'red':srvAttention?'yellow':'green', svcFailed?`${svcFailed} failed`:srvReboot?'reboot required':srvUpdates?`${srvUpdates} updates`:'all ok')}
+        ${bdg(svcFailed?'red':srvAttention?'yellow':'green', svcFailed?`${svcFailed} services failed`:srvReboot?'reboot required':srvUpdates?`${srvUpdates} updates`:'online')}
         ${notifyBell('lx:'+srv.name)}
         <span class="chevron ${isOpen?'open':''}" style="margin-left:4px">▼</span>
       </div>
@@ -3475,10 +3797,12 @@ function buildLinux(linux){
     iconKey: 'linux',
     color: 'var(--green)',
     meta: `${reachable}/${linux.length} reachable`,
+    sbMeta: `${reachable}/${linux.length} online`,
     badge: bdg(
-      connecting && !realLinux.length ? 'gray' : allOk && !connecting ? 'green' : offlineServers ? offlineRatioBadgeClass(offlineServers, linux.length, reachable) : (failed || reachable === 0) ? 'red' : 'yellow',
-      connecting && !realLinux.length ? 'connecting…' : allOk && !connecting ? 'healthy' : offlineServers ? offlineRatioLabel(offlineServers, linux.length, reachable) : failed ? `${failed} services failed` : rebootCount ? `${rebootCount} reboot required` : updateCount ? `${updateCount} updates` : `${reachable}/${linux.length} reachable`
+      connecting && !realLinux.length ? 'gray' : allOk && !connecting && !updateAttention ? 'green' : offlineServers ? offlineRatioBadgeClass(offlineServers, linux.length, reachable) : (failed || reachable === 0) ? 'red' : 'yellow',
+      connecting && !realLinux.length ? 'connecting…' : allOk && !connecting && !updateAttention ? 'healthy' : offlineServers ? offlineRatioLabel(offlineServers, linux.length, reachable) : failed ? `${failed} services failed` : rebootCount ? `${rebootCount} reboot required` : updateCount ? `${updateCount} updates` : `${reachable}/${linux.length} reachable`
     ),
+    detailMeta: '',
     sbSummary: sbSummaryHtml,
     summary: summaryHtml,
     body,
@@ -3579,7 +3903,6 @@ function buildWindows(windows){
       bwTotal != null ? pveHeadStat('BW', fmtRate(bwTotal), 'var(--green)', bwMbps != null ? miniSparkline(bwHistory, 'bandwidthMbps', bwMbps, ()=>'#34D399', rateSparkMax(bwHistory, 'bandwidthMbps', bwMbps), ' MB/s', 'Bandwidth') : '') : '',
       svcTotal ? pveHeadStat('Services', `${svcUp}/${svcTotal}`) : '',
       srv.updates ? pveHeadStat('Updates', srvUpdates, srvUpdates ? 'var(--yellow)' : 'var(--green)', '', 'agent-update-stat') : '',
-      srvReboot ? pveHeadStat('Reboot', 'required', 'var(--yellow)') : '',
       srv.uptime ? pveHeadStat('Uptime', fmtUptime(srv.uptime)) : '',
     ].filter(Boolean).join('');
     return `
@@ -3588,11 +3911,11 @@ function buildWindows(windows){
         <div class="pve-head-main">
           <div class="pve-head-title">
             <div class="node-name">${escHtml(srv.name)}</div>
-            <div class="pve-head-sub">${svcFailed ? `${svcFailed} failed` : srvReboot ? 'reboot required' : 'online'}</div>
+            <div class="pve-head-sub">${svcFailed ? `${svcFailed} failed` : 'online'}</div>
           </div>
           ${stats}
         </div>
-        ${bdg(svcFailed?'red':srvAttention?'yellow':'green', svcFailed?`${svcFailed} failed`:srvReboot?'reboot required':srvUpdates?`${srvUpdates} updates`:'all ok')}
+        ${bdg(svcFailed?'red':srvAttention?'yellow':'green', svcFailed?`${svcFailed} services failed`:srvReboot?'reboot required':srvUpdates?`${srvUpdates} updates`:'online')}
         ${notifyBell('win:'+srv.name)}
         <span class="chevron ${isOpen?'open':''}" style="margin-left:4px">▼</span>
       </div>
@@ -3623,11 +3946,312 @@ function buildWindows(windows){
     iconKey: 'windows',
     color: 'var(--blue)',
     meta: `${reachable}/${windows.length} reachable`,
+    sbMeta: `${reachable}/${windows.length} online`,
     badge: bdg(connecting && !real.length ? 'gray' : allOk && !connecting ? 'green' : offlineServers ? offlineRatioBadgeClass(offlineServers, windows.length, reachable) : (failed || reachable === 0) ? 'red' : 'yellow', connecting && !real.length ? 'connecting...' : allOk && !connecting ? 'healthy' : offlineServers ? offlineRatioLabel(offlineServers, windows.length, reachable) : failed ? `${failed} services failed` : rebootCount ? `${rebootCount} reboot required` : updateCount ? `${updateCount} updates` : `${reachable}/${windows.length} reachable`),
+    detailMeta: '',
     sbSummary: sbSummaryHtml,
     summary: summaryHtml,
     body,
     agentUpdateState: { count: updateCount, visible: updateAttention },
+  };
+}
+
+/* ── VMware ESXi / vCenter ── */
+function vmwareHealthDot(online, health, maintenance = false) {
+  if (!online) return 'md-red';
+  if (String(health || '').toLowerCase() === 'red') return 'md-red';
+  if (maintenance || String(health || '').toLowerCase() === 'yellow') return 'md-yellow';
+  return 'md-green';
+}
+
+function vmwareToolsLabel(status) {
+  const raw = String(status || '').trim();
+  if (!raw) return '';
+  const normalized = raw.toLowerCase();
+  if (normalized === 'guesttoolsrunning') return 'Running';
+  if (normalized === 'guesttoolsnotrunning') return 'Not running';
+  if (normalized === 'guesttoolsexecutingscripts') return 'Executing scripts';
+  return raw.replace(/^guestTools/i, '').replace(/([a-z])([A-Z])/g, '$1 $2').trim();
+}
+
+function toggleVmwareInstance(index, key) {
+  const stateKey = `vmware:endpoint:${key}`;
+  const next = !panelOpenState(stateKey, true);
+  setOverride(stateKey, next);
+  document.getElementById(`vmware-body-${index}`)?.classList.toggle('open', next);
+  document.getElementById(`vmware-chev-${index}`)?.classList.toggle('open', next);
+}
+
+function toggleVmwareHost(instanceIndex, hostIndex, key) {
+  const stateKey = `vmware:host:${key}`;
+  const next = !panelOpenState(stateKey, false);
+  setOverride(stateKey, next);
+  document.getElementById(`vmware-host-body-${instanceIndex}-${hostIndex}`)?.classList.toggle('open', next);
+  document.getElementById(`vmware-host-chev-${instanceIndex}-${hostIndex}`)?.classList.toggle('open', next);
+}
+
+function toggleVmwareDatastores(instanceIndex, key) {
+  const body = document.getElementById(`vmware-datastores-body-${instanceIndex}`);
+  const header = document.getElementById(`vmware-datastores-header-${instanceIndex}`);
+  if (!body) return;
+  body.style.display = '';
+  const open = body.classList.toggle('open');
+  setOverride(`vmware:datastores:${key}`, open);
+  header?.querySelector('.chevron')?.classList.toggle('open', open);
+  requestAnimationFrame(layoutOverviewMasonry);
+}
+
+function buildVmware(vmware) {
+  if (!vmware) return null;
+  const instances = vmware.instances || [];
+  if (!instances.length && !vmware._connecting && vmware.online === undefined) return null;
+  const summary = vmware.summary || {};
+  const stale = !!vmware._stale;
+  const endpointTotal = Number(summary.instances ?? instances.length);
+  const endpointUp = Number(summary.up ?? instances.filter(instance => instance.online).length);
+  const endpointDown = Math.max(0, Number(summary.down ?? (endpointTotal - endpointUp)));
+  const hostTotal = Number(summary.hosts || 0);
+  const hostsOnline = Number(summary.hostsOnline || 0);
+  const vmTotal = Number(summary.vms || 0);
+  const runningVms = Number(summary.runningVms || 0);
+  const datastoreTotal = Number(summary.datastores || 0);
+  const warningCount = Number(summary.hostsWarning || 0)
+    + Number(summary.hostsMaintenance || 0)
+    + Number(summary.vmsWarning || 0)
+    + Number(summary.datastoresWarning || 0);
+  const connecting = !!vmware._connecting || instances.some(instance => instance._connecting && !instance.online);
+  const noHostsOnline = hostTotal > 0 && hostsOnline === 0;
+  const partialHosts = hostsOnline < hostTotal;
+  const healthClass = connecting && endpointUp === 0
+    ? 'gray'
+    : stale
+      ? 'yellow'
+      : endpointUp === 0 || noHostsOnline
+      ? 'red'
+      : endpointDown > 0 || partialHosts || warningCount > 0
+        ? 'yellow'
+        : 'green';
+  const healthText = connecting && endpointUp === 0
+    ? 'connecting...'
+    : stale
+      ? 'stale data'
+      : endpointDown > 0
+      ? offlineRatioLabel(endpointDown, endpointTotal, endpointUp)
+      : partialHosts
+        ? offlineRatioLabel(hostTotal - hostsOnline, hostTotal, hostsOnline)
+        : warningCount > 0
+          ? 'attention'
+          : 'healthy';
+  const inventoryHosts = instances.flatMap(instance => instance.hosts || []);
+  const cpuCores = hasNum(summary.cpuCores)
+    ? Number(summary.cpuCores)
+    : inventoryHosts.reduce((sum, host) => sum + Number(host.cpuCores || 0), 0);
+  const cpuUsedCores = hasNum(summary.cpuUsedCores)
+    ? Number(summary.cpuUsedCores)
+    : inventoryHosts.filter(host => host.online).reduce((sum, host) => {
+        const usage = hasNum(host.cpuUsedMhz) && hasNum(host.cpuTotalMhz) && Number(host.cpuTotalMhz) > 0
+          ? Number(host.cpuUsedMhz) / Number(host.cpuTotalMhz)
+          : hasNum(host.cpuPercent) ? Number(host.cpuPercent) / 100 : 0;
+        return sum + Number(host.cpuCores || 0) * usage;
+      }, 0);
+  const memoryUsedBytes = hasNum(summary.memoryUsedBytes)
+    ? Number(summary.memoryUsedBytes)
+    : inventoryHosts.filter(host => host.online).reduce((sum, host) => sum + Number(host.memoryUsedBytes || 0), 0);
+  const memoryTotalBytes = hasNum(summary.memoryTotalBytes)
+    ? Number(summary.memoryTotalBytes)
+    : inventoryHosts.reduce((sum, host) => sum + Number(host.memoryTotalBytes || 0), 0);
+  const cpuPercent = hasNum(summary.cpuPercent) ? Number(summary.cpuPercent) : cpuCores > 0 ? cpuUsedCores / cpuCores * 100 : null;
+  const memoryPercent = hasNum(summary.memoryPercent) ? Number(summary.memoryPercent) : memoryTotalBytes > 0 ? memoryUsedBytes / memoryTotalBytes * 100 : null;
+  const storagePercent = hasNum(summary.storagePercent) ? Number(summary.storagePercent) : null;
+  const sidebarSummary = `<div class="sb-csum pve-sb-csum">
+    <div class="sb-csum-item"><div class="sb-csum-val">${hostsOnline}/${hostTotal}</div><div class="sb-csum-lbl">Hosts</div></div>
+    <div class="sb-csum-item"><div class="sb-csum-val">${cpuCores > 0 ? `<span style="color:${cpuPercent === null ? 'var(--muted)' : bc(cpuPercent)}">${cpuUsedCores.toFixed(1)}</span>/${fmtChartValue(cpuCores)}` : '—'}</div><div class="sb-csum-lbl">Cores</div></div>
+    <div class="sb-csum-item"><div class="sb-csum-val">${memoryTotalBytes > 0 ? `<span style="color:${memoryPercent === null ? 'var(--muted)' : bc(memoryPercent)}">${(memoryUsedBytes / 1024 ** 3).toFixed(0)}</span>/${(memoryTotalBytes / 1024 ** 3).toFixed(0)}G` : '—'}</div><div class="sb-csum-lbl">RAM</div></div>
+    <div class="sb-csum-item"><div class="sb-csum-val">${runningVms}/${vmTotal}</div><div class="sb-csum-lbl">VMs</div></div>
+  </div>`;
+
+  const endpointHtml = instances.map((instance, instanceIndex) => {
+    const endpointKey = instance.url || instance.name || String(instanceIndex);
+    const instanceStale = stale || !!instance._stale;
+    const isOpen = panelOpenState(`vmware:endpoint:${endpointKey}`, true);
+    const instanceHosts = instance.hosts || [];
+    const instanceVms = instance.vms || [];
+    const instanceDatastores = instance.datastores || [];
+    const datastoresOpen = panelOpenState(`vmware:datastores:${endpointKey}`, false);
+    const instanceSummary = instance.summary || {};
+    const instanceHostsOnline = Number(instanceSummary.hostsOnline ?? instanceHosts.filter(host => host.online).length);
+    const instanceHostTotal = Number(instanceSummary.hosts ?? instanceHosts.length);
+    const instanceRunningVms = Number(instanceSummary.runningVms ?? instanceVms.filter(vm => vm.running).length);
+    const endpointWarning = instanceStale || instanceHosts.some(host => !host.online || host.maintenance || ['yellow', 'red'].includes(String(host.health || '').toLowerCase()))
+      || instanceVms.some(vm => vm.running && ['yellow', 'red'].includes(String(vm.health || '').toLowerCase()))
+      || instanceDatastores.some(datastore => datastore.accessible === false || ['yellow', 'red'].includes(String(datastore.health || '').toLowerCase()));
+    const endpointState = instance._connecting ? 'connecting' : !instance.online ? 'offline' : instanceStale || endpointWarning ? 'warn' : 'online';
+    const endpointBadge = instance._connecting
+      ? bdg('gray', 'connecting...')
+      : !instance.online
+        ? bdg('red', 'offline')
+        : instanceStale
+          ? bdg('yellow', 'stale data')
+          : bdg(endpointWarning ? 'yellow' : 'green', endpointWarning ? 'attention' : 'online');
+    const productLabel = instance.type === 'vcenter' ? 'vCenter Server' : instance.type === 'esxi' ? 'Standalone ESXi' : 'VMware endpoint';
+
+    const clusterRows = (instance.clusters || []).map(cluster => {
+      const members = instanceHosts.filter(host => (cluster.hostRefs || []).includes(host.id));
+      const membersOnline = members.filter(host => host.online).length;
+      const clusterHealth = String(cluster.health || '').toLowerCase();
+      const clusterWarn = instanceStale || ['yellow', 'red'].includes(clusterHealth) || membersOnline < members.length;
+      const clusterBadgeClass = instanceStale ? 'yellow' : clusterHealth === 'red' || (members.length > 0 && membersOnline === 0) ? 'red' : clusterWarn ? 'yellow' : 'green';
+      const memberHtml = members.map(host => `<span class="pve-cluster-member"><span class="mon-dot ${instanceStale ? 'md-yellow' : vmwareHealthDot(host.online, host.health, host.maintenance)}"></span>${escHtml(host.name)}</span>`).join('');
+      return `<div class="pve-cluster-status ${clusterWarn ? 'is-warn' : 'is-ok'}">
+        <span class="mon-dot md-${clusterBadgeClass}"></span>
+        <div class="pve-cluster-main">
+          <div class="pve-cluster-title"><span class="pve-cluster-kicker">Cluster</span><strong>${escHtml(cluster.name || 'VMware')}</strong></div>
+          <div class="pve-cluster-meta">${membersOnline}/${members.length || Number(cluster.totalHosts || 0)} hosts online</div>
+        </div>
+        ${memberHtml ? `<div class="pve-cluster-members">${memberHtml}</div>` : '<div style="flex:1"></div>'}
+        ${bdg(clusterBadgeClass, instanceStale ? 'stale data' : clusterWarn ? 'attention' : 'healthy')}
+      </div>`;
+    }).join('');
+
+    const hostRows = instanceHosts.map((host, hostIndex) => {
+      const hostKey = `${endpointKey}:${host.id || host.name || hostIndex}`;
+      const hostOpen = panelOpenState(`vmware:host:${hostKey}`, false);
+      const hostVms = instanceVms.filter(vm => vm.hostId === host.id);
+      const hostRunningVms = hostVms.filter(vm => vm.running).length;
+      const hostVmWarning = hostVms.some(vm => vm.running && ['yellow', 'red'].includes(String(vm.health || '').toLowerCase()));
+      const hostWarn = instanceStale || host.maintenance || hostVmWarning || ['yellow', 'red'].includes(String(host.health || '').toLowerCase());
+      const hostStateText = instanceStale ? 'stale data' : !host.online ? 'offline' : host.maintenance ? 'maintenance' : hostWarn ? 'attention' : 'online';
+      const hostBadgeClass = instanceStale ? 'yellow' : !host.online || String(host.health || '').toLowerCase() === 'red' ? 'red' : hostWarn ? 'yellow' : 'green';
+      const hostSubtitle = host.clusterName ? `${host.clusterName} · ${hostStateText}` : hostStateText;
+      const hostHistory = Array.isArray(host.history) ? host.history : [];
+      const hostChartKey = `vmware:${hostKey}`;
+      const vmRows = hostVms.length ? hostVms.map(vm => {
+        const powerText = vm.running ? 'powered on' : vm.powerState === 'poweredoff' ? 'powered off' : vm.powerState || 'unknown';
+        const vmHealth = String(vm.health || '').toLowerCase();
+        const vmBadgeClass = !vm.running ? 'gray' : vmHealth === 'red' ? 'red' : vmHealth === 'yellow' ? 'yellow' : 'green';
+        const resourceText = [hasNum(vm.cpuCount) ? `${vm.cpuCount} vCPU` : '', hasNum(vm.memoryMb) ? `${Math.round(Number(vm.memoryMb))} MB RAM` : ''].filter(Boolean).join(' · ');
+        const guestText = [vm.guestOs, vm.ipAddress].filter(Boolean).join(' · ');
+        const toolsText = vmwareToolsLabel(vm.toolsStatus);
+        return `<div class="mon-row clickable" onclick="event.stopPropagation();showVmwareGuest(${jsStr(endpointKey)},${jsStr(vm.id)})" title="View details" style="grid-template-columns:18px minmax(150px,1.15fr) minmax(180px,1.5fr) minmax(110px,.8fr) 104px">
+          <div class="mon-dot md-${vmBadgeClass}"></div>
+          <div class="mon-name" style="width:auto;min-width:0;max-width:none" title="${escAttr(vm.name)}">${escHtml(vm.name || 'Virtual machine')}</div>
+          <span style="color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escAttr(guestText)}">${escHtml(guestText || toolsText || 'Guest details unavailable')}</span>
+          <span style="color:var(--muted);font-size:12px">${escHtml(resourceText || toolsText || '--')}</span>
+          <span style="text-align:right">${bdg(vmBadgeClass, powerText)}</span>
+        </div>`;
+      }).join('') : '<div class="empty">No virtual machines assigned to this host</div>';
+      const hostStats = [
+        hasNum(host.cpuPercent) ? pveHeadStat('CPU', fmtPct(host.cpuPercent), bc(host.cpuPercent), miniSparkline(hostHistory, 'cpu', host.cpuPercent)) : '',
+        hasNum(host.memoryPercent) ? pveHeadStat('RAM', fmtPct(host.memoryPercent), bc(host.memoryPercent), miniSparkline(hostHistory, 'mem', host.memoryPercent)) : '',
+        pveHeadStat('VMs', `${hostRunningVms}/${hostVms.length}`, 'var(--text)', '', 'is-vms'),
+        hasNum(host.cpuCores) ? pveHeadStat('Cores', host.cpuCores, 'var(--text)') : '',
+        host.uptimeSeconds ? pveHeadStat('Uptime', fmtUptime(host.uptimeSeconds), 'var(--text)', '', 'is-uptime') : '',
+      ].filter(Boolean).join('');
+      return `<div class="node-hdr pve-node-hdr" onclick="toggleVmwareHost(${instanceIndex},${hostIndex},${jsStr(hostKey)})">
+        <div class="mon-dot ${instanceStale ? 'md-yellow' : vmwareHealthDot(host.online, host.health, host.maintenance)}"></div>
+        <div class="pve-head-main vmware-head-main">
+          <div class="pve-head-title">
+            <div class="node-name">${escHtml(host.name || 'ESXi host')}</div>
+            <div class="pve-head-sub">${escHtml(hostSubtitle)}</div>
+          </div>
+          ${host.online ? hostStats : pveHeadStat('Status', 'Disconnected', 'var(--red)')}
+        </div>
+        ${bdg(hostBadgeClass, hostStateText)}
+        ${notifyBell(`vmware:${instance.name || endpointKey}:host:${host.name || host.id}`)}
+        <span class="chevron ${hostOpen ? 'open' : ''}" id="vmware-host-chev-${instanceIndex}-${hostIndex}" style="margin-left:4px">▼</span>
+      </div>
+      <div class="node-body ${hostOpen ? 'open' : ''}" id="vmware-host-body-${instanceIndex}-${hostIndex}">
+        ${host.online && (hasNum(host.cpuPercent) || hasNum(host.memoryPercent)) ? `${chartHeader(hostChartKey, historyLimitFor(hostChartKey))}
+          ${hasNum(host.cpuPercent) ? `<div class="chart-row"><div class="chart-hdr"><span class="nb-label">CPU</span><span class="nb-pct" style="color:${bc(host.cpuPercent)}">${fmtPct(host.cpuPercent)}</span></div>${histChart(hostHistory, 'cpu', host.cpuPercent, historyLimitFor(hostChartKey))}</div>` : ''}
+          ${hasNum(host.memoryPercent) ? `<div class="chart-row"><div class="chart-hdr"><span class="nb-label">RAM</span><span class="nb-pct" style="color:${bc(host.memoryPercent)}">${fmtPct(host.memoryPercent)}</span></div>${histChart(hostHistory, 'mem', host.memoryPercent, historyLimitFor(hostChartKey))}${hasNum(host.memoryUsedBytes) && hasNum(host.memoryTotalBytes) ? `<div class="chart-foot">${fmtBytes(host.memoryUsedBytes)} / ${fmtBytes(host.memoryTotalBytes)}</div>` : ''}</div>` : ''}
+        ` : ''}
+        <div class="row" style="padding:8px 0;gap:16px;flex-wrap:wrap;border-bottom:1px solid var(--border)">
+          ${metricSpan('Product', host.productName || 'VMware ESXi')}
+          ${metricSpan('Version', [host.version, host.build ? `build ${host.build}` : ''].filter(Boolean).join(' '))}
+          ${metricSpan('Connection', host.connectionState || 'unknown')}
+          ${metricSpan('Power', host.powerState || 'unknown')}
+        </div>
+        <div class="overview-nested-title" style="margin-top:8px"><span>Virtual machines</span><span>${hostRunningVms}/${hostVms.length} running</span></div>
+        ${vmRows}
+      </div>`;
+    }).join('');
+
+    const datastoreCards = instanceDatastores.length ? instanceDatastores.map(datastore => {
+      const datastoreHealth = String(datastore.health || '').toLowerCase();
+      const datastoreWarn = datastore.accessible === false || ['yellow', 'red'].includes(datastoreHealth);
+      const datastoreBadgeClass = datastore.accessible === false || datastoreHealth === 'red' ? 'red' : datastoreWarn ? 'yellow' : 'green';
+      const usage = hasNum(datastore.usedPercent) ? Number(datastore.usedPercent) : null;
+      return capacityGaugeCard(
+        datastore.name || 'Datastore',
+        usage,
+        datastore.usedBytes,
+        datastore.capacityBytes,
+        {
+          ariaLabel: `VMware datastore ${datastore.name || 'Datastore'}`,
+          badgeHtml: datastoreWarn ? bdg(datastoreBadgeClass, datastore.accessible === false ? 'inaccessible' : 'attention') : '',
+          cardClass: 'vmware-datastore-card',
+          hideTitle: instanceDatastores.length === 1,
+          metaSuffix: datastore.type || 'Datastore',
+        }
+      );
+    }).join('') : '';
+    const datastoreRows = datastoreCards
+      ? `<div class="vmware-datastore-grid">${datastoreCards}</div>`
+      : '<div class="empty">No datastores reported</div>';
+    const inaccessibleDatastores = instanceDatastores.filter(datastore => datastore.accessible === false).length;
+    const warningDatastores = instanceDatastores.filter(datastore => datastore.accessible !== false && ['yellow', 'red'].includes(String(datastore.health || '').toLowerCase())).length;
+    const datastoreHeaderClass = instanceStale ? 'yellow' : !instanceDatastores.length ? 'gray' : inaccessibleDatastores > 0 ? 'red' : warningDatastores > 0 ? 'yellow' : 'green';
+    const datastoreHeaderText = instanceStale ? 'stale data' : !instanceDatastores.length ? 'no datastores' : inaccessibleDatastores > 0 ? `${inaccessibleDatastores} inaccessible` : warningDatastores > 0 ? `${warningDatastores} attention` : 'OK';
+    const instanceBody = instance.online ? `
+      <div class="k8s-grp ceph-health-group vmware-datastore-group">
+        <div class="k8s-grp-hdr" id="vmware-datastores-header-${instanceIndex}" onclick="toggleVmwareDatastores(${instanceIndex},${jsStr(endpointKey)})">
+          <div class="mon-dot md-${datastoreHeaderClass}"></div>
+          <span style="font-size:14px;font-weight:600;flex:1">Datastores</span>
+          ${bdg(datastoreHeaderClass, datastoreHeaderText)}
+          <span class="chevron ${datastoresOpen ? 'open' : ''}" style="margin-left:4px">▼</span>
+        </div>
+        <div class="k8s-grp-body ${datastoresOpen ? 'open' : ''}" id="vmware-datastores-body-${instanceIndex}">
+          ${datastoreRows}
+        </div>
+      </div>
+      ${clusterRows ? `<div class="overview-nested-title" style="margin-top:10px"><span>Clusters</span><span>${instance.clusters.length}</span></div><div class="pve-cluster-list">${clusterRows}</div>` : ''}
+      ${hostRows || '<div class="empty">No ESXi hosts reported</div>'}
+    ` : `<div class="offline-row"><div class="mon-dot ${instance._connecting ? 'md-gray' : 'md-red'}"></div><div>${instance._connecting ? 'Connecting to VMware...' : 'VMware endpoint unreachable'}<div class="offline-err">${escHtml(instance._connecting ? (instance.url || '') : (instance.error || instance.url || ''))}</div>${instance.permissionHint ? `<div class="offline-err">${escHtml(instance.permissionHint)}</div>` : ''}</div></div>`;
+
+    if (instance.type === 'esxi') return `<section class="prom-instance vmware-standalone-instance">
+      <div class="prom-instance-body open" id="vmware-body-${instanceIndex}">${instanceBody}</div>
+    </section>`;
+
+    return `<section class="prom-instance">
+      <div class="prom-instance-h service-node-hdr ${endpointState}" onclick="toggleVmwareInstance(${instanceIndex},${jsStr(endpointKey)})">
+        <div class="mon-dot ${instance._connecting ? 'md-gray' : instance.online ? (endpointWarning ? 'md-yellow' : 'md-green') : 'md-red'}"></div>
+        <div class="prom-instance-main">
+          <div class="prom-instance-name">${escHtml(instance.name || instance.url || 'VMware')}</div>
+          <div class="prom-instance-url">${escHtml([productLabel, (instance.datacenters || []).map(datacenter => datacenter.name).filter(Boolean).join(', '), instance.product, instance.version ? `v${instance.version}` : ''].filter(Boolean).join(' · '))}</div>
+        </div>
+        <div class="prom-instance-meta">${instance.online ? `${instanceHostsOnline}/${instanceHostTotal} hosts · ${instanceRunningVms}/${instanceVms.length} VMs` : instance._connecting ? 'waiting for first check' : 'unreachable'}</div>
+        ${endpointBadge}
+        ${notifyBell(`vmware:${instance.name || endpointKey}`)}
+        <span class="chevron ${isOpen ? 'open' : ''}" id="vmware-chev-${instanceIndex}" style="margin-left:4px">▼</span>
+      </div>
+      <div class="prom-instance-body ${isOpen ? 'open' : ''}" id="vmware-body-${instanceIndex}">
+        ${instanceBody}
+      </div>
+    </section>`;
+  }).join('');
+
+  return {
+    id: 'vmware',
+    title: 'VMware ESXi',
+    iconKey: 'vmware',
+    color: 'var(--blue)',
+    meta: connecting && endpointUp === 0 ? 'connecting...' : `${hostsOnline}/${hostTotal} hosts · ${runningVms}/${vmTotal} VMs`,
+    badge: bdg(healthClass, healthText),
+    detailMeta: '',
+    detailSummary: sidebarSummary,
+    sbSummary: sidebarSummary,
+    summary: '',
+    body: endpointHtml || '<div class="offline-row"><div class="mon-dot md-gray"></div><div>Connecting to VMware...</div></div>',
   };
 }
 
@@ -3724,6 +4348,12 @@ function buildKubernetes(k8s){
   const sbSummaryHtml = `<div class="sb-csum">
     <div class="sb-csum-item"><div class="sb-csum-val">${totalPods}</div><div class="sb-csum-lbl">Pods</div></div>
     <div class="sb-csum-item"><div class="sb-csum-val" style="color:var(--green)">${s.running??0}</div><div class="sb-csum-lbl">Running</div></div>
+    <div class="sb-csum-item"><div class="sb-csum-val" style="color:var(--blue)">${s.succeeded??0}</div><div class="sb-csum-lbl">Succeeded</div></div>
+    <div class="sb-csum-item"><div class="sb-csum-val" style="color:var(--yellow)">${s.pending??0}</div><div class="sb-csum-lbl">Pending</div></div>
+    <div class="sb-csum-item"><div class="sb-csum-val" style="color:${failed>0?'var(--red)':'var(--muted)'}">${failed}</div><div class="sb-csum-lbl">Failed</div></div>
+  </div>`;
+  const detailSummaryHtml = `<div class="sb-csum">
+    <div class="sb-csum-item"><div class="sb-csum-val">${s.running??0}/${totalPods}</div><div class="sb-csum-lbl">Pods</div></div>
     <div class="sb-csum-item"><div class="sb-csum-val" style="color:var(--blue)">${s.succeeded??0}</div><div class="sb-csum-lbl">Succeeded</div></div>
     <div class="sb-csum-item"><div class="sb-csum-val" style="color:var(--yellow)">${s.pending??0}</div><div class="sb-csum-lbl">Pending</div></div>
     <div class="sb-csum-item"><div class="sb-csum-val" style="color:${failed>0?'var(--red)':'var(--muted)'}">${failed}</div><div class="sb-csum-lbl">Failed</div></div>
@@ -3845,6 +4475,8 @@ function buildKubernetes(k8s){
     color: 'var(--purple,#9b59b6)',
     meta: `${s.running??0}/${totalPods} pods`,
     badge: bdg(failed>0?'yellow':'green', failed>0?'degraded':'healthy'),
+    detailMeta: '',
+    detailSummary: detailSummaryHtml,
     sbSummary: sbSummaryHtml,
     summary: summaryHtml,
     body,
@@ -4072,6 +4704,7 @@ function buildSynology(syn, opts = {}){
     color: panelColor,
     meta: `${onlineDevs.length}/${syn.length} online`,
     badge: bdg(isConnecting ? 'gray' : (allOk ? 'green' : offline ? offlineRatioBadgeClass(offline, syn.length, onlineDevs.length) : 'yellow'), isConnecting ? 'connecting…' : (allOk ? 'healthy' : offlineRatioLabel(offline, syn.length, onlineDevs.length))),
+    detailMeta: panelId === 'synology' || panelId === 'mikrotik' ? '' : undefined,
     sbSummary: sbSummaryHtml,
     summary: summaryHtml,
     body,
@@ -4379,6 +5012,7 @@ function buildHealthchecks(hc){
     color: 'var(--green)',
     meta: connecting ? 'connecting...' : online?`${s.up??0}/${s.total??0} up`:'',
     badge: connecting ? bdg('gray','connecting...') : !online ? bdg('red', offlineRatioLabel(1, 1, 0)) : down > 0 ? bdg(offlineRatioBadgeClass(down, total, Number(s.up || 0)), offlineRatioLabel(down, total, Number(s.up || 0))) : grace > 0 ? bdg('yellow','degraded') : bdg('green','healthy'),
+    detailMeta: '',
     sbSummary: sbSummaryHtml,
     summary: '',
     body,
@@ -4582,6 +5216,7 @@ function buildUptimeKuma(uk){
     color: 'var(--green)',
     meta: connecting ? 'connecting...' : online?`${s.up??0}/${s.total??0} up`:'',
     badge: bdg(health.badgeCls, health.label),
+    detailMeta: '',
     sbSummary: sbSummaryHtml,
     summary: '',
     body,
@@ -4648,6 +5283,7 @@ function buildChecks(chk){
     color: 'var(--green)',
     meta: connecting && !up && !down ? 'connecting...' : `${up}/${total} up`,
     badge: bdg(connecting && !up && !down ? 'gray' : healthy ? 'green' : down > 0 ? offlineRatioBadgeClass(down, total, up) : 'green', connecting && !up && !down ? 'connecting...' : healthy ? 'healthy' : down > 0 ? offlineRatioLabel(down, total, up) : 'healthy'),
+    detailMeta: '',
     sbSummary: sbSummaryHtml,
     summary: summaryHtml,
     body,
@@ -4804,6 +5440,7 @@ function buildPrometheus(prom){
     color: 'var(--red)',
     meta: topConnecting ? 'connecting...' : online?`${s.up??0}/${s.total??0} up${s.instances?` · ${s.instanceUp??0}/${s.instances} servers`:''}`:'',
     badge: bdg(health.badgeCls, health.label),
+    detailMeta: '',
     sbSummary: sbSummaryHtml,
     summary: '',
     body,
@@ -4955,12 +5592,14 @@ function buildDocker(docker){
     iconKey: 'docker',
     color: '#2496ed',
     meta: anyConnecting ? (onlineHosts ? `${onlineHosts}/${docker.length} hosts · ${connectingHosts} connecting` : 'connecting...') : (noContainersReported ? `${onlineHosts}/${docker.length} hosts online · no containers` : `${totalRunning}/${totalAll} containers`),
+    sbMeta: `${totalRunning}/${totalAll} containers · ${onlineHosts}/${docker.length} hosts`,
     badge: offlineHosts
       ? bdg(offlineRatioBadgeClass(offlineHosts, docker.length, onlineHosts), offlineRatioLabel(offlineHosts, docker.length, onlineHosts))
       : anyConnecting
       ? bdg(onlineHosts ? 'yellow' : 'gray', onlineHosts ? `${connectingHosts} connecting` : 'connecting...')
       : bdg(noContainersReported?'gray':onlineHosts===0?'red':cFailed>0?'red':containerIssueLabel?'yellow':allOk&&totalStopped===0?'green':'red',
             noContainersReported?'no containers':onlineHosts===0?offlineRatioLabel(docker.length, docker.length, onlineHosts):containerIssueLabel || (allOk&&totalStopped===0?'healthy':`${totalStopped} ${trText('stopped')}`)),
+    detailMeta: '',
     sbSummary: sbSummaryHtml,
     summary: '',
     body,
@@ -5054,7 +5693,9 @@ function buildDockhand(dockhand){
     iconKey: 'dockhand',
     color: 'var(--green)',
     meta: connecting && !onlineServers ? 'connecting...' : noContainers ? `no containers · ${onlineServers}/${totalServers} servers` : `${running}/${total} running · ${onlineServers}/${totalServers} servers`,
+    sbMeta: `${running}/${total} containers · ${onlineServers}/${totalServers} hosts`,
     badge: bdg(healthCls, healthTxt),
+    detailMeta: '',
     sbSummary: sbSummaryHtml,
     summary: summaryHtml,
     body: hostSection || '<div class="empty">No Dockhand instances configured</div>',
@@ -5943,6 +6584,7 @@ function buildDatabase(dbs){
     meta: `${online}/${dbs.length} online`,
     badge: bdg(isConnecting ? 'gray' : (allOk ? 'green' : offlineRatioBadgeClass(offline, dbs.length, online)),
                isConnecting ? 'connecting…' : (allOk ? 'healthy' : offlineRatioLabel(offline, dbs.length, online))),
+    detailMeta: '',
     sbSummary: sbSummaryHtml,
     summary: '',
     body,
@@ -6093,7 +6735,8 @@ function orderIds(ids, order){
 }
 function getSidebarPanelOrder(){ return Array.isArray(sidebarPanelOrder) ? sidebarPanelOrder : []; }
 function saveSidebarPanelOrder(order){
-  sidebarPanelOrder = cleanUiOrder(order);
+  sidebarPanelOrder = mergeUiOrder(sidebarPanelOrder, order);
+  markPanelOrderLocalEdit('sidebar');
   try { localStorage.setItem('os_sidebar_panel_order', JSON.stringify(sidebarPanelOrder)); } catch {}
   scheduleUiPreferencesSave();
 }
@@ -6102,7 +6745,8 @@ function orderedSidebarIds(ids){
 }
 function getDashboardPanelOrder(){ return Array.isArray(dashboardPanelOrder) ? dashboardPanelOrder : []; }
 function saveDashboardPanelOrder(order){
-  dashboardPanelOrder = cleanUiOrder(order);
+  dashboardPanelOrder = mergeUiOrder(dashboardPanelOrder, order);
+  markPanelOrderLocalEdit('dashboard');
   try { localStorage.setItem('os_dashboard_panel_order', JSON.stringify(dashboardPanelOrder)); } catch {}
   scheduleUiPreferencesSave();
 }
@@ -6506,7 +7150,7 @@ function iconFallback(img, iconKey, color){
   span.innerHTML = html;
   img.replaceWith(span);
 }
-const DEFAULT_ICON = { proxmox:'proxmox', kubernetes:'kubernetes', synology:'synology', mikrotik:'mikrotik', unifi:'unifi', healthchecks:'healthchecks', uptimekuma:'uptime-kuma', checks:'', prometheus:'prometheus', docker:'docker', dockhand:'https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/dockhand.png', firewall:'opnsense', truenas:'truenas', qnap:'qnap', ugreen:'ugreen', pbs:'proxmox', cloudflare:'cloudflare', cicd:'github', veeam:'veeam', portainer:'portainer' };
+const DEFAULT_ICON = { proxmox:'proxmox', vmware:'vmware-esxi', kubernetes:'kubernetes', synology:'synology', mikrotik:'mikrotik', unifi:'unifi', healthchecks:'healthchecks', uptimekuma:'uptime-kuma', checks:'', prometheus:'prometheus', docker:'docker', dockhand:'https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/dockhand.png', firewall:'opnsense', truenas:'truenas', qnap:'qnap', ugreen:'ugreen', pbs:'proxmox', cloudflare:'cloudflare', cicd:'github', veeam:'veeam', portainer:'portainer' };
 function useInlineThemedIcon(panel, name){
   const normalized = String(name || '').trim().toLowerCase();
   if (panel?.id === 'cicd') {
@@ -6543,7 +7187,7 @@ function sidebarMetaHtml(meta){
 /* ── Sidebar card ── */
 function sidebarCard(panel, isActive){
   const iconSvg = platformIcon(panel);
-  const meta = panel.meta || panel.sbMeta || '';
+  const meta = panel.sbMeta !== undefined ? panel.sbMeta : (panel.meta || '');
   return `
   <div class="sb-card ${isActive?'active':''}" id="sbcard-${panel.id}" data-id="${panel.id}" draggable="false" title="${escAttr(panel.title)}" onclick="selectPanel('${panel.id}')">
     <div class="sb-hdr">
@@ -6562,7 +7206,7 @@ function updateSidebarCard(card, panel, isActive){
   card.title = panel.title || '';
   const title = card.querySelector('.sb-title');
   if(title && title.textContent !== panel.title) title.textContent = panel.title;
-  const metaText = panel.meta || panel.sbMeta || '';
+  const metaText = panel.sbMeta !== undefined ? panel.sbMeta : (panel.meta || '');
   const meta = card.querySelector('.sb-meta');
   if(meta){
     meta.style.display = metaText ? '' : 'none';
@@ -6577,6 +7221,55 @@ function updateSidebarCard(card, panel, isActive){
     summary.style.display = html ? '' : 'none';
     if(summary.innerHTML !== html) summary.innerHTML = html;
   }
+}
+let sidebarBadgeLayoutFrame = 0;
+let sidebarBadgeMeasureCanvas = null;
+function sidebarBadgeMinimumWidth(badge){
+  const text = String(badge?.textContent || '').trim();
+  const naturalWidth = Math.ceil(badge?.getBoundingClientRect().width || 0);
+  const words = text.split(/\s+/).filter(Boolean);
+  if(words.length < 2) return naturalWidth;
+  const style = getComputedStyle(badge);
+  sidebarBadgeMeasureCanvas ||= document.createElement('canvas');
+  const context = sidebarBadgeMeasureCanvas.getContext('2d');
+  if(!context) return naturalWidth;
+  context.font = `${style.fontStyle || 'normal'} ${style.fontWeight || '400'} ${style.fontSize || '11px'} ${style.fontFamily || 'sans-serif'}`;
+  const letterSpacing = Number.parseFloat(style.letterSpacing) || 0;
+  const longestWord = Math.max(...words.map(word => context.measureText(word).width + Math.max(0, word.length - 1) * letterSpacing));
+  const horizontalChrome = (Number.parseFloat(style.paddingLeft) || 0)
+    + (Number.parseFloat(style.paddingRight) || 0)
+    + (Number.parseFloat(style.borderLeftWidth) || 0)
+    + (Number.parseFloat(style.borderRightWidth) || 0);
+  return Math.min(naturalWidth, Math.ceil(longestWord + horizontalChrome + 1));
+}
+function syncSidebarBadgeWrapping(){
+  sidebarBadgeLayoutFrame = 0;
+  const sidebar = document.getElementById('sidebar');
+  if(!sidebar) return;
+  const cards = [...sidebar.querySelectorAll('.sb-card')];
+  cards.forEach(card => {
+    card.classList.remove('sb-badge-priority');
+    card.style.removeProperty('--sb-badge-width');
+  });
+  if(document.body.classList.contains('rail-collapsed') || window.matchMedia('(max-width: 1100px)').matches) return;
+  cards.forEach(card => {
+    const title = card.querySelector('.sb-title');
+    const badge = card.querySelector('.sb-badge-wrap>.badge');
+    if(!title || !badge || card.offsetWidth <= 0) return;
+    const titleOverflow = Math.ceil(title.scrollWidth - title.clientWidth);
+    if(titleOverflow <= 1) return;
+    const naturalWidth = Math.ceil(badge.getBoundingClientRect().width);
+    const minimumWidth = sidebarBadgeMinimumWidth(badge);
+    if(naturalWidth <= minimumWidth + 1) return;
+    const targetWidth = Math.max(minimumWidth, naturalWidth - titleOverflow - 2);
+    if(targetWidth >= naturalWidth - 1) return;
+    card.style.setProperty('--sb-badge-width', `${Math.ceil(targetWidth)}px`);
+    card.classList.add('sb-badge-priority');
+  });
+}
+function scheduleSidebarBadgeWrapping(){
+  if(sidebarBadgeLayoutFrame) return;
+  sidebarBadgeLayoutFrame = requestAnimationFrame(syncSidebarBadgeWrapping);
 }
 function updateSidebarOverflow(){
   const sidebar = document.getElementById('sidebar');
@@ -6595,6 +7288,7 @@ function renderSidebar(ids, panels, activeId){
     sidebar.dataset.ids = key;
     sidebar.dataset.html = '';
     updateSidebarOverflow();
+    scheduleSidebarBadgeWrapping();
     return;
   }
   ids.forEach(id => {
@@ -6602,6 +7296,7 @@ function renderSidebar(ids, panels, activeId){
     if(card) updateSidebarCard(card, panels[id], id === activeId);
   });
   updateSidebarOverflow();
+  scheduleSidebarBadgeWrapping();
 }
 function renderConfiguredSidebarShell(){
   if(!configuredIds.length || window._sidebarDragging) return false;
@@ -6625,6 +7320,14 @@ function platformKpiLabel(id, panels){
   if(id === 'snmp') return trText('SNMP');
   return panels?.[id]?.title || id;
 }
+function overviewHostLabel(row, fallback, index){
+  return String(row?.node?.name || row?.name || row?.system?.hostname || row?.instanceName || fallback || `${trText('Host')} ${index + 1}`);
+}
+function overviewHostIdentity(row, fallback, index){
+  if(row?.clusterName && row?.node?.name) return `${row.clusterName}:${row.node.name}`;
+  if(row?.instanceName && (row?.name || row?.id)) return `${row.instanceName}:${row.name || row.id}`;
+  return String(row?.id || row?.host || row?.url || row?.node?.name || row?.name || row?.system?.hostname || fallback || index);
+}
 function overviewKpiData(data){
   const onlineRows = rows => (rows || []).filter(row => row?.online);
   const rateSum = obj => metricRateSum(obj, 'readBps', 'writeBps');
@@ -6638,6 +7341,9 @@ function overviewKpiData(data){
   const genericSnmpOnline = snmpRowsForPanel(snmpOnline, 'snmp');
   const pveRows = (data.proxmox?.nodes || []).filter(n => n.node?.online);
   const pveOnline = pveRows.map(n => n.node || n).filter(n => n.online);
+  const vmwareHosts = (data.vmware?.instances || []).filter(instance => instance.online).flatMap(instance =>
+    (instance.hosts || []).filter(host => host.online).map(host => ({ ...host, instanceName: instance.name || instance.url }))
+  );
   const dockerOnline = onlineRows(data.docker);
   const firewallOnline = onlineRows(data.firewall?.instances);
   const truenasOnline = onlineRows(data.truenas?.instances);
@@ -6645,9 +7351,10 @@ function overviewKpiData(data){
   const ugreenOnline = onlineRows(data.ugreen?.instances);
   const pbsOnline = onlineRows(data.pbs?.instances);
   const pbsNodes = pbsOnline.flatMap(inst => (inst.nodes || []).map(node => ({ ...node, instanceName: inst.name || inst.url })));
-  return {
+  const sources = {
     cpu: {
       proxmox: pveOnline.map(n => n.cpu),
+      vmware: vmwareHosts.map(host => host.cpuPercent),
       linux: linuxOnline.map(s => s.cpu),
       windows: windowsOnline.map(s => s.cpu),
       synology: synologyOnline.map(s => s.cpu),
@@ -6663,6 +7370,7 @@ function overviewKpiData(data){
     },
     mem: {
       proxmox: pveOnline.map(n => n.memPct ?? n.ram?.percent),
+      vmware: vmwareHosts.map(host => host.memoryPercent),
       linux: linuxOnline.map(s => s.ram?.percent),
       windows: windowsOnline.map(s => s.ram?.percent),
       synology: synologyOnline.map(s => s.ram?.percent),
@@ -6696,6 +7404,7 @@ function overviewKpiData(data){
     },
     names: {
       proxmox: pveOnline.map(n => n.name).filter(Boolean),
+      vmware: vmwareHosts.map(host => host.name).filter(Boolean),
       linux: linuxOnline.map(s => s.name).filter(Boolean),
       windows: windowsOnline.map(s => s.name).filter(Boolean),
       synology: synologyOnline.map(s => s.name).filter(Boolean),
@@ -6711,6 +7420,7 @@ function overviewKpiData(data){
     },
     percentRows: {
       proxmox: pveRows,
+      vmware: vmwareHosts,
       linux: linuxOnline,
       windows: windowsOnline,
       synology: synologyOnline,
@@ -6726,6 +7436,27 @@ function overviewKpiData(data){
     },
     rateRows: { proxmox: pveRows, linux: linuxOnline, windows: windowsOnline, synology: synologyOnline, mikrotik: mikrotikOnline, unifi: unifiOnline, snmp: genericSnmpOnline },
   };
+  sources.hosts = {};
+  Object.entries(sources.percentRows).forEach(([platform, rows]) => {
+    const usedKeys = new Map();
+    sources.hosts[platform] = (rows || []).map((row, index) => {
+      const fallback = sources.names?.[platform]?.[index];
+      const label = overviewHostLabel(row, fallback, index);
+      const baseKey = overviewHostIdentity(row, label, index);
+      const duplicate = usedKeys.get(baseKey) || 0;
+      usedKeys.set(baseKey, duplicate + 1);
+      return {
+        id: duplicate ? `${baseKey}#${duplicate + 1}` : baseKey,
+        label,
+        row,
+        cpu: sources.cpu?.[platform]?.[index],
+        mem: sources.mem?.[platform]?.[index],
+        disk: sources.disk?.[platform]?.[index],
+        bandwidth: sources.bandwidth?.[platform]?.[index],
+      };
+    });
+  });
+  return sources;
 }
 function overviewKpiOptions(metric, ids, panels, data){
   const sources = overviewKpiData(data);
@@ -6733,11 +7464,17 @@ function overviewKpiOptions(metric, ids, panels, data){
   const hasMetric = id => (metricVals[id] || []).some(hasNum);
   return ['all', ...ids.filter(id => hasMetric(id))].map(id => ({ id, label: platformKpiLabel(id, panels) }));
 }
+function overviewKpiHostOptions(platform, data, metric = ''){
+  if(!platform || platform === 'all') return [];
+  const hosts = overviewKpiData(data).hosts?.[platform] || [];
+  const metricHosts = metric ? hosts.filter(host => hasNum(host?.[metric])) : hosts;
+  return [{ id:'all', label:trText('All hosts') }, ...metricHosts.map(host => ({ id:host.id, label:host.label }))];
+}
 function drawOverviewKpiSelect(metric, current, options){
   if(!options.some(o => o.id === current)) current = 'all';
   const cur = options.find(o => o.id === current) || options[0];
   const optsHtml = options.map(o =>
-    `<div class="os-sel-opt ${o.id === current ? 'active' : ''}" onclick="setOverviewKpiPlatform('${metric}','${o.id}')">${escHtml(o.label)}</div>`
+    `<div class="os-sel-opt ${o.id === current ? 'active' : ''}" onclick="setOverviewKpiPlatform(${jsStr(metric)},${jsStr(o.id)})">${escHtml(o.label)}</div>`
   ).join('');
   return `<div class="os-sel" onclick="event.stopPropagation()">
     <div class="os-sel-btn" onclick="openOsSel(this)" title="${escAttr(cur.label)}">
@@ -6745,6 +7482,38 @@ function drawOverviewKpiSelect(metric, current, options){
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
     </div>
     <div class="os-sel-menu">${optsHtml}</div>
+  </div>`;
+}
+function drawOverviewKpiCascadeSelect(metric, current, currentHost, options, data){
+  if(!options.some(option => option.id === current)) current = 'all';
+  const selectedPlatform = options.find(option => option.id === current) || options[0];
+  const selectedHostOptions = overviewKpiHostOptions(current, data, metric);
+  if(!selectedHostOptions.some(option => option.id === currentHost)) currentHost = 'all';
+  const selectedHost = selectedHostOptions.find(option => option.id === currentHost);
+  const selectedLabel = current === 'all' || currentHost === 'all'
+    ? selectedPlatform.label
+    : `${selectedPlatform.label} / ${selectedHost?.label || currentHost}`;
+  const allPlatforms = options.find(option => option.id === 'all') || { id:'all', label:trText('All platforms') };
+  const platformBranches = options.filter(option => option.id !== 'all').map(option => {
+    const hostOptions = overviewKpiHostOptions(option.id, data, metric);
+    const hostOptionsHtml = hostOptions.map(host =>
+      `<div class="os-sel-opt ${option.id === current && host.id === currentHost ? 'active' : ''}" onclick="setOverviewKpiTarget(${jsStr(metric)},${jsStr(option.id)},${jsStr(host.id)})">${escHtml(host.label)}</div>`
+    ).join('');
+    return `<div class="os-sel-branch ${option.id === current ? 'active' : ''}" data-platform="${escAttr(option.id)}" onclick="openOverviewKpiSubmenu(this,event)">
+      <span class="os-sel-branch-label">${escHtml(option.label)}</span>
+      <svg class="os-sel-branch-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+      <div class="os-sel-submenu" onclick="event.stopPropagation()">${hostOptionsHtml}</div>
+    </div>`;
+  }).join('');
+  return `<div class="os-sel overview-kpi-cascade" onclick="event.stopPropagation()">
+    <div class="os-sel-btn" onclick="openOsSel(this)" title="${escAttr(selectedLabel)}">
+      <span>${escHtml(selectedLabel)}</span>
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <div class="os-sel-menu">
+      <div class="os-sel-opt ${current === 'all' ? 'active' : ''}" onclick="setOverviewKpiTarget(${jsStr(metric)},${jsStr(allPlatforms.id)},'all')">${escHtml(allPlatforms.label)}</div>
+      ${platformBranches}
+    </div>
   </div>`;
 }
 function kpiPct(label, vals){
@@ -6792,7 +7561,7 @@ function overviewBucketHistory(series, mode='sum'){
     value: mode === 'avg' ? vals.reduce((a,b)=>a+b,0) / vals.length : vals.reduce((a,b)=>a+b,0),
   }));
 }
-function overviewRateHistory(data, platform, metric){
+function overviewRateHistory(data, platform, metric, host = 'all'){
   const sources = overviewKpiData(data);
   const rowBandwidthLimit = row => {
     const bw = row?.metrics?.bandwidth;
@@ -6815,10 +7584,14 @@ function overviewRateHistory(data, platform, metric){
     const valid = hasNum(total) && (!limit || (Number(total) >= 0 && Number(total) <= limit * 1.08));
     return { time: h?.time, value: valid ? rateToMBps(total) : null };
   }) : []);
-  const series = Object.fromEntries(Object.entries(sources.rateRows).map(([id, rows]) => [id, mapRate(rows)]));
+  const selectedHost = platform !== 'all' && host !== 'all'
+    ? (sources.hosts?.[platform] || []).find(item => item.id === host)
+    : null;
+  const rateRows = selectedHost ? { [platform]: [selectedHost.row] } : sources.rateRows;
+  const series = Object.fromEntries(Object.entries(rateRows).map(([id, rows]) => [id, mapRate(rows)]));
   return overviewBucketHistory(platform === 'all' ? Object.values(series).flat() : (series[platform] || []), 'sum');
 }
-function overviewPercentHistory(data, platform, metric){
+function overviewPercentHistory(data, platform, metric, host = 'all'){
   const sources = overviewKpiData(data);
   const keys = metric === 'cpu'
     ? ['cpu','cpuPercent','cpuUsage','cpuUsagePercent']
@@ -6829,7 +7602,11 @@ function overviewPercentHistory(data, platform, metric){
     }
     return null;
   };
-  const series = Object.fromEntries(Object.entries(sources.percentRows || {}).map(([id, rows]) => [id,
+  const selectedHost = platform !== 'all' && host !== 'all'
+    ? (sources.hosts?.[platform] || []).find(item => item.id === host)
+    : null;
+  const percentRows = selectedHost ? { [platform]: [selectedHost.row] } : (sources.percentRows || {});
+  const series = Object.fromEntries(Object.entries(percentRows).map(([id, rows]) => [id,
     (rows || []).map(row => {
       const history = Array.isArray(row?.history) ? row.history : Array.isArray(row?.system?.history) ? row.system.history : [];
       return history.map(point => ({ time:point?.time, value:valueOf(point) }));
@@ -6837,29 +7614,41 @@ function overviewPercentHistory(data, platform, metric){
   ]));
   return overviewBucketHistory(platform === 'all' ? Object.values(series).flat() : (series[platform] || []), 'avg');
 }
-function overviewKpiMetric(data, metric, platform){
+function overviewKpiMetric(data, metric, platform, host = 'all'){
   const sources = overviewKpiData(data);
   const { cpu, mem, disk, bandwidth, names } = sources;
   const allVals = obj => Object.values(obj).flat();
   const allNames = obj => Object.values(obj).flat();
   if(metric === 'cpu' || metric === 'mem') {
     const values = metric === 'cpu' ? cpu : mem;
-    const stat = kpiPct('reporting source', platform === 'all' ? allVals(values) : (values[platform] || []));
+    const selectedHost = platform !== 'all' && host !== 'all'
+      ? (sources.hosts?.[platform] || []).find(item => item.id === host)
+      : null;
+    const metricValues = selectedHost ? [selectedHost[metric]] : platform === 'all' ? allVals(values) : (values[platform] || []);
+    const stat = kpiPct('reporting source', metricValues);
     return {
       ...stat,
-      names: platform === 'all' ? allNames(names) : (names[platform] || []),
-      history: overviewPercentHistory(data, platform, metric),
+      names: selectedHost ? [selectedHost.label] : platform === 'all' ? allNames(names) : (names[platform] || []),
+      history: overviewPercentHistory(data, platform, metric, selectedHost?.id || 'all'),
     };
   }
   if(metric === 'disk') {
-    const stat = { ...kpiRate(trText('Read and write combined'), platform === 'all' ? allVals(disk) : (disk[platform] || [])), color: 'var(--cyan)' };
-    const history = overviewRateHistory(data, platform, 'disk');
+    const selectedHost = platform !== 'all' && host !== 'all'
+      ? (sources.hosts?.[platform] || []).find(item => item.id === host)
+      : null;
+    const metricValues = selectedHost ? [selectedHost.disk] : platform === 'all' ? allVals(disk) : (disk[platform] || []);
+    const stat = { ...kpiRate(trText('Read and write combined'), metricValues), color: 'var(--cyan)' };
+    const history = overviewRateHistory(data, platform, 'disk', selectedHost?.id || 'all');
     const current = hasNum(stat.normalizedValue) ? stat.normalizedValue : (history.length ? history[history.length - 1].value : null);
     return { ...stat, history, historyValue: current, historyMax: rateSparkMax(history, 'value', current), rateColor: '#22D3EE' };
   }
   if(metric === 'bandwidth') {
-    const stat = { ...kpiRate(trText('Inbound plus outbound'), platform === 'all' ? allVals(bandwidth) : (bandwidth[platform] || [])), color: 'var(--green)' };
-    const history = overviewRateHistory(data, platform, 'bandwidth');
+    const selectedHost = platform !== 'all' && host !== 'all'
+      ? (sources.hosts?.[platform] || []).find(item => item.id === host)
+      : null;
+    const metricValues = selectedHost ? [selectedHost.bandwidth] : platform === 'all' ? allVals(bandwidth) : (bandwidth[platform] || []);
+    const stat = { ...kpiRate(trText('Inbound plus outbound'), metricValues), color: 'var(--green)' };
+    const history = overviewRateHistory(data, platform, 'bandwidth', selectedHost?.id || 'all');
     const current = hasNum(stat.normalizedValue) ? stat.normalizedValue : (history.length ? history[history.length - 1].value : null);
     return { ...stat, history, historyValue: current, historyMax: rateSparkMax(history, 'value', current), rateColor: '#34D399' };
   }
@@ -6947,10 +7736,16 @@ function overviewKpiBody(metric, stat, current, panels){
 function overviewKpi(metric, label, data, ids, panels){
   const options = overviewKpiOptions(metric, ids, panels, data);
   const current = options.some(o => o.id === overviewKpiPlatforms[metric]) ? overviewKpiPlatforms[metric] : 'all';
-  const stat = overviewKpiMetric(data, metric, current);
+  const supportsHostSelection = ['cpu','mem','disk','bandwidth'].includes(metric);
+  const hostOptions = supportsHostSelection ? overviewKpiHostOptions(current, data, metric) : [];
+  const currentHost = hostOptions.some(option => option.id === overviewKpiHosts[metric]) ? overviewKpiHosts[metric] : 'all';
+  const stat = overviewKpiMetric(data, metric, current, currentHost);
   const body = overviewKpiBody(metric, stat, current, panels);
+  const selector = supportsHostSelection
+    ? drawOverviewKpiCascadeSelect(metric, current, currentHost, options, data)
+    : drawOverviewKpiSelect(metric, current, options);
   return `<div class="overview-kpi ${metric==='cpu'||metric==='mem'?'overview-kpi-gauge':metric==='disk'||metric==='bandwidth'?'overview-kpi-rate':''}" data-kpi="${metric}">
-    <div class="overview-kpi-head"><span>${trText(label)}</span>${drawOverviewKpiSelect(metric, current, options)}</div>
+    <div class="overview-kpi-head"><span>${trText(label)}</span><div class="overview-kpi-filters">${selector}</div></div>
     <div class="overview-kpi-body">${body}</div>
   </div>`;
 }
@@ -7316,6 +8111,18 @@ function overviewRows(id, data){
       return overviewRow('proxmox', node.name, sub, node.online?(failed?'yellow':'green'):'red', node.online?(failed?`${failed} failed`:'healthy'):'offline', node.online?(failed?'md-yellow':'md-green'):'md-red');
     }).join('');
   }
+  if(id === 'vmware'){
+    const rows = (data.vmware?.instances || []).flatMap(instance => (instance.hosts || []).map(host => ({ ...host, instanceName: instance.name || instance.url, endpointOnline: instance.online, endpointConnecting: instance._connecting })));
+    return rows.slice(0, 8).map(host => {
+      const warning = host.maintenance || ['yellow', 'red'].includes(String(host.health || '').toLowerCase());
+      const sub = host.endpointConnecting
+        ? host.instanceName || 'Connecting'
+        : host.online
+          ? [host.clusterName || host.instanceName, hasNum(host.cpuPercent) ? `CPU ${fmtPct(host.cpuPercent)}` : '', hasNum(host.memoryPercent) ? `RAM ${fmtPct(host.memoryPercent)}` : '', `${(host.vmRefs || []).length} VMs`].filter(Boolean).join(' · ')
+          : host.connectionState || 'ESXi host disconnected';
+      return overviewRow('vmware', host.name || 'ESXi host', sub, host.endpointConnecting ? 'gray' : !host.online ? 'red' : warning ? 'yellow' : 'green', host.endpointConnecting ? 'connecting' : !host.online ? 'offline' : host.maintenance ? 'maintenance' : warning ? 'attention' : 'healthy', host.endpointConnecting ? 'md-gray' : vmwareHealthDot(host.online, host.health, host.maintenance));
+    }).join('') || '<div class="overview-empty">No ESXi hosts reported</div>';
+  }
   if(id === 'healthchecks'){
     const checks = (data.healthchecks?.checks||[]).slice().sort((a,b)=>String(a.status).localeCompare(String(b.status)));
     return checks.map(c => {
@@ -7433,6 +8240,12 @@ function activeAlerts(data){
     (s.services||[]).filter(x=>!x.excluded&&!x.active&&x.state!=='unknown').forEach(x=>out.push(['Service issue', `${s.name}: ${x.name}`]));
   });
   (data.snmp||[]).forEach(d => { if(!d._connecting && !d.online) out.push(['SNMP unreachable', d.name]); });
+  (data.vmware?.instances || []).forEach(instance => {
+    if(instance._connecting) return;
+    if(!instance.online) out.push(['VMware endpoint offline', instance.name || instance.url || 'VMware']);
+    (instance.hosts || []).filter(host => !host.online).forEach(host => out.push(['ESXi host disconnected', host.name || host.id]));
+    (instance.datastores || []).filter(datastore => datastore.accessible === false).forEach(datastore => out.push(['Datastore inaccessible', datastore.name || datastore.id]));
+  });
   (data.docker||[]).forEach(h => {
     if(h._connecting) return;
     if(!h.online) out.push(['Docker offline', h.name]);
@@ -7649,6 +8462,25 @@ function overviewMetaHtml(meta){
   const parts = text.split(/\s+(?:\u00b7|-)\s+/).map(part => part.trim()).filter(Boolean);
   return `<div class="overview-meta" title="${escAttr(text)}">${parts.map(part => `<span class="overview-meta-part">${escHtml(part)}</span>`).join('')}</div>`;
 }
+function captureOverviewKpiMenuState(detail){
+  return [...(detail?.querySelectorAll('.overview-kpi[data-kpi] .overview-kpi-cascade.open') || [])].map(menu => ({
+    metric:menu.closest('.overview-kpi')?.dataset.kpi || '',
+    platform:menu.querySelector('.os-sel-branch.open')?.dataset.platform || '',
+  })).filter(state => state.metric);
+}
+function restoreOverviewKpiMenuState(detail, states){
+  (states || []).forEach(state => {
+    const card = detail?.querySelector(`.overview-kpi[data-kpi="${state.metric}"]`);
+    const menu = card?.querySelector('.overview-kpi-cascade');
+    if(!menu) return;
+    menu.classList.add('open');
+    card.classList.add('sel-open');
+    if(state.platform){
+      const branch = [...menu.querySelectorAll('.os-sel-branch')].find(item => item.dataset.platform === state.platform);
+      branch?.classList.add('open');
+    }
+  });
+}
 function renderDashboardOverview(data, ids, panels, opts = {}){
   const showSide = dashboardSidePanelVisible(data);
   const visibleIds = ids.filter(id => !dashboardHiddenPlatforms.has(id));
@@ -7683,6 +8515,7 @@ function renderDashboardOverview(data, ids, panels, opts = {}){
   }).join('');
   document.querySelectorAll('.sb-card.active').forEach(c=>c.classList.remove('active'));
   const detail = document.getElementById('detail');
+  const openKpiMenus = captureOverviewKpiMenuState(detail);
   parkEmbedFrames(detail, { abortInflight: true });
   detail.dataset.panelId = '';
   detail.dataset.panelHtml = '';
@@ -7715,6 +8548,7 @@ function renderDashboardOverview(data, ids, panels, opts = {}){
     detail.dataset.overviewIds = key;
     initOverviewScrollHold(detail);
     initOverviewDrag();
+    restoreOverviewKpiMenuState(detail, openKpiMenus);
     requestAnimationFrame(() => {
       layoutOverviewMasonry(true);
       restoreOverviewScroll(detail, scrollState);
@@ -7734,7 +8568,9 @@ function updateOverviewKpis(data, ids, panels){
     const metric = el.dataset.kpi;
     const options = overviewKpiOptions(metric, ids, panels, data);
     const current = options.some(o => o.id === overviewKpiPlatforms[metric]) ? overviewKpiPlatforms[metric] : 'all';
-    const stat = overviewKpiMetric(data, metric, current);
+    const hostOptions = ['cpu','mem','disk','bandwidth'].includes(metric) ? overviewKpiHostOptions(current, data, metric) : [];
+    const currentHost = hostOptions.some(option => option.id === overviewKpiHosts[metric]) ? overviewKpiHosts[metric] : 'all';
+    const stat = overviewKpiMetric(data, metric, current, currentHost);
     el.classList.toggle('overview-kpi-gauge', metric === 'cpu' || metric === 'mem');
     el.classList.toggle('overview-kpi-rate', metric === 'disk' || metric === 'bandwidth');
     const body = el.querySelector('.overview-kpi-body');
@@ -7760,6 +8596,7 @@ function updateOverviewKpis(data, ids, panels){
 function buildPanels(data){
   const builders = {
     proxmox:      () => buildProxmox(data.proxmox),
+    vmware:       () => buildVmware(data.vmware),
     kubernetes:   () => buildKubernetes(data.kubernetes),
     linux:        () => buildLinux(data.linux),
     windows:      () => buildWindows(data.windows),
@@ -7917,19 +8754,267 @@ function agentUpdateDetailConsistent(detail, panel){
   return rowTotal === expected && (state.visible ? summaryTotal === expected : summary === null);
 }
 
+function detailSystemKey(header, body, index){
+  const source = String(header?.getAttribute('onclick') || '');
+  const args = [...source.matchAll(/'((?:\\.|[^'])*)'/g)];
+  const raw = args.length ? args[args.length - 1][1].replace(/\\(['\\])/g, '$1') : '';
+  return String(raw || body?.id || `system-${index}`).slice(0, 180);
+}
+
+function detailSystemUnits(detail, panelId){
+  if(!detail || !panelId) return [];
+  const seen = new Set();
+  return [...detail.querySelectorAll('.det-body .node-body[id], .det-body .prom-instance-body[id]')].map((body, index) => {
+    if(body.id === 'nd-pvesvcs') return null;
+    const section = body.parentElement?.classList.contains('prom-instance') ? body.parentElement : null;
+    const header = section ? body.previousElementSibling : body.previousElementSibling;
+    if(!header || !/\btoggle(?:Node|Linux|Windows|VmwareInstance|VmwareHost|Snmp|PrometheusInstance|Docker|DockhandInstance|FirewallInstance|TrueNasInstance|SimpleNasInstance|PbsInstance|PortainerInstance)\s*\(/.test(String(header.getAttribute('onclick') || ''))) return null;
+    const key = detailSystemKey(header, body, index);
+    if(!key || seen.has(key)) return null;
+    seen.add(key);
+    header.dataset.detailSystemKey = key;
+    body.dataset.detailSystemKey = key;
+    return {
+      key,
+      header,
+      body,
+      start: section || header,
+      end: section || body,
+      parent: (section || header).parentElement,
+    };
+  }).filter(Boolean);
+}
+
+function detailSystemGroups(units){
+  const groups = [];
+  units.forEach(unit => {
+    const group = groups[groups.length - 1];
+    const previous = group?.[group.length - 1];
+    if(previous && previous.parent === unit.parent && previous.end.nextElementSibling === unit.start) group.push(unit);
+    else groups.push([unit]);
+  });
+  return groups;
+}
+
+function moveDetailUnitBefore(unit, reference){
+  const referenceParent = reference?.parentElement || reference?.parentNode;
+  if(!unit?.parent || !reference || unit.parent !== referenceParent) return;
+  unit.parent.insertBefore(unit.start, reference);
+  if(unit.start !== unit.end) unit.parent.insertBefore(unit.end, reference);
+}
+
+function applyDetailSystemOrder(detail, panelId){
+  const preferred = cleanDetailSystemOrderList(detailSystemOrder?.[panelId]);
+  if(!preferred.length) return;
+  const rank = new Map(preferred.map((key, index) => [key, index]));
+  detailSystemGroups(detailSystemUnits(detail, panelId)).forEach(group => {
+    if(group.length < 2) return;
+    const desired = group.map((unit, index) => ({ unit, index })).sort((left, right) => {
+      const leftRank = rank.has(left.unit.key) ? rank.get(left.unit.key) : Number.MAX_SAFE_INTEGER;
+      const rightRank = rank.has(right.unit.key) ? rank.get(right.unit.key) : Number.MAX_SAFE_INTEGER;
+      return leftRank - rightRank || left.index - right.index;
+    }).map(item => item.unit);
+    if(desired.every((unit, index) => unit === group[index])) return;
+    const anchors = group.map(unit => {
+      const anchor = document.createComment('detail-system-order');
+      unit.parent.insertBefore(anchor, unit.start);
+      return anchor;
+    });
+    desired.forEach((unit, index) => {
+      moveDetailUnitBefore(unit, anchors[index]);
+      anchors[index].remove();
+    });
+  });
+}
+
+function saveDetailSystemOrder(detail, panelId){
+  const visibleOrder = detailSystemUnits(detail, panelId).map(unit => unit.key);
+  detailSystemOrder = {
+    ...cleanDetailSystemOrderMap(detailSystemOrder),
+    [panelId]: mergeStableOrder(detailSystemOrder?.[panelId] || [], visibleOrder, cleanDetailSystemOrderList),
+  };
+  markDetailSystemOrderLocalEdit();
+  try { localStorage.setItem('os_detail_system_order', JSON.stringify(detailSystemOrder)); } catch {}
+  scheduleUiPreferencesSave();
+}
+
+function moveDetailUnitAfter(unit, target){
+  if(!unit?.parent || !target || target.parent !== unit.parent || target === unit) return;
+  const reference = target.end.nextSibling;
+  if(reference === unit.start) return;
+  unit.parent.insertBefore(unit.start, reference);
+  if(unit.start !== unit.end) unit.parent.insertBefore(unit.end, reference);
+}
+
+function moveDraggedDetailSystem(detail, panelId, key, clientY){
+  const units = detailSystemUnits(detail, panelId);
+  const current = units.find(unit => unit.key === key);
+  if(!current || current.body.classList.contains('open')) return;
+  const group = detailSystemGroups(units).find(items => items.includes(current));
+  if(!group || group.length < 2) return;
+  const candidates = group.filter(unit => unit !== current);
+  let insertAt = candidates.findIndex(unit => {
+    const box = unit.header.getBoundingClientRect();
+    return clientY < box.top + box.height / 2;
+  });
+  if(insertAt < 0) insertAt = candidates.length;
+  const desired = [...candidates];
+  desired.splice(insertAt, 0, current);
+  if(desired.every((unit, index) => unit === group[index])) return;
+  if(insertAt < candidates.length) moveDetailUnitBefore(current, candidates[insertAt].start);
+  else moveDetailUnitAfter(current, candidates[candidates.length - 1]);
+}
+
+function refreshDetailSystemDraggability(detail, panelId){
+  const units = detailSystemUnits(detail, panelId);
+  detailSystemGroups(units).forEach(group => {
+    group.forEach(unit => {
+      const canDrag = group.length > 1 && !unit.body.classList.contains('open');
+      unit.header.classList.toggle('detail-system-draggable', canDrag);
+    });
+  });
+}
+
+let detailSystemDrag = null;
+let detailSystemSuppressClickUntil = 0;
+let detailSystemAutoScrollTimer = null;
+
+function scrollDetailBy(detail, delta){
+  const max = detail.scrollHeight - detail.clientHeight;
+  if(!Number.isFinite(delta) || !delta || max <= 0) return false;
+  const before = detail.scrollTop;
+  detail.scrollTop = Math.max(0, Math.min(max, before + delta));
+  return detail.scrollTop !== before;
+}
+
+function autoScrollDetail(detail, clientY){
+  const box = detail.getBoundingClientRect();
+  if(!box.height) return false;
+  const edge = Math.max(44, Math.min(84, box.height * .14));
+  let delta = 0;
+  if(clientY < box.top + edge) delta = -Math.ceil((box.top + edge - clientY) / edge * 18);
+  else if(clientY > box.bottom - edge) delta = Math.ceil((clientY - (box.bottom - edge)) / edge * 18);
+  return delta ? scrollDetailBy(detail, delta) : false;
+}
+
+function startDetailSystemDrag(){
+  if(!detailSystemDrag || detailSystemDrag.active) return;
+  detailSystemDrag.active = true;
+  window._detailSystemDragging = true;
+  detailSystemDrag.detail.classList.add('detail-system-reordering');
+  detailSystemDrag.header.classList.add('dragging');
+  detailSystemAutoScrollTimer = setInterval(() => {
+    if(!detailSystemDrag?.active) return;
+    const scrolled = autoScrollDetail(detailSystemDrag.detail, detailSystemDrag.lastY);
+    if(scrolled) moveDraggedDetailSystem(detailSystemDrag.detail, detailSystemDrag.panelId, detailSystemDrag.key, detailSystemDrag.lastY);
+  }, 80);
+}
+
+function endDetailSystemDrag(event){
+  if(!detailSystemDrag || event.pointerId !== detailSystemDrag.pointerId) return;
+  if(event._detailSystemDropHandled) return;
+  event._detailSystemDropHandled = true;
+  const state = detailSystemDrag;
+  try { state.header.releasePointerCapture?.(state.pointerId); } catch {}
+  if(detailSystemAutoScrollTimer) clearInterval(detailSystemAutoScrollTimer);
+  detailSystemAutoScrollTimer = null;
+  state.header.classList.remove('dragging');
+  state.detail.classList.remove('detail-system-reordering');
+  detailSystemDrag = null;
+  if(state.active){
+    saveDetailSystemOrder(state.detail, state.panelId);
+    refreshDetailSystemDraggability(state.detail, state.panelId);
+    detailSystemSuppressClickUntil = Date.now() + 350;
+    event.preventDefault?.();
+    event.stopPropagation?.();
+  }
+  window._detailSystemDragging = false;
+}
+
+function bindDetailSystemDragging(detail){
+  if(detail.dataset.detailOrderBound === '1') return;
+  detail.dataset.detailOrderBound = '1';
+  detail.addEventListener('pointerdown', event => {
+    if(event.button !== 0 || event.pointerType === 'touch') return;
+    if(event.target.closest('button,a,input,select,textarea,.os-sel,[contenteditable="true"]')) return;
+    const header = event.target.closest('[data-detail-system-key].detail-system-draggable');
+    const panelId = detail.dataset.panelId || activePanel;
+    if(!header || !panelId || !detail.contains(header)) return;
+    const unit = detailSystemUnits(detail, panelId).find(item => item.header === header);
+    if(!unit || unit.body.classList.contains('open')) return;
+    const group = detailSystemGroups(detailSystemUnits(detail, panelId)).find(items => items.some(item => item.key === unit.key));
+    if(!group || group.length < 2) return;
+    detailSystemDrag = {
+      detail,
+      panelId,
+      key:unit.key,
+      header,
+      pointerId:event.pointerId,
+      startX:event.clientX,
+      startY:event.clientY,
+      lastY:event.clientY,
+      active:false,
+    };
+    try { header.setPointerCapture?.(event.pointerId); } catch {}
+  });
+  const move = event => {
+    if(!detailSystemDrag || event.pointerId !== detailSystemDrag.pointerId) return;
+    if(event._detailSystemDragHandled) return;
+    event._detailSystemDragHandled = true;
+    detailSystemDrag.lastY = event.clientY;
+    if(!detailSystemDrag.active){
+      const distance = Math.hypot(event.clientX - detailSystemDrag.startX, event.clientY - detailSystemDrag.startY);
+      if(distance < 6) return;
+      startDetailSystemDrag();
+    }
+    event.preventDefault();
+    autoScrollDetail(detailSystemDrag.detail, event.clientY);
+    moveDraggedDetailSystem(detailSystemDrag.detail, detailSystemDrag.panelId, detailSystemDrag.key, event.clientY);
+  };
+  detail.addEventListener('pointermove', move);
+  window.addEventListener('pointermove', move, true);
+  detail.addEventListener('dragstart', event => {
+    if(event.target.closest('.detail-system-draggable')) event.preventDefault();
+  });
+  detail.addEventListener('click', event => {
+    if(Date.now() < detailSystemSuppressClickUntil){
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      return;
+    }
+    requestAnimationFrame(() => refreshDetailSystemDraggability(detail, detail.dataset.panelId || activePanel));
+  }, true);
+  detail.addEventListener('pointerup', endDetailSystemDrag);
+  detail.addEventListener('pointercancel', endDetailSystemDrag);
+  window.addEventListener('pointerup', endDetailSystemDrag, true);
+  window.addEventListener('pointercancel', endDetailSystemDrag, true);
+}
+
+function prepareDetailSystemOrdering(detail, panelId){
+  if(!detail || !panelId) return;
+  applyDetailSystemOrder(detail, panelId);
+  refreshDetailSystemDraggability(detail, panelId);
+  bindDetailSystemDragging(detail);
+}
+
 function panelDetailHtml(panel){
   const iconSvg = platformIcon(panel);
-  const headerSummary = panel.sbSummary && panel.sbSummary.includes('sb-csum')
-    ? `<div class="det-platform-summary">${panel.sbSummary}</div>`
+  const detailSummary = panel.detailSummary !== undefined ? panel.detailSummary : panel.sbSummary;
+  const hasBoxedDetailSummary = !!(detailSummary && detailSummary.includes('sb-csum'));
+  const headerSummary = hasBoxedDetailSummary
+    ? `<div class="det-platform-summary">${detailSummary}</div>`
     : '';
   const detailBadge = panel.detailBadge !== undefined ? panel.detailBadge : panel.badge;
+  const detailMeta = panel.detailMeta !== undefined
+    ? panel.detailMeta
+    : hasBoxedDetailSummary ? '' : panel.meta;
   return `
     <div class="det-hdr">
       <div class="det-icon">${iconSvg}</div>
       <span class="det-title">${panel.title}</span>
       ${headerSummary}
       <div class="det-summary">
-        ${panel.meta?`<span class="det-meta">${panel.meta}</span>`:''}
+        ${detailMeta?`<span class="det-meta">${detailMeta}</span>`:''}
         ${detailBadge}
       </div>
     </div>
@@ -7964,6 +9049,7 @@ function selectPanel(id, opts = {}){
       detail.innerHTML = '<div class="empty" style="padding:48px">Loading platform details...</div>';
     }
     applyLanguage(currentLang(window._lastData));
+    prepareDetailSystemOrdering(detail, id);
     const fullStatusPromise = pendingFullStatusPromise || fetchStatus({ detail: true, timeoutMs: 10000 }).catch(e => e);
     if(!pendingFullStatusPromise) pendingFullStatusPromise = fullStatusPromise;
     fullStatusPromise
@@ -7989,6 +9075,7 @@ function selectPanel(id, opts = {}){
     return;
   }
   const detail = document.getElementById('detail');
+  if(window._detailSystemDragging && detail.dataset.panelId === id) return;
   parkEmbedFrames(detail, { abortInflight: true });
   detail.dataset.embedUrl = '';
   const html = panelDetailHtml(panel);
@@ -8008,6 +9095,7 @@ function selectPanel(id, opts = {}){
   const data = window._lastData;
   if(!data){
     applyLanguage(currentLang());
+    prepareDetailSystemOrdering(detail, id);
     return;
   }
 
@@ -8096,6 +9184,7 @@ function selectPanel(id, opts = {}){
     });
   }
   applyLanguage(currentLang(data));
+  prepareDetailSystemOrdering(detail, id);
 }
 function selectPanelGroup(id, grpId){
   selectPanel(id);
@@ -8155,6 +9244,29 @@ function render(data, opts = {}){
     const cephBad = data.proxmox?.ceph && data.proxmox.ceph.health !== 'HEALTH_OK';
     platforms.push(o === 0 ? 'down' : (o < px.length || svcBad || cephBad) ? 'degraded' : 'ok'); 
     }
+  }
+  const vmware = data.vmware;
+  if(vmware && (vmware._connecting || vmware.online !== undefined || (vmware.instances || []).length)){
+    const vmwareInstances = vmware.instances || [];
+    const vmwareSummary = vmware.summary || {};
+    const endpointUp = Number(vmwareSummary.up ?? vmwareInstances.filter(instance => instance.online).length);
+    const endpointTotal = Number(vmwareSummary.instances ?? vmwareInstances.length);
+    const hostTotal = Number(vmwareSummary.hosts || 0);
+    const hostsOnline = Number(vmwareSummary.hostsOnline || 0);
+    const warning = Number(vmwareSummary.hostsWarning || 0) > 0
+      || Number(vmwareSummary.vmsWarning || 0) > 0
+      || Number(vmwareSummary.datastoresWarning || 0) > 0
+      || Number(vmwareSummary.hostsMaintenance || 0) > 0;
+    const connecting = !!vmware._connecting || vmwareInstances.some(instance => instance._connecting);
+    platforms.push(connecting && endpointUp === 0
+      ? 'connecting'
+      : endpointUp === 0
+        ? 'down'
+        : endpointUp < endpointTotal || (hostTotal > 0 && hostsOnline === 0)
+          ? (hostsOnline === 0 ? 'down' : 'degraded')
+          : hostsOnline < hostTotal || warning
+            ? 'degraded'
+            : 'ok');
   }
   if((data.linux||[]).length){ if(data.linux.some(l=>l._connecting)) platforms.push('connecting'); else { const o=data.linux.filter(l=>l.online).length; const svcBad=data.linux.some(l=>l.online&&(l.services||[]).some(s=>!s.active && !s.excluded)); platforms.push(o===0?'down':(o<data.linux.length||svcBad)?'degraded':'ok'); } }
   if((data.windows||[]).length){ if(data.windows.some(w=>w._connecting)) platforms.push('connecting'); else { const o=data.windows.filter(w=>w.online).length; const svcBad=data.windows.some(w=>w.online&&(w.services||[]).some(s=>!s.active && !s.excluded)); platforms.push(o===0?'down':(o<data.windows.length||svcBad)?'degraded':'ok'); } }
@@ -8286,7 +9398,7 @@ function render(data, opts = {}){
   setFavicon(anyOff);
   setLogoDot(anyOff);
 
-  const dataHas={ proxmox:!!(data.proxmox?.nodes?.length), linux:!!((data.linux||[]).length), windows:!!((data.windows||[]).length), kubernetes:!!data.kubernetes, synology:!!snmpRowsForPanel(data.snmp,'synology').length, mikrotik:!!snmpRowsForPanel(data.snmp,'mikrotik').length, unifi:!!snmpRowsForPanel(data.snmp,'unifi').length||!!((data.unifi?.instances)||[]).length, snmp:!!snmpRowsForPanel(data.snmp,'snmp').length, healthchecks:!!data.healthchecks, uptimekuma:!!data.uptimekuma, checks:!!data.checks, prometheus:!!data.prometheus, docker:!!((data.docker||[]).length), dockhand:!!data.dockhand, firewall:!!data.firewall, truenas:!!data.truenas, qnap:!!data.qnap, ugreen:!!data.ugreen, pbs:!!data.pbs, cloudflare:!!data.cloudflare, cicd:!!data.cicd, veeam:!!data.veeam, portainer:!!data.portainer, database:!!((data.database||[]).length) };
+  const dataHas={ proxmox:!!(data.proxmox?.nodes?.length), vmware:!!data.vmware, linux:!!((data.linux||[]).length), windows:!!((data.windows||[]).length), kubernetes:!!data.kubernetes, synology:!!snmpRowsForPanel(data.snmp,'synology').length, mikrotik:!!snmpRowsForPanel(data.snmp,'mikrotik').length, unifi:!!snmpRowsForPanel(data.snmp,'unifi').length||!!((data.unifi?.instances)||[]).length, snmp:!!snmpRowsForPanel(data.snmp,'snmp').length, healthchecks:!!data.healthchecks, uptimekuma:!!data.uptimekuma, checks:!!data.checks, prometheus:!!data.prometheus, docker:!!((data.docker||[]).length), dockhand:!!data.dockhand, firewall:!!data.firewall, truenas:!!data.truenas, qnap:!!data.qnap, ugreen:!!data.ugreen, pbs:!!data.pbs, cloudflare:!!data.cloudflare, cicd:!!data.cicd, veeam:!!data.veeam, portainer:!!data.portainer, database:!!((data.database||[]).length) };
   const connectingCount=platformConnectingCount + configuredIds.filter(id=>id!=='linux'&&!dataHas[id]).length;
   window._connecting = connectingCount;
 
@@ -8363,6 +9475,7 @@ function applyRailCollapsed(collapsed){
     btn.setAttribute('aria-label', btn.title);
   }
   updateSidebarOverflow();
+  scheduleSidebarBadgeWrapping();
 }
 function applyMainNavCollapsed(collapsed){
   document.documentElement.classList.toggle('nav-collapsed', !!collapsed);
@@ -8394,7 +9507,7 @@ function toggleRail(){
   const shell = document.querySelector('.shell');
   const handle = document.getElementById('rail-resizer');
   if(!shell || !handle) return;
-  const clamp = v => Math.max(238, Math.min(440, Math.round(v)));
+  const clamp = clampRailWidth;
   let resizeRaf = 0;
   let resizePendingWidth = 0;
   let resizeCurrentWidth = 0;
@@ -8406,8 +9519,7 @@ function toggleRail(){
   };
   const apply = v => {
     resizeCurrentWidth = clamp(v);
-    shell.style.setProperty('--rail-w', resizeCurrentWidth + 'px');
-    shell.classList.toggle('rail-narrow', resizeCurrentWidth <= 254);
+    applyRailWidth(resizeCurrentWidth);
   };
   const scheduleApply = v => {
     resizePendingWidth = clamp(v);
@@ -8421,41 +9533,50 @@ function toggleRail(){
   applyRailCollapsed(railCollapsedPref);
   applyMainNavCollapsed(navCollapsedPref);
   window.addEventListener('resize', updateSidebarOverflow);
+  window.addEventListener('resize', scheduleSidebarBadgeWrapping);
   handle.addEventListener('pointerdown', e => {
     if(document.body.classList.contains('rail-collapsed')) return;
     if(window.matchMedia('(max-width: 1100px)').matches) return;
     e.preventDefault();
     handle.setPointerCapture(e.pointerId);
+    window._railResizing = true;
     document.body.classList.add('os-resizing');
     notifySettingsResize(true);
     const railLeft = shell.getBoundingClientRect().left;
     resizeCurrentWidth = parseInt(getComputedStyle(shell).getPropertyValue('--rail-w').trim().replace('px',''), 10) || railWidthPref || 264;
     resizePendingWidth = resizeCurrentWidth;
-    const move = ev => scheduleApply(ev.clientX - railLeft);
+    const pointerId = e.pointerId;
+    const move = ev => {
+      if(ev.pointerId !== pointerId) return;
+      ev.preventDefault();
+      scheduleApply(ev.clientX - railLeft);
+    };
     const up = ev => {
+      if(ev.pointerId !== pointerId) return;
       try { handle.releasePointerCapture(ev.pointerId); } catch {}
       if(resizeRaf){
         cancelAnimationFrame(resizeRaf);
         resizeRaf = 0;
         apply(resizePendingWidth);
       }
+      window._railResizing = false;
       document.body.classList.remove('os-resizing');
       notifySettingsResize(false);
       railWidthPref = resizeCurrentWidth || railWidthPref;
       try { localStorage.setItem('os_rail_width', String(railWidthPref)); } catch {}
       scheduleUiPreferencesSave();
       requestAnimationFrame(updateSidebarOverflow);
-      handle.removeEventListener('pointermove', move);
-      handle.removeEventListener('pointerup', up);
-      handle.removeEventListener('pointercancel', up);
+      window.removeEventListener('pointermove', move, true);
+      window.removeEventListener('pointerup', up, true);
+      window.removeEventListener('pointercancel', up, true);
     };
-    handle.addEventListener('pointermove', move);
-    handle.addEventListener('pointerup', up);
-    handle.addEventListener('pointercancel', up);
+    window.addEventListener('pointermove', move, { capture:true, passive:false });
+    window.addEventListener('pointerup', up, true);
+    window.addEventListener('pointercancel', up, true);
   });
 })();
 
-/* ── Progress bar ── */
+/* ── Refresh activity bar ── */
 let pbarStarted = false;
 let pbarRestartTimer = null;
 function setPbarScale(scale, transition = 'none'){
@@ -8466,17 +9587,10 @@ function setPbarScale(scale, transition = 'none'){
   return b;
 }
 function startPbar(){
-  clearTimeout(pbarRestartTimer);
-  const b=setPbarScale(0, 'none');
-  if(!b) return;
-  pbarStarted = true;
-  b.getBoundingClientRect();
-  requestAnimationFrame(()=>setPbarScale(1, `transform ${INTERVAL}ms linear`));
+  manualPbarStart();
 }
 function resetPbar(){
-  clearTimeout(pbarRestartTimer);
-  setPbarScale(0, 'none');
-  pbarRestartTimer = setTimeout(startPbar,50);
+  manualPbarDone();
 }
 function manualPbarStart(){
   clearTimeout(pbarRestartTimer);
@@ -8491,9 +9605,7 @@ function manualPbarDone(){
   if(!b) return;
   clearTimeout(pbarRestartTimer);
   pbarRestartTimer = setTimeout(()=>{
-    if(typeof paused !== 'undefined' && paused){
-      setPbarScale(0, 'none');
-    } else resetPbar();
+    setPbarScale(0, 'none');
   }, 220);
 }
 
@@ -8822,6 +9934,18 @@ function commandPaletteItems(){
       items.push(commandItem(v.name || v.id, `${node.name || node.node || n.name} - ${v.type === 'lxc' ? 'LXC' : 'VM'} - ${v.status || ''}`, 'guest', cmdIcon('proxmox'), () => showPveGuest(node.name || node.node || n.name, v.id, v.type)));
     });
   });
+  (data.vmware?.instances || []).forEach(instance => {
+    items.push(commandItem(instance.name || instance.url || 'VMware', [instance.type === 'vcenter' ? 'vCenter Server' : 'Standalone ESXi', instance.url, instance.online ? 'online' : instance._connecting ? 'connecting' : 'offline'].filter(Boolean).join(' - '), 'vmware', cmdIcon('vmware'), () => selectPanel('vmware')));
+    (instance.hosts || []).forEach(host => {
+      items.push(commandItem(host.name || host.id || 'ESXi host', [instance.name || instance.url, host.clusterName, host.online ? 'online' : 'offline'].filter(Boolean).join(' - '), 'esxi', cmdIcon('vmware'), () => selectPanel('vmware')));
+    });
+    (instance.vms || []).forEach(vm => {
+      items.push(commandItem(vm.name || vm.id || 'Virtual machine', [vm.hostName, vm.guestOs, vm.running ? 'powered on' : 'powered off'].filter(Boolean).join(' - '), 'vm', cmdIcon('vmware'), () => showVmwareGuest(instance.url || instance.name, vm.id)));
+    });
+    (instance.datastores || []).forEach(datastore => {
+      items.push(commandItem(datastore.name || datastore.id || 'Datastore', [instance.name || instance.url, datastore.type, hasNum(datastore.usedPercent) ? `${fmtPct(datastore.usedPercent)} used` : ''].filter(Boolean).join(' - '), 'datastore', cmdIcon('vmware'), () => selectPanel('vmware')));
+    });
+  });
   const k8s = data.kubernetes || {};
   (k8s.pods || []).forEach(p => {
     items.push(commandItem(p.name, `${p.namespace || 'default'} - ${p.phase || p.status || 'pod'}`, 'pod', cmdIcon('pod'), () => showPodLogs(p.namespace || 'default', p.name)));
@@ -9007,6 +10131,7 @@ function openEmbed(url, opts = {}){
   showEmbedFrame(ifr, detail, url, navSeq);
   renderConfiguredSidebarShell();
   applyThemeToEmbed();
+  scheduleShellSummarySync(80);
 }
 let embedPrefetchStarted = false;
 function prefetchRouteResource(href, as = 'document'){
@@ -9143,6 +10268,10 @@ window.addEventListener('message', e => {
   if(e.origin !== window.location.origin) return;
   if(e.data?.type === 'omnisight-profile') applyTopProfile(e.data.profile || {});
   if(e.data?.type === 'omnisight-passkey-add') addPasskeyFromShell(e.source);
+  if(e.data?.type === 'omnisight-status-changed') {
+    scheduleShellSummarySync(60);
+    scheduleShellSummaryFollowup();
+  }
 });
 function highlightLog(text){
   const re=/(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?)|\b(ERROR|ERR|FATAL|CRITICAL|WARNING|WARN|INFO|NOTICE|DEBUG|TRACE)\b|(\b\d{1,3}(?:\.\d{1,3}){3}(?::\d+)?\b)|("[^"]*"|'+"'"+'[^'+"'"+']*'+"'"+')|(\b\d+(?:\.\d+)?\b)/g;
@@ -9281,6 +10410,38 @@ function showPveGuest(nodeName, id, type){
     ['Lock', guest.lock || ''],
   ]);
 }
+function showVmwareGuest(endpointKey, id){
+  const instance = (window._lastData?.vmware?.instances || []).find(row => row.url === endpointKey || row.name === endpointKey);
+  const guest = (instance?.vms || []).find(vm => String(vm.id) === String(id));
+  if(!guest) return;
+  const datacenters = (instance.datacenters || []).map(datacenter => datacenter.name).filter(Boolean).join(', ');
+  const powerState = guest.running ? 'powered on' : guest.powerState === 'poweredoff' ? 'powered off' : guest.powerState || 'unknown';
+  const health = String(guest.health || '').toLowerCase();
+  const healthText = health === 'green' ? 'healthy' : health === 'yellow' || health === 'red' ? 'attention' : health || 'unknown';
+  const configuredMemory = hasNum(guest.memoryMb) ? fmtBytes(Number(guest.memoryMb) * 1024 * 1024) : '';
+  const guestMemory = hasNum(guest.guestMemoryMb) ? fmtBytes(Number(guest.guestMemoryMb) * 1024 * 1024) : '';
+  const hostMemory = hasNum(guest.hostMemoryMb) ? fmtBytes(Number(guest.hostMemoryMb) * 1024 * 1024) : '';
+  showK8sDetail(`${guest.name || guest.id} — VM`, [
+    ['Endpoint', instance.name || instance.url || 'VMware'],
+    ['Datacenter', datacenters],
+    ['Cluster', guest.clusterName || ''],
+    ['ESXi host', guest.hostName || ''],
+    ['ID', guest.id],
+    ['Power state', powerState],
+    ['Health', healthText],
+    ['vCPU', hasNum(guest.cpuCount) ? guest.cpuCount : ''],
+    ['Configured RAM', configuredMemory],
+    ['Guest memory', guestMemory],
+    ['Host memory', hostMemory],
+    ['CPU usage', hasNum(guest.cpuUsedMhz) ? `${fmtChartValue(guest.cpuUsedMhz)} MHz` : ''],
+    ['Storage used', hasNum(guest.storageCommittedBytes) ? fmtBytes(guest.storageCommittedBytes) : ''],
+    ['Provisioned storage', hasNum(guest.storageProvisionedBytes) ? fmtBytes(guest.storageProvisionedBytes) : ''],
+    ['Uptime', guest.uptimeSeconds ? fmtUptime(guest.uptimeSeconds) : ''],
+    ['Guest OS', guest.guestOs || ''],
+    ['IP address', guest.ipAddress || ''],
+    ['VMware Tools', vmwareToolsLabel(guest.toolsStatus)],
+  ]);
+}
 document.addEventListener('keydown', e => {
   const open = document.getElementById('cmdk-backdrop')?.classList.contains('open');
   if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k'){
@@ -9323,7 +10484,7 @@ function statusCacheKey(){
   const token = sessionStorage.getItem('os_token') || localStorage.getItem('os_token') || 'anon';
   return `${STATUS_CACHE_KEY}:${String(token).slice(-18)}`;
 }
-const STATUS_INSTANCE_IDS = new Set(['prometheus','dockhand','firewall','truenas','qnap','ugreen','pbs','cloudflare','cicd','veeam','portainer']);
+const STATUS_INSTANCE_IDS = new Set(['vmware','prometheus','dockhand','firewall','truenas','qnap','ugreen','pbs','cloudflare','cicd','veeam','portainer']);
 function statusPlatformPresent(data = {}, id){
   if(SNMP_PANEL_IDS.includes(id)) return snmpRowsForPanel(data.snmp, id).length > 0;
   const value = data?.[id];
@@ -9590,6 +10751,28 @@ async function fetchStatusSummary(opts = {}){
 function shouldUseShellSummary(){
   return embedOpen && !dashboardOpen;
 }
+let shellSummarySyncTimer = null;
+let shellSummaryFollowupTimer = null;
+let shellSummarySyncPromise = null;
+function scheduleShellSummarySync(delay = 0){
+  clearTimeout(shellSummarySyncTimer);
+  if(!shouldUseShellSummary() || paused || pageHidden()) return;
+  shellSummarySyncTimer = setTimeout(() => {
+    shellSummarySyncTimer = null;
+    if(shellSummarySyncPromise) return;
+    shellSummarySyncPromise = fetchStatusSummary({ timeoutMs: 4000 })
+      .then(applyShellSummary)
+      .catch(e => { if(e.message !== 'Unauthorized') console.warn('shell summary refresh failed:', e.message || e); })
+      .finally(() => {
+        shellSummarySyncPromise = null;
+        scheduleRefresh();
+      });
+  }, Math.max(0, Number(delay) || 0));
+}
+function scheduleShellSummaryFollowup(){
+  clearTimeout(shellSummaryFollowupTimer);
+  shellSummaryFollowupTimer = setTimeout(() => scheduleShellSummarySync(0), 1800);
+}
 function shellSummaryBadge(status, lang){
   const s = String(status || '').toLowerCase();
   if(s === 'ok' || s === 'healthy') return { cls:'green', txt:trText('healthy', lang) };
@@ -9608,6 +10791,12 @@ function shellSummaryMeta(item, base){
       .replace(/^\s*,\s*|\s*,\s*$/g, '')
       .trim();
   }
+  if(item?.id === 'linux' || item?.id === 'windows'){
+    const total = Math.max(0, Math.floor(Number(item?.total) || 0));
+    const online = Math.max(0, Math.min(total, Math.floor(Number(item?.online) || 0)));
+    if(total > 0) return `${online}/${total} online`;
+    detail = detail.replace(/\breachable\b/ig, 'online');
+  }
   return detail || base?.meta || '';
 }
 function shellSummaryBadgeForItem(item, lang){
@@ -9616,6 +10805,12 @@ function shellSummaryBadgeForItem(item, lang){
   if(offline > 0 && total > 0){
     const online = Math.max(0, Math.floor(Number(item?.online) || 0));
     return { cls:offlineRatioBadgeClass(offline, total, online), txt:offlineRatioLabel(offline, total, online) };
+  }
+  if(item?.badge){
+    const cls = ['red','yellow','green','gray'].includes(String(item.badgeClass || '').toLowerCase())
+      ? String(item.badgeClass).toLowerCase()
+      : shellSummaryBadge(item?.status, lang).cls;
+    return { cls, txt:String(item.badge) };
   }
   if(item?.id === 'proxmox'){
     const detail = String(item.detail || '');
@@ -9694,6 +10889,10 @@ function applyShellSummary(summary){
     };
   });
   missingConfigured.forEach(id => { if(!panels[id]) panels[id] = placeholderPanel(id); });
+  const activeIds = new Set([...present, ...configuredIds]);
+  Object.keys(panels).forEach(id => {
+    if(ALL_IDS.includes(id) && !activeIds.has(id)) delete panels[id];
+  });
   window._panels = panels;
   const ids = orderedSidebarIds(ALL_IDS.filter(id => panels[id]));
   renderSidebar(ids, panels, null);
@@ -9724,11 +10923,12 @@ function togglePause(){
     ? '<polygon points="5 3 19 12 5 21 5 3"/>'
     : '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>';
   if(paused){ clearTimeout(timer); setPbarScale(0, 'none'); }
-  else { scheduleRefresh(); startPbar(); }
+  else { scheduleRefresh(); }
 }
 
 async function pollOnce(){
-  if(paused || pageHidden() || embedOpen) return;
+  if(paused || pageHidden()) return;
+  manualPbarStart();
   try{
     const useSummary = shouldUseShellSummary();
     const data = useSummary
@@ -9741,6 +10941,7 @@ async function pollOnce(){
       else clearInitialLoadRetry();
     }
     if(data.loading){
+      manualPbarDone();
       clearTimeout(timer);
       timer = setTimeout(pollOnce, 5000);
       return;
@@ -9757,7 +10958,11 @@ async function handleStatusStreamEvent(event){
   if(paused || pageHidden() || embedOpen || statusStreamFetchBusy) return;
   let msg = {};
   try { msg = JSON.parse(event.data || '{}'); } catch {}
-  if(msg.type === 'refreshing') return;
+  if(msg.type === 'refreshing') {
+    manualPbarStart();
+    return;
+  }
+  if(msg.type === 'updated') manualPbarDone();
   const ts = String(msg.timestamp || '');
   if(ts && ts === lastStatusEventTs) return;
   lastStatusEventTs = ts;
@@ -9800,9 +11005,9 @@ function connectStatusStream(){
   }
 }
 function scheduleRefresh(){
-  if(paused || pageHidden() || embedOpen) return;
+  if(paused || pageHidden()) return;
   clearTimeout(timer);
-  timer = setTimeout(pollOnce, statusStreamOpen ? INTERVAL * 3 : INTERVAL);
+  timer = setTimeout(pollOnce, statusStreamOpen ? INTERVAL * 3 : (shouldUseShellSummary() ? SHELL_SUMMARY_INTERVAL : INTERVAL));
 }
 function closeStatusStream(){
   if(!statusStream) return;
@@ -9820,7 +11025,6 @@ document.addEventListener('visibilitychange', () => {
   if(!paused){
     connectStatusStream();
     pollOnce();
-    resetPbar();
   }
 });
 
@@ -9904,7 +11108,7 @@ async function initialLoad(preloadedData, attempt = 0){
       throw renderErr;
     }
     ensureDashboardContent('initial-render');
-    if(!pbarStarted) startPbar();
+    manualPbarDone();
     if(window.location.hash && !initialRouteApplied){
       initialRouteApplied = true;
       applyHashRoute();
@@ -9920,6 +11124,7 @@ async function initialLoad(preloadedData, attempt = 0){
     scheduleRefresh();
     if(!embedOpen && !document.querySelector('.sb-card')) openEmbed('/settings');
   } catch(e){
+    manualPbarDone();
     if(e.message!=='Unauthorized') {
       console.error(e);
       if(!window._lastData || window._lastData.loading){

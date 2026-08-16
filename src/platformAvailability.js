@@ -47,6 +47,17 @@ function unifiAvailability(data) {
 
 function platformAvailability(data = {}, id = '') {
   if (id === 'proxmox') return rowAvailability(data.proxmox?.nodes, row => !row.node?.online, row => !!row.node?.online);
+  if (id === 'vmware') {
+    if (data.vmware?._stale) {
+      const unknownTotal = (data.vmware.instances || []).flatMap(instance => instance.hosts || []).length
+        || data.vmware.instances?.length
+        || data.vmware.summary?.instances;
+      return availabilityCounts(0, unknownTotal, 0);
+    }
+    const hosts = (data.vmware?.instances || []).flatMap(instance => instance.hosts || []);
+    const hostCounts = rowAvailability(hosts);
+    return hostCounts.total ? hostCounts : summaryInstanceAvailability(data.vmware);
+  }
   if (id === 'linux') return rowAvailability(data.linux);
   if (id === 'windows') return rowAvailability(data.windows);
   if (id === 'kubernetes') {

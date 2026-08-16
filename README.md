@@ -2,7 +2,7 @@
 
 ![Status](https://img.shields.io/badge/status-stable-brightgreen) [![Latest Release](https://img.shields.io/github/v/release/caglaryalcin/OmniSight?include_prereleases&color=blue)](https://github.com/caglaryalcin/OmniSight/releases)
 
-A simple, single-glance monitoring dashboard for Proxmox, Linux servers, Kubernetes, SNMP devices, Docker, Dockhand, firewalls, TrueNAS/QNAP/UGREEN storage, Proxmox Backup Server, Portainer, databases, built-in service checks, Healthchecks, Uptime Kuma and Prometheus.
+A simple, single-glance monitoring dashboard for Proxmox, VMware ESXi/vCenter, Linux servers, Kubernetes, SNMP devices, Docker, Dockhand, firewalls, TrueNAS/QNAP/UGREEN storage, Proxmox Backup Server, Portainer, databases, built-in service checks, Healthchecks, Uptime Kuma and Prometheus.
 
 For deeper architecture, operations and troubleshooting notes, see [DOCUMENTATION.md](DOCUMENTATION.md).
 
@@ -13,6 +13,10 @@ For deeper architecture, operations and troubleshooting notes, see [DOCUMENTATIO
 - **Proxmox** — node CPU/RAM/temperature/uptime, Disk I/O and bandwidth when exposed by the API, agent or optional SSH metrics fallback, VM/LXC lists with clickable detail views, per-node service status with **start/stop/restart/exclude** actions, **last backup** (vzdump) status, **Ceph cluster storage health** with active alert summaries, node storage utilization and CPU/RAM/temperature history charts — collected via API token, locally by the agent via `pvesh`, or SSH fallback for host-only metrics
 
 ![](https://raw.githubusercontent.com/caglaryalcin/OmniSight/refs/heads/main/screenshots/gifs/proxmox.gif)
+
+- **VMware ESXi / vCenter** — standalone ESXi and vCenter discovery through the vSphere Web Services API, including datacenters, clusters, host connection/maintenance health, CPU/RAM/uptime, virtual machines, guest OS/IP/VMware Tools state and datastore capacity/accessibility
+
+![](https://raw.githubusercontent.com/caglaryalcin/OmniSight/refs/heads/main/screenshots/gifs/esxi.gif)
 
 - **Linux & Windows servers** — CPU/RAM/disk/swap/load/temperature/uptime/OS where available plus disk I/O and bandwidth history, with **auto-discovered** services and near-instant **status/start/stop/restart/exclude** actions over the agent's command long-poll.
 
@@ -195,6 +199,10 @@ EOF
 [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12; $env:OMNISIGHT_URL="http://<omnisight-host>:3000"; $env:OMNISIGHT_TOKEN="<token>"; $env:OMNISIGHT_AGENT_ROLE="windows"; iwr -UseBasicParsing "http://<omnisight-host>:3000/agent/install-windows.ps1" | iex
 ```
 
+The Windows installer compiles the agent with the Windows-provided .NET Framework compiler and registers `OmniSightAgent` as an automatic Windows service. Runtime files are stored under `%ProgramFiles%\OmniSight Agent`, configuration and logs under `%ProgramData%\OmniSight`, and no persistent PowerShell process or scheduled task is used.
+
+Windows agents older than v1.4.0 use the legacy scheduled-task runtime. Selecting **Update** for one of these agents shows a one-time elevated PowerShell migration command instead of stopping the running agent. The command installs the Windows service, preserves the existing agent ID, and stops and removes the legacy task only after the service starts successfully.
+
 3. Run it on the server — the dialog shows a live "✓ connected" confirmation and the system appears on the dashboard within seconds.
 
 **What one agent covers, automatically:**
@@ -211,9 +219,9 @@ EOF
 - Authentication: one shared token (`X-Agent-Token` header), auto-generated on first add and regenerable from **Settings → Linux Server**. Regenerating invalidates all installed agents until updated.
 - Agent identity: the installer writes a unique `OMNISIGHT_AGENT_ID` into `/etc/omnisight-agent/agent.env`, so cloned VMs with the same `/etc/machine-id` still appear as separate systems.
 - A system is marked **offline** when no report arrives for ~2.5× its interval.
-- Agent versions are visible in **Agents**. If an agent is outdated, use the Update action there; very old agents may show a one-time manual update command.
-- Logs: `journalctl -u omnisight-agent -f` (binary) / `docker logs -f omnisight-agent` (container)
-- Uninstall: `curl -fsSL http://<omnisight-host>:3000/agent/install.sh | sudo bash -s uninstall` / `docker rm -f omnisight-agent` / `docker stack rm omnisight-agent`
+- Agent versions are visible in **Agents**. If an agent is outdated, use the Update action there. Windows agents older than v1.4.0 show a one-time elevated service-migration command; other very old agents may also require a manual update.
+- Logs: `journalctl -u omnisight-agent -f` (Linux), `Get-Content "$env:ProgramData\OmniSight\logs\agent.log" -Tail 100 -Wait` (Windows), or `docker logs -f omnisight-agent` (container)
+- Uninstall: `curl -fsSL http://<omnisight-host>:3000/agent/install.sh | sudo bash -s uninstall` (Linux), use the generated elevated PowerShell uninstall command for Windows, or run `docker rm -f omnisight-agent` / `docker stack rm omnisight-agent` for containers
 - Remove from dashboard: the ✕ button next to the system in Settings.
 
 > Upgrading from ≤0.7.x: SSH-based `linux.servers[]` is no longer used. Install the agent on Linux systems instead; service exclude lists are preserved per hostname. Proxmox and Docker can be monitored either with agents or with the dedicated API/SSH options in Settings.
@@ -395,6 +403,7 @@ The live config is `data/config.yaml` (created automatically on first save). Eas
 
 - `linux` — `enabled` + `agentToken` (auto-generated from the Settings UI). Systems self-register via the [agent](#the-agent); no per-server entries needed. Services are auto-discovered and Exclude/Include is managed from the UI
 - `proxmox` — `enabled`, optional API `instances[]` (`name`, `url`, `tokenId`, `tokenSecret`, `insecureTLS`) for one or more independent Proxmox servers/clusters, optional `sshMetrics[]` (`node`, `sshHost`, `sshUser`, `sshPassword`/`sshKey`, `sshPort`, `sudo`) to fill host CPU temperature and host Disk I/O when the API does not expose them, plus optional `icon`. The old single `url` / token fields remain backward compatible. Without API settings, data can come from agents running on the nodes (`pvesh`)
+- `vmware` — `enabled` and one or more `instances[]` with `name`, ESXi/vCenter `url`, read-only `username`, `password`, and optional `insecureTLS`. Enter the server URL only; OmniSight uses `/sdk` automatically. A vCenter endpoint discovers its clusters, hosts, virtual machines and datastores
 - `docker` — `enabled`, optional `hosts[]` for Docker API or SSH hosts (`sshHost`, `sshUser`, `sshPassword`/`sshKey`, `sshMode`, `sudo`, `insecureTLS`), plus optional `icon`. Agent-reported Docker hosts also appear automatically
 - `dockhand` — one or more API `instances[]` with name, url, bearer token and optional `insecureTLS`
 - `firewall` — one or more gateway `instances[]` with name, type (`opnsense` or `pfsense` compatible API), url, API key/secret or username/password and optional `insecureTLS`

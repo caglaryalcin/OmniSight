@@ -1,6 +1,6 @@
 # OmniSight Dokümantasyonu
 
-OmniSight; Proxmox, Linux sunucular, Docker, Kubernetes, SNMP cihazları, Healthchecks, Uptime Kuma, Prometheus, Dockhand, güvenlik duvarları, TrueNAS/QNAP/UGREEN depolama sistemleri, Proxmox Backup Server, Portainer ve veritabanları için tek bakışta izleme sağlayan bir paneldir.
+OmniSight; Proxmox, VMware ESXi/vCenter, Linux sunucular, Docker, Kubernetes, SNMP cihazları, Healthchecks, Uptime Kuma, Prometheus, Dockhand, güvenlik duvarları, TrueNAS/QNAP/UGREEN depolama sistemleri, Proxmox Backup Server, Portainer ve veritabanları için tek bakışta izleme sağlayan bir paneldir.
 
 Bu doküman platformun ne olduğunu, nasıl çalıştığını, verileri nerede sakladığını, her entegrasyonun verileri nasıl topladığını, ajan ve bildirim akışlarının nasıl işlediğini, kimlik doğrulama ile güvenliğin nasıl yönetildiğini ve üretim sorunlarının nasıl giderileceğini açıklar.
 
@@ -29,7 +29,7 @@ OmniSight tek süreçli bir izleme uygulamasıdır. Backend, Node.js + Express k
 Temel hedefler:
 
 - Altyapı sağlığını tek panelde göstermek.
-- Proxmox, Linux, Docker, Kubernetes ve harici servisleri ortak bir arayüz modeliyle izlemek.
+- Proxmox, VMware ESXi/vCenter, Linux, Docker, Kubernetes ve harici servisleri ortak bir arayüz modeliyle izlemek.
 - NAT veya güvenlik duvarı arkasındaki sistemleri push ajanı ile izlemek.
 - Servis ve container işlemlerini arayüzden çalıştırmak.
 - Bildirim, denetim ve çalışma zamanı olaylarını Olay Merkezi'nde toplamak.
@@ -58,7 +58,7 @@ Uygulamanın merkezinde `server.js` bulunur. Express sunucusunu, kimlik doğrula
 |---|---|---|
 | Çalışma zamanı sunucusu | `server.js` | API, kimlik doğrulama, RBAC, planlayıcı, önbellek, bildirimler ve statik sunum |
 | Frontend | `public/*.html`, `public/i18n.js` | Panel, Ayarlar, Olay Merkezi, Ajanlar, Topoloji ve Profil |
-| Ajan | `agent/install.sh`, `agent/omnisight-agent.sh`, `agent/install-windows.ps1`, `agent/omnisight-agent.ps1` | Linux, Windows, Proxmox ve Docker sunucularından push raporları gönderir ve komut çalıştırır |
+| Ajan | `agent/install.sh`, `agent/omnisight-agent.sh`, `agent/install-windows.ps1`, `agent/OmniSight.Agent.cs`, `agent/omnisight-agent.ps1` | Linux, Windows, Proxmox ve Docker sunucularından push raporları gönderir ve komut çalıştırır; PowerShell ajanı yalnızca eski kurulumların taşınması için tutulur |
 | Veri toplayıcılar | `src/*.js` | Platforma özel veri toplama |
 | Kalıcı durum | `data/` | Yapılandırma, kullanıcılar, oturumlar, ajanlar, geçmiş, sertifikalar ve ikonlar |
 
@@ -67,6 +67,7 @@ Uygulamanın merkezinde `server.js` bulunur. Express sunucusunu, kimlik doğrula
 | Modül | Platform |
 |---|---|
 | `src/proxmox.js` | Proxmox API ve SSH fallback |
+| `src/vmware.js` | Standalone ESXi ve vCenter için VMware vSphere Web Services API |
 | `src/agents.js` | Push ajan raporları ve normalize edilmiş Linux/Docker/Proxmox ajan verileri |
 | `src/docker.js` | Docker API/SSH sunucuları, kayıtlar ve prune işlemi |
 | `src/kubernetes.js` | Kubernetes pod, servis, deployment ve kayıtları |
@@ -137,7 +138,7 @@ Panel hızlı operasyonel kontrol için tasarlanmıştır.
 ### Ana Parçalar
 
 - Üst KPI kartları: CPU, Bellek, Disk I/O ve Bant Genişliği.
-- Platform kartları: Proxmox, Linux, Docker, Kubernetes, SNMP, Healthchecks, Uptime Kuma, Checks, Prometheus, Dockhand, Firewalls, TrueNAS, QNAP, Ugreen, Proxmox Backup, Cloudflare, GitHub/GitLab CI, Portainer ve Database.
+- Platform kartları: Proxmox, VMware ESXi/vCenter, Linux, Docker, Kubernetes, SNMP, Healthchecks, Uptime Kuma, Checks, Prometheus, Dockhand, Firewalls, TrueNAS, QNAP, Ugreen, Proxmox Backup, Cloudflare, GitHub/GitLab CI, Portainer ve Database.
 - Aktif bildirimler ve son kayıtlar için isteğe bağlı yan panel.
 - Genel sağlık rozeti.
 - Herkese açık durum sayfası bağlantısı.
@@ -145,12 +146,17 @@ Panel hızlı operasyonel kontrol için tasarlanmıştır.
 
 ### Kart Davranışı
 
+- CPU ve RAM KPI kartları tek bir kademeli seçim menüsü kullanır; platforma tıklanınca platform menüsü kapanmadan host listesi sağ tarafta açılır.
+- Açık CPU ve RAM seçim menüleri panel verileri yenilenirken kapanmaz.
 - Kartlar sürükle-bırak ile sıralanabilir.
 - Kartlar daraltılıp genişletilebilir.
+- Platform detaylarında daraltılmış host, sunucu ve cihaz satırları doğrudan sürükle-bırak ile sıralanabilir; sıralama platform bazında kaydedilir.
 - Gizlenen platformlar panelin üstündeki kompakt gizli platform çubuğunda görünür.
 - Geri yükleme düğmesi gizli platformları geri getirir.
 - Platform kartına tıklamak detay görünümünü açar.
 - Detay başlığı, panel kartındaki kompakt özet sayaçlarını yeniden kullanır.
+- İzlenen bir sistemin eklenmesi, silinmesi veya sayfalar arasında gezinilmesi; kayıtlı sidebar genişliğini, görünürlüğünü, sırasını, gruplamasını ya da daraltma tercihlerini sıfırlamaz.
+- Agent, host ve cihaz durumları Ayarlar veya başka bir gömülü sayfa açıkken sidebar ile eşitlenir; son sistem kaldırıldığında ilgili platform kartı da kaldırılır.
 
 ### Sağlık Modeli
 
@@ -158,6 +164,7 @@ Her platform kendi sinyallerini ortak panel sağlığına dönüştürür:
 
 - Linux: çevrimdışı sunucu, başarısız veya pasif servis.
 - Proxmox: çevrimdışı node, başarısız servis, Ceph uyarısı/hatası veya kaynak sorunu.
+- VMware: erişilemeyen endpoint, bağlantısı kesilmiş/yanıt vermeyen ESXi hostu, maintenance modu, sağlıksız çalışan VM veya erişilemeyen datastore. Kapatılmış VM'ler nötrdür.
 - Docker: çevrimdışı sunucu, durmuş veya başarısız container, image güncelleme sinyalleri.
 - Kubernetes: başarısız veya bekleyen pod, deployment uyuşmazlığı.
 - Healthchecks: down veya grace durumu.
@@ -188,6 +195,7 @@ Proxmox iki ana yöntemle izlenebilir:
 
 Toplanan veriler:
 
+- Otomatik cluster/standalone algılama, gerçek Proxmox cluster adı, üye node’lar ve quorum durumu.
 - Node çevrimiçi/çevrimdışı durumu.
 - CPU, RAM ve çalışma süresi.
 - CPU/Sistem/NVMe sıcaklıkları.
@@ -201,9 +209,28 @@ Toplanan veriler:
 
 Notlar:
 
+- Tek bir Proxmox API adresi cluster’daki tüm node’ları keşfeder. Proxmox ajanları aynı cluster kimliğini yerel olarak `pvesh` ile okur; quorum kaybı sağlık sorunu sayılır ve bildirim üretebilir.
 - Proxmox API her zaman sunucu sensörlerini yayınlamaz. NVMe SMART, CPU sıcaklığı veya sunucu Disk I/O değerleri için ajan ya da SSH fallback gerekebilir.
 - Proxmox ajanı bulunan sunucu, tekrarlı görünümü önlemek için Linux kartından çıkarılır.
 - Mini grafikler bilerek kompakt tutulur; ayrıntılı disk ve sağlık verileri detay görünümündedir.
+
+### VMware ESXi / vCenter
+
+VMware envanteri `/sdk` adresindeki vSphere Web Services API üzerinden toplanır. Aynı entegrasyon standalone ESXi hostlarını ve vCenter Server'ı destekler. Mümkün olduğunda yalnızca okuma yetkili ayrı bir VMware hesabı kullanın.
+
+Toplanan veriler:
+
+- Endpoint türü, ürün, sürüm, build, API sürümü ve datacenter'lar.
+- vCenter cluster'ları ve host üyelikleri.
+- ESXi bağlantı, güç ve maintenance durumu; CPU/RAM kullanımı ve çalışma süresi.
+- Sanal makine güç/sağlık durumu, vCPU, tanımlı ve aktif bellek, depolama kullanımı, guest işletim sistemi, IP adresi, VMware Tools durumu ve çalışma süresi. Ayrıntıları açmak için VM satırına tıklayın.
+- Datastore türü, kapasite, boş/kullanılan alan ve erişilebilirlik.
+
+Notlar:
+
+- TLS sertifika doğrulaması varsayılan olarak açıktır. Yalnızca güvendiğiniz ve self-signed sertifika kullanan endpointlerde kapatın.
+- Kapatılmış bir VM beklenen, nötr bir durum olarak gösterilir ve platform sağlığını bozmaz.
+- Topoloji endpoint -> cluster -> ESXi host -> VM şeklinde otomatik oluşturulur. Standalone ESXi hostu doğrudan endpoint'e bağlanır.
 
 ### Linux Servers
 
@@ -484,19 +511,21 @@ Toplanan veriler:
 
 ## 6. Ajan Sistemi
 
-Ajan, hedef sistemde çalışan küçük bir bash veya PowerShell scriptidir. Gelen bağlantı portuna ihtiyaç duymaz; OmniSight'a giden HTTP(S) bağlantısıyla rapor gönderir.
+Linux ajanı küçük bir bash servisi, Windows ajanı ise native .NET Framework Windows hizmetidir. Hiçbiri gelen bağlantı portuna ihtiyaç duymaz; OmniSight'a giden HTTP(S) bağlantısıyla rapor gönderir.
 
 ### Kurulum Modeli
 
 Ayarlar'daki uygun işlemi kullanın:
 
 - Linux Servers → Sistem Ekle.
+- Windows Servers → Windows Host Ekle.
 - Proxmox → Node Ekle.
 - Docker → Host Ekle.
 
 Desteklenen kurulum biçimleri:
 
 - Binary/systemd.
+- Windows hizmeti.
 - Docker container.
 - Docker Stack/Swarm.
 
@@ -513,6 +542,8 @@ Kendinden imzalı TLS için:
 curl -fsSL --insecure https://omnisight.example/agent/install.sh | \
   sudo OMNISIGHT_URL=https://omnisight.example OMNISIGHT_TOKEN=<token> OMNISIGHT_INSECURE_TLS=1 bash
 ```
+
+Windows kurulumu, yönetici olarak açılmış PowerShell penceresinden çalıştırılır ve otomatik başlayan `OmniSightAgent` hizmetini kaydeder. Çalışma dosyaları `%ProgramFiles%\OmniSight Agent`, yapılandırma ve loglar `%ProgramData%\OmniSight` altında tutulur. v1.4.0 öncesi Windows ajanlarında **Ajanlar → Güncelle**, eski ajanı durdurmak yerine bir defalık yönetici yetkili taşıma komutunu gösterir. Kurucu mevcut ajan kimliğini korur; yeni hizmet başarıyla başladıktan sonra eski görevi durdurup siler. Taşıma başarısız olursa mevcut ajan çalışmaya devam eder.
 
 ### Ajan Endpointleri
 
@@ -533,6 +564,17 @@ Arayüz servis yeniden başlatma, Docker kayıtları, Docker prune veya ajan gü
 4. Ajan stdout/stderr sonucunu `/api/agent/result` adresine gönderir.
 5. Arayüz sonucu gösterir.
 
+### Uzaktan Kaldırma
+
+Adminler, platformun Ayarlar sayfasındaki X düğmesiyle veya Ajanlar sayfasındaki **Kaldır** düğmesiyle kurulu bir ajanı kaldırabilir.
+
+- Ajan çevrim içi olmalı ve 1.3.3 veya daha yeni bir sürümü çalıştırmalıdır.
+- OmniSight tek bir `agent_uninstall` komutu gönderir; izlenen sistemde ayrıca onay sorulmaz.
+- Ajan, başarı sonucunu göndermeden önce temizliği bağımsız bir yerel yardımcı işlemle başlatır. Böylece tarayıcı, panel bağlantısı veya ağ oturumu kapansa bile temizlik devam eder.
+- Temizlik, OmniSight ajan servisini veya containerını, ajan dosyalarını, yapılandırmayı ve ilgili panel kaydını siler. İzlenen uygulamaları silmez.
+- Linux/systemd geçici bir systemd görevi, Windows hizmeti geçici bir native yardımcı `.exe`, container ajanları ise bağımsız bir Docker yardımcı containerı kullanır.
+- Docker Swarm servisindeki tek bir task, tüm servisi değiştirmeden güvenli biçimde kaldırılamaz. Swarm ile kurulan ajanları bir manager üzerinde stack veya servis komutuyla kaldırın.
+
 ### Ajan Rolleri
 
 | Rol | Davranış |
@@ -546,7 +588,7 @@ Arayüz servis yeniden başlatma, Docker kayıtları, Docker prune veya ajan gü
 
 Ajanlar sayfasında önce **Ajanı kontrol et** komutunu kullanın. Bu komut servis durumunu, son kayıtları ve panel erişimini kontrol eder; ajanı yeniden başlatmaz veya onarmaz.
 
-Onarım komutu gerektiğinde:
+Linux onarım komutu gerektiğinde:
 
 - Mevcut `/etc/omnisight-agent/agent.env` dosyasını okur.
 - Ajan kimliğini korur.
@@ -554,6 +596,8 @@ Onarım komutu gerektiğinde:
 - Ajanı yeniden kurar ve systemd servisini başlatır.
 
 Servis mevcut değilse kurulum scripti systemd unitini yeniden oluşturur. Timeout, DNS, bağlantı veya TLS hatasında ajanı onarmak yerine önce ağ, panel adresi ve sertifikayı düzeltin.
+
+Windows onarım komutu `OmniSightAgent` hizmetini kontrol eder, `%ProgramData%\OmniSight\logs\agent.log` dosyasını okur, mevcut ajan kimliğini korur, hizmeti panelden sağlanan kaynakla yeniden derler ve otomatik kurtarma ayarlarını tekrar uygular.
 
 ## 7. Ayarlar ve Yapılandırma
 
@@ -568,7 +612,7 @@ Ayarlar sayfası `data/config.yaml` dosyasının arayüz karşılığıdır.
 | Kullanıcılar ve roller | Kullanıcılar, roller ve parola sıfırlama ayarı |
 | Oturumlar ve erişim | Aktif oturumlar, tarayıcı/IP, zorla çıkış ve public IP allowlist |
 | Sertifikalar | CA yükleme ve güven deposu |
-| Platform kartları | Proxmox, Linux, Kubernetes, SNMP, Healthchecks, Uptime Kuma, Checks, Prometheus, Docker, Dockhand ve Database |
+| Platform kartları | Proxmox, VMware ESXi/vCenter, Linux, Kubernetes, SNMP, Healthchecks, Uptime Kuma, Checks, Prometheus, Docker, Dockhand ve Database |
 | Bildirimler | Kaynak eşikleri, bildirim zamanlaması, anomali algılama, sunucu güncellemeleri, webhook ve bildirim kanalları |
 
 ### Yapılandırma Kaydetme Davranışı
@@ -696,6 +740,7 @@ Topoloji platformlar, sunucular ve iş yükleri arasındaki ilişkileri görsell
 - Elle düzenlenebilir bağlantılar.
 - Kalıcı konumlar.
 - Panel sağlık verisine göre durum renkleri.
+- Otomatik VMware endpoint, cluster, ESXi host ve sanal makine ilişkileri.
 - Proxmox altyapı ilişkilerine ek olarak UniFi controller cihazlarından otomatik ağ ilişkileri.
 
 UniFi verisi seyrek ve önbellekli okunur. Aynı cihaz SNMP ile de izleniyorsa topolojide ikinci kez gösterilmez. Topoloji yapılandırması, yerleşim verisinin platform ayarlarından ayrı yönetilebilmesi için yan durum olarak saklanır.
@@ -849,6 +894,7 @@ Bu ayarlar güncellemelerden sonra Ctrl+F5 ihtiyacını azaltır.
 | `POST /api/agent/report` | Ajan raporunu al |
 | `GET /api/agent/commands` | Ajan long-poll komutları |
 | `POST /api/agent/result` | Ajan komut sonucu |
+| `POST /api/agent/uninstall` | Etkileşimsiz uzaktan ajan kaldırma işlemini zamanla |
 | `POST /api/webhook/event` | Harici olay alma |
 | `GET /api/public/status` | Herkese açık durum verisi |
 | `GET /api/about` | Sürüm ve yazar bilgisi |

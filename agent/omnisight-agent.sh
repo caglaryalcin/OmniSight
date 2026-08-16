@@ -9,7 +9,7 @@ URL="${URL%/}"
 TOKEN="${OMNISIGHT_TOKEN:?OMNISIGHT_TOKEN required}"
 INTERVAL="${OMNISIGHT_INTERVAL:-15}"
 AGENT_ROLE="${OMNISIGHT_AGENT_ROLE:-auto}"
-VERSION="1.3.2"
+VERSION="1.4.1"
 HOST_ROOT="${OMNISIGHT_HOST_ROOT:-/}"
 INSECURE_TLS="${OMNISIGHT_INSECURE_TLS:-}"
 CURL_TLS_ARGS=""
@@ -118,6 +118,61 @@ docker_cmd_capture() {
   fi
   printf '%s' "$out"
   return "$rc"
+}
+
+schedule_agent_uninstall() {
+  local cleanup_unit cleanup_script cleanup_pid container_id swarm_service helper_name helper_output
+  if [ -f /.dockerenv ]; then
+    container_id="${HOSTNAME:-}"
+    printf '%s' "$container_id" | grep -Eq '^[a-zA-Z0-9_.-]+$' || {
+      printf 'error: container identity is unavailable'
+      return 1
+    }
+    docker_cmd inspect "$container_id" >/dev/null 2>&1 || {
+      printf 'error: Docker cannot inspect the agent container'
+      return 1
+    }
+    swarm_service=$(docker_cmd_capture inspect --format '{{ index .Config.Labels "com.docker.swarm.service.name" }}' "$container_id" 2>/dev/null || true)
+    helper_name="omnisight-agent-uninstall-${container_id%%.*}-$$"
+    helper_name=$(printf '%s' "$helper_name" | tr -cd 'a-zA-Z0-9_.-' | cut -c1-63)
+    if [ -n "$swarm_service" ] && [ "$swarm_service" != '<no value>' ]; then
+      printf 'error: Docker Swarm agents must be removed with the stack or service command on a manager'
+      return 1
+    fi
+    helper_output=$(docker_cmd_capture run -d --rm --name "$helper_name" \
+      -v /var/run/docker.sock:/var/run/docker.sock docker:cli \
+      sh -c "sleep 12; docker rm -f '$container_id' >/dev/null 2>&1") || {
+        printf 'error: could not schedule Docker agent removal: %s' "$helper_output"
+        return 1
+      }
+    printf 'uninstall scheduled'
+    return 0
+  fi
+
+  command -v systemctl >/dev/null 2>&1 || {
+    printf 'error: systemd is required for remote uninstall'
+    return 1
+  }
+  cleanup_unit="omnisight-agent-uninstall-$(date +%s 2>/dev/null || echo now)-$$"
+  cleanup_script='sleep 12
+systemctl disable omnisight-agent >/dev/null 2>&1 || true
+rm -f /usr/local/bin/omnisight-agent /etc/systemd/system/omnisight-agent.service
+rm -rf /etc/omnisight-agent
+systemctl daemon-reload >/dev/null 2>&1 || true
+systemctl reset-failed omnisight-agent >/dev/null 2>&1 || true
+systemctl stop omnisight-agent >/dev/null 2>&1 || true'
+  if command -v systemd-run >/dev/null 2>&1 && systemd-run --quiet --collect --unit="$cleanup_unit" /bin/sh -c "$cleanup_script" >/dev/null 2>&1; then
+    printf 'uninstall scheduled'
+    return 0
+  fi
+  nohup /bin/sh -c "$cleanup_script" >/dev/null 2>&1 &
+  cleanup_pid=$!
+  sleep 1
+  kill -0 "$cleanup_pid" >/dev/null 2>&1 || {
+    printf 'error: could not schedule agent removal'
+    return 1
+  }
+  printf 'uninstall scheduled'
 }
 
 detect_type() {
@@ -393,9 +448,10 @@ docker_json() {
 
 pve_json() {
   command -v pvesh >/dev/null 2>&1 || return 0
-  local res ceph cephdf cephosd task
+  local res cluster ceph cephdf cephosd task
   res=$(timeout 12 pvesh get /cluster/resources --output-format json 2>/dev/null)
   [ -n "$res" ] || return 0
+  cluster=$(timeout 8 pvesh get /cluster/status --output-format json 2>/dev/null)
   ceph=$(timeout 8 pvesh get /cluster/ceph/status --output-format json 2>/dev/null)
   [ -z "$ceph" ] && ceph=$(timeout 8 pvesh get /ceph/status --output-format json 2>/dev/null)
   [ -z "$ceph" ] && ceph=$(timeout 8 pvesh get "/nodes/$HOSTNAME_S/ceph/status" --output-format json 2>/dev/null)
@@ -404,6 +460,7 @@ pve_json() {
   cephosd=$(timeout 8 pvesh get "/nodes/$HOSTNAME_S/ceph/osd" --output-format json 2>/dev/null)
   task=$(timeout 8 pvesh get "/nodes/$HOSTNAME_S/tasks" --typefilter vzdump --limit 1 --output-format json 2>/dev/null)
   printf '"pve":{"node":"%s","resources":%s' "$(json_escape "$HOSTNAME_S")" "$res"
+  [ -n "$cluster" ] && printf ',"clusterStatus":%s' "$cluster"
   if [ -n "$ceph" ]; then
     printf ',"ceph":{"statusData":%s' "$ceph"
     [ -n "$cephdf" ] && printf ',"df":%s' "$cephdf"
@@ -480,7 +537,7 @@ EOF
 }
 
 run_command() {
-  local cid="$1" action="$2" target="$3" out b64 restart_agent
+  local cid="$1" action="$2" target="$3" out b64 restart_agent uninstall_agent tmp rc
   printf '%s' "$target" | grep -Eq '^[a-zA-Z0-9@._:-]+$' || return
   case "$action" in
     status)
@@ -504,6 +561,15 @@ run_command() {
         rm -f "$tmp"
         out="agent update failed (curl exit $rc)"
       fi ;;
+    agent_uninstall)
+      if [ "$target" != 'self' ]; then
+        out='error: invalid uninstall target'
+      elif out=$(schedule_agent_uninstall 2>&1); then
+        uninstall_agent=1
+      else
+        rc=$?
+        out="${out:-error: agent uninstall could not be scheduled} (exit $rc)"
+      fi ;;
     *) return ;;
   esac
   b64=$(printf '%s' "$out" | base64 2>/dev/null | tr -d '\n')
@@ -511,6 +577,10 @@ run_command() {
     -d "{\"id\":\"$cid\",\"output\":\"$b64\"}" "$URL/api/agent/result" >/dev/null 2>&1
   if [ "${restart_agent:-}" = "1" ]; then
     ( sleep 1; if command -v systemctl >/dev/null 2>&1; then systemctl restart omnisight-agent >/dev/null 2>&1 || true; else kill "$$" >/dev/null 2>&1 || true; fi ) &
+  fi
+  if [ "${uninstall_agent:-}" = "1" ]; then
+    sleep 120
+    exit 0
   fi
 }
 

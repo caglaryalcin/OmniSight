@@ -1,6 +1,6 @@
 # OmniSight Documentation
 
-OmniSight is a single-glance monitoring dashboard for Proxmox, Linux servers, Docker, Kubernetes, SNMP devices, Healthchecks, Uptime Kuma, Prometheus, Dockhand, firewalls, TrueNAS/QNAP/UGREEN storage, Proxmox Backup Server, Portainer, and databases.
+OmniSight is a single-glance monitoring dashboard for Proxmox, VMware ESXi/vCenter, Linux servers, Docker, Kubernetes, SNMP devices, Healthchecks, Uptime Kuma, Prometheus, Dockhand, firewalls, TrueNAS/QNAP/UGREEN storage, Proxmox Backup Server, Portainer, and databases.
 
 This document explains what the platform is, how it works, where it stores state, how each integration is collected, how the agent and alert flows operate, how authentication and security are handled, and how to troubleshoot production issues.
 
@@ -29,7 +29,7 @@ OmniSight is a single-process monitoring application. The backend is Node.js + E
 Primary goals:
 
 - Show infrastructure health in one dashboard.
-- Monitor Proxmox, Linux, Docker, Kubernetes, and external services through a shared UI model.
+- Monitor Proxmox, VMware ESXi/vCenter, Linux, Docker, Kubernetes, and external services through a shared UI model.
 - Monitor systems behind NAT or firewalls using a push agent.
 - Run service and container actions from the UI.
 - Collect alert, audit, and runtime events in Event Center.
@@ -58,7 +58,7 @@ The center of the application is `server.js`. It owns the Express server, authen
 |---|---|---|
 | Runtime server | `server.js` | API, auth, RBAC, scheduler, cache, alerts, static serving |
 | Frontend | `public/*.html`, `public/i18n.js` | Dashboard, Settings, Event Center, Agents, Topology, Profile |
-| Agent | `agent/install.sh`, `agent/omnisight-agent.sh`, `agent/install-windows.ps1`, `agent/omnisight-agent.ps1` | Push reports and execute commands on Linux, Windows, Proxmox, and Docker hosts |
+| Agent | `agent/install.sh`, `agent/omnisight-agent.sh`, `agent/install-windows.ps1`, `agent/OmniSight.Agent.cs`, `agent/omnisight-agent.ps1` | Push reports and execute commands on Linux, Windows, Proxmox, and Docker hosts; the PowerShell agent is retained only for legacy migration |
 | Collectors | `src/*.js` | Platform-specific data collection |
 | State | `data/` | Config, users, sessions, agents, history, certificates, icons |
 
@@ -67,6 +67,7 @@ The center of the application is `server.js`. It owns the Express server, authen
 | Module | Platform |
 |---|---|
 | `src/proxmox.js` | Proxmox API and SSH fallback |
+| `src/vmware.js` | VMware vSphere Web Services API for standalone ESXi and vCenter |
 | `src/agents.js` | Push agent reports and normalized Linux/Docker/Proxmox agent data |
 | `src/docker.js` | Docker API/SSH hosts, logs, prune |
 | `src/kubernetes.js` | Kubernetes pods, services, deployments, logs |
@@ -137,7 +138,7 @@ The dashboard is designed for fast operational scanning.
 ### Main Parts
 
 - Top KPI cards: CPU, Memory, Disk I/O, Bandwidth.
-- Platform cards: Proxmox, Linux, Docker, Kubernetes, SNMP, Healthchecks, Uptime Kuma, Checks, Prometheus, Dockhand, Firewalls, TrueNAS, QNAP, Ugreen, Proxmox Backup, Cloudflare, GitHub/GitLab CI, Portainer, Database.
+- Platform cards: Proxmox, VMware ESXi/vCenter, Linux, Docker, Kubernetes, SNMP, Healthchecks, Uptime Kuma, Checks, Prometheus, Dockhand, Firewalls, TrueNAS, QNAP, Ugreen, Proxmox Backup, Cloudflare, GitHub/GitLab CI, Portainer, Database.
 - Optional side panel for active alerts and recent logs.
 - Global health badge.
 - Public status link.
@@ -158,6 +159,7 @@ Each platform translates domain-specific signals into dashboard health:
 
 - Linux: offline host, failed or inactive service.
 - Proxmox: offline node, failed service, Ceph warning/error, resource issues.
+- VMware: unreachable endpoint, disconnected or unresponsive ESXi host, maintenance mode, unhealthy powered-on VM, or inaccessible datastore. Powered-off VMs are neutral.
 - Docker: offline host, stopped or failed container, update/image signals.
 - Kubernetes: failed or pending pod, deployment mismatch.
 - Healthchecks: down or grace.
@@ -188,6 +190,7 @@ Optional SSH metrics fallback can fill metrics that the API does not expose.
 
 Collected data:
 
+- Automatic cluster/standalone detection, the real Proxmox cluster name, member nodes and quorum state.
 - Node online/offline state.
 - CPU, RAM, uptime.
 - CPU/System/NVMe temperatures.
@@ -201,9 +204,28 @@ Collected data:
 
 Notes:
 
+- One Proxmox API endpoint discovers every node in that cluster. Proxmox agents read the same cluster identity locally with `pvesh`; quorum loss is treated as a health problem and can generate an alert.
 - The Proxmox API does not always expose host sensors. NVMe SMART, CPU temperature, or host Disk I/O may require the agent or SSH fallback.
 - If a Proxmox agent exists, that host is filtered out of the Linux card to avoid duplicate display.
 - Mini charts intentionally stay compact; detailed disk and health data is available in the detail view.
+
+### VMware ESXi / vCenter
+
+VMware inventory is collected from the vSphere Web Services API at `/sdk`. The same integration supports a standalone ESXi host or a vCenter Server. Use a dedicated read-only VMware account whenever possible.
+
+Collected data:
+
+- Endpoint type, product, version, build, API version, and datacenters.
+- vCenter clusters and host membership.
+- ESXi connection, power, and maintenance state; CPU/RAM usage and uptime.
+- Virtual machine power/health state, vCPU, configured and active memory, storage usage, guest OS, IP address, VMware Tools state, and uptime. Click a VM row to open these details.
+- Datastore type, capacity, free/used space, and accessibility.
+
+Notes:
+
+- TLS certificate verification is enabled by default. Disable it only for a trusted endpoint that uses a self-signed certificate.
+- A powered-off VM is displayed as an expected neutral state and does not degrade platform health.
+- Topology is generated automatically as endpoint -> cluster -> ESXi host -> VM. Standalone ESXi hosts attach directly to the endpoint.
 
 ### Linux Server
 
@@ -556,19 +578,21 @@ If the monitoring user lacks permission for connection or size metrics, those fi
 
 ## 6. Agent System
 
-The agent is a small bash script that runs on a target system. It does not require inbound ports. It reports to OmniSight through outbound HTTP(S).
+The Linux agent is a small bash service, while Windows uses a native .NET Framework Windows service. Neither requires inbound ports; both report to OmniSight through outbound HTTP(S).
 
 ### Installation Model
 
 Use one of these Settings actions:
 
-- Linux Server -> Add System.
+- Linux Servers -> Add System.
+- Windows Servers -> Add Windows Host.
 - Proxmox -> Add Node.
 - Docker -> Add Host.
 
 Supported installation modes:
 
 - Binary/systemd.
+- Windows service.
 - Docker container.
 - Docker Stack/Swarm.
 
@@ -585,6 +609,8 @@ For self-signed TLS:
 curl -fsSL --insecure https://omnisight.example/agent/install.sh | \
   sudo OMNISIGHT_URL=https://omnisight.example OMNISIGHT_TOKEN=<token> OMNISIGHT_INSECURE_TLS=1 bash
 ```
+
+Windows installation runs from an elevated PowerShell window and registers the automatic `OmniSightAgent` service. For Windows agents older than v1.4.0, **Agents → Update** displays a one-time elevated migration command rather than stopping the legacy runtime. The installer preserves `%ProgramData%\OmniSight\agent.id`, so the same dashboard record is retained. The legacy task is stopped and removed only after the service reaches the running state; a failed migration leaves the old agent operational.
 
 ### Agent Endpoints
 
@@ -616,7 +642,7 @@ When the UI starts an action such as service restart, Docker logs, Docker prune,
 
 ### Repair Logic
 
-The repair command shown on the Agents page:
+The Linux repair command shown on the Agents page:
 
 - Reads the current `/etc/omnisight-agent/agent.env`.
 - Preserves the agent ID.
@@ -625,6 +651,8 @@ The repair command shown on the Agents page:
 - Restarts the systemd service.
 
 If the service does not exist, the install script recreates the systemd unit.
+
+The Windows repair command checks `OmniSightAgent`, reads `%ProgramData%\OmniSight\logs\agent.log`, preserves the configured agent ID, recompiles the service from the dashboard-provided source, and restores automatic service recovery settings.
 
 ## 7. Settings and Configuration
 
@@ -638,7 +666,7 @@ The Settings page is the UI representation of `data/config.yaml`.
 | Users & roles | Users, roles, password reset setting |
 | Sessions & access | Active sessions, browser/IP, force sign out, public IP allowlist |
 | Certificates | CA upload and trust store |
-| Platform cards | Proxmox, Linux, Kubernetes, SNMP, Healthchecks, Uptime Kuma, Checks, Prometheus, Docker, Dockhand, Database |
+| Platform cards | Proxmox, VMware ESXi/vCenter, Linux, Kubernetes, SNMP, Healthchecks, Uptime Kuma, Checks, Prometheus, Docker, Dockhand, Database |
 | Alerts | Thresholds, alert timing, anomaly detection, maintenance windows, webhook, notification channels |
 
 ### Config Save Behavior
@@ -762,6 +790,7 @@ Features:
 - Manually editable links.
 - Persistent positions.
 - Status colors based on dashboard health data.
+- Automatic VMware endpoint, cluster, ESXi host, and virtual machine relationships.
 
 Topology configuration is stored as sidecar state so layout data can be managed separately from platform configuration.
 

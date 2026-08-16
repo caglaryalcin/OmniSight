@@ -59,6 +59,17 @@ proxmox:
   #     tokenSecret: "${PVE_B_TOKEN_SECRET:-}"
   #     insecureTLS: false
 
+# VMware uses the vSphere Web Services API. One vCenter entry discovers its
+# clusters, ESXi hosts, virtual machines and datastores. Standalone ESXi is also supported.
+vmware:
+  enabled: false
+  # instances:
+  #   - name: vCenter
+  #     url: "https://vcenter.example.com"
+  #     username: "monitoring@vsphere.local"
+  #     password: "${VMWARE_PASSWORD:-}"
+  #     insecureTLS: false
+
 kubernetes:
   kubeconfig: './data/kube.bin'   # put your kubeconfig in data/
   namespaces:

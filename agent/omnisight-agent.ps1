@@ -1,7 +1,8 @@
 Set-StrictMode -Version 2.0
 $ErrorActionPreference = "SilentlyContinue"
 
-$Version = "1.3.2"
+$Version = "1.4.1"
+$ReportedVersion = $Version
 $Url = [string]$env:OMNISIGHT_URL
 $Url = $Url.TrimEnd("/")
 $Token = $env:OMNISIGHT_TOKEN
@@ -44,8 +45,57 @@ function Get-AgentId {
 
 $AgentId = Get-AgentId
 $RestartAfterCommand = $false
+$UninstallAfterCommand = $false
+$ExitAfterCommand = $false
 $UpdateStatus = $null
 $UpdateCheckedAt = [datetime]::MinValue
+
+function Remove-LegacyAgentTask {
+  try {
+    if (Get-ScheduledTask -TaskName "OmniSightAgent" -ErrorAction SilentlyContinue) {
+      Unregister-ScheduledTask -TaskName "OmniSightAgent" -Confirm:$false -ErrorAction SilentlyContinue
+    }
+  } catch {}
+}
+
+function Invoke-WindowsServiceMigration {
+  if ("$env:OMNISIGHT_LEGACY_AGENT" -match "^(1|true|yes)$") { return $false }
+  $installer = $null
+  try {
+    $service = Get-Service -Name "OmniSightAgent" -ErrorAction SilentlyContinue
+    if ($service -and $service.Status -eq "Running") {
+      Remove-LegacyAgentTask
+      return $true
+    }
+    $installer = Join-Path $env:TEMP "omnisight-service-install-$([guid]::NewGuid().ToString('N')).ps1"
+    $downloadArgs = @{
+      Uri = "$Url/agent/install-windows.ps1"
+      OutFile = $installer
+      UseBasicParsing = $true
+      TimeoutSec = 45
+    }
+    if ($Insecure -and $PSVersionTable.PSVersion.Major -ge 7) { $downloadArgs.SkipCertificateCheck = $true }
+    Invoke-WebRequest @downloadArgs
+    if (-not (Test-Path -LiteralPath $installer) -or ((Get-Content -LiteralPath $installer -TotalCount 1) -notmatch "Set-StrictMode")) {
+      throw "downloaded Windows service installer is invalid"
+    }
+    $powershell = Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\powershell.exe"
+    & $powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $installer
+    if ($LASTEXITCODE -ne 0) { throw "Windows service installer exited with code $LASTEXITCODE" }
+    $service = Get-Service -Name "OmniSightAgent" -ErrorAction SilentlyContinue
+    return $null -ne $service -and $service.Status -eq "Running"
+  } catch {
+    Write-Host "Windows service migration failed; legacy agent will continue: $($_.Exception.Message)"
+    return $false
+  } finally {
+    if ($installer) { Remove-Item -LiteralPath $installer -Force -ErrorAction SilentlyContinue }
+  }
+}
+
+if (Invoke-WindowsServiceMigration) {
+  exit 0
+}
+$ReportedVersion = "1.3.4"
 
 function Invoke-OmniSight {
   param([string]$Method, [string]$Path, $Body = $null, [int]$TimeoutSec = 20)
@@ -207,7 +257,7 @@ function Get-Payload {
     kernel = $os.BuildNumber
     platform = "windows"
     role = $Role
-    agentVersion = $Version
+    agentVersion = $ReportedVersion
     interval = $Interval
     uptime = $uptime
     cpu = NumberOrNull $cpu.LoadPercentage
@@ -231,6 +281,40 @@ function Send-CommandResult {
   try { Invoke-OmniSight -Method "POST" -Path "/api/agent/result" -Body $body -TimeoutSec 20 | Out-Null } catch {}
 }
 
+function Start-AgentUninstall {
+  $cleanupTask = "OmniSightAgentUninstall-$([guid]::NewGuid().ToString('N').Substring(0,8))"
+  $cleanupScript = @'
+$ErrorActionPreference = "SilentlyContinue"
+Start-Sleep -Seconds 12
+$mainTask = "OmniSightAgent"
+$installDir = Join-Path $env:ProgramData "OmniSight"
+$serviceDir = Join-Path $env:ProgramFiles "OmniSight Agent"
+try { Stop-Service -Name $mainTask -Force -ErrorAction SilentlyContinue } catch {}
+try { & "$env:SystemRoot\System32\sc.exe" delete $mainTask 2>&1 | Out-Null } catch {}
+try { Stop-ScheduledTask -TaskName $mainTask -ErrorAction SilentlyContinue } catch {}
+try { Unregister-ScheduledTask -TaskName $mainTask -Confirm:$false -ErrorAction SilentlyContinue } catch {}
+try {
+  $selfPid = $PID
+  Get-CimInstance Win32_Process -Filter "Name = 'powershell.exe'" |
+    Where-Object { $_.ProcessId -ne $selfPid -and $_.CommandLine -like "*OmniSight*omnisight-agent.ps1*" } |
+    ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+} catch {}
+Remove-Item -LiteralPath $serviceDir -Recurse -Force -ErrorAction SilentlyContinue
+Remove-Item -LiteralPath $installDir -Recurse -Force -ErrorAction SilentlyContinue
+try { Unregister-ScheduledTask -TaskName "__CLEANUP_TASK__" -Confirm:$false -ErrorAction SilentlyContinue } catch {}
+'@.Replace('__CLEANUP_TASK__', $cleanupTask)
+  $encoded = [Convert]::ToBase64String([System.Text.Encoding]::Unicode.GetBytes($cleanupScript))
+  $powershell = Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\powershell.exe"
+  $action = New-ScheduledTaskAction -Execute $powershell -Argument "-NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand $encoded" -ErrorAction Stop
+  $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(5) -ErrorAction Stop
+  $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -ErrorAction Stop
+  $principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest -ErrorAction Stop
+  Register-ScheduledTask -TaskName $cleanupTask -Action $action -Trigger $trigger -Settings $settings -Principal $principal -Description "Remove the OmniSight Windows agent" -ErrorAction Stop | Out-Null
+  Start-ScheduledTask -TaskName $cleanupTask -ErrorAction Stop
+  $script:UninstallAfterCommand = $true
+  return "uninstall scheduled"
+}
+
 function Invoke-AgentCommand {
   param([string]$Action, [string]$Target)
   try {
@@ -251,24 +335,15 @@ function Invoke-AgentCommand {
       return "restarted $Target"
     }
     if ($Action -eq "agent_update") {
-      $targetPath = $PSCommandPath
-      if (-not $targetPath) { $targetPath = Join-Path $env:ProgramData "OmniSight\omnisight-agent.ps1" }
-      $tmp = Join-Path $env:TEMP "omnisight-agent-$([guid]::NewGuid().ToString("N")).ps1"
-      $downloadArgs = @{
-        Uri = "$Url/agent/omnisight-agent.ps1"
-        OutFile = $tmp
-        UseBasicParsing = $true
-        TimeoutSec = 30
+      if (-not (Invoke-WindowsServiceMigration)) {
+        throw "Windows service migration failed; the scheduled-task agent remains active"
       }
-      if ($Insecure -and $PSVersionTable.PSVersion.Major -ge 7) { $downloadArgs.SkipCertificateCheck = $true }
-      Invoke-WebRequest @downloadArgs
-      if (-not (Test-Path $tmp) -or ((Get-Content $tmp -TotalCount 1) -notmatch "Set-StrictMode")) {
-        throw "downloaded payload is not the OmniSight Windows agent"
-      }
-      Copy-Item -LiteralPath $tmp -Destination $targetPath -Force
-      Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
-      $script:RestartAfterCommand = $true
-      return "Windows agent updated; restart scheduled"
+      $script:ExitAfterCommand = $true
+      return "Windows agent migrated to the OmniSight Windows service"
+    }
+    if ($Action -eq "agent_uninstall") {
+      if ($Target -ne "self") { throw "invalid uninstall target" }
+      return Start-AgentUninstall
     }
     return "unsupported action $Action"
   } catch {
@@ -291,6 +366,14 @@ function Handle-CommandText {
   if ($script:RestartAfterCommand) {
     Start-Sleep -Seconds 1
     exit 1
+  }
+  if ($script:ExitAfterCommand) {
+    Start-Sleep -Seconds 2
+    exit 0
+  }
+  if ($script:UninstallAfterCommand) {
+    Start-Sleep -Seconds 120
+    exit 0
   }
 }
 

@@ -20,7 +20,7 @@ h1{font-size:18px;font-weight:750;flex:1}
 .sub{color:var(--muted);font-size:13px;margin-top:5px}
 .pill{border:1px solid var(--border);background:var(--panel);border-radius:999px;padding:6px 10px;color:var(--muted);font-size:12px;font-weight:650}
 .card{background:var(--panel);border:1px solid var(--border);border-radius:10px;overflow:hidden}
-.row{display:grid;grid-template-columns:10px minmax(170px,1.1fr) minmax(100px,.6fr) minmax(160px,1fr) 110px 125px 130px;gap:14px;align-items:center;padding:12px 14px;border-top:1px solid var(--border)}
+.row{display:grid;grid-template-columns:10px minmax(170px,1.1fr) minmax(100px,.6fr) minmax(160px,1fr) 110px 125px 210px;gap:14px;align-items:center;padding:12px 14px;border-top:1px solid var(--border)}
 .row:first-child{border-top:0}
 .hdr{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em;font-weight:750;background:rgba(0,0,0,.08)}
 .dot{width:9px;height:9px;border-radius:50%;background:var(--muted)}
@@ -36,6 +36,8 @@ h1{font-size:18px;font-weight:750;flex:1}
 .btn{height:30px;border-radius:7px;border:1px solid var(--border);background:var(--row);color:var(--text);font-size:12px;font-weight:700;cursor:pointer;padding:0 11px}
 .btn:hover{border-color:var(--blue)}
 .btn.primary{background:var(--blue);border-color:var(--blue);color:#fff}
+.btn.danger{color:var(--red);border-color:rgba(248,113,113,.38);background:rgba(248,113,113,.08)}
+.btn.danger:hover{border-color:var(--red);background:rgba(248,113,113,.14)}
 .btn:disabled{opacity:.55;cursor:not-allowed}
 .action-cell{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .empty{padding:34px;color:var(--muted);text-align:center}
@@ -61,6 +63,8 @@ h1{font-size:18px;font-weight:750;flex:1}
 .cmd-guide ol{display:grid;gap:6px;margin:0;padding-left:19px}
 .cmd-guide li::marker{color:var(--blue);font-weight:850}
 .cmd-guide-warning{margin-top:9px;border-left:3px solid var(--yellow);background:rgba(251,191,36,.07);padding:7px 9px;color:var(--muted)}
+.cmd-guide-migration{margin-top:9px;border-left:3px solid var(--blue);background:rgba(96,165,250,.08);padding:7px 9px;color:var(--muted)}
+.cmd-guide-migration strong{color:var(--blue);margin-right:5px}
 .notice{display:none;align-items:flex-start;gap:10px;margin:0 0 14px;border:1px solid rgba(251,191,36,.30);background:rgba(251,191,36,.08);border-radius:8px;padding:10px 12px;color:var(--text);font-size:13px;line-height:1.35}
 .notice.show{display:flex}
 .notice-dot{width:9px;height:9px;border-radius:50%;background:var(--yellow);margin-top:4px;flex:0 0 auto}
@@ -83,6 +87,11 @@ h1{font-size:18px;font-weight:750;flex:1}
 .tab-btn{height:30px;border-radius:7px;border:1px solid var(--border);background:var(--row);color:var(--text);font-size:12px;font-weight:750;cursor:pointer;padding:0 10px}
 .tab-btn.active{border-color:var(--blue);color:var(--blue)}
 .modal-desc{color:var(--muted);font-size:13px;line-height:1.45}
+.confirm-box{width:min(520px,96vw)}
+.confirm-copy{color:var(--text);font-size:13px;line-height:1.55}
+.confirm-target{margin-top:12px;border:1px solid var(--border);background:var(--row);border-radius:8px;padding:10px 12px;font-weight:800;word-break:break-word}
+.confirm-note{margin-top:10px;color:var(--muted);font-size:12px;line-height:1.45}
+.confirm-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
 .check-line{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px;margin:8px 0}
 .cmd-wrap{position:relative;margin-top:10px}
 .cmd-wrap .cmd{margin-top:0}
@@ -90,7 +99,7 @@ h1{font-size:18px;font-weight:750;flex:1}
 .await-dot{width:9px;height:9px;border-radius:50%;background:var(--yellow)}
 @media(max-width:720px){.kind-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 html.embed header{display:none}
-@media(max-width:900px){.row{grid-template-columns:10px minmax(150px,1fr) 90px 100px}.row .hide-sm,.hdr .hide-sm{display:none}}
+@media(max-width:900px){.row{grid-template-columns:10px minmax(140px,1fr) 84px minmax(170px,auto)}.row .hide-sm,.hdr .hide-sm{display:none}}
 </style>
 <script>if(window.self!==window.top)document.documentElement.classList.add('embed');</script>
 </head>
@@ -148,6 +157,23 @@ html.embed header{display:none}
         <div class="cmd-wrap"><div class="cmd"><pre class="cmd-body" id="aa-cmd-stack"></pre><button class="btn" onclick="copyText(document.getElementById('aa-cmd-stack').textContent,this)">Copy</button></div></div>
       </div>
       <div class="await"><span class="await-dot"></span><span id="aa-wait">Waiting for the agent to connect...</span></div>
+    </div>
+  </div>
+</div>
+<div class="modal" id="uninstall-agent-modal" onclick="if(event.target===this)closeUninstallAgentModal(false)">
+  <div class="modal-box confirm-box">
+    <div class="modal-hdr">
+      <span class="modal-title" id="uninstall-agent-title">Uninstall agent</span>
+      <button class="modal-x" type="button" onclick="closeUninstallAgentModal(false)">x</button>
+    </div>
+    <div class="modal-body">
+      <div class="confirm-copy" id="uninstall-agent-message">Are you sure you want to uninstall the OmniSight agent?</div>
+      <div class="confirm-target" id="uninstall-agent-target"></div>
+      <div class="confirm-note" id="uninstall-agent-note">This removes the agent service, files and configuration. The cleanup runs non-interactively on the system even if the dashboard connection closes.</div>
+      <div class="confirm-actions">
+        <button class="btn" type="button" id="uninstall-agent-cancel" onclick="closeUninstallAgentModal(false)">Cancel</button>
+        <button class="btn danger" type="button" id="uninstall-agent-confirm" onclick="closeUninstallAgentModal(true)">Yes</button>
+      </div>
     </div>
   </div>
 </div>
@@ -219,16 +245,40 @@ function cmpVer(a,b){
 function roleText(a){
   if(a.pveNode || a.platform === 'proxmox' || a.role === 'proxmox') return 'Proxmox';
   if(a.role === 'docker' || a.hasDocker) return 'Docker';
+  if(a.platform === 'windows' || a.role === 'windows') return 'Windows';
   return a.platform === 'synology' ? 'Synology' : 'Linux';
 }
 function badge(cls, text){ return `<span class="badge bg-${cls}">${esc(text)}</span>`; }
 function copyText(text, btn){
   navigator.clipboard?.writeText(text).then(()=>{ const o=btn.textContent; btn.textContent=t('Copied'); setTimeout(()=>btn.textContent=o,1200); });
 }
+const REMOTE_UNINSTALL_VERSION = '1.3.3';
+const LATEST_AGENT_VERSION = '1.4.1';
+const demoUninstalledAgentIds = new Set();
+let uninstallAgentModalResolver = null;
+function showUninstallAgentModal(name){
+  return new Promise(resolve => {
+    uninstallAgentModalResolver = resolve;
+    document.getElementById('uninstall-agent-title').textContent = t('Uninstall agent');
+    document.getElementById('uninstall-agent-message').textContent = t('Are you sure you want to uninstall the OmniSight agent?');
+    document.getElementById('uninstall-agent-target').textContent = name || '';
+    document.getElementById('uninstall-agent-note').textContent = t('This removes the agent service, files and configuration. The cleanup runs non-interactively on the system even if the dashboard connection closes.');
+    document.getElementById('uninstall-agent-cancel').textContent = t('Cancel');
+    document.getElementById('uninstall-agent-confirm').textContent = t('Yes');
+    document.getElementById('uninstall-agent-modal').classList.add('open');
+    setTimeout(() => document.getElementById('uninstall-agent-confirm')?.focus(), 0);
+  });
+}
+function closeUninstallAgentModal(ok){
+  document.getElementById('uninstall-agent-modal')?.classList.remove('open');
+  const resolve = uninstallAgentModalResolver;
+  uninstallAgentModalResolver = null;
+  if(resolve) resolve(!!ok);
+}
 function demoAgentsData(){
   const now = Date.now();
   return {
-    latestVersion: '1.2.0',
+    latestVersion: LATEST_AGENT_VERSION,
     demo: true,
     agents: [
       {
@@ -240,7 +290,7 @@ function demoAgentsData(){
         platform: 'linux',
         role: 'linux',
         online: true,
-        agentVersion: '1.2.0',
+        agentVersion: LATEST_AGENT_VERSION,
         lastSeen: now - 15000,
       },
       {
@@ -255,7 +305,7 @@ function demoAgentsData(){
         agentVersion: '1.1.0',
         lastSeen: now - 3600_000,
       },
-    ],
+    ].filter(agent => !demoUninstalledAgentIds.has(agent.id)),
   };
 }
 function demoAgentRepairCommands(id){
@@ -263,12 +313,12 @@ function demoAgentRepairCommands(id){
   return [
     {
       title: 'Query agent',
-      description: 'Run this first to check service state, recent logs and dashboard reachability on the offline host.',
+      description: 'Run first and check the service state and HTTP result.',
       command: `sudo bash -lc 'systemctl status omnisight-agent --no-pager -l || true\njournalctl -u omnisight-agent -n 120 --no-pager || true\ncurl -sS -m 20 http://demo.local/api/agent/ping -H "X-Agent-Token: demo-token" -H "Content-Type: application/json" --data "{\"id\":\"${safeId}\"}"'`,
     },
     {
       title: 'Repair systemd agent',
-      description: 'Run this when logs show 401 invalid agent token or after restoring a backup. It reinstalls the agent with the current dashboard token, keeps the same agent identity and restarts the service.',
+      description: 'Use for a failed or missing service, or HTTP 401/403.',
       command: `curl -fsSL http://demo.local/agent/install.sh | sudo OMNISIGHT_URL=http://demo.local OMNISIGHT_TOKEN=demo-token OMNISIGHT_AGENT_ID=${safeId} bash`,
     },
   ];
@@ -276,7 +326,7 @@ function demoAgentRepairCommands(id){
 
 const ADD_AGENT_META = {
   linux: { title: 'Add Linux Agent', desc: 'Works on any systemd Linux: bare-metal/VM servers, NAS and other Linux devices. The agent pushes metrics + services; no inbound access to the server is needed.' },
-  windows: { title: 'Add Windows Agent', desc: 'Run the PowerShell command in an elevated PowerShell window. The agent pushes CPU, RAM, disk, network and Windows service status with no inbound access to the server.' },
+  windows: { title: 'Add Windows Agent', desc: 'Run the PowerShell command in an elevated PowerShell window. It installs a real Windows service that pushes CPU, RAM, disk, network and service status with no inbound access.' },
   proxmox: { title: 'Add Proxmox Agent', desc: 'Run the command on a Proxmox VE node (as root). The agent uses pvesh locally to report VMs/LXC, storage, backups and Ceph — no API token needed. Repeat on every node of the cluster.' },
   docker: { title: 'Add Docker Agent', desc: 'The agent reports containers, unused images and host metrics, and runs logs/prune commands locally. Pick Binary for a normal install or Docker to run the agent itself in a container.' },
 };
@@ -325,12 +375,13 @@ function addAgentCommands(){
   const synology = addAgentKind === 'docker' && !!document.getElementById('aa-synology')?.checked;
   const dockerBin = synology ? 'sudo /usr/local/bin/docker' : 'docker';
   const psTLS = insecure ? '; $env:OMNISIGHT_INSECURE_TLS="1"' : '';
+  const psTLS12 = '[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12;';
   return {
     binary: addAgentKind === 'windows'
-      ? `$env:OMNISIGHT_URL="${base}"; $env:OMNISIGHT_TOKEN="${token}"; $env:OMNISIGHT_AGENT_ROLE="windows"${psTLS}; iwr -UseBasicParsing "${base}/agent/install-windows.ps1" | iex`
+      ? `${psTLS12} $env:OMNISIGHT_URL="${base}"; $env:OMNISIGHT_TOKEN="${token}"; $env:OMNISIGHT_AGENT_ROLE="windows"${psTLS}; iwr -UseBasicParsing "${base}/agent/install-windows.ps1" | iex`
       : `curl -fsSL${curlTLS} ${base}/agent/install.sh | sudo OMNISIGHT_URL=${base} OMNISIGHT_TOKEN=${token} OMNISIGHT_AGENT_ROLE=${role}${envTLS} bash`,
     uninstall: addAgentKind === 'windows'
-      ? `iwr -UseBasicParsing "${base}/agent/install-windows.ps1" | iex; Uninstall-OmniSightAgent`
+      ? `${psTLS12} $env:OMNISIGHT_ACTION="uninstall"; try { iwr -UseBasicParsing "${base}/agent/install-windows.ps1" | iex } finally { Remove-Item Env:OMNISIGHT_ACTION -ErrorAction SilentlyContinue }`
       : `curl -fsSL${curlTLS} ${base}/agent/install.sh | sudo${sudoTLS} bash -s uninstall`,
     docker: `${dockerBin} run -d --name omnisight-agent --restart unless-stopped \\
   --network host --pid host \\
@@ -498,26 +549,39 @@ function commandRecommendation(command){
   if(/^Repair\b/i.test(title) && title !== 'Repair unavailable') return { label: 'Only when required', className: ' repair' };
   return null;
 }
-function commandPanelGuide(commands){
+function commandPanelGuide(commands, opts = {}){
   const titles = (commands || []).map(command => String(command?.title || ''));
   const isWindows = titles.some(title => /Windows agent/i.test(title));
   const hasDockerRepair = titles.includes('Repair Docker container agent');
+  const agentVersion = String(opts.agentVersion || '');
+  const latestVersion = String(opts.latestVersion || LATEST_AGENT_VERSION);
+  const isWindows13 = isWindows && /^1\.3(?:\.|$)/.test(agentVersion);
   const intro = isWindows
-    ? 'Run these commands on the affected Windows host, not on the OmniSight server. Open PowerShell as administrator.'
-    : 'Run these commands on the affected host, not on the OmniSight server. Connect to that host with SSH and use its terminal.';
-  const dockerStep = hasDockerRepair
-    ? `<li><strong>${esc(t('Choose the repair type that matches the installation.'))}</strong> ${esc(t('Use Repair Docker container agent only when the agent itself was installed as a Docker container; otherwise use Repair systemd agent.'))}</li>`
+    ? 'Run Query Windows agent on this host in PowerShell as administrator.'
+    : 'Run Query agent on the affected host.';
+  const healthyResult = isWindows
+    ? 'RESULT says the service is running and the dashboard HTTP check passed.'
+    : 'Service is active (running) and the HTTP result is 200.';
+  const repairResult = isWindows
+    ? 'RESULT says to use Repair Windows agent.'
+    : 'Service is inactive, failed or missing, or HTTP is 401/403.';
+  const repairAction = isWindows
+    ? 'Run Repair Windows agent.'
+    : hasDockerRepair
+      ? 'Run the repair command that matches the installation: Docker container or systemd.'
+      : 'Run Repair systemd agent.';
+  const migrationNote = isWindows13
+    ? `<div class="cmd-guide-migration"><strong>${esc(`v${agentVersion} → v${latestVersion}`)}</strong>${esc(t('This v1.3.x agent uses the old scheduled task. Repair Windows agent installs the v1.4 service, keeps the same identity and removes the old task after the service starts.'))}</div>`
     : '';
   return `<div class="cmd-guide">
-    <div class="cmd-guide-title">${esc(t('How to use these commands'))}</div>
+    <div class="cmd-guide-title">${esc(t('Check result → action'))}</div>
     <div class="cmd-guide-intro">${esc(t(intro))}</div>
     <ol>
-      <li><strong>${esc(t('Run the query command first.'))}</strong> ${esc(t('It only checks the service state, recent logs and dashboard access; it does not restart or repair the agent.'))}</li>
-      <li><strong>${esc(t('Use a repair command only when required.'))}</strong> ${esc(t('Run it if the query shows 401/403, a failed or missing agent service, or after restoring the host from a backup.'))}</li>
-      ${dockerStep}
-      <li><strong>${esc(t('Verify the result.'))}</strong> ${esc(t('After repair, wait up to 30 seconds and then refresh the Agents page.'))}</li>
+      <li><strong>${esc(t(healthyResult))}</strong> ${esc(t('No repair. Wait up to 30 seconds and refresh this page.'))}</li>
+      <li><strong>${esc(t(repairResult))}</strong> ${esc(t(repairAction))}</li>
+      <li><strong>${esc(t('Result contains timeout, DNS, connection or TLS error.'))}</strong> ${esc(t('Do not repair. Check the network, OmniSight address or certificate.'))}</li>
     </ol>
-    <div class="cmd-guide-warning">${esc(t('If the query reports a timeout, DNS, connection or TLS error, do not repair the agent; check the network, dashboard address or certificate.'))}</div>
+    ${migrationNote}
   </div>`;
 }
 function showCommandPanel(title, commands, opts = {}){
@@ -526,7 +590,7 @@ function showCommandPanel(title, commands, opts = {}){
   msgHoldUntil = Date.now() + 120000;
   const subject = opts.subjectValue ? `<div class="cmd-host-chip"><span>${esc(t(opts.subjectLabel || 'Hostname'))}</span>${esc(opts.subjectValue)}</div>` : '';
   const head = `<div class="cmd-panel-head"><div class="cmd-panel-title">${esc(title)}</div>${subject}</div>`;
-  const guide = commandPanelGuide(commands);
+  const guide = commandPanelGuide(commands, opts);
   const blocks = (commands || []).map(c => {
     const recommendation = commandRecommendation(c);
     const command = String(c.command || '').trim();
@@ -573,13 +637,26 @@ function agentRowHtml(a, latest){
   const newer = ver !== 'unknown' && cmpVer(ver, latest) > 0;
   const versionBadge = ver === 'unknown' ? badge('gray',t('unknown')) : outdated ? badge('yellow','v'+ver) : newer ? badge('yellow','v'+ver) : badge('green','v'+ver);
   const safeId = esc(a.id);
-  const action = a.connecting
-    ? `<button class="btn" disabled>${t('Waiting')}</button><div class="action-hint">${esc(t('Waiting for report'))}</div>`
+  const primaryAction = a.connecting
+    ? `<button class="btn" disabled>${t('Waiting')}</button>`
     : !a.online
-    ? `<button class="btn" onclick="showAgentRepair(${jsArg(a.id)},this)">${t('Check / repair')}</button><div class="action-hint">${esc(t('Run on affected host'))}</div>`
+    ? `<button class="btn" onclick="showAgentRepair(${jsArg(a.id)},this)">${t('Check / repair')}</button>`
     : outdated
     ? `<button class="btn primary" onclick="updateAgent(${jsArg(a.id)},this)">${t('Update')}</button>`
     : `<button class="btn" disabled>${t('Current')}</button>`;
+  const actionHint = a.connecting
+    ? `<div class="action-hint">${esc(t('Waiting for report'))}</div>`
+    : !a.online
+    ? `<div class="action-hint">${esc(t('Run on affected host'))}</div>`
+    : '';
+  const canUninstall = a.online && ver !== 'unknown' && cmpVer(ver, REMOTE_UNINSTALL_VERSION) >= 0;
+  const uninstallTitle = !a.online
+    ? t('The agent must be online before it can be uninstalled.')
+    : !canUninstall
+    ? t(`Update the agent to v${REMOTE_UNINSTALL_VERSION} or later before using remote uninstall.`)
+    : t('Uninstall');
+  const uninstallAction = `<button class="btn danger" ${canUninstall ? `onclick="uninstallAgent(${jsArg(a.id)},${jsArg(a.name || a.id)},this)"` : 'disabled'} title="${esc(uninstallTitle)}">${t('Uninstall')}</button>`;
+  const action = primaryAction + uninstallAction + actionHint;
   return `<div class="row" data-agent-id="${safeId}">
     <div class="dot ${a.online?'ok':a.connecting?'connecting':'bad'}"></div>
     <div class="cell"><div class="name">${esc(a.name||a.id)}</div><div class="meta">${esc(a.id)}${a.ip?' · '+esc(a.ip):''}</div></div>
@@ -747,17 +824,58 @@ async function updateAgent(id, btn){
     setTimeout(loadAgents, 2500);
   }catch(e){ msg.textContent = e.message; msg.className = 'msg err'; btn.disabled = false; btn.textContent = old; }
 }
+async function uninstallAgent(id, name, btn){
+  const confirmed = await showUninstallAgentModal(name || id);
+  if(!confirmed) return;
+  const msg = document.getElementById('msg');
+  clearMsg(true);
+  const old = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = t('Uninstalling...');
+  if(AGENTS_DEMO_MODE){
+    demoUninstalledAgentIds.add(id);
+    agentsSignature = '';
+    renderAgents(demoAgentsData());
+    msg.textContent = t('Agent uninstall scheduled');
+    msg.className = 'msg ok';
+    return;
+  }
+  try{
+    const r = await fetch('/api/agent/uninstall', { method:'POST', headers:{ 'Content-Type':'application/json', ...authHeaders() }, body:JSON.stringify({ id }) });
+    handleUnauth(r);
+    const d = await readJson(r).catch(e => ({ error:e.message }));
+    if(!r.ok) throw new Error(d.error || r.statusText);
+    const cached = readAgentsCache();
+    if(cached?.agents){
+      cached.agents = cached.agents.filter(agent => agent.id !== id);
+      writeAgentsCache(cached);
+      agentsSignature = '';
+      renderAgents(cached);
+    }
+    agentsLastLoadedAt = 0;
+    await loadAgents({ force:true });
+    msgHoldUntil = Date.now() + 10000;
+    msg.textContent = t('Agent uninstall scheduled');
+    msg.className = 'msg ok';
+  }catch(e){
+    msg.textContent = t(e.message);
+    msg.className = 'msg err';
+    btn.disabled = false;
+    btn.textContent = old;
+  }
+}
 async function showAgentRepair(id, btn){
   const msg = document.getElementById('msg');
   clearMsg(true);
   if(AGENTS_DEMO_MODE){
-    showCommandPanel(t('Agent diagnostic and repair commands'), demoAgentRepairCommands(id), { subjectLabel: 'Hostname', subjectValue: id || 'demo-offline' });
+    const agent = demoAgentsData().agents.find(item => item.id === id);
+    showCommandPanel(t('Agent diagnostic and repair commands'), demoAgentRepairCommands(id), { subjectLabel: 'Hostname', subjectValue: id || 'demo-offline', agentVersion: agent?.agentVersion || '', latestVersion: LATEST_AGENT_VERSION, agentRole: roleText(agent || {}) });
     return;
   }
   const old = btn.textContent; btn.disabled = true; btn.textContent = t('Loading...');
   try{
     const d = await fetchJson(`/api/agent/repair-commands?id=${encodeURIComponent(id)}`, { headers:authHeaders() }, 6000);
-    showCommandPanel(t('Agent diagnostic and repair commands'), d.commands || [], { subjectLabel: 'Hostname', subjectValue: d.name || id });
+    showCommandPanel(t('Agent diagnostic and repair commands'), d.commands || [], { subjectLabel: 'Hostname', subjectValue: d.name || id, agentVersion: d.agentVersion || '', latestVersion: d.latestVersion || LATEST_AGENT_VERSION, agentRole: d.role || '' });
   }catch(e){
     msg.textContent = e.message;
     msg.className = 'msg err';

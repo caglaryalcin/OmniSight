@@ -37,6 +37,7 @@ header{height:64px;display:flex;align-items:center;justify-content:space-between
 .edge.layer-nas{stroke:rgba(251,191,36,.64);stroke-width:2.05}
 .edge.layer-platform{stroke:rgba(167,139,250,.66);stroke-width:2.1}
 .edge.layer-proxmox{stroke:rgba(249,115,22,.66);stroke-width:2.1}
+.edge.layer-vmware{stroke:rgba(96,165,250,.68);stroke-width:2.1}
 .edge.layer-vm{stroke:rgba(52,211,153,.58);stroke-width:2.05}
 .flow-trace{fill:none;stroke:currentColor;stroke-width:4.2;stroke-linecap:round;stroke-dasharray:12 180;stroke-dashoffset:0;opacity:.68;vector-effect:non-scaling-stroke;pointer-events:none;animation:topoFlow var(--flow-speed,1.9s) linear infinite;filter:drop-shadow(0 0 5px currentColor)}
 .flow-trace-glow{stroke-width:11;opacity:.13;filter:drop-shadow(0 0 9px currentColor)}
@@ -238,10 +239,11 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 const ICONS = {
-  proxmox:'PX', kubernetes:'K8', docker:'D', dockhand:'DH', snmp:'SN', synology:'SY', qnap:'QP', ugreen:'UG', mikrotik:'MT', unifi:'UI', router:'RT', switch:'SW', nas:'NAS', linux:'LX', node:'N', host:'H', guest:'G'
+  proxmox:'PX', vmware:'VM', kubernetes:'K8', docker:'D', dockhand:'DH', snmp:'SN', synology:'SY', qnap:'QP', ugreen:'UG', mikrotik:'MT', unifi:'UI', router:'RT', switch:'SW', nas:'NAS', linux:'LX', node:'N', host:'H', guest:'G'
 };
 const ICON_URLS = {
   proxmox:'https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/proxmox.svg',
+  vmware:'https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/vmware-esxi.svg',
   kubernetes:'https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/kubernetes.svg',
   dockhand:'https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/dockhand.png',
   synology:'https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/synology.svg',
@@ -442,6 +444,7 @@ function guestOsIcon(v){
     v?.os,
     v?.ostype,
     v?.osType,
+    v?.guestOs,
     v?.tags,
     v?.name,
     v?.type,
@@ -531,6 +534,8 @@ function buildGraph(d){
   const standaloneRefs = new Set(Array.isArray(topologyNodes) ? topologyNodes : []);
   const hiddenRefs = new Set(Array.isArray(topologyHidden) ? topologyHidden : []);
   const px = d.proxmox?.nodes || [];
+  const pxClusters = (d.proxmox?.clusters || []).filter(cluster => cluster?.isCluster);
+  const vmwareInstances = d.vmware?.instances || [];
   const k8s = d.kubernetes || null;
   const docker = Array.isArray(d.docker)?d.docker:[];
   const dockhand = d.dockhand || null;
@@ -545,13 +550,27 @@ function buildGraph(d){
     if(linkedRefs.has(c.ref) || standaloneRefs.has(c.ref)) addCandidate(nodes, c);
   }
   if(shouldShowProxmox(px.length)){
+    const clusterNodeIds = new Map();
+    limited(pxClusters,20).forEach(cluster=>{
+      const clusterName = cluster.name || 'Proxmox';
+      const clusterRef = `proxmox-cluster:${safeId(clusterName)}`;
+      const totalNodes = Number(cluster.totalNodes) || (cluster.members || []).length || px.filter(node=>node.clusterName===clusterName).length;
+      const onlineNodes = Number(cluster.nodesOnline) || (cluster.members || []).filter(member=>member.online===true).length;
+      const status = cluster.online===false || cluster.quorate===false ? 'bad' : onlineNodes < totalNodes ? 'warn' : 'good';
+      const meta = `${onlineNodes}/${totalNodes} ${tr('nodes online')} · ${tr(cluster.quorate===true?'quorate':cluster.quorate===false?'no quorum':'quorum unknown')}`;
+      topologyCandidates.push(candidate(-1,`px-cluster-${clusterName}`,clusterName,meta,status,'proxmox','cluster',clusterRef,'proxmox'));
+      if(hiddenRefs.has(clusterRef)) return;
+      const clusterId = addNode(nodes,null,-1,`px-cluster-${clusterName}`,clusterName,meta,status,'proxmox','cluster',clusterRef,'proxmox');
+      clusterNodeIds.set(clusterName, clusterId);
+    });
     limited(px,20).forEach(n=>{
       const online = n.node?.online || n.online;
       const hostName = n.node?.name || n.name || 'node';
       const hostRef = `proxmox-host:${safeId(hostName)}`;
       topologyCandidates.push(candidate(0,`px-${hostName}`,hostName,`${n.vms?.length||0} guests`,online?'good':n._connecting?'idle':'bad','proxmox','host',hostRef));
       if(hiddenRefs.has(hostRef)) return;
-      const h = addNode(nodes,null,0,`px-${hostName}`,hostName,`${n.vms?.length||0} guests`,online?'good':n._connecting?'idle':'bad','proxmox','host',hostRef);
+      const clusterParent = clusterNodeIds.get(n.clusterName || '') || null;
+      const h = addNode(nodes,clusterParent,0,`px-${hostName}`,hostName,`${n.vms?.length||0} guests`,online?'good':n._connecting?'idle':'bad','proxmox','host',hostRef);
       limited(n.vms,40).forEach(v=>{
         const vmName = v.name || v.id || 'guest';
         const vmKey = `${hostName}-${v.id || vmName}`;
@@ -565,6 +584,53 @@ function buildGraph(d){
       plusNode(nodes,h,1,n.vms?.length||0,40);
     });
     plusNode(nodes,null,0,px.length,20);
+  }
+  if(vmwareInstances.length || (!hideEmpty && configured.has('vmware'))){
+    limited(vmwareInstances, 12).forEach((instance, instanceIndex) => {
+      const endpointName = instance.name || `VMware ${instanceIndex + 1}`;
+      const endpointKey = safeId(`${endpointName}-${instanceIndex}`);
+      const endpointRef = `vmware-endpoint:${endpointKey}`;
+      const endpointStatus = instance._connecting ? 'idle' : instance.online ? 'good' : 'bad';
+      const endpointMeta = [tr(instance.type === 'vcenter' ? 'vCenter Server' : instance.type === 'esxi' ? 'Standalone ESXi' : 'VMware endpoint'), `${(instance.hosts || []).filter(host => host.online).length}/${(instance.hosts || []).length} ${tr('hosts')}`].filter(Boolean).join(' - ');
+      topologyCandidates.push(candidate(-2, `vmware-endpoint-${endpointKey}`, endpointName, endpointMeta, endpointStatus, 'vmware', 'platform', endpointRef, 'vmware'));
+      if(hiddenRefs.has(endpointRef)) return;
+      const endpointId = addNode(nodes, null, -2, `vmware-endpoint-${endpointKey}`, endpointName, endpointMeta, endpointStatus, 'vmware', 'platform', endpointRef, 'vmware');
+      const clusterIds = new Map();
+      limited(instance.clusters || [], 30).forEach(cluster => {
+        const clusterKey = safeId(cluster.id || cluster.name || 'cluster');
+        const clusterRef = `vmware-cluster:${endpointKey}:${clusterKey}`;
+        const members = (instance.hosts || []).filter(host => (cluster.hostRefs || []).includes(host.id));
+        const membersOnline = members.filter(host => host.online).length;
+        const clusterStatus = String(cluster.health || '').toLowerCase() === 'red' ? 'bad' : String(cluster.health || '').toLowerCase() === 'yellow' || membersOnline < members.length ? 'warn' : 'good';
+        const clusterMeta = `${membersOnline}/${members.length || cluster.hostRefs?.length || 0} ${tr('hosts online')}`;
+        topologyCandidates.push(candidate(-1, `vmware-cluster-${endpointKey}-${clusterKey}`, cluster.name || 'Cluster', clusterMeta, clusterStatus, 'vmware', 'cluster', clusterRef, 'vmware'));
+        if(hiddenRefs.has(clusterRef)) return;
+        clusterIds.set(cluster.id, addNode(nodes, endpointId, -1, `vmware-cluster-${endpointKey}-${clusterKey}`, cluster.name || 'Cluster', clusterMeta, clusterStatus, 'vmware', 'cluster', clusterRef, 'vmware'));
+      });
+      limited(instance.hosts || [], 40).forEach((host, hostIndex) => {
+        const hostKey = safeId(host.id || host.name || `host-${hostIndex}`);
+        const hostRef = `vmware-host:${endpointKey}:${hostKey}`;
+        const hostHealth = String(host.health || '').toLowerCase();
+        const hostStatus = !host.online || hostHealth === 'red' ? 'bad' : host.maintenance || hostHealth === 'yellow' ? 'warn' : 'good';
+        const hostVms = (instance.vms || []).filter(vm => vm.hostId === host.id);
+        const hostMeta = [host.clusterName || (instance.type === 'esxi' ? tr('Standalone ESXi') : ''), `${hostVms.filter(vm => vm.running).length}/${hostVms.length} ${tr('VMs running')}`].filter(Boolean).join(' - ');
+        topologyCandidates.push(candidate(0, `vmware-host-${endpointKey}-${hostKey}`, host.name || 'ESXi host', hostMeta, hostStatus, 'vmware', 'host', hostRef, 'vmware'));
+        if(hiddenRefs.has(hostRef)) return;
+        const hostParent = clusterIds.get(host.clusterId) || endpointId;
+        const hostId = addNode(nodes, hostParent, 0, `vmware-host-${endpointKey}-${hostKey}`, host.name || 'ESXi host', hostMeta, hostStatus, 'vmware', 'host', hostRef, 'vmware');
+        limited(hostVms, 60).forEach((vm, vmIndex) => {
+          const vmKey = safeId(vm.id || vm.name || `vm-${vmIndex}`);
+          const vmRef = `vmware-guest:${endpointKey}:${vmKey}`;
+          const vmHealth = String(vm.health || '').toLowerCase();
+          const vmStatus = !vm.running ? 'idle' : vmHealth === 'red' ? 'bad' : vmHealth === 'yellow' ? 'warn' : 'good';
+          const vmMeta = [host.name, vm.guestOs, tr(vm.running ? 'powered on' : 'powered off')].filter(Boolean).join(' - ');
+          topologyCandidates.push(candidate(1, `vmware-guest-${endpointKey}-${vmKey}`, vm.name || 'Virtual machine', vmMeta, vmStatus, guestOsIcon(vm) || 'node', 'guest', vmRef, 'vmware'));
+          if(hiddenRefs.has(vmRef)) return;
+          addNode(nodes, hostId, 1, `vmware-guest-${endpointKey}-${vmKey}`, vm.name || 'Virtual machine', vmMeta, vmStatus, guestOsIcon(vm) || 'node', 'guest', vmRef, 'vmware');
+        });
+        plusNode(nodes, hostId, 1, hostVms.length, 60);
+      });
+    });
   }
   if(k8s){
     const pods = k8s?.pods || [];
@@ -638,7 +704,7 @@ function layoutNodes(nodes, viewportWidth, viewportHeight){
   return {width,height};
 }
 function packProxmoxClusters(nodes, width, compactSaved = false){
-  const hosts = nodes.filter(n => /^proxmox-host:/.test(String(n.ref || ''))).sort((a,b)=>a.x-b.x);
+  const hosts = nodes.filter(n => /^(?:proxmox|vmware)-host:/.test(String(n.ref || ''))).sort((a,b)=>a.x-b.x);
   if(hosts.length < 2) return;
   const childGap = 154;
   const clusterGap = 18;
@@ -699,6 +765,7 @@ function topologyNodeLayer(node){
   const label = String(node?.label || '').toLowerCase();
   if(/^proxmox-guest:/.test(ref) || node?.kind === 'guest') return 'vm';
   if(/^proxmox-host:/.test(ref) || icon === 'proxmox') return 'proxmox';
+  if(/^vmware-(?:endpoint|cluster|host):/.test(ref) || icon === 'vmware') return 'vmware';
   if(icon === 'synology' || icon === 'qnap' || icon === 'ugreen' || /\bnas\b|synology|qnap|ugreen|ugos|diskstation|rackstation/.test(label) || /^snmp:.*nas/.test(ref)) return 'nas';
   if(icon === 'switch' || icon === 'router' || icon === 'mikrotik' || icon === 'unifi') return 'switch';
   if(/^kubernetes:/.test(ref) || /^docker:/.test(ref) || /^dockhand:/.test(ref) || ['kubernetes','docker','dockhand'].includes(icon) || node?.kind === 'platform') return 'platform';
@@ -709,9 +776,11 @@ function edgeLayerClass(a,b, manual = false){
   const lb = topologyNodeLayer(b);
   const layers = new Set([la, lb]);
   if(!manual && layers.has('proxmox') && layers.has('vm')) return 'layer-vm';
+  if(!manual && layers.has('vmware') && layers.has('vm')) return 'layer-vm';
   if(layers.has('platform')) return 'layer-platform';
   if(layers.has('nas')) return 'layer-nas';
   if(layers.has('proxmox')) return 'layer-proxmox';
+  if(layers.has('vmware')) return 'layer-vmware';
   if(layers.has('switch')) return 'layer-switch';
   if(layers.has('vm')) return 'layer-vm';
   return manual ? 'manual' : edgeClass(b || a);
@@ -727,6 +796,7 @@ function edgeFlowColor(cls){
   if(/\blayer-nas\b/.test(cls)) return '#FBBF24';
   if(/\blayer-platform\b/.test(cls)) return '#A78BFA';
   if(/\blayer-proxmox\b/.test(cls)) return '#f97316';
+  if(/\blayer-vmware\b/.test(cls)) return '#60a5fa';
   if(/\blayer-vm\b/.test(cls)) return '#34D399';
   if(/\bgood\b/.test(cls)) return '#34D399';
   if(/\bwarn\b/.test(cls)) return '#FBBF24';
@@ -963,6 +1033,7 @@ function topologyPlatformId(value){
   if(node?.platform) return node.platform;
   const ref = node?.ref || value;
   if(String(ref || '').startsWith('proxmox-')) return 'proxmox';
+  if(String(ref || '').startsWith('vmware-')) return 'vmware';
   if(String(ref || '').startsWith('kubernetes:')) return 'kubernetes';
   if(String(ref || '').startsWith('snmp:')) return 'snmp';
   if(String(ref || '').startsWith('docker:')) return 'docker';
@@ -1317,7 +1388,10 @@ function initTopologyControls(){
     };
   }
   function isProxmoxTopologyNode(node){
-    return /^proxmox-(host|guest):/.test(String(node?.ref || ''));
+    return /^proxmox-(cluster|host|guest):/.test(String(node?.ref || ''));
+  }
+  function isVmwareTopologyNode(node){
+    return /^vmware-(endpoint|cluster|host|guest):/.test(String(node?.ref || ''));
   }
   function nodeElementByRef(ref){
     return [...shell.querySelectorAll('.topo-node')].find(el => el.dataset.ref === ref) || null;
@@ -1325,7 +1399,9 @@ function initTopologyControls(){
   function dragItemsForNode(node){
     const group = isProxmoxTopologyNode(node)
       ? currentNodes.filter(isProxmoxTopologyNode)
-      : [node];
+      : isVmwareTopologyNode(node)
+        ? currentNodes.filter(isVmwareTopologyNode)
+        : [node];
     return group.map(item => ({
       ref: item.ref,
       startX: item.x,

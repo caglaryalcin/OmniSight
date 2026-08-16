@@ -1,7 +1,7 @@
 {
   "name": "omnisight",
-  "version": "2.3.0",
-  "description": "Agent-based monitoring dashboard for Proxmox, Linux servers, Docker, Kubernetes, SNMP devices, firewalls, TrueNAS, PBS, Portainer, databases, Healthchecks and Uptime Kuma",
+  "version": "2.4.0",
+  "description": "Monitoring dashboard for Proxmox, VMware ESXi/vCenter, Linux, Docker, Kubernetes, SNMP, storage, services and databases",
   "main": "server.js",
   "scripts": {
     "start": "node --openssl-legacy-provider server.js",

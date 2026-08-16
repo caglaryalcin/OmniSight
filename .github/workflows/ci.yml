@@ -32,3 +32,35 @@ jobs:
         run: bash -n scripts/install-lxc.sh scripts/proxmox-lxc.sh
       - name: Smoke test
         run: node scripts/ci-smoke.js
+
+  windows-agent:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate PowerShell installers
+        shell: powershell
+        run: |
+          $failed = $false
+          foreach ($file in @('agent/install-windows.ps1', 'agent/omnisight-agent.ps1')) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $file), [ref]$tokens, [ref]$errors) | Out-Null
+            if ($errors.Count) {
+              $errors | ForEach-Object { Write-Error "$file`: $($_.Message)" }
+              $failed = $true
+            }
+          }
+          if ($failed) { exit 1 }
+      - name: Compile Windows service agent
+        shell: powershell
+        run: |
+          $framework = Join-Path $env:SystemRoot 'Microsoft.NET\Framework64\v4.0.30319'
+          $output = Join-Path $env:RUNNER_TEMP 'OmniSight.Agent.exe'
+          $source = (Resolve-Path 'agent/OmniSight.Agent.cs').Path
+          $references = @('System.dll', 'System.Core.dll', 'System.Management.dll', 'System.ServiceProcess.dll', 'System.Web.Extensions.dll', 'Microsoft.CSharp.dll') |
+            ForEach-Object { "/reference:$(Join-Path $framework $_)" }
+          & (Join-Path $framework 'csc.exe') /nologo /target:winexe /optimize+ /platform:anycpu "/out:$output" @references $source
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path $output)) { exit 1 }
+          $version = [Reflection.AssemblyName]::GetAssemblyName($output).Version.ToString(3)
+          if ($version -ne '1.4.1') { throw "Unexpected Windows agent version: $version" }
+          & scripts/ci-windows-agent.ps1 -ExecutablePath $output

@@ -4,6 +4,7 @@ const yaml = require('js-yaml');
 const crypto = require('crypto');
 const { loadHistoryMap, scheduleSaveHistoryMap, cancelHistorySaves } = require('./historyStore');
 const { normalizeCephStatus } = require('./ceph');
+const { normalizeClusterStatus } = require('./proxmox');
 
 const AGENTS_PATH = path.join(__dirname, '..', 'data', 'agents.yaml');
 const HISTORY_MAX = 5760;
@@ -290,9 +291,14 @@ function handleReport(r) {
 
   let pve = null;
   if (r.pve && typeof r.pve === 'object' && Array.isArray(r.pve.resources)) {
+    const resources = r.pve.resources.slice(0, 2000);
     pve = {
       node: String(r.pve.node || r.hostname || '').slice(0, 128),
-      resources: r.pve.resources.slice(0, 2000),
+      resources,
+      cluster: normalizeClusterStatus(r.pve.clusterStatus, {
+        name: 'Proxmox',
+        nodesRaw: resources.filter(row => row?.type === 'node'),
+      }),
       ceph: (r.pve.ceph && typeof r.pve.ceph === 'object') ? r.pve.ceph : null,
       backup: Array.isArray(r.pve.backup) ? r.pve.backup.slice(0, 5) : null,
     };
@@ -623,15 +629,25 @@ function getProxmoxData(config) {
     storage: [],
     _connecting: true,
   }));
-  if (!pveAgents.length) return { clusterSummary: null, nodes: pendingNodes, ceph: null };
+  if (!pveAgents.length) return { clusterSummary: null, nodes: pendingNodes, ceph: null, clusters: [] };
 
   let ceph = null;
   const nodes = pveAgents.map(a => {
     const nodeName = a.pve?.node || a.pveNode || a.hostname;
+    const agentCluster = a.pve?.cluster || normalizeClusterStatus(null, {
+      name: 'Proxmox',
+      nodesRaw: (a.pve?.resources || []).filter(row => row?.type === 'node'),
+    });
+    const clusterMembersKey = (agentCluster.members || []).map(member => member.name).sort().join(',');
+    const clusterKey = agentCluster.isCluster
+      ? `cluster:${clusterMembersKey || agentCluster.name}`
+      : `standalone:${nodeName}`;
     const online = isOnline(a, now) && !!a.pve;
     const connecting = isConnecting(a, now);
     if (!online) {
       return {
+        clusterName: agentCluster.name,
+        clusterKey,
         node: { name: nodeName, online: false, cpuCores: 0, cpuRaw: 0, ram: { used: 0, total: 0 }, temp: a.temp ?? null, temps: a.metrics?.temps || [] },
         host: a.ip,
         services: [],
@@ -678,6 +694,8 @@ function getProxmoxData(config) {
     }
     if (!ceph && a.pve.ceph) ceph = normalizeCephStatus(a.pve.ceph);
     return {
+      clusterName: agentCluster.name,
+      clusterKey,
       node: {
         name: nodeName,
         online: true,
@@ -721,7 +739,49 @@ function getProxmoxData(config) {
     usedRAM: onlineNodes.reduce((s, n) => s + (n.node.ram?.used || 0), 0),
   };
 
-  return { clusterSummary, nodes, ceph };
+  const clusterMap = new Map();
+  pveAgents.forEach(a => {
+    const nodeName = a.pve?.node || a.pveNode || a.hostname;
+    const info = a.pve?.cluster || normalizeClusterStatus(null, {
+      name: 'Proxmox',
+      nodesRaw: (a.pve?.resources || []).filter(row => row?.type === 'node'),
+    });
+    const membersKey = (info.members || []).map(member => member.name).sort().join(',');
+    const key = info.isCluster ? `cluster:${membersKey || info.name}` : `standalone:${nodeName}`;
+    const live = isOnline(a, now) && !!a.pve;
+    const previous = clusterMap.get(key);
+    if (!previous || (live && !previous.live) || (info.detected && !previous.info.detected)) {
+      clusterMap.set(key, { key, info, live });
+    }
+  });
+  const clusters = [...clusterMap.values()].map(({ key, info, live }) => {
+    const clusterNodes = nodes.filter(node => node.clusterKey === key);
+    const monitoredOnline = clusterNodes.filter(node => node.node?.online).length;
+    return {
+      name: info.name,
+      configuredName: info.configuredName,
+      url: '',
+      online: live,
+      isCluster: info.isCluster,
+      detected: info.detected,
+      quorate: live ? info.quorate : null,
+      version: info.version,
+      nodesOnline: live ? info.nodesOnline : monitoredOnline,
+      totalNodes: info.totalNodes || clusterNodes.length,
+      localNode: info.localNode,
+      members: info.members || [],
+      clusterSummary: {
+        nodesOnline: monitoredOnline,
+        totalNodes: clusterNodes.length,
+        totalCores: clusterNodes.reduce((sum, node) => sum + Number(node.node?.cpuCores || 0), 0),
+        usedCores: clusterNodes.filter(node => node.node?.online).reduce((sum, node) => sum + Number(node.node?.cpuRaw || 0) * Number(node.node?.cpuCores || 0), 0),
+        totalRAM: clusterNodes.reduce((sum, node) => sum + Number(node.node?.ram?.total || 0), 0),
+        usedRAM: clusterNodes.filter(node => node.node?.online).reduce((sum, node) => sum + Number(node.node?.ram?.used || 0), 0),
+      },
+    };
+  });
+
+  return { clusterSummary, nodes, ceph, clusters };
 }
 
 function hasPve() {
@@ -754,6 +814,13 @@ function findAgent(hostOrName) {
 function takeCommands(agentId) {
   const list = pending.get(agentId) || [];
   pending.delete(agentId);
+  for (const command of list) {
+    const waiter = waiters.get(command.id);
+    if (waiter) {
+      waiter.delivered = true;
+      waiter.deliveredAt = Date.now();
+    }
+  }
   return list;
 }
 
@@ -766,15 +833,26 @@ function queueCommand(hostOrName, action, service) {
     const agent = findAgent(hostOrName);
     if (!agent) return reject(new Error('agent not found'));
     if (!SVC_NAME.test(service)) return reject(new Error('invalid target name'));
-    if (!['status', 'start', 'stop', 'restart', 'docker_logs', 'docker_prune', 'agent_update'].includes(action)) return reject(new Error('invalid action'));
+    if (!['status', 'start', 'stop', 'restart', 'docker_logs', 'docker_prune', 'agent_update', 'agent_uninstall'].includes(action)) return reject(new Error('invalid action'));
     const id = crypto.randomBytes(8).toString('hex');
     const list = pending.get(agent.id) || [];
     list.push({ id, action, service });
     pending.set(agent.id, list);
-    waiters.set(id, {
-      resolve, reject,
-      timer: setTimeout(() => { waiters.delete(id); reject(new Error('agent did not respond in time')); }, CMD_TIMEOUT),
-    });
+    const waiter = { resolve, reject, delivered: false, deliveredAt: 0, timer: null };
+    waiter.timer = setTimeout(() => {
+      waiters.delete(id);
+      if (!waiter.delivered) {
+        const remaining = (pending.get(agent.id) || []).filter(command => command.id !== id);
+        if (remaining.length) pending.set(agent.id, remaining);
+        else pending.delete(agent.id);
+      }
+      const error = new Error(waiter.delivered ? 'agent command result was not received in time' : 'agent did not respond in time');
+      error.commandDelivered = waiter.delivered;
+      error.commandDeliveredAt = waiter.deliveredAt;
+      error.code = waiter.delivered ? 'AGENT_RESULT_TIMEOUT' : 'AGENT_DELIVERY_TIMEOUT';
+      reject(error);
+    }, CMD_TIMEOUT);
+    waiters.set(id, waiter);
     const pw = pollWaiters.get(agent.id);
     if (pw) { pollWaiters.delete(agent.id); pw(); }
   });

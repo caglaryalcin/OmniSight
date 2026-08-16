@@ -24,6 +24,72 @@ function ratioValue(value) {
   return Math.max(0, Math.min(1, n <= 1 ? n : n / 100));
 }
 
+function optionalBool(value) {
+  if (value === true || value === 1) return true;
+  if (value === false || value === 0) return false;
+  const text = String(value ?? '').trim().toLowerCase();
+  if (['1', 'true', 'yes', 'online', 'active', 'quorate'].includes(text)) return true;
+  if (['0', 'false', 'no', 'offline', 'inactive', 'lost'].includes(text)) return false;
+  return null;
+}
+
+function clusterMemberOnline(row = {}) {
+  const direct = optionalBool(row.online);
+  if (direct !== null) return direct;
+  return optionalBool(row.status);
+}
+
+function normalizeClusterStatus(rawStatus, options = {}) {
+  const statusRows = Array.isArray(rawStatus)
+    ? rawStatus
+    : Array.isArray(rawStatus?.data)
+      ? rawStatus.data
+      : [];
+  const nodeRows = Array.isArray(options.nodesRaw) ? options.nodesRaw : [];
+  const clusterRow = statusRows.find(row => String(row?.type || '').toLowerCase() === 'cluster') || null;
+  const membersByName = new Map();
+  const addMember = row => {
+    const name = String(row?.name || row?.node || '').trim().slice(0, 128);
+    if (!name) return;
+    const previous = membersByName.get(name) || {};
+    const online = clusterMemberOnline(row);
+    const local = optionalBool(row?.local);
+    const nodeId = Number(row?.nodeid ?? row?.nodeId);
+    membersByName.set(name, {
+      name,
+      online: online === null ? (previous.online ?? null) : online,
+      local: local === null ? (previous.local ?? false) : local,
+      nodeId: Number.isFinite(nodeId) ? nodeId : (previous.nodeId ?? null),
+    });
+  };
+  statusRows
+    .filter(row => String(row?.type || '').toLowerCase() === 'node')
+    .forEach(addMember);
+  nodeRows.forEach(addMember);
+  const members = [...membersByName.values()]
+    .sort((a, b) => (Number(a.nodeId ?? Number.MAX_SAFE_INTEGER) - Number(b.nodeId ?? Number.MAX_SAFE_INTEGER)) || a.name.localeCompare(b.name));
+  const configuredName = String(options.name || options.label || 'Proxmox').trim().slice(0, 128) || 'Proxmox';
+  const detectedName = String(clusterRow?.name || '').trim().slice(0, 128);
+  const isCluster = !!clusterRow || members.length > 1;
+  const localNode = members.find(member => member.local)?.name || '';
+  const totalFromCluster = Number(clusterRow?.nodes);
+  const totalNodes = Math.max(members.length, Number.isFinite(totalFromCluster) ? Math.max(0, Math.floor(totalFromCluster)) : 0);
+  const nodesOnline = members.filter(member => member.online === true).length;
+  const version = Number(clusterRow?.version);
+  return {
+    name: detectedName || (isCluster ? configuredName : (localNode || members[0]?.name || configuredName)),
+    configuredName,
+    isCluster,
+    detected: !!clusterRow,
+    quorate: isCluster && clusterRow ? optionalBool(clusterRow.quorate) : null,
+    version: Number.isFinite(version) ? version : null,
+    totalNodes,
+    nodesOnline,
+    localNode,
+    members,
+  };
+}
+
 function normBase(url) {
   return String(url || '').replace(/\/+$/, '');
 }
@@ -462,7 +528,7 @@ function svcName(s) {
 
 async function nodeData(cfg, node, excluded, resource = null) {
   const name = node.node || node.name;
-  const clusterName = String(cfg.name || cfg.label || cfg.url || 'Proxmox');
+  const clusterName = String(cfg.actualClusterName || cfg.name || cfg.label || cfg.url || 'Proxmox');
   const historyKey = `${cfg.instanceKey || normBase(cfg.url)}:${name}`;
   try {
     const [status, qemu, lxc, storage, services, rrdHour, sensors] = await Promise.all([
@@ -577,25 +643,29 @@ async function nodeData(cfg, node, excluded, resource = null) {
 }
 
 async function getProxmoxApiData(cfg = {}) {
-  if (!cfg.url || !cfg.tokenId || !cfg.tokenSecret) return { clusterSummary: null, nodes: [], ceph: null };
+  if (!cfg.url || !cfg.tokenId || !cfg.tokenSecret) return { clusterSummary: null, nodes: [], ceph: null, cluster: null };
   const excluded = cfg.excludedServices?.proxmox || {};
   const nodesPromise = pveFetch(cfg, '/api2/json/nodes');
+  const clusterStatusPromise = pveFetch(cfg, '/api2/json/cluster/status').catch(() => null);
   const cephOsdPromise = nodesPromise.then(rawNodes => {
     const node = (rawNodes || []).find(item => String(item.status || '').toLowerCase() !== 'offline') || (rawNodes || [])[0];
     if (!node?.node) return null;
     return pveFetch(cfg, `/api2/json/nodes/${encodeURIComponent(node.node)}/ceph/osd`).catch(() => null);
   }).catch(() => null);
-  const [nodesRaw, resourcesRaw, cephRaw, cephDfRaw, cephOsdRaw] = await Promise.all([
+  const [nodesRaw, resourcesRaw, clusterStatusRaw, cephRaw, cephDfRaw, cephOsdRaw] = await Promise.all([
     nodesPromise,
     pveFetch(cfg, '/api2/json/cluster/resources').catch(() => []),
+    clusterStatusPromise,
     pveFetch(cfg, '/api2/json/cluster/ceph/status').catch(() => null),
     pveFetch(cfg, '/api2/json/cluster/ceph/df').catch(() => null),
     cephOsdPromise,
   ]);
+  const cluster = normalizeClusterStatus(clusterStatusRaw, { name: cfg.name || cfg.label, nodesRaw });
+  const nodeConfig = { ...cfg, actualClusterName: cluster.name };
   const resourcesByNode = new Map((resourcesRaw || [])
     .filter(r => r.type === 'node' && (r.node || r.id))
     .map(r => [String(r.node || r.id).replace(/^node\//, ''), r]));
-  const nodes = (await mapLimit((nodesRaw || []), Number(cfg.concurrency || cfg.collectorConcurrency || 3), n => nodeData(cfg, n, excluded, resourcesByNode.get(n.node || n.name))))
+  const nodes = (await mapLimit((nodesRaw || []), Number(cfg.concurrency || cfg.collectorConcurrency || 3), n => nodeData(nodeConfig, n, excluded, resourcesByNode.get(n.node || n.name))))
     .sort((a, b) => String(a.node.name).localeCompare(String(b.node.name)));
   const onlineNodes = nodes.filter(n => n.node.online);
   const clusterSummary = {
@@ -606,7 +676,7 @@ async function getProxmoxApiData(cfg = {}) {
     totalRAM: nodes.reduce((s, n) => s + (n.node.ram?.total || 0), 0),
     usedRAM: onlineNodes.reduce((s, n) => s + (n.node.ram?.used || 0), 0),
   };
-  return { clusterSummary, nodes, ceph: normalizeCephStatus(cephRaw, cephDfRaw, cephOsdRaw) };
+  return { clusterSummary, nodes, ceph: normalizeCephStatus(cephRaw, cephDfRaw, cephOsdRaw), cluster };
 }
 
 function configuredInstances(config = {}) {
@@ -630,9 +700,9 @@ async function getAllProxmoxApiData(config = {}) {
   const clusters = await mapLimit(instances, Number(config.concurrency || config.collectorConcurrency || 3), async cfg => {
     try {
       const data = await getProxmoxApiData(cfg);
-      return { name: cfg.name, url: cfg.url, online: true, ...data };
+      return { name: data.cluster?.name || cfg.name, configuredName: cfg.name, url: cfg.url, online: true, ...data };
     } catch (err) {
-      return { name: cfg.name, url: cfg.url, online: false, error: err.message, clusterSummary: null, nodes: [], ceph: null };
+      return { name: cfg.name, configuredName: cfg.name, url: cfg.url, online: false, error: err.message, clusterSummary: null, nodes: [], ceph: null, cluster: null };
     }
   });
   const nodes = clusters.flatMap(cluster => (cluster.nodes || []).map(node => ({
@@ -658,14 +728,23 @@ async function getAllProxmoxApiData(config = {}) {
     ceph: cephClusters.length === 1 ? cephClusters[0] : null,
     cephClusters,
     clusters: clusters.map(cluster => ({
-      name: cluster.name,
+      name: cluster.cluster?.name || cluster.name,
+      configuredName: cluster.configuredName || cluster.name,
       url: cluster.url,
       online: cluster.online,
       error: cluster.error || '',
+      isCluster: cluster.cluster?.isCluster ?? ((cluster.nodes || []).length > 1),
+      detected: cluster.cluster?.detected ?? false,
+      quorate: cluster.cluster?.quorate ?? null,
+      version: cluster.cluster?.version ?? null,
+      nodesOnline: cluster.cluster?.nodesOnline ?? cluster.clusterSummary?.nodesOnline ?? 0,
+      totalNodes: cluster.cluster?.totalNodes ?? cluster.clusterSummary?.totalNodes ?? 0,
+      localNode: cluster.cluster?.localNode || '',
+      members: cluster.cluster?.members || [],
       clusterSummary: cluster.clusterSummary,
     })),
     error: clusters.find(cluster => !cluster.online)?.error || '',
   };
 }
 
-module.exports = { getProxmoxApiData, getAllProxmoxApiData, configuredInstances };
+module.exports = { getProxmoxApiData, getAllProxmoxApiData, configuredInstances, normalizeClusterStatus };

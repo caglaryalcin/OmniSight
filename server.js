@@ -30,6 +30,7 @@ const { getCloudflareData } = require('./src/cloudflare');
 const { getAllCiData, configuredProjects: ciConfigProjects } = require('./src/cicd');
 const { getAllVeeamData, configuredInstances: veeamConfigInstances } = require('./src/veeam');
 const { getAllProxmoxApiData, configuredInstances: proxmoxConfigInstances } = require('./src/proxmox');
+const { getAllVmwareData, configuredInstances: vmwareConfigInstances } = require('./src/vmware');
 const { getDockerApiData, dockerLogs: dockerApiLogs, dockerPrune: dockerApiPrune } = require('./src/docker');
 const { dispatchAlert, serverUpdateNotificationsEnabled, buildServerUpdateDetections } = require('./src/alerts');
 const { decryptConfig, encryptConfigValue, isEncrypted, SENSITIVE_KEYS, encryptionEnabled } = require('./src/crypto');
@@ -2013,10 +2014,10 @@ function stripDeprecatedConfig(obj) {
   return obj;
 }
 
-const UI_PLATFORM_IDS = new Set(['proxmox','kubernetes','linux','windows','synology','mikrotik','unifi','snmp','healthchecks','uptimekuma','checks','prometheus','docker','dockhand','database','firewall','truenas','qnap','ugreen','pbs','cloudflare','cicd','veeam','portainer']);
-const UI_GROUP_KEYS = new Set(['pods','deps','svcs','synologyDevices','mikrotikDevices','unifiDevices','snmpDevices','snmpServers','dockerHosts','dockerContainers','checksServices','prometheusServers','prometheusTargets','firewallGateways','firewallLinks','truenasSystems','truenasPools','qnapSystems','ugreenSystems','pbsServers','pbsDatastores','pbsTasks','cloudflareZones','cloudflareTunnels','cloudflareDomains','cicdProjects','cicdPipelines','veeamServers','veeamSessions','veeamRepositories','portainerServers','portainerEnvironments','portainerContainers','databaseServers']);
+const UI_PLATFORM_IDS = new Set(['proxmox','vmware','kubernetes','linux','windows','synology','mikrotik','unifi','snmp','healthchecks','uptimekuma','checks','prometheus','docker','dockhand','database','firewall','truenas','qnap','ugreen','pbs','cloudflare','cicd','veeam','portainer']);
+const UI_GROUP_KEYS = new Set(['pods','deps','svcs','synologyDevices','mikrotikDevices','unifiDevices','snmpDevices','snmpServers','dockerHosts','dockerContainers','checksServices','prometheusServers','prometheusTargets','firewallGateways','firewallLinks','truenasSystems','truenasPools','qnapSystems','ugreenSystems','pbsServers','pbsDatastores','pbsTasks','cloudflareZones','cloudflareTunnels','cloudflareDomains','cicdProjects','cicdPipelines','veeamServers','veeamSessions','veeamRepositories','portainerServers','portainerEnvironments','portainerContainers','databaseServers','vmwareHosts','vmwareVms','vmwareDatastores']);
 const UI_SORT_KEYS = new Set(['state','name','cpu','memory','disk','network','status','restarts']);
-const UI_KPI_KEYS = new Set(['cpu','memory','disk','bandwidth']);
+const UI_KPI_KEYS = new Set(['cpu','mem','memory','disk','bandwidth']);
 
 function cleanBoolMap(obj, allowedKeys, max = 80) {
   const out = {};
@@ -2030,12 +2031,12 @@ function cleanBoolMap(obj, allowedKeys, max = 80) {
   return out;
 }
 
-function cleanStringArray(list, allowedKeys, max = 80) {
+function cleanStringArray(list, allowedKeys, max = 80, maxLength = 80) {
   const seen = new Set();
   const out = [];
   if (!Array.isArray(list)) return out;
   for (const item of list) {
-    const value = String(item || '').trim().slice(0, 80);
+    const value = String(item || '').trim().slice(0, maxLength);
     if (!value || seen.has(value)) continue;
     if (allowedKeys && !allowedKeys.has(value)) continue;
     seen.add(value);
@@ -2060,16 +2061,29 @@ function cleanLayoutMap(obj) {
   return out;
 }
 
-function cleanStringMap(obj, allowedKeys, allowedValues, max = 80) {
+function cleanStringMap(obj, allowedKeys, allowedValues, max = 80, maxLength = 80) {
   const out = {};
   if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return out;
   for (const [key, value] of Object.entries(obj)) {
     const k = String(key || '').slice(0, 80);
-    const v = String(value || '').slice(0, 80);
+    const v = String(value || '').slice(0, maxLength);
     if (allowedKeys && !allowedKeys.has(k)) continue;
     if (allowedValues && !allowedValues.has(v)) continue;
     out[k] = v;
     if (Object.keys(out).length >= max) break;
+  }
+  return out;
+}
+
+function cleanStringArrayMap(obj, allowedKeys, maxKeys = 40, maxItems = 160, maxLength = 180) {
+  const out = {};
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return out;
+  for (const [key, value] of Object.entries(obj)) {
+    const cleanKey = String(key || '').slice(0, 80);
+    if (allowedKeys && !allowedKeys.has(cleanKey)) continue;
+    const clean = cleanStringArray(value, null, maxItems, maxLength);
+    if (clean.length) out[cleanKey] = clean;
+    if (Object.keys(out).length >= maxKeys) break;
   }
   return out;
 }
@@ -2101,6 +2115,8 @@ function cleanUiPreferences(raw = {}) {
   ui.k8sNamespaceFilter = String(src.k8sNamespaceFilter || '').trim().slice(0, 80);
   if (!ui.k8sNamespaceFilter) delete ui.k8sNamespaceFilter;
   ui.overviewKpiPlatforms = cleanStringMap(src.overviewKpiPlatforms, UI_KPI_KEYS, new Set(['all', ...UI_PLATFORM_IDS]), 20);
+  ui.overviewKpiHosts = cleanStringMap(src.overviewKpiHosts, UI_KPI_KEYS, null, 20, 180);
+  ui.detailSystemOrder = cleanStringArrayMap(src.detailSystemOrder, UI_PLATFORM_IDS, 40, 160, 180);
   ui.userOverride = cleanBoolMap(src.userOverride, null, 600);
   if (src.railCollapsed !== undefined) ui.railCollapsed = !!src.railCollapsed;
   if (src.navCollapsed !== undefined) ui.navCollapsed = !!src.navCollapsed;
@@ -2469,7 +2485,7 @@ function eventsViewSignature(limit) {
   ].join('|');
 }
 
-const PLATFORM_REFRESH_KEYS = ['proxmox','linux','windows','kubernetes','snmp','healthchecks','uptimekuma','checks','prometheus','docker','dockhand','database','firewall','truenas','qnap','ugreen','unifi','pbs','cloudflare','cicd','veeam','portainer'];
+const PLATFORM_REFRESH_KEYS = ['proxmox','vmware','linux','windows','kubernetes','snmp','healthchecks','uptimekuma','checks','prometheus','docker','dockhand','database','firewall','truenas','qnap','ugreen','unifi','pbs','cloudflare','cicd','veeam','portainer'];
 const platformRefreshState = Object.fromEntries(PLATFORM_REFRESH_KEYS.map(k => [k, { inFlight: false, nextDue: 0, failures: 0, lastStarted: 0, lastFinished: 0 }]));
 const forceConnectingPlatforms = new Set();
 const CONFIG_CHANGE_CONNECTING_MS = Math.max(30000, Number(process.env.OMNISIGHT_CONFIG_CHANGE_CONNECTING_MS || 120000));
@@ -2533,6 +2549,7 @@ function platformResultLooksFailed(key, value, enabled) {
   if (key === 'ugreen') return value?.instances?.length && value.instances.every(i => i.online === false || i.error || i._connecting);
   if (key === 'unifi') return value?.instances?.length && value.instances.every(i => i.online === false || i.error || i._connecting);
   if (key === 'pbs') return value?.instances?.length && value.instances.every(i => i.online === false || i.error || i._connecting);
+  if (key === 'vmware') return value?._stale === true || (value?.instances?.length && value.instances.every(i => i.online === false || i.error || i._connecting));
   if (key === 'cloudflare') return value && value.online === false && (value.error || value._connecting);
   if (key === 'cicd') return value?.projects?.length && value.projects.every(i => i.online === false || i.error || i._connecting);
   if (key === 'veeam') return value?.instances?.length && value.instances.every(i => i.online === false || i.error || i._connecting);
@@ -2624,9 +2641,10 @@ function replaceMapContents(target, source) {
 }
 
 function reloadRuntimeHistoryMaps() {
-  cancelHistorySaves(['platform-history', 'docker-history', 'uptimekuma-history']);
+  cancelHistorySaves(['platform-history', 'docker-history', 'vmware-history', 'uptimekuma-history']);
   replaceObjectContents(PLATFORM_HISTORY, Object.fromEntries(loadHistoryMap('platform-history', HISTORY_STORE_MAX)));
   replaceMapContents(dockerHistory, loadHistoryMap('docker-history', HISTORY_STORE_MAX));
+  replaceMapContents(vmwareHistory, loadHistoryMap('vmware-history', HISTORY_STORE_MAX));
   replaceMapContents(uptimeKumaHistory, loadHistoryMap('uptimekuma-history', HISTORY_STORE_MAX));
 }
 
@@ -2735,6 +2753,54 @@ function preserveDockerOnTransient(nextRows) {
 }
 
 const dockerHistory = loadHistoryMap('docker-history', HISTORY_STORE_MAX);
+const vmwareHistory = loadHistoryMap('vmware-history', HISTORY_STORE_MAX);
+
+function vmwareHistoryKey(instance = {}, host = {}) {
+  const endpoint = String(instance.url || instance.name || 'vmware').trim().replace(/\/+$/, '').toLowerCase();
+  const hostId = String(host.id || host.name || 'host').trim().toLowerCase();
+  return `${endpoint}|${hostId}`;
+}
+
+function mergeVmwareHistory(next) {
+  if (!next || !Array.isArray(next.instances)) return next;
+  const now = Date.now();
+  let changed = false;
+  const instances = next.instances.map(instance => {
+    if (!instance || !Array.isArray(instance.hosts)) return instance;
+    const hosts = instance.hosts.map(host => {
+      if (!host) return host;
+      const key = vmwareHistoryKey(instance, host);
+      const stored = vmwareHistory.get(key) || [];
+      const supplied = Array.isArray(host.history) ? host.history : [];
+      const byTime = new Map();
+      [...stored, ...supplied].forEach(point => {
+        const time = Number(point?.time);
+        if (Number.isFinite(time)) byTime.set(time, point);
+      });
+      let history = [...byTime.values()].sort((a, b) => Number(a.time) - Number(b.time));
+      const cpu = host.cpuPercent == null ? null : Number(host.cpuPercent);
+      const mem = host.memoryPercent == null ? null : Number(host.memoryPercent);
+      const point = {
+        time: now,
+        cpu: Number.isFinite(cpu) ? cpu : null,
+        mem: Number.isFinite(mem) ? mem : null,
+      };
+      const last = history[history.length - 1];
+      if (host.online && (point.cpu != null || point.mem != null) && (!last || now - Number(last.time || 0) > REFRESH_INTERVAL / 2)) {
+        if (!history.length) history.push({ ...point, time: now - REFRESH_INTERVAL });
+        history.push(point);
+        changed = true;
+      }
+      history = trimHistoryRetention(history);
+      vmwareHistory.set(key, history);
+      return { ...host, history: [...history] };
+    });
+    return { ...instance, hosts };
+  });
+  if (changed) scheduleSaveHistoryMap('vmware-history', vmwareHistory, historyRetentionMaxPoints());
+  return { ...next, instances };
+}
+
 function dockerHistoryKey(row = {}) {
   return dockerRowKeys(row)[0] || String(row.name || row.host || 'docker');
 }
@@ -2899,7 +2965,7 @@ function assignStatic(base) {
   };
   base.ui = cleanUiPreferences(config.ui || {});
   base.icons = {
-    proxmox: publicIconValue(config.proxmox?.icon), linux: publicIconValue(config.linux?.icon), windows: publicIconValue(config.windows?.icon), kubernetes: publicIconValue(config.kubernetes?.icon),
+    proxmox: publicIconValue(config.proxmox?.icon), vmware: publicIconValue(config.vmware?.icon), linux: publicIconValue(config.linux?.icon), windows: publicIconValue(config.windows?.icon), kubernetes: publicIconValue(config.kubernetes?.icon),
     snmp: publicIconValue(config.snmp?.icon), healthchecks: publicIconValue(config.healthchecks?.icon), uptimekuma: publicIconValue(config.uptimekuma?.icon), checks: publicIconValue(config.checks?.icon), prometheus: publicIconValue(config.prometheus?.icon), docker: publicIconValue(config.docker?.icon), dockhand: publicIconValue(config.dockhand?.icon),
     firewall: publicIconValue(config.firewall?.icon),
     truenas: publicIconValue(config.truenas?.icon),
@@ -2992,7 +3058,37 @@ function settingsStatusData(data = cache.data || EMPTY) {
     refreshing: refreshBusy(),
     configured: data.configured || configuredList(),
     publicStatus: !!config.publicStatus,
-    proxmox: { _connecting: !!data.proxmox?._connecting, nodes: pxNodes },
+    proxmox: {
+      _connecting: !!data.proxmox?._connecting,
+      nodes: pxNodes,
+      clusters: (data.proxmox?.clusters || []).map(cluster => ({
+        name: cluster.name,
+        online: cluster.online !== false,
+        isCluster: !!cluster.isCluster,
+        quorate: typeof cluster.quorate === 'boolean' ? cluster.quorate : null,
+      })),
+    },
+    vmware: data.vmware ? {
+      online: !!data.vmware.online,
+      _connecting: !!data.vmware._connecting,
+      _stale: !!data.vmware._stale,
+      error: data.vmware.error || '',
+      summary: data.vmware.summary || {},
+      instances: (data.vmware.instances || []).map(instance => ({
+        name: instance.name,
+        type: instance.type,
+        online: !!instance.online,
+        _connecting: !!instance._connecting,
+        error: instance.error || '',
+        summary: instance.summary || {},
+        hosts: (instance.hosts || []).map(host => ({
+          name: host.name,
+          online: !!host.online,
+          maintenance: !!host.maintenance,
+          health: host.health || 'gray',
+        })),
+      })),
+    } : null,
     linux: linuxRows,
     windows: windowsRows,
     kubernetes: data.kubernetes ? {
@@ -3171,8 +3267,22 @@ function topologyStatusData(data = cache.data || EMPTY) {
     topologyView: topologyViewConfig(),
     unifiTopology,
     proxmox: {
+      clusters: (data.proxmox?.clusters || []).map(cluster => ({
+        name: cluster.name,
+        online: cluster.online !== false,
+        isCluster: !!cluster.isCluster,
+        quorate: typeof cluster.quorate === 'boolean' ? cluster.quorate : null,
+        nodesOnline: Number(cluster.nodesOnline) || 0,
+        totalNodes: Number(cluster.totalNodes) || 0,
+        members: (cluster.members || []).map(member => ({
+          name: member.name,
+          online: typeof member.online === 'boolean' ? member.online : null,
+          local: !!member.local,
+        })),
+      })),
       nodes: (data.proxmox?.nodes || []).map(n => ({
         name: n.name || n.node?.name || '',
+        clusterName: n.clusterName || '',
         online: !!(n.online || n.node?.online),
         _connecting: !!n._connecting,
         node: {
@@ -3191,6 +3301,39 @@ function topologyStatusData(data = cache.data || EMPTY) {
         })),
       })),
     },
+    vmware: data.vmware ? {
+      instances: (data.vmware.instances || []).map(instance => ({
+        name: instance.name,
+        type: instance.type,
+        online: !!instance.online,
+        _connecting: !!instance._connecting,
+        clusters: (instance.clusters || []).map(cluster => ({
+          id: cluster.id,
+          name: cluster.name,
+          health: cluster.health,
+          hostRefs: cluster.hostRefs || [],
+        })),
+        hosts: (instance.hosts || []).map(host => ({
+          id: host.id,
+          name: host.name,
+          online: !!host.online,
+          maintenance: !!host.maintenance,
+          health: host.health,
+          clusterId: host.clusterId,
+          clusterName: host.clusterName,
+        })),
+        vms: (instance.vms || []).map(vm => ({
+          id: vm.id,
+          name: vm.name,
+          hostId: vm.hostId,
+          hostName: vm.hostName,
+          clusterName: vm.clusterName,
+          powerState: vm.powerState,
+          running: !!vm.running,
+          guestOs: vm.guestOs,
+        })),
+      })),
+    } : null,
     kubernetes: data.kubernetes ? {
       online: data.kubernetes.online !== false,
       _connecting: !!data.kubernetes._connecting,
@@ -3438,6 +3581,7 @@ function settingsAgentRows() {
       platform: a.platform || '',
       online: !!a.online,
       connecting: !!a.connecting,
+      agentVersion: a.agentVersion || '',
       lastSeen: a.lastSeen || 0,
       meta: kind === 'docker' ? 'Docker agent' : kind === 'windows' ? 'Windows agent' : '',
     };
@@ -3546,6 +3690,7 @@ function configuredList() {
   const hasQnap = c => !!(c && (c.url || (Array.isArray(c.instances) && c.instances.length)));
   const hasUgreen = c => !!(c && (c.url || (Array.isArray(c.instances) && c.instances.length)));
   const hasPbs = c => !!(c && (c.url || (Array.isArray(c.instances) && c.instances.length)));
+  const hasVmware = c => !!(c && (c.url || (Array.isArray(c.instances) && c.instances.length)));
   const hasCloudflare = c => !!(c && (c.apiToken || c.token || c.bearerToken));
   const hasCiCd = c => !!(c && ((Array.isArray(c.projects) && c.projects.length) || (Array.isArray(c.instances) && c.instances.length)));
   const hasVeeam = c => !!(c && (c.url || (Array.isArray(c.instances) && c.instances.length)));
@@ -3563,6 +3708,7 @@ function configuredList() {
     return ['synology', 'mikrotik', 'unifi'].includes(p) ? p : 'snmp';
   };
   if (en(config.proxmox)      && (agents.hasPve() || hasCachedRows('proxmox') || hasProxmoxApi())) ids.push('proxmox');
+  if (en(config.vmware)       && hasVmware(config.vmware))               ids.push('vmware');
   if (en(config.kubernetes)   && config.kubernetes.kubeconfig)          ids.push('kubernetes');
   if (en(config.linux)        && config.linux.agentToken && (agents.hasLinux?.() || hasCachedRows('linux'))) ids.push('linux');
   if (en(config.windows)      && config.linux?.agentToken && (agents.hasWindows?.() || hasCachedRows('windows'))) ids.push('windows');
@@ -3660,6 +3806,30 @@ function pbsConnectingData(conf = config.pbs) {
     online: false,
     _connecting: true,
     summary: { instances: rows.length, up: 0, down: 0, datastores: 0, datastoresWarn: 0, snapshots: 0, groups: 0, failedTasks: 0 },
+    instances: rows,
+  };
+}
+
+function vmwareConnectingData(conf = config.vmware) {
+  const instances = vmwareConfigInstances(conf || {});
+  const rows = instances.map((instance, index) => ({
+    name: instance.name || instance.url || `VMware ${index + 1}`,
+    url: instance.url || '',
+    type: 'unknown',
+    online: false,
+    _connecting: true,
+    datacenters: [],
+    clusters: [],
+    hosts: [],
+    vms: [],
+    templates: [],
+    datastores: [],
+    summary: {},
+  }));
+  return {
+    online: false,
+    _connecting: true,
+    summary: { instances: rows.length, up: 0, down: 0, datacenters: 0, clusters: 0, hosts: 0, hostsOnline: 0, vms: 0, runningVms: 0, templates: 0, datastores: 0 },
     instances: rows,
   };
 }
@@ -3999,6 +4169,12 @@ function extractChecks(data) {
         durationSeconds: anomaly.durationSeconds,
       });
   };
+  (data.proxmox?.clusters || [])
+    .filter(cluster => cluster?.isCluster && typeof cluster.quorate === 'boolean')
+    .forEach(cluster => {
+      const name = cluster.name || 'Proxmox';
+      add(`px:cluster:${name}:quorum`, cluster.quorate, `Proxmox cluster ${name} quorum`, cluster.quorate ? 'available' : 'lost');
+    });
   (data.proxmox?.nodes || []).forEach(n => {
     if (n._connecting) return;
     const nm = n.node?.name || n.name || 'node';
@@ -4015,6 +4191,34 @@ function extractChecks(data) {
         if (!s.excluded) add('px:' + nm + ':' + s.name, !!s.active, 'Proxmox ' + nm + ' / ' + s.name, 'inactive');
       });
     }
+  });
+  const vmwareStale = !!data.vmware?._stale;
+  (data.vmware?.instances || []).forEach(instance => {
+    if (instance._connecting) return;
+    const instanceName = instance.name || 'VMware';
+    const instanceAvailable = !vmwareStale && !instance._stale && !!instance.online;
+    add(`vmware:${instanceName}`, instanceAvailable, `VMware endpoint ${instanceName}`, vmwareStale ? (data.vmware.error || 'stale VMware data') : 'unreachable');
+    if (!instanceAvailable) return;
+    (instance.hosts || []).forEach(host => {
+      const hostKey = host.id || host.name;
+      add(`vmware:${instanceName}:host:${hostKey}`, !!host.online, `ESXi host ${host.name || host.id}`, 'disconnected');
+      if (!host.online) return;
+      add(`vmware:${instanceName}:host:${hostKey}:maintenance`, !host.maintenance, `ESXi host ${host.name || host.id}`, 'in maintenance mode');
+      add(`vmware:${instanceName}:host:${hostKey}:health`, !['yellow', 'red'].includes(String(host.health || '').toLowerCase()), `ESXi host ${host.name || host.id}`, `health is ${host.health || 'unknown'}`);
+      addPct(`vmware:${instanceName}:host:${hostKey}:cpu`, `ESXi host ${host.name || host.id}`, 'CPU usage', host.cpuPercent, thresholds.cpu);
+      addPct(`vmware:${instanceName}:host:${hostKey}:ram`, `ESXi host ${host.name || host.id}`, 'RAM usage', host.memoryPercent, thresholds.ram);
+    });
+    (instance.vms || []).forEach(vm => {
+      if (!vm.running) return;
+      const vmKey = vm.id || vm.name;
+      add(`vmware:${instanceName}:vm:${vmKey}:health`, !['yellow', 'red'].includes(String(vm.health || '').toLowerCase()), `VMware VM ${vm.name || vm.id}`, `health is ${vm.health || 'unknown'}`);
+    });
+    (instance.datastores || []).forEach(datastore => {
+      const datastoreKey = datastore.id || datastore.name;
+      add(`vmware:${instanceName}:datastore:${datastoreKey}`, datastore.accessible !== false, `VMware datastore ${datastore.name || datastore.id}`, 'inaccessible');
+      add(`vmware:${instanceName}:datastore:${datastoreKey}:health`, !['yellow', 'red'].includes(String(datastore.health || '').toLowerCase()), `VMware datastore ${datastore.name || datastore.id}`, `health is ${datastore.health || 'unknown'}`);
+      if (datastore.accessible !== false) addPct(`vmware:${instanceName}:datastore:${datastoreKey}:usage`, `VMware datastore ${datastore.name || datastore.id}`, 'disk usage', datastore.usedPercent, thresholds.disk);
+    });
   });
   (data.linux || []).forEach(l => {
     if (l._connecting) return;
@@ -4729,7 +4933,7 @@ function preserveUptimeKumaOnTransient(next, err) {
   };
 }
 
-const OBJECT_INSTANCE_PLATFORMS = new Set(['prometheus', 'dockhand', 'firewall', 'truenas', 'qnap', 'ugreen', 'unifi', 'pbs', 'cloudflare', 'cicd', 'veeam', 'portainer']);
+const OBJECT_INSTANCE_PLATFORMS = new Set(['prometheus', 'dockhand', 'firewall', 'truenas', 'qnap', 'ugreen', 'unifi', 'pbs', 'vmware', 'cloudflare', 'cicd', 'veeam', 'portainer']);
 function objectPlatformHasUsableData(value) {
   if (!value || typeof value !== 'object') return false;
   const instances = Array.isArray(value.instances) ? value.instances : [];
@@ -4812,10 +5016,10 @@ function backgroundRefresh(opts = {}) {
   const generation = refreshGeneration;
   base.loading = false;
   assignStatic(base);
-  broadcastStatusEvent('refreshing');
 
   const taskDefs = [
     ['proxmox',      enabled(config.proxmox),      () => getProxmoxData(),                      { clusterSummary: null, nodes: [] }],
+    ['vmware',       enabled(config.vmware),       () => getAllVmwareData(config.vmware),       null],
     ['linux',        enabled(config.linux),        () => Promise.resolve(getLinuxData()),        []],
     ['windows',      enabled(config.windows),      () => Promise.resolve(getWindowsData()),      []],
     ['kubernetes',   enabled(config.kubernetes),   () => getAllKubernetesData(config.kubernetes), null],
@@ -4857,6 +5061,7 @@ function backgroundRefresh(opts = {}) {
         if (generation !== refreshGeneration) return;
         const next = (v == null ? fb : v);
         base[key] = key === 'proxmox' ? preserveProxmoxOnTransient(next)
+          : key === 'vmware' ? preservePlatformOnTransient(key, mergeVmwareHistory(next))
           : key === 'kubernetes' ? keepKubernetesConnectingAfterConfigChange(next)
           : key === 'docker' ? mergeDockerHistory(preserveDockerOnTransient(next))
           : key === 'healthchecks' ? preserveHealthchecksOnTransient(next)
@@ -4929,6 +5134,7 @@ function backgroundRefresh(opts = {}) {
     return Promise.resolve(base);
   }
 
+  broadcastStatusEvent('refreshing');
   refreshActiveCount += taskFns.length;
   const currentPromise = runLimited(taskFns, collectorConcurrencyLimit())
     .then(() => { 
@@ -4946,6 +5152,7 @@ function backgroundRefresh(opts = {}) {
 const EMPTY = {
   loading: false,
   proxmox: { clusterSummary: null, nodes: [] },
+  vmware: null,
   linux: [],
   windows: [],
   kubernetes: null,
@@ -4973,6 +5180,7 @@ const EMPTY = {
 function runtimeEmptyFor(id) {
   return {
     proxmox: { clusterSummary: null, nodes: [] },
+    vmware: null,
     linux: [],
     windows: [],
     kubernetes: null,
@@ -5017,6 +5225,10 @@ function ensureRuntimeShell(data = cache.data) {
   } else {
     out.proxmox = { clusterSummary: null, nodes: [] };
   }
+
+  out.vmware = en(config.vmware)
+    ? (out.vmware || vmwareConnectingData(config.vmware))
+    : null;
 
   if (en(config.linux)) out.linux = filterLinuxProxmoxRows(Array.isArray(out.linux) ? out.linux : getLinuxData(out.proxmox), out.proxmox);
   else out.linux = [];
@@ -5132,7 +5344,7 @@ function ensureRuntimeShell(data = cache.data) {
 function pruneRuntimeSnapshot(data = {}) {
   const out = { ...EMPTY, ...(data || {}) };
   const configured = new Set(configuredList());
-  for (const id of ['proxmox','linux','windows','kubernetes','snmp','healthchecks','uptimekuma','checks','prometheus','docker','dockhand','database','firewall','truenas','qnap','ugreen','unifi','pbs','cloudflare','cicd','veeam','portainer']) {
+  for (const id of ['proxmox','vmware','linux','windows','kubernetes','snmp','healthchecks','uptimekuma','checks','prometheus','docker','dockhand','database','firewall','truenas','qnap','ugreen','unifi','pbs','cloudflare','cicd','veeam','portainer']) {
     if (!configured.has(id)) out[id] = runtimeEmptyFor(id);
   }
   out.loading = false;
@@ -5276,6 +5488,7 @@ function getCachedData() {
     backgroundRefresh();
     return Promise.resolve(cache.data);
   }
+  ensureAgentDerivedCacheCurrent();
   return Promise.resolve(cache.data);
 }
 
@@ -5724,6 +5937,8 @@ function onboardingPlatformConfig(input = {}) {
   const out = {};
   if (type === 'proxmox' && url && input.tokenId && input.tokenSecret) {
     out.proxmox = { enabled: true, url, tokenId: String(input.tokenId).trim(), tokenSecret: String(input.tokenSecret).trim(), insecureTLS: input.insecureTLS === true };
+  } else if (type === 'vmware' && url && input.username && input.password) {
+    out.vmware = { enabled: true, instances: [{ name: name || 'VMware', url, username: String(input.username).trim(), password: String(input.password), insecureTLS: input.insecureTLS === true }] };
   } else if (type === 'docker-api' && (url || host)) {
     out.docker = { enabled: true, hosts: [{ type: 'api', name: name || 'Docker', url: url || host, insecureTLS: input.insecureTLS === true }] };
   } else if (type === 'docker-ssh' && host) {
@@ -6569,7 +6784,9 @@ app.get('/api/status/summary', async (req, res) => {
         id: s.id,
         name: s.name || s.title,
         status: s.status,
-        detail: s.detail || s.meta || '',
+        detail: s.sidebarMeta || s.detail || s.meta || '',
+        badge: s.badge || '',
+        badgeClass: s.badgeClass || '',
         offline: s.offline,
         online: s.online,
         total: s.total,
@@ -7209,6 +7426,7 @@ const CONFIG_AUDIT_LABELS = {
   performance: 'performance',
   security: 'security',
   proxmox: 'Proxmox',
+  vmware: 'VMware ESXi',
   linux: 'Linux Servers',
   windows: 'Windows Servers',
   kubernetes: 'Kubernetes',
@@ -8072,6 +8290,10 @@ app.get('/agent/omnisight-agent.ps1', (req, res) => {
   res.type('text/plain; charset=utf-8').sendFile(path.join(__dirname, 'agent', 'omnisight-agent.ps1'));
 });
 
+app.get('/agent/OmniSight.Agent.cs', (req, res) => {
+  res.type('text/plain; charset=utf-8').sendFile(path.join(__dirname, 'agent', 'OmniSight.Agent.cs'));
+});
+
 app.post('/api/agent/ping', (req, res) => {
   if (!agentAuth(req, res)) return;
   res.json({ ok: true, id: String(req.body?.id || '').replace(/[^\w.-]/g, '').slice(0, 128), serverTime: new Date().toISOString() });
@@ -8080,6 +8302,7 @@ app.post('/api/agent/ping', (req, res) => {
 const AGENT_CACHE_UPDATE_DELAY_MS = Math.max(250, Number(process.env.OMNISIGHT_AGENT_CACHE_UPDATE_DELAY_MS || 1500));
 const AGENT_CACHE_UPDATE_SLOW_MS = Math.max(250, Number(process.env.OMNISIGHT_AGENT_CACHE_UPDATE_SLOW_MS || 750));
 let agentCacheUpdateTimer = null;
+let agentDerivedCacheRevision = -1;
 function refreshAgentDerivedCache() {
   if (!cache.data) return;
   const en = c => c && c.enabled !== false;
@@ -8095,6 +8318,15 @@ function refreshAgentDerivedCache() {
   cache.data.docker = en(config.docker) ? mergeDockerHistory(mergeDockerConfiguredRows(cache.data.docker, agents.getDockerData())) : [];
   assignStatic(cache.data);
   cache.data.timestamp = new Date().toISOString();
+  agentDerivedCacheRevision = typeof agents.revision === 'function' ? agents.revision() : agentDerivedCacheRevision;
+  clearViewCache();
+  broadcastStatusEvent('updated');
+}
+function ensureAgentDerivedCacheCurrent() {
+  const revision = typeof agents.revision === 'function' ? agents.revision() : agentDerivedCacheRevision;
+  if (revision === agentDerivedCacheRevision) return false;
+  refreshAgentDerivedCache();
+  return true;
 }
 function scheduleAgentCacheUpdate() {
   if (agentCacheUpdateTimer) return;
@@ -8102,7 +8334,7 @@ function scheduleAgentCacheUpdate() {
     agentCacheUpdateTimer = null;
     try {
       const start = Date.now();
-      refreshAgentDerivedCache();
+      ensureAgentDerivedCacheCurrent();
       const ms = Date.now() - start;
       if (ms >= AGENT_CACHE_UPDATE_SLOW_MS) console.warn(`[agents] derived cache refresh ${ms}ms ${diagnosticSnapshot()}`);
     }
@@ -8280,6 +8512,9 @@ function agentInstallRole(agent) {
   return agent?.platform === 'synology' ? 'synology' : 'linux';
 }
 
+const REMOTE_AGENT_UNINSTALL_VERSION = '1.3.3';
+const WINDOWS_SERVICE_AGENT_VERSION = '1.4.0';
+
 const WINDOWS_TLS12_BOOTSTRAP = '[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12;';
 
 function agentRepairCommands(req, agent) {
@@ -8288,16 +8523,24 @@ function agentRepairCommands(req, agent) {
   const role = agentInstallRole(agent);
   const id = String(agent.id || '');
   if (role === 'windows') {
+    const queryScript = [
+      '$service = Get-Service -Name OmniSightAgent -ErrorAction SilentlyContinue',
+      '$task = Get-ScheduledTask -TaskName OmniSightAgent -ErrorAction SilentlyContinue',
+      '$configPath = "$env:ProgramData\\OmniSight\\agent.json"',
+      'Write-Host ""',
+      "if ($service -and $service.Status -eq 'Running') { if (-not (Test-Path -LiteralPath $configPath)) { Write-Host 'RESULT: Agent configuration is missing; use Repair Windows agent.' -ForegroundColor Yellow } else { try { $config = Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json; [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12; if ($config.insecureTls) { [Net.ServicePointManager]::ServerCertificateValidationCallback = { $true } }; $headers = @{ 'X-Agent-Token' = [string]$config.token }; $body = @{ id = [string]$config.agentId } | ConvertTo-Json -Compress; Invoke-RestMethod -Method Post -Uri (([string]$config.url).TrimEnd('/') + '/api/agent/ping') -Headers $headers -ContentType 'application/json' -Body $body -TimeoutSec 15 -ErrorAction Stop | Out-Null; Write-Host 'RESULT: OmniSightAgent service is running; dashboard HTTP check passed.' -ForegroundColor Green } catch { $statusCode = 0; try { if ($_.Exception.Response) { $statusCode = [int]$_.Exception.Response.StatusCode } } catch {}; if ($statusCode -eq 401 -or $statusCode -eq 403) { Write-Host (\"RESULT: Dashboard returned HTTP {0}; use Repair Windows agent.\" -f $statusCode) -ForegroundColor Yellow } else { Write-Host 'RESULT: Dashboard connection/TLS check failed; check the network, OmniSight address or certificate. Do not repair.' -ForegroundColor Red } } } } elseif ($task) { Write-Host (\"RESULT: Legacy scheduled-task agent detected. State={0}; use Repair Windows agent.\" -f $task.State) -ForegroundColor Yellow } elseif ($service) { Write-Host (\"RESULT: OmniSightAgent service is {0}; use Repair Windows agent.\" -f $service.Status) -ForegroundColor Yellow } else { Write-Host 'RESULT: OmniSightAgent service and legacy scheduled task are missing; use Repair Windows agent.' -ForegroundColor Red }",
+      "if ($service) { $service | Format-List Name,DisplayName,Status,StartType; Write-Host 'Service History:'; Write-Host ''; Get-Content \"$env:ProgramData\\OmniSight\\logs\\agent.log\" -Tail 100 -ErrorAction SilentlyContinue } elseif ($task) { Write-Host 'Legacy Scheduled Task:'; Write-Host ''; $task | Format-List TaskName,State }",
+    ].join('; ');
     const commands = [{
       title: 'Query Windows agent',
-      description: 'Run in an elevated PowerShell window on the Windows host.',
-      command: 'Get-ScheduledTask -TaskName OmniSightAgent -ErrorAction SilentlyContinue | Format-List *; Get-Content "$env:ProgramData\\OmniSight\\agent.id" -ErrorAction SilentlyContinue',
+      description: 'Run first and read the RESULT line.',
+      command: queryScript,
     }];
     if (token) {
       commands.push({
         title: 'Repair Windows agent',
-        description: 'Reinstalls the scheduled task and keeps the same agent identity when ProgramData still exists.',
-        command: `${WINDOWS_TLS12_BOOTSTRAP} $env:OMNISIGHT_URL="${base}"; $env:OMNISIGHT_TOKEN="${token}"; $env:OMNISIGHT_AGENT_ROLE="windows"; iwr -UseBasicParsing "${base}/agent/install-windows.ps1" | iex`,
+        description: 'Run only when the RESULT line says to use Repair Windows agent.',
+        command: `${WINDOWS_TLS12_BOOTSTRAP} $env:OMNISIGHT_URL="${base}"; $env:OMNISIGHT_TOKEN="${token}"; $env:OMNISIGHT_AGENT_ROLE="windows"; $env:OMNISIGHT_AGENT_ID="${id}"; iwr -UseBasicParsing "${base}/agent/install-windows.ps1" | iex`,
       });
     } else {
       commands.push({
@@ -8336,7 +8579,7 @@ function agentRepairCommands(req, agent) {
   ].join('\n');
   const commands = [{
     title: 'Query agent',
-    description: 'Run this first to check service state, recent logs and dashboard reachability on the offline host.',
+    description: 'Run first and check the service state and HTTP result.',
     command: `sudo bash -lc ${shQuote(queryScript)}`,
   }];
   if (token) {
@@ -8361,13 +8604,13 @@ function agentRepairCommands(req, agent) {
     ].join('\n');
     commands.push({
       title: 'Repair systemd agent',
-      description: 'Run this when logs show 401 invalid agent token or after restoring a backup. It reinstalls the agent with the current dashboard token, keeps the same agent identity and restarts the service.',
+      description: 'Use for a failed or missing service, or HTTP 401/403.',
       command: `sudo bash -lc ${shQuote(repairScript)}`,
     });
     if (role === 'docker') {
       commands.push({
         title: 'Repair Docker container agent',
-        description: 'Use this only if the agent was installed as the Docker container from Settings; it recreates the container with the current dashboard token.',
+        description: 'Use only when the agent runs as a Docker container.',
         command: [
           'docker rm -f omnisight-agent 2>/dev/null || true',
           'docker run -d --name omnisight-agent --restart unless-stopped \\',
@@ -8414,7 +8657,7 @@ app.get('/api/agent/repair-commands', (req, res) => {
     if (!id) return res.status(400).json({ error: 'id required' });
     const agent = agents.findAgent(id);
     if (!agent) return res.status(404).json({ error: 'agent not found' });
-    res.json({ ok: true, id: agent.id, name: agent.hostname || agent.id, commands: agentRepairCommands(req, agent) });
+    res.json({ ok: true, id: agent.id, name: agent.hostname || agent.id, agentVersion: agent.agentVersion || '', latestVersion: agentLatestVersion(), role: agentInstallRole(agent), commands: agentRepairCommands(req, agent) });
   } catch (err) {
     sendServerError(res, err);
   }
@@ -8427,11 +8670,11 @@ app.post('/api/agent/update', async (req, res) => {
     const agent = agents.findAgent(id);
     if (!agent) return res.status(404).json({ error: 'agent not found' });
     const role = agentInstallRole(agent);
-    if (role === 'windows' && versionCompare(agent.agentVersion, '1.2.4') < 0) {
+    if (role === 'windows' && versionCompare(agent.agentVersion, WINDOWS_SERVICE_AGENT_VERSION) < 0) {
       const base = browserRequestOrigin(req);
       const token = String(config.linux?.agentToken || '');
       return res.status(409).json({
-        error: 'This Windows agent needs a one-time reinstall before remote updates are available.',
+        error: `Windows agents before v${WINDOWS_SERVICE_AGENT_VERSION} need a one-time service migration. Run this command in PowerShell as administrator; the existing agent ID is preserved.`,
         manualCommand: token
           ? `${WINDOWS_TLS12_BOOTSTRAP} $env:OMNISIGHT_URL="${base}"; $env:OMNISIGHT_TOKEN="${token}"; $env:OMNISIGHT_AGENT_ROLE="windows"; $env:OMNISIGHT_AGENT_ID="${id}"; iwr -UseBasicParsing "${base}/agent/install-windows.ps1" | iex`
           : 'Generate an agent token in Settings before reinstalling the Windows agent.',
@@ -8447,6 +8690,62 @@ app.post('/api/agent/update', async (req, res) => {
     auditEvent('agent.update.queued', { id, version: agent.agentVersion }, req);
     res.json({ ok: true, output });
   } catch (err) {
+    sendServerError(res, err);
+  }
+});
+
+function refreshAgentCacheAfterRemoval() {
+  refreshAgentDerivedCache();
+}
+
+app.post('/api/agent/uninstall', async (req, res) => {
+  try {
+    if (sessionRole(req) !== 'admin') return res.status(403).json({ error: 'Forbidden' });
+    const id = String(req.body?.id || '').replace(/[^\w.-]/g, '').slice(0, 128);
+    if (!id) return res.status(400).json({ error: 'id required' });
+    const agent = agents.findAgent(id);
+    if (!agent) return res.status(404).json({ error: 'agent not found' });
+    const live = agents.listAgents().find(item => item.id === agent.id);
+    if (!live?.online) {
+      return res.status(409).json({ error: 'The agent must be online before it can be uninstalled.' });
+    }
+    if (versionCompare(agent.agentVersion, REMOTE_AGENT_UNINSTALL_VERSION) < 0) {
+      return res.status(409).json({
+        error: `Update the agent to v${REMOTE_AGENT_UNINSTALL_VERSION} or later before using remote uninstall.`,
+        updateRequired: true,
+        requiredVersion: REMOTE_AGENT_UNINSTALL_VERSION,
+      });
+    }
+    let output = '';
+    try {
+      output = String(await agents.queueCommand(id, 'agent_uninstall', 'self') || '').trim();
+    } catch (err) {
+      if (!err.commandDelivered) throw err;
+      const current = agents.findAgent(agent.id);
+      if (Number(current?.lastSeen || 0) > Number(err.commandDeliveredAt || 0)) {
+        auditEvent('agent.uninstall.failed', { id: agent.id, error: 'agent continued reporting after command delivery' }, req);
+        return res.status(502).json({ error: 'The agent continued reporting after the uninstall command, so it was not removed.' });
+      }
+      const ok = agents.removeAgent(agent.id);
+      refreshAgentCacheAfterRemoval();
+      auditEvent('agent.uninstall.delivery_unconfirmed', { id: agent.id, version: agent.agentVersion, ok }, req);
+      return res.status(202).json({
+        ok,
+        output: 'uninstall command delivered; result connection closed',
+        deliveryUnconfirmed: true,
+        data: cache.data,
+      });
+    }
+    if (!/^uninstall scheduled\b/i.test(output)) {
+      auditEvent('agent.uninstall.failed', { id, output }, req);
+      return res.status(502).json({ error: output || 'The agent could not schedule its uninstall.' });
+    }
+    const ok = agents.removeAgent(agent.id);
+    refreshAgentCacheAfterRemoval();
+    auditEvent('agent.uninstall.scheduled', { id: agent.id, version: agent.agentVersion, ok }, req);
+    res.json({ ok, output, data: cache.data });
+  } catch (err) {
+    auditEvent('agent.uninstall.failed', { id: req.body?.id || '', error: err.message }, req);
     sendServerError(res, err);
   }
 });
@@ -8481,21 +8780,7 @@ app.post('/api/agent/pending', (req, res) => {
   try {
     const kind = ['linux', 'windows', 'proxmox', 'docker'].includes(req.body?.kind) ? req.body.kind : 'linux';
     const pending = agents.addPendingInstall(kind);
-    if (cache.data) {
-      if (kind === 'linux') {
-        cache.data.linux = getLinuxData(cache.data.proxmox);
-      }
-      if (kind === 'windows') {
-        cache.data.windows = getWindowsData();
-      }
-      if (kind === 'proxmox') {
-        cache.data.proxmox = preserveProxmoxOnTransient(agents.getProxmoxData({ excludedServices: config.excludedServices }));
-      }
-      if (kind === 'docker') {
-        cache.data.docker = mergeDockerHistory(mergeDockerConfiguredRows(cache.data.docker, agents.getDockerData()));
-      }
-      assignStatic(cache.data);
-    }
+    refreshAgentDerivedCache();
     auditEvent('agent.pending.add', { kind, id: pending.id }, req);
     res.json({ ok: true, pending, data: cache.data });
   } catch (err) { sendServerError(res, err); }
@@ -8506,15 +8791,7 @@ app.post('/api/agent/remove', (req, res) => {
     const { id } = req.body || {};
     if (!id) return res.status(400).json({ error: 'id required' });
     const ok = agents.removeAgent(id);
-    if (cache.data) {
-      cache.data.proxmox = hasProxmoxApi()
-        ? cache.data.proxmox
-        : preserveProxmoxOnTransient(agents.getProxmoxData({ excludedServices: config.excludedServices }));
-      cache.data.linux = getLinuxData(cache.data.proxmox);
-      cache.data.windows = getWindowsData();
-      cache.data.docker = mergeDockerHistory(mergeDockerConfiguredRows(cache.data.docker, agents.getDockerData()));
-      assignStatic(cache.data);
-    }
+    refreshAgentCacheAfterRemoval();
     auditEvent('agent.remove', { id, ok }, req);
     res.json({ ok, data: cache.data });
   } catch (err) { sendServerError(res, err); }
@@ -8754,19 +9031,39 @@ function buildPublicSummary(data) {
     const online = activeNodes.filter(n => n.node?.online).length;
     const failedSvcs = activeNodes.reduce((a, n) => a + (n.services || []).filter(s => !s.active && !s.excluded).length, 0);
     const ceph = data.proxmox.ceph;
+    const quorumLost = (data.proxmox.clusters || []).filter(cluster => cluster?.isCluster && cluster.quorate === false);
     
     let status = 'ok';
     const metaParts = activeNodes.length ? [`${online}/${activeNodes.length} nodes up`] : ['connecting...'];
     
     if (!activeNodes.length && connecting) status = 'connecting';
     else if (online === 0) status = 'down';
-    else if (online < activeNodes.length || connecting || failedSvcs > 0 || (ceph && ceph.health !== 'HEALTH_OK')) status = 'warn';
+    else if (online < activeNodes.length || connecting || failedSvcs > 0 || quorumLost.length > 0 || (ceph && ceph.health !== 'HEALTH_OK')) status = 'warn';
     if (ceph && ceph.health === 'HEALTH_ERR') status = 'down';
     
     if (failedSvcs > 0) metaParts.push(`${failedSvcs} failed services`);
+    if (quorumLost.length > 0) metaParts.push(`Cluster ${quorumLost.map(cluster => cluster.name).join(', ')} quorum lost`);
     if (ceph && ceph.health !== 'HEALTH_OK') metaParts.push(`Ceph ${ceph.health.replace('HEALTH_', '')}`);
     
     out.push({ id: 'proxmox', title: 'Proxmox', status, meta: metaParts.join(' · ') });
+  }
+  const vmware = data.vmware;
+  if (vmware && Array.isArray(vmware.instances) && vmware.instances.length) {
+    const summary = vmware.summary || {};
+    const stale = !!vmware._stale;
+    const connecting = vmware.instances.filter(instance => instance._connecting).length;
+    const endpointsUp = Number(summary.up || vmware.instances.filter(instance => instance.online).length);
+    const hosts = Number(summary.hosts || 0);
+    const hostsOnline = Number(summary.hostsOnline || 0);
+    const warnings = Number(summary.hostsWarning || 0) + Number(summary.hostsMaintenance || 0) + Number(summary.vmsWarning || 0) + Number(summary.datastoresWarning || 0);
+    const status = stale ? 'warn'
+      : !endpointsUp && connecting === vmware.instances.length ? 'connecting'
+      : !endpointsUp || (hosts > 0 && hostsOnline === 0) ? 'down'
+      : endpointsUp < vmware.instances.length || hostsOnline < hosts || warnings > 0 ? 'warn'
+      : 'ok';
+    const meta = status === 'connecting' ? 'connecting...'
+      : `${stale ? 'last known · ' : ''}${hostsOnline}/${hosts} hosts · ${summary.runningVms || 0}/${summary.vms || 0} VMs running`;
+    out.push({ id: 'vmware', title: 'VMware ESXi', status, meta });
   }
   if ((data.linux || []).length) {
     const linuxRows = data.linux.filter(l => !l._connecting);
@@ -8775,8 +9072,17 @@ function buildPublicSummary(data) {
     const svcTotal = linuxRows.reduce((a, l) => a + (l.services || []).filter(s => !s.excluded).length, 0);
     const svcUp = linuxRows.reduce((a, l) => a + (l.services || []).filter(x => x.active && !x.excluded).length, 0);
     const failedSvcs = svcTotal - svcUp;
+    const updateCount = linuxRows.reduce((sum, row) => sum + (row.online ? Number(row.updates?.count || 0) : 0), 0);
+    const rebootCount = linuxRows.filter(row => row.online && row.updates?.rebootRequired).length;
     const status = !linuxRows.length && connecting ? 'connecting' : up === 0 ? 'down' : (up < linuxRows.length || connecting || failedSvcs > 0 ? 'warn' : 'ok');
-    out.push({ id: 'linux', title: 'Linux Servers', status, meta: linuxRows.length ? `${up}/${linuxRows.length} servers\n${svcUp}/${svcTotal} services` : 'connecting...' });
+    out.push({
+      id: 'linux',
+      title: 'Linux Servers',
+      status,
+      meta: linuxRows.length ? `${up}/${linuxRows.length} servers\n${svcUp}/${svcTotal} services` : 'connecting...',
+      badge: failedSvcs > 0 ? `${failedSvcs} services failed` : rebootCount > 0 ? `${rebootCount} reboot required` : updateCount > 0 ? `${updateCount} updates` : '',
+      badgeClass: failedSvcs > 0 ? 'red' : rebootCount > 0 || updateCount > 0 ? 'yellow' : '',
+    });
   }
   if ((data.windows || []).length) {
     const rows = data.windows.filter(w => !w._connecting);
@@ -8785,8 +9091,17 @@ function buildPublicSummary(data) {
     const svcTotal = rows.reduce((a, w) => a + (w.services || []).filter(s => !s.excluded).length, 0);
     const svcUp = rows.reduce((a, w) => a + (w.services || []).filter(x => x.active && !x.excluded).length, 0);
     const failedSvcs = rows.reduce((a, w) => a + (w.services || []).filter(x => !x.active && !x.excluded && x.state !== 'unknown').length, 0);
+    const updateCount = rows.reduce((sum, row) => sum + (row.online ? Number(row.updates?.count || 0) : 0), 0);
+    const rebootCount = rows.filter(row => row.online && row.updates?.rebootRequired).length;
     const status = !rows.length && connecting ? 'connecting' : up === 0 ? 'down' : (up < rows.length || connecting || failedSvcs > 0 ? 'warn' : 'ok');
-    out.push({ id: 'windows', title: 'Windows Servers', status, meta: rows.length ? `${up}/${rows.length} servers\n${svcUp}/${svcTotal} services` : 'connecting...' });
+    out.push({
+      id: 'windows',
+      title: 'Windows Servers',
+      status,
+      meta: rows.length ? `${up}/${rows.length} servers\n${svcUp}/${svcTotal} services` : 'connecting...',
+      badge: failedSvcs > 0 ? `${failedSvcs} services failed` : rebootCount > 0 ? `${rebootCount} reboot required` : updateCount > 0 ? `${updateCount} updates` : '',
+      badgeClass: failedSvcs > 0 ? 'red' : rebootCount > 0 || updateCount > 0 ? 'yellow' : '',
+    });
   }
   const k = data.kubernetes;
   if (k && k.online !== undefined && (k.online || k.summary)) {
@@ -8899,7 +9214,8 @@ function buildPublicSummary(data) {
     const containerIssues = stopped + failed + pending;
     const status = !dockerRows.length && connecting ? 'connecting' : up < dockerRows.length ? (up > 0 ? 'warn' : 'down') : (connecting || containerIssues > 0 ? 'warn' : 'ok');
     const meta = failed > 0 ? `${running}/${total} running\n${failed} failed` : stopped > 0 ? `${running}/${total} running\n${stopped} stopped` : pending > 0 ? `${running}/${total} running\n${pending} pending` : created > 0 ? `${running}/${total} running\n${created} created` : `${running}/${total} containers`;
-    out.push({ id: 'docker', title: 'Docker', status, meta: dockerRows.length ? meta : 'connecting...' });
+    const sidebarMeta = `${running}/${total} containers · ${up}/${data.docker.length} hosts`;
+    out.push({ id: 'docker', title: 'Docker', status, meta, sidebarMeta });
   }
   const dh = data.dockhand;
   if (dh && dh.online !== undefined) {
@@ -8908,11 +9224,14 @@ function buildPublicSummary(data) {
     const connecting = instances.length - active.length;
     const up = active.filter(i => i.online).length;
     const sm = dh.summary || {};
+    const onlineServers = Number(sm.serverUp ?? up);
+    const totalServers = Number(sm.servers ?? instances.length);
     const stopped = Number(sm.stopped || 0);
     const noContainers = up > 0 && Number(sm.total || 0) === 0 && !connecting;
     const status = !active.length && connecting ? 'connecting' : up === 0 ? 'down' : (noContainers || up < active.length || connecting || stopped > 0 ? 'warn' : 'ok');
     const meta = active.length ? (noContainers ? `no containers · ${up}/${active.length} servers` : `${sm.running || 0}/${sm.total || 0} running · ${up}/${active.length} servers`) : 'connecting...';
-    out.push({ id: 'dockhand', title: 'Dockhand', status, meta });
+    const sidebarMeta = `${sm.running || 0}/${sm.total || 0} containers · ${onlineServers}/${totalServers} hosts`;
+    out.push({ id: 'dockhand', title: 'Dockhand', status, meta, sidebarMeta });
   }
   if ((data.database || []).length) {
     const connecting = data.database.filter(d => d._connecting && !d.online).length;
@@ -9032,7 +9351,7 @@ app.get('/api/public/status', (req, res) => {
     : null;
   const services = buildPublicSummary(data).filter(s => !visible || visible.has(s.id));
   const present = new Set(services.map(s => s.id));
-  const titles = { proxmox: 'Proxmox', linux: 'Linux Servers', windows: 'Windows Servers', kubernetes: 'Kubernetes', synology: 'Synology', mikrotik: 'MikroTik', unifi: 'UniFi', snmp: 'SNMP', healthchecks: 'Healthchecks', uptimekuma: 'Uptime Kuma', checks: 'Service checks', prometheus: 'Prometheus', docker: 'Docker', dockhand: 'Dockhand', database: 'Databases', firewall: 'Firewalls', truenas: 'TrueNAS', qnap: 'QNAP', ugreen: 'Ugreen', pbs: 'Proxmox Backup', cloudflare: 'Cloudflare', cicd: 'GitHub/GitLab CI', veeam: 'Veeam', portainer: 'Portainer' };
+  const titles = { proxmox: 'Proxmox', vmware: 'VMware ESXi', linux: 'Linux Servers', windows: 'Windows Servers', kubernetes: 'Kubernetes', synology: 'Synology', mikrotik: 'MikroTik', unifi: 'UniFi', snmp: 'SNMP', healthchecks: 'Healthchecks', uptimekuma: 'Uptime Kuma', checks: 'Service checks', prometheus: 'Prometheus', docker: 'Docker', dockhand: 'Dockhand', database: 'Databases', firewall: 'Firewalls', truenas: 'TrueNAS', qnap: 'QNAP', ugreen: 'Ugreen', pbs: 'Proxmox Backup', cloudflare: 'Cloudflare', cicd: 'GitHub/GitLab CI', veeam: 'Veeam', portainer: 'Portainer' };
   configuredList().forEach(id => {
     if (visible && !visible.has(id)) return;
     if (!present.has(id)) services.push({ id, title: titles[id] || id, status: 'connecting', meta: 'connecting…' });

@@ -284,6 +284,185 @@ function testProxmoxInstances() {
   assert.deepStrictEqual(rows.map(row => row.name), ['a', 'b']);
 }
 
+function testProxmoxClusterStatus() {
+  const { normalizeClusterStatus } = require('../src/proxmox');
+  const cluster = normalizeClusterStatus([
+    { type: 'cluster', name: 'lab-cluster', quorate: 1, nodes: 3, version: 9 },
+    { type: 'node', name: 'pve-c', online: 1, nodeid: 3 },
+    { type: 'node', name: 'pve-a', online: 1, local: 1, nodeid: 1 },
+    { type: 'node', name: 'pve-b', online: 0, nodeid: 2 },
+  ], { name: 'Configured Proxmox' });
+  assert.strictEqual(cluster.name, 'lab-cluster');
+  assert.strictEqual(cluster.configuredName, 'Configured Proxmox');
+  assert.strictEqual(cluster.isCluster, true);
+  assert.strictEqual(cluster.detected, true);
+  assert.strictEqual(cluster.quorate, true);
+  assert.strictEqual(cluster.version, 9);
+  assert.strictEqual(cluster.totalNodes, 3);
+  assert.strictEqual(cluster.nodesOnline, 2);
+  assert.strictEqual(cluster.localNode, 'pve-a');
+  assert.deepStrictEqual(cluster.members.map(member => member.name), ['pve-a', 'pve-b', 'pve-c']);
+
+  const lost = normalizeClusterStatus([
+    { type: 'cluster', name: 'lab-cluster', quorate: 0, nodes: 3 },
+    { type: 'node', name: 'pve-a', online: 1, local: 1 },
+  ], { name: 'Configured Proxmox' });
+  assert.strictEqual(lost.quorate, false, 'a detected quorum loss must remain distinct from an unknown result');
+
+  const standalone = normalizeClusterStatus([
+    { type: 'node', name: 'pve-solo', online: 1, local: 1 },
+  ], { name: 'Configured Proxmox' });
+  assert.strictEqual(standalone.name, 'pve-solo');
+  assert.strictEqual(standalone.isCluster, false);
+  assert.strictEqual(standalone.quorate, null);
+
+  const inferred = normalizeClusterStatus(null, {
+    name: 'restricted-cluster',
+    nodesRaw: [
+      { node: 'pve-a', status: 'online' },
+      { node: 'pve-b', status: 'offline' },
+    ],
+  });
+  assert.strictEqual(inferred.name, 'restricted-cluster');
+  assert.strictEqual(inferred.isCluster, true);
+  assert.strictEqual(inferred.detected, false);
+  assert.strictEqual(inferred.quorate, null);
+  assert.strictEqual(inferred.totalNodes, 2);
+  assert.strictEqual(inferred.nodesOnline, 1);
+}
+
+function testVmwareInventoryNormalization() {
+  const { normalizeInventory, parsePropertyResult } = require('../src/vmware');
+  const fixture = `<?xml version="1.0"?>
+  <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <soapenv:Body><RetrievePropertiesExResponse xmlns="urn:vim25"><returnval>
+      <objects><obj type="ClusterComputeResource">domain-c1</obj>
+        <propSet><name>name</name><val xsi:type="xsd:string">Production</val></propSet>
+        <propSet><name>overallStatus</name><val xsi:type="xsd:string">green</val></propSet>
+        <propSet><name>summary</name><val xsi:type="ClusterComputeResourceSummary"><numHosts>1</numHosts><numEffectiveHosts>1</numEffectiveHosts><numCpuCores>8</numCpuCores><totalCpu>20000</totalCpu><effectiveCpu>16800</effectiveCpu><totalMemory>34359738368</totalMemory><effectiveMemory>24576</effectiveMemory></val></propSet>
+        <propSet><name>host</name><val xsi:type="ArrayOfManagedObjectReference"><ManagedObjectReference type="HostSystem">host-1</ManagedObjectReference></val></propSet>
+      </objects>
+      <objects><obj type="HostSystem">host-1</obj>
+        <propSet><name>name</name><val xsi:type="xsd:string">esxi-a</val></propSet>
+        <propSet><name>overallStatus</name><val xsi:type="xsd:string">green</val></propSet>
+        <propSet><name>runtime.connectionState</name><val xsi:type="xsd:string">connected</val></propSet>
+        <propSet><name>runtime.powerState</name><val xsi:type="xsd:string">poweredOn</val></propSet>
+        <propSet><name>runtime.inMaintenanceMode</name><val xsi:type="xsd:boolean">false</val></propSet>
+        <propSet><name>summary.quickStats</name><val xsi:type="HostListSummaryQuickStats"><overallCpuUsage>3200</overallCpuUsage><overallMemoryUsage>8192</overallMemoryUsage><uptime>86400</uptime></val></propSet>
+        <propSet><name>hardware.cpuInfo</name><val xsi:type="HostCpuInfo"><numCpuPackages>1</numCpuPackages><numCpuCores>8</numCpuCores><numCpuThreads>16</numCpuThreads><hz>2500000000</hz></val></propSet>
+        <propSet><name>hardware.memorySize</name><val xsi:type="xsd:long">34359738368</val></propSet>
+        <propSet><name>summary.config.product</name><val xsi:type="AboutInfo"><fullName>VMware ESXi 8.0.3</fullName><version>8.0.3</version><build>24280767</build></val></propSet>
+      </objects>
+      <objects><obj type="VirtualMachine">vm-10</obj>
+        <propSet><name>name</name><val xsi:type="xsd:string">app-01</val></propSet>
+        <propSet><name>overallStatus</name><val xsi:type="xsd:string">green</val></propSet>
+        <propSet><name>runtime.powerState</name><val xsi:type="xsd:string">poweredOn</val></propSet>
+        <propSet><name>runtime.host</name><val type="HostSystem">host-1</val></propSet>
+        <propSet><name>summary.config</name><val xsi:type="VirtualMachineConfigSummary"><numCpu>4</numCpu><memorySizeMB>8192</memorySizeMB><guestFullName>Ubuntu Linux (64-bit)</guestFullName><template>false</template></val></propSet>
+        <propSet><name>summary.storage</name><val xsi:type="VirtualMachineStorageSummary"><committed>10737418240</committed><uncommitted>5368709120</uncommitted><unshared>8589934592</unshared></val></propSet>
+        <propSet><name>summary.quickStats</name><val xsi:type="VirtualMachineQuickStats"><overallCpuUsage>420</overallCpuUsage><guestMemoryUsage>2048</guestMemoryUsage><hostMemoryUsage>2304</hostMemoryUsage><uptimeSeconds>7200</uptimeSeconds></val></propSet>
+        <propSet><name>guest.guestFullName</name><val xsi:type="xsd:string">Ubuntu Linux (64-bit)</val></propSet>
+        <propSet><name>guest.ipAddress</name><val xsi:type="xsd:string">10.0.0.50</val></propSet>
+        <propSet><name>guest.toolsRunningStatus</name><val xsi:type="xsd:string">guestToolsRunning</val></propSet>
+      </objects>
+      <objects><obj type="VirtualMachine">vm-11</obj>
+        <propSet><name>name</name><val xsi:type="xsd:string">ubuntu-template</val></propSet>
+        <propSet><name>runtime.powerState</name><val xsi:type="xsd:string">poweredOff</val></propSet>
+        <propSet><name>summary.config</name><val xsi:type="VirtualMachineConfigSummary"><numCpu>2</numCpu><memorySizeMB>2048</memorySizeMB><guestFullName>Ubuntu Linux (64-bit)</guestFullName><template>true</template></val></propSet>
+      </objects>
+      <objects><obj type="Datastore">datastore-1</obj>
+        <propSet><name>name</name><val xsi:type="xsd:string">datastore1</val></propSet>
+        <propSet><name>overallStatus</name><val xsi:type="xsd:string">green</val></propSet>
+        <propSet><name>summary</name><val xsi:type="DatastoreSummary"><type>VMFS</type><capacity>1000</capacity><freeSpace>250</freeSpace><accessible>true</accessible><multipleHostAccess>false</multipleHostAccess></val></propSet>
+        <propSet><name>host</name><val xsi:type="ArrayOfDatastoreHostMount"><DatastoreHostMount><key type="HostSystem">host-1</key></DatastoreHostMount></val></propSet>
+      </objects>
+      <objects><obj type="Datacenter">datacenter-1</obj>
+        <propSet><name>name</name><val xsi:type="xsd:string">Primary DC</val></propSet>
+        <propSet><name>overallStatus</name><val xsi:type="xsd:string">green</val></propSet>
+      </objects>
+    </returnval></RetrievePropertiesExResponse></soapenv:Body>
+  </soapenv:Envelope>`;
+  const parsed = parsePropertyResult(fixture);
+  assert.strictEqual(parsed.objects.length, 6);
+  const normalized = normalizeInventory(parsed.objects, {
+    apiType: 'HostAgent',
+    fullName: 'VMware ESXi 8.0.3',
+    version: '8.0.3',
+    build: '24280767',
+    apiVersion: '8.0.3.0',
+  }, 'Lab ESXi');
+  assert.strictEqual(normalized.type, 'esxi');
+  assert.strictEqual(normalized.clusters[0].name, 'Production');
+  assert.strictEqual(normalized.clusters[0].effectiveMemoryBytes, 24576 * 1024 * 1024);
+  assert.strictEqual(normalized.datacenters[0].name, 'Primary DC');
+  assert.strictEqual(normalized.hosts[0].clusterName, 'Production');
+  assert.strictEqual(normalized.hosts[0].online, true);
+  assert.strictEqual(normalized.hosts[0].cpuPercent, 16);
+  assert.strictEqual(normalized.hosts[0].memoryPercent, 25);
+  assert.deepStrictEqual(normalized.hosts[0].vmRefs, ['vm-10']);
+  assert.strictEqual(normalized.vms[0].hostName, 'esxi-a');
+  assert.strictEqual(normalized.vms[0].running, true);
+  assert.strictEqual(normalized.vms[0].cpuCount, 4);
+  assert.strictEqual(normalized.vms[0].memoryMb, 8192);
+  assert.strictEqual(normalized.vms[0].storageCommittedBytes, 10737418240);
+  assert.strictEqual(normalized.vms[0].storageProvisionedBytes, 16106127360);
+  assert.strictEqual(normalized.templates[0].name, 'ubuntu-template');
+  assert.strictEqual(normalized.datastores[0].usedPercent, 75);
+  assert.deepStrictEqual(normalized.datastores[0].hostRefs, ['host-1']);
+  assert.strictEqual(normalized.summary.hostsOnline, 1);
+  assert.strictEqual(normalized.summary.runningVms, 1);
+  assert.strictEqual(normalized.summary.cpuCores, 8);
+  assert.strictEqual(normalized.summary.cpuUsedCores, 1.28);
+  assert.strictEqual(normalized.summary.vmsWarning, 0);
+  assert.strictEqual(normalized.summary.templates, 1);
+}
+
+async function testVmwareSoapFlow() {
+  const requests = [];
+  const soapEnvelope = (method, content = '') => `<?xml version="1.0"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><soapenv:Body><${method}Response xmlns="urn:vim25">${content}</${method}Response></soapenv:Body></soapenv:Envelope>`;
+  const server = await listen((req, res) => {
+    let body = '';
+    req.setEncoding('utf8');
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => {
+      const method = body.match(/<soapenv:Body>\s*<([A-Za-z][A-Za-z0-9]+)/)?.[1] || '';
+      requests.push({ method, path: req.url, cookie: req.headers.cookie || '', soapAction: req.headers.soapaction || '', body });
+      res.setHeader('Content-Type', 'text/xml; charset=utf-8');
+      if (method === 'RetrieveServiceContent') {
+        return res.end(soapEnvelope(method, '<returnval><rootFolder type="Folder">group-d1</rootFolder><propertyCollector type="PropertyCollector">propertyCollector</propertyCollector><sessionManager type="SessionManager">SessionManager</sessionManager><viewManager type="ViewManager">ViewManager</viewManager><about><name>VMware vCenter Server</name><fullName>VMware vCenter Server 8.0.3</fullName><apiType>VirtualCenter</apiType><version>8.0.3</version><build>24305161</build><apiVersion>8.0.3.0</apiVersion></about></returnval>'));
+      }
+      if (method === 'Login') {
+        res.setHeader('Set-Cookie', 'vmware_soap_session="stub-session"; Path=/; HttpOnly');
+        return res.end(soapEnvelope(method));
+      }
+      if (method === 'CreateContainerView') return res.end(soapEnvelope(method, '<returnval type="ContainerView">session[stub]52</returnval>'));
+      if (method === 'RetrievePropertiesEx') {
+        return res.end(soapEnvelope(method, '<returnval><objects><obj type="HostSystem">host-42</obj><propSet><name>name</name><val xsi:type="xsd:string">esxi-stub</val></propSet><propSet><name>runtime.connectionState</name><val xsi:type="xsd:string">connected</val></propSet><propSet><name>runtime.powerState</name><val xsi:type="xsd:string">poweredOn</val></propSet><propSet><name>runtime.inMaintenanceMode</name><val xsi:type="xsd:boolean">false</val></propSet><propSet><name>summary.quickStats</name><val xsi:type="HostListSummaryQuickStats"><overallCpuUsage>1000</overallCpuUsage><overallMemoryUsage>4096</overallMemoryUsage><uptime>3600</uptime></val></propSet><propSet><name>hardware.cpuInfo</name><val xsi:type="HostCpuInfo"><numCpuCores>4</numCpuCores><numCpuThreads>8</numCpuThreads><hz>2500000000</hz></val></propSet><propSet><name>hardware.memorySize</name><val xsi:type="xsd:long">17179869184</val></propSet></objects></returnval>'));
+      }
+      if (method === 'DestroyView' || method === 'Logout') return res.end(soapEnvelope(method));
+      res.statusCode = 500;
+      return res.end(soapEnvelope(method || 'Unknown', '<soapenv:Fault><faultcode>Server</faultcode><faultstring>unexpected method</faultstring></soapenv:Fault>'));
+    });
+  });
+  try {
+    const { getAllVmwareData } = require('../src/vmware');
+    const endpoint = `http://127.0.0.1:${server.address().port}`;
+    const data = await getAllVmwareData({ instances: [{ name: 'Stub vCenter', url: endpoint, username: 'monitoring@vsphere.local', password: 'p<&' }] });
+    assert.strictEqual(data.online, true);
+    assert.strictEqual(data.instances[0].type, 'vcenter');
+    assert.strictEqual(data.instances[0].hosts[0].name, 'esxi-stub');
+    assert.strictEqual(data.instances[0].hosts[0].online, true);
+    assert.strictEqual(data.summary.hostsOnline, 1);
+    assert.deepStrictEqual(requests.map(request => request.method), ['RetrieveServiceContent', 'Login', 'CreateContainerView', 'RetrievePropertiesEx', 'DestroyView', 'Logout']);
+    assert.ok(requests.every(request => request.path === '/sdk'), 'VMware collector must normalize endpoint URLs to /sdk');
+    assert.ok(requests.every(request => request.soapAction === '"urn:vim25/6.5"'), 'VMware collector must send a vSphere SOAPAction');
+    assert.ok(requests.find(request => request.method === 'Login').body.includes('<password>p&lt;&amp;</password>'), 'VMware credentials must be XML escaped');
+    assert.ok(requests.filter(request => ['CreateContainerView', 'RetrievePropertiesEx', 'DestroyView', 'Logout'].includes(request.method)).every(request => request.cookie.includes('vmware_soap_session')), 'VMware session cookie must be reused and logged out');
+  } finally {
+    await close(server);
+  }
+}
+
 function testCephNormalization() {
   const { normalizeCephStatus } = require('../src/ceph');
   const normalized = normalizeCephStatus({
@@ -370,17 +549,23 @@ function testPlatformAvailability() {
     ],
     uptimekuma: { online: true, summary: { up: 3, down: 1, total: 4 } },
     portainer: { online: true, instances: [{ online: true }], summary: { environments: 3, environmentsDown: 1 } },
+    vmware: { online: true, instances: [{ online: true, hosts: [{ online: true }, { online: false }] }] },
   };
   assert.deepStrictEqual(platformAvailability(data, 'unifi'), { offline: 2, online: 1, total: 3 });
   assert.deepStrictEqual(platformAvailability(data, 'uptimekuma'), { offline: 1, online: 3, total: 4 });
   assert.deepStrictEqual(platformAvailability(data, 'portainer'), { offline: 1, online: 2, total: 3 });
+  assert.deepStrictEqual(platformAvailability(data, 'vmware'), { offline: 1, online: 1, total: 2 });
+  data.vmware._stale = true;
+  assert.deepStrictEqual(platformAvailability(data, 'vmware'), { offline: 0, online: 0, total: 2 });
 }
 
 function testStaticRegressions() {
   const root = path.join(__dirname, '..');
   const windowsAgent = fs.readFileSync(path.join(root, 'agent', 'omnisight-agent.ps1'), 'utf8');
   const windowsInstaller = fs.readFileSync(path.join(root, 'agent', 'install-windows.ps1'), 'utf8');
+  const windowsService = fs.readFileSync(path.join(root, 'agent', 'OmniSight.Agent.cs'), 'utf8');
   const linuxAgent = fs.readFileSync(path.join(root, 'agent', 'omnisight-agent.sh'), 'utf8');
+  const agentStore = fs.readFileSync(path.join(root, 'src', 'agents.js'), 'utf8');
   const dashboard = fs.readFileSync(path.join(root, 'public', 'index.html'), 'utf8');
   const agentsPage = fs.readFileSync(path.join(root, 'public', 'agents.html'), 'utf8');
   const docsPage = fs.readFileSync(path.join(root, 'public', 'docs.html'), 'utf8');
@@ -391,12 +576,16 @@ function testStaticRegressions() {
   const i18n = fs.readFileSync(path.join(root, 'public', 'i18n.js'), 'utf8');
   const readme = fs.readFileSync(path.join(root, 'README.md'), 'utf8');
   const demoServer = fs.readFileSync(path.join(root, 'demo-server.js'), 'utf8');
+  const onboarding = fs.readFileSync(path.join(root, 'public', 'onboarding.html'), 'utf8');
+  const configExample = fs.readFileSync(path.join(root, 'config.example.yaml'), 'utf8');
+  const packageJson = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+  const vmwareCollector = fs.readFileSync(path.join(root, 'src', 'vmware.js'), 'utf8');
   const server = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
   const deploy = fs.readFileSync(path.join(root, '.github', 'workflows', 'deploy.yml'), 'utf8');
   const docker = fs.readFileSync(path.join(root, 'src', 'docker.js'), 'utf8');
   const snmp = fs.readFileSync(path.join(root, 'src', 'snmp.js'), 'utf8');
-  assert.ok(!windowsAgent.includes('Get-Counter'), 'localized Windows counters must not return');
-  assert.ok(windowsAgent.includes('Win32_PerfFormattedData_PerfDisk_PhysicalDisk'));
+  assert.ok(!windowsAgent.includes('Get-Counter') && !windowsService.includes('Get-Counter'), 'localized Windows counters must not return');
+  assert.ok(windowsAgent.includes('Win32_PerfFormattedData_PerfDisk_PhysicalDisk') && windowsService.includes('Win32_PerfFormattedData_PerfDisk_PhysicalDisk'));
   assert.ok(windowsAgent.includes('SecurityProtocolType]::Tls12') && windowsInstaller.includes('SecurityProtocolType]::Tls12'));
   const windowsDownloadLines = [settings, server, readme].flatMap(source => source.split(/\r?\n/).filter(line => /\biwr\b/.test(line)));
   assert.ok(windowsDownloadLines.length >= 5);
@@ -418,12 +607,66 @@ function testStaticRegressions() {
   }
   const linuxAgentVersion = (linuxAgent.match(/^VERSION="([^"]+)"/m) || [])[1];
   const windowsAgentVersion = (windowsAgent.match(/^\$Version = "([^"]+)"/m) || [])[1];
+  const windowsServiceVersion = (windowsService.match(/internal const string Version = "([^"]+)"/) || [])[1];
   assert.strictEqual(linuxAgentVersion, windowsAgentVersion, 'Linux and Windows agent versions must stay synchronized');
+  assert.strictEqual(linuxAgentVersion, windowsServiceVersion, 'Linux and Windows service agent versions must stay synchronized');
+  assert.strictEqual(linuxAgentVersion, '1.4.1', 'cluster-aware agents must advertise the 1.4.1 protocol');
+  assert.ok(server.includes("const WINDOWS_SERVICE_AGENT_VERSION = '1.4.0'") && server.includes('versionCompare(agent.agentVersion, WINDOWS_SERVICE_AGENT_VERSION) < 0'), 'legacy Windows agents must receive a one-time service migration command instead of a remote update that can stop the scheduled task');
+  assert.ok(windowsInstaller.includes('New-Service -Name $script:ServiceName') && windowsInstaller.includes('failureflag') && !windowsInstaller.includes('Register-ScheduledTask'), 'Windows installs must use Service Control Manager rather than a persistent scheduled task');
+  assert.ok(windowsInstaller.includes('Repair-AgentDataAccess') && windowsInstaller.includes('Protect-AgentDataAcl') && windowsInstaller.lastIndexOf('    Protect-AgentDataAcl') < windowsInstaller.lastIndexOf('    Start-OmniSightService'), 'Windows agent ACL hardening must be recoverable and complete before the service starts writing logs');
+  assert.ok(windowsInstaller.includes('takeown.exe') && windowsInstaller.includes('agent.id.tmp') && windowsInstaller.includes('"/reset", "/T"') && !windowsInstaller.includes('"/inheritance:r", "/T"') && !windowsInstaller.includes('"/setowner"'), 'Windows migration must recover legacy ACL failures, reset children to protected inherited access and replace the agent ID atomically');
+  assert.ok(windowsAgent.includes('Invoke-WindowsServiceMigration') && windowsAgent.includes('$ReportedVersion = "1.3.4"') && windowsAgent.includes('legacy agent will continue'), 'legacy Windows agents must migrate automatically and retain a safe fallback');
+  assert.ok(windowsService.includes('class OmniSightAgentService : ServiceBase') && windowsService.includes('protected override void OnStart') && windowsService.includes('protected override void OnStop'), 'the Windows agent must implement the Windows service lifecycle');
+  assert.ok(windowsInstaller.includes('Stop-ScheduledTask -TaskName $script:TaskName') && windowsService.includes('class LegacyTaskCleanup') && windowsService.includes('/End /TN') && windowsService.includes('/Delete /TN'), 'a successful Windows service migration must stop and remove every running legacy scheduled-task instance');
+  assert.ok(windowsService.includes('service start failed:') && windowsService.includes('OmniSightAgent-startup.log') && windowsInstaller.includes('Windows service installation failed:') && windowsInstaller.includes('Agent log:') && windowsInstaller.includes('Startup diagnostic:'), 'Windows service startup failures must include actionable primary and fallback diagnostics');
+  assert.ok(windowsService.includes('ScheduleHelper("--update-helper"') && windowsService.includes('ScheduleHelper("--uninstall-helper"') && windowsService.includes('RunUninstall()'), 'the Windows service must update and uninstall through detached native helpers');
+  assert.ok(server.includes("app.get('/agent/OmniSight.Agent.cs'") && windowsInstaller.includes('/agent/OmniSight.Agent.cs'), 'the dashboard must distribute the Windows service source used by the installer');
+  assert.ok(agentStore.includes("'agent_uninstall'") && server.includes("agents.queueCommand(id, 'agent_uninstall', 'self')"), 'remote uninstall must use one agent command');
+  assert.ok(linuxAgent.includes('schedule_agent_uninstall()') && linuxAgent.includes('systemd-run --quiet --collect') && linuxAgent.includes('docker rm -f') && linuxAgent.includes("printf 'uninstall scheduled'"), 'Linux remote uninstall must schedule independent systemd and Docker cleanup');
+  assert.ok(linuxAgent.includes('Docker Swarm agents must be removed with the stack or service command') && !linuxAgent.includes("docker service rm '$swarm_service'"), 'single-agent uninstall must never remove an entire Docker Swarm service');
+  assert.ok(linuxAgent.includes('if [ "${uninstall_agent:-}" = "1" ]') && linuxAgent.includes('sleep 120'), 'the Linux agent must stop reporting while detached cleanup completes');
+  assert.ok(windowsAgent.includes('function Start-AgentUninstall') && windowsAgent.includes('Register-ScheduledTask') && windowsAgent.includes('-NonInteractive'), 'legacy Windows agents must retain connection-independent scheduled cleanup during migration');
+  assert.ok(windowsAgent.includes('if ($script:UninstallAfterCommand)') && windowsAgent.includes('Start-Sleep -Seconds 120'), 'the legacy Windows agent must stop reporting while detached cleanup completes');
+  const uninstallEndpoint = server.slice(server.indexOf("app.post('/api/agent/uninstall'"), server.indexOf("app.post('/api/agent/token'"));
+  assert.ok(uninstallEndpoint.includes("versionCompare(agent.agentVersion, REMOTE_AGENT_UNINSTALL_VERSION) < 0") && uninstallEndpoint.includes('if (!live?.online)'), 'remote uninstall must require a current online agent');
+  assert.ok(uninstallEndpoint.indexOf("agents.queueCommand(id, 'agent_uninstall', 'self')") < uninstallEndpoint.indexOf('agents.removeAgent(agent.id)'), 'the dashboard record must be removed only after the agent schedules cleanup');
+  assert.ok(agentStore.includes('waiter.delivered = true') && agentStore.includes('error.commandDelivered = waiter.delivered') && agentStore.includes('error.commandDeliveredAt = waiter.deliveredAt') && uninstallEndpoint.includes('agent.uninstall.delivery_unconfirmed'), 'a dropped result connection must still finish a delivered uninstall without leaving a stale dashboard record');
+  assert.ok(uninstallEndpoint.includes("current?.lastSeen") && uninstallEndpoint.includes('agent continued reporting after command delivery'), 'an agent that keeps reporting after a failed uninstall must not be removed by the timeout fallback');
   for (const manager of ['dnf', 'yum', 'zypper', 'apk', 'pacman']) {
     assert.ok(linuxAgent.includes(`output=$(${manager}`), `${manager} update output must be captured before it is counted`);
     assert.ok(!linuxAgent.includes(`count=$(${manager}`), `${manager} failures must not be converted to zero updates by a pipeline`);
   }
   assert.ok(server.includes("synology: 'Synology'"), 'public status title must say Synology');
+  assert.ok(vmwareCollector.includes("client.call('RetrieveServiceContent'") && vmwareCollector.includes("client.call('CreateContainerView'") && vmwareCollector.includes("client.call('RetrievePropertiesEx'"), 'VMware collector must use the authenticated vSphere inventory flow');
+  assert.ok(vmwareCollector.includes("'summary.config'") && vmwareCollector.includes("'summary.storage'") && !vmwareCollector.includes("'config.hardware'"), 'VMware VM inventory must collect compact configuration and storage summaries without downloading every virtual hardware device');
+  assert.ok(vmwareCollector.includes('/<!DOCTYPE|<!ENTITY/i') && vmwareCollector.includes('maxResponseBytes'), 'VMware SOAP responses must reject unsafe XML and enforce a size limit');
+  assert.ok(server.includes("require('./src/vmware')") && server.includes("['vmware',       enabled(config.vmware)"), 'production refresh must collect configured VMware endpoints');
+  assert.ok(settings.includes('data-settings-section="vmware"') && settings.includes('function addVmwareInstance(data = {})') && settings.includes('cfg.vmware = {'), 'Settings must configure and persist ESXi/vCenter endpoints');
+  assert.ok(dashboard.includes('function buildVmware(vmware)') && dashboard.includes('function showVmwareGuest(endpointKey, id)') && dashboard.includes('showVmwareGuest(${jsStr(endpointKey)},${jsStr(vm.id)})') && dashboard.includes('vmware:       () => buildVmware(data.vmware)') && dashboard.includes('vmwareHosts.map(host => host.cpuPercent)'), 'dashboard details, clickable VM dialogs and KPI selectors must consume VMware inventory');
+  const vmwareOverviewSource = dashboard.slice(dashboard.indexOf('function buildVmware'), dashboard.indexOf('function buildKubernetes'));
+  assert.ok(dashboard.includes('.vmware-head-main{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(min-content,1fr)') && vmwareOverviewSource.includes('<div class="pve-head-main vmware-head-main">'), 'wide VMware host summary cells must stay equal unless their content needs more room');
+  const vmwareSummarySource = vmwareOverviewSource.slice(vmwareOverviewSource.indexOf('const sidebarSummary ='), vmwareOverviewSource.indexOf('const endpointHtml ='));
+  assert.ok(vmwareSummarySource.includes('<div class="sb-csum pve-sb-csum">') && vmwareSummarySource.indexOf('Hosts</div>') < vmwareSummarySource.indexOf('Cores</div>') && vmwareSummarySource.indexOf('Cores</div>') < vmwareSummarySource.indexOf('RAM</div>') && vmwareSummarySource.indexOf('RAM</div>') < vmwareSummarySource.indexOf('VMs</div>'), 'VMware detail must use the Proxmox-style Hosts, Cores, RAM and VMs summary order');
+  assert.ok(vmwareOverviewSource.includes("miniSparkline(hostHistory, 'cpu'") && vmwareOverviewSource.includes("miniSparkline(hostHistory, 'mem'") && vmwareOverviewSource.includes("histChart(hostHistory, 'cpu'") && vmwareOverviewSource.includes("histChart(hostHistory, 'mem'"), 'VMware hosts must show CPU and RAM history in summary and expanded charts');
+  const vmwareHostHeader = vmwareOverviewSource.slice(vmwareOverviewSource.indexOf('<div class="node-hdr pve-node-hdr" onclick="toggleVmwareHost'), vmwareOverviewSource.indexOf('<div class="node-body', vmwareOverviewSource.indexOf('<div class="node-hdr pve-node-hdr" onclick="toggleVmwareHost')));
+  assert.ok(vmwareHostHeader.includes('${bdg(hostBadgeClass, hostStateText)}') && vmwareOverviewSource.includes("const hostBadgeClass = instanceStale ? 'yellow' : !host.online") && vmwareOverviewSource.includes('detailSummary: sidebarSummary') && !vmwareOverviewSource.includes("detailBadge: ''") && vmwareOverviewSource.includes("detailMeta: ''"), 'VMware host and top summaries must restore their far-right health badges');
+  assert.ok(vmwareOverviewSource.includes('const stale = !!vmware._stale;') && vmwareOverviewSource.includes("? 'stale data'") && vmwareOverviewSource.includes("const instanceStale = stale || !!instance._stale"), 'stale VMware inventory must be visibly degraded instead of remaining healthy');
+  assert.ok(server.includes("if (key === 'vmware') return value?._stale === true") && server.includes('const vmwareStale = !!data.vmware?._stale;') && server.includes("const status = stale ? 'warn'"), 'stale VMware inventory must affect refresh backoff, alerts and public health');
+  assert.ok(i18n.includes("'stale data':'güncel değil'"), 'stale VMware status must follow the selected language');
+  assert.ok(vmwareOverviewSource.includes('class="vmware-datastore-grid"') && vmwareOverviewSource.includes('const datastoreCards = instanceDatastores.length') && vmwareOverviewSource.includes("datastore.name || 'Datastore'") && vmwareOverviewSource.includes('hideTitle: instanceDatastores.length === 1') && dashboard.includes('.vmware-datastore-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))') && dashboard.includes('function capacityGaugeCard(title, percent, usedBytes, totalBytes, options = {})'), 'VMware datastores must reuse responsive side-by-side Ceph capacity gauges and suppress a redundant single-datastore card title');
+  assert.ok(dashboard.includes('function toggleVmwareDatastores(instanceIndex, key)') && dashboard.includes('setOverride(`vmware:datastores:${key}`, open)') && vmwareOverviewSource.includes('panelOpenState(`vmware:datastores:${endpointKey}`, false)') && vmwareOverviewSource.includes('class="k8s-grp ceph-health-group vmware-datastore-group"') && vmwareOverviewSource.includes('onclick="toggleVmwareDatastores(${instanceIndex},${jsStr(endpointKey)})"'), 'VMware datastores must use a persistent Ceph-style expand and collapse group');
+  const vmwareInstanceLayout = vmwareOverviewSource.slice(vmwareOverviewSource.indexOf('const instanceBody ='), vmwareOverviewSource.indexOf("if (instance.type === 'esxi')"));
+  assert.ok(vmwareInstanceLayout.indexOf('<span>Datastores</span>') < vmwareInstanceLayout.indexOf('<span>Clusters</span>') && vmwareInstanceLayout.indexOf('<span>Clusters</span>') < vmwareInstanceLayout.indexOf('${hostRows') && !vmwareInstanceLayout.includes('<span>ESXi hosts</span>'), 'VMware detail must show datastores first, optional clusters second and host rows last without a redundant ESXi host count heading');
+  assert.ok(vmwareOverviewSource.includes("if (instance.type === 'esxi') return `<section class=\"prom-instance vmware-standalone-instance\">") && vmwareOverviewSource.includes('<div class="prom-instance-body open" id="vmware-body-${instanceIndex}">${instanceBody}</div>'), 'standalone ESXi details must omit the duplicate endpoint row while retaining datastore and host controls');
+  assert.ok(vmwareOverviewSource.includes("badgeHtml: datastoreWarn ? bdg(datastoreBadgeClass, datastore.accessible === false ? 'inaccessible' : 'attention') : ''") && !vmwareOverviewSource.includes("datastore.accessible === false ? 'inaccessible' : 'online'"), 'healthy VMware datastore gauges must not repeat an online badge');
+  assert.ok(server.includes("const vmwareHistory = loadHistoryMap('vmware-history'") && server.includes("key === 'vmware' ? preservePlatformOnTransient(key, mergeVmwareHistory(next))"), 'VMware host history must persist across refreshes and restarts');
+  assert.ok(!dashboard.includes('transform ${INTERVAL}ms linear') && dashboard.includes("if(msg.type === 'refreshing')") && dashboard.includes('manualPbarStart();') && dashboard.includes("if(msg.type === 'updated') manualPbarDone();"), 'the top progress bar must represent actual refresh activity instead of a fixed 15-second countdown');
+  assert.ok(server.indexOf("broadcastStatusEvent('refreshing')") > server.indexOf('if (!taskFns.length)'), 'refresh activity must only be broadcast when collector tasks actually run');
+  assert.ok(topology.includes('vmware-endpoint:') && topology.includes('vmware-cluster:') && topology.includes('vmware-host:') && topology.includes('vmware-guest:'), 'topology must map vCenter endpoints, clusters, ESXi hosts and VMs');
+  assert.ok(demoServer.includes('const vmwareHosts = [') && demoServer.includes('history: history(96, 20, 35)') && demoServer.includes('data.vmware = {') && demoServer.includes("['vmware', 'vmware']"), 'demo mode must expose realistic VMware inventory and host history');
+  assert.ok(onboarding.includes('<option value="vmware">VMware ESXi / vCenter</option>') && server.includes("type === 'vmware' && url && input.username && input.password"), 'first-run onboarding must accept a VMware endpoint');
+  assert.ok(configExample.includes('vmware:') && readme.includes('**VMware ESXi / vCenter**') && docsEnglish.includes('### VMware ESXi / vCenter') && docsTurkish.includes('### VMware ESXi / vCenter'), 'VMware configuration and operation must be documented in both languages');
+  assert.ok(i18n.includes("'VMware endpoints':'VMware endpoint’leri'") && packageJson.description.includes('VMware ESXi/vCenter'), 'VMware UI strings and package metadata must identify the platform');
   assert.ok(dashboard.includes('/api/status/history?points='));
   assert.ok(!dashboard.includes("const clusterLabel = /^https?:\\/\\//i"), 'Proxmox node subtitle must not include cluster metadata');
   assert.ok(dashboard.includes("replace(/:8006\\/?$/i, '')"), 'Proxmox host summaries must hide the default 8006 port');
@@ -433,6 +676,11 @@ function testStaticRegressions() {
   assert.ok(dashboard.includes("os_app_update_footer_v3") && dashboard.includes("cache:'no-store'"), 'app update check must bypass stale browser responses');
   assert.ok(!dashboard.includes("cachedUpdate || fetch('/api/update-check'"), 'cached app version must not replace the GitHub update request');
   assert.ok(dashboard.includes('@container (max-width:300px)') && dashboard.includes('-webkit-line-clamp:2'), 'overview titles must adapt to narrow cards');
+  assert.ok(dashboard.includes('@container (min-width:301px)') && dashboard.includes('.overview-title{display:block;white-space:nowrap'), 'normal-width overview titles must stay on one line so alert badges cannot make one card taller');
+  assert.ok(dashboard.includes('.overview-card[data-id="windows"] .overview-card-h>.badge{width:64px') && dashboard.includes('white-space:normal;line-height:1.08;text-align:center') && dashboard.includes('.overview-card[data-id="windows"] .overview-title{overflow:visible;text-overflow:clip}'), 'Windows overview must preserve its full title and wrap reboot-required into the badge');
+  assert.ok(dashboard.includes('.shell .sb-card.sb-badge-priority .sb-badge-wrap>.badge{width:var(--sb-badge-width)') && dashboard.includes('overflow-wrap:normal;word-break:normal;line-height:1.08;text-align:center;font-size:11px'), 'all sidebar platform badges must support readable word wrapping');
+  assert.ok(dashboard.includes('function syncSidebarBadgeWrapping()') && dashboard.includes('title.scrollWidth - title.clientWidth') && dashboard.includes('const minimumWidth = sidebarBadgeMinimumWidth(badge)') && dashboard.includes('naturalWidth - titleOverflow - 2'), 'sidebar badges must give space to the complete platform title before allowing the title to truncate');
+  assert.ok(!dashboard.includes('.shell.rail-narrow .sb-card[data-id="windows"] .sb-badge-wrap>.badge'), 'sidebar badge wrapping must not be limited to Windows or Linux');
   assert.ok(dashboard.includes('function overviewMetaHtml(meta)'), 'overview metadata must be rendered as separate metrics');
   assert.ok(dashboard.includes('.overview-meta-part+.overview-meta-part::before'), 'wide overview metadata must keep its separator');
   assert.ok(dashboard.includes('.overview-meta{flex-direction:column;align-items:flex-start'), 'narrow overview metadata must wrap each metric onto its own line');
@@ -443,31 +691,75 @@ function testStaticRegressions() {
   assert.ok(dashboard.includes('.ov-gauge{position:relative;width:100%;height:118px') && dashboard.includes('overflow:hidden;transform:translateY(-3px)'), 'the complete overview gauge must sit slightly higher without changing its internal alignment');
   assert.ok(dashboard.includes('transform:translateY(8px) scale(1.15);transform-origin:center bottom'), 'overview CPU and RAM gauge rings must retain the original width and height');
   assert.ok(dashboard.includes('function overviewPercentHistory') && dashboard.includes('class="ov-gauge-trend"'), 'overview CPU and RAM gauges must use real metric history for their trend line');
+  assert.ok(dashboard.includes("function overviewKpiHostOptions(platform, data, metric = '')") && dashboard.includes('window.setOverviewKpiTarget = function(metric, platform, host = \'all\')'), 'CPU, RAM, Disk I/O and Bandwidth KPIs must expose an atomic platform-and-host selector');
+  assert.ok(dashboard.includes('function drawOverviewKpiCascadeSelect(metric, current, currentHost, options, data)') && dashboard.includes('overviewKpiHostOptions(option.id, data, metric)') && dashboard.includes('class="os-sel-submenu"') && dashboard.includes('openOverviewKpiSubmenu(this,event)'), 'all KPI host choices must open as a right-side cascading submenu');
+  assert.ok(dashboard.includes('function captureOverviewKpiMenuState(detail)') && dashboard.includes('restoreOverviewKpiMenuState(detail, openKpiMenus)') && dashboard.includes('data-platform="${escAttr(option.id)}"'), 'open KPI cascading menus must survive dashboard data refreshes');
+  assert.ok(!dashboard.includes('drawOverviewKpiHostSelect') && !dashboard.includes('overview-kpi-host-select'), 'KPIs must not render a second standalone host dropdown');
+  assert.ok(dashboard.includes("label:trText('All hosts')") && dashboard.includes("overviewPercentHistory(data, platform, metric, selectedHost?.id || 'all')"), 'CPU and RAM host selection must filter both the current KPI value and its history');
+  assert.ok(dashboard.includes('disk: sources.disk?.[platform]?.[index]') && dashboard.includes('bandwidth: sources.bandwidth?.[platform]?.[index]') && dashboard.includes('const metricHosts = metric ? hosts.filter(host => hasNum(host?.[metric])) : hosts'), 'rate KPI host menus must include only devices reporting the selected metric');
+  assert.ok(dashboard.includes("const supportsHostSelection = ['cpu','mem','disk','bandwidth'].includes(metric)") && dashboard.includes("const hostOptions = ['cpu','mem','disk','bandwidth'].includes(metric) ? overviewKpiHostOptions(current, data, metric) : []"), 'all four overview KPIs must retain device selection during initial and incremental renders');
+  assert.ok(dashboard.includes("function overviewRateHistory(data, platform, metric, host = 'all')") && dashboard.includes('const rateRows = selectedHost ? { [platform]: [selectedHost.row] } : sources.rateRows') && dashboard.includes('const metricValues = selectedHost ? [selectedHost.disk]') && dashboard.includes('const metricValues = selectedHost ? [selectedHost.bandwidth]'), 'Disk I/O and Bandwidth device selection must filter both current values and history');
+  assert.ok(dashboard.includes('overviewKpiHosts: overviewKpiHosts || {}') && server.includes('ui.overviewKpiHosts = cleanStringMap(') && server.includes("'cpu','mem','memory','disk','bandwidth'"), 'KPI host filters and the RAM metric key must survive preference persistence');
   assert.ok(dashboard.includes('overviewResponsiveLayoutKey') && dashboard.includes('stableOverviewIds'), 'responsive resizing must preserve the dashboard card order');
+  assert.ok(dashboard.includes('function bindDetailSystemDragging(detail)') && dashboard.includes("header.classList.toggle('detail-system-draggable', canDrag)") && dashboard.includes('moveDraggedDetailSystem(detailSystemDrag.detail'), 'collapsed detail systems must support pointer-based drag-and-drop ordering');
+  assert.ok(!dashboard.includes('detail-order-btn') && !dashboard.includes('detail-order-controls'), 'platform detail ordering must not render separate up/down buttons');
+  assert.ok(dashboard.includes("localStorage.setItem('os_detail_system_order'") && server.includes('ui.detailSystemOrder = cleanStringArrayMap('), 'detail system order must persist locally and on the server');
+  assert.ok(dashboard.includes('sidebarPanelOrder = mergeUiOrder(sidebarPanelOrder, order)') && dashboard.includes('dashboardPanelOrder = mergeUiOrder(dashboardPanelOrder, order)'), 'sidebar and dashboard ordering must retain systems that are temporarily absent');
+  assert.ok(dashboard.split("panel.sbMeta !== undefined ? panel.sbMeta : (panel.meta || '')").length - 1 === 2 && dashboard.includes("if(item?.id === 'linux' || item?.id === 'windows')") && dashboard.includes('if(total > 0) return `${online}/${total} online`;'), 'Linux and Windows sidebar metadata must remain online across full and embedded pages');
+  assert.ok(dashboard.includes('function readLocalRailWidthPref()') && dashboard.includes('const localRailWidth = readLocalRailWidthPref()') && dashboard.includes('if(localRailWidth) railWidthPref = localRailWidth') && dashboard.includes("localStorage.setItem('os_rail_width', String(railWidthPref))"), 'a locally saved sidebar width must remain authoritative across navigation and monitored-system changes');
+  assert.ok(dashboard.includes('if(!window._railResizing)') && dashboard.includes('window._railResizing = true') && dashboard.includes('window._railResizing = false'), 'status refreshes must not resize the sidebar during an active drag');
+  assert.ok(dashboard.includes("window.addEventListener('pointermove', move, { capture:true, passive:false })") && dashboard.includes("window.removeEventListener('pointermove', move, true)"), 'sidebar resizing must keep tracking the pointer when it leaves the narrow resize handle');
+  const embeddedPollSource = dashboard.slice(dashboard.indexOf('async function pollOnce()'), dashboard.indexOf('let statusStream = null'));
+  assert.ok(!embeddedPollSource.includes('embedOpen') && dashboard.includes('SHELL_SUMMARY_INTERVAL') && dashboard.includes('scheduleShellSummarySync(80)'), 'embedded pages must keep the sidebar health summary refreshed');
+  assert.ok(server.includes("badge: failedSvcs > 0 ? `${failedSvcs} services failed`") && server.includes('badge: s.badge ||') && dashboard.includes('if(item?.badge)') && dashboard.includes('txt:String(item.badge)'), 'embedded pages must preserve detailed Linux and Windows failure, reboot and update badges');
+  assert.ok(dashboard.includes("e.data?.type === 'omnisight-status-changed'") && settings.includes("type: 'omnisight-status-changed'"), 'settings status and agent changes must immediately notify the parent sidebar');
+  assert.ok(dashboard.includes('const activeIds = new Set([...present, ...configuredIds])') && dashboard.includes('if(ALL_IDS.includes(id) && !activeIds.has(id)) delete panels[id]'), 'summary refreshes must remove platforms that no longer have configured systems');
+  const orderHelperStart = dashboard.indexOf('function validUiPlatform');
+  const orderHelperEnd = dashboard.indexOf('function compactUiPreferences', orderHelperStart);
+  const orderContext = {};
+  vm.runInNewContext(`const ALL_IDS = ${JSON.stringify(['proxmox','vmware','kubernetes','linux','windows','synology','mikrotik','unifi','snmp','healthchecks','uptimekuma','checks','prometheus','docker','dockhand','firewall','truenas','qnap','ugreen','pbs','cloudflare','cicd','veeam','portainer','database'])};\n${dashboard.slice(orderHelperStart, orderHelperEnd)}\nglobalThis.mergeUiOrder = mergeUiOrder;`, orderContext);
+  assert.strictEqual(JSON.stringify(orderContext.mergeUiOrder(['proxmox','kubernetes','linux','docker'], ['docker','proxmox','linux'])), JSON.stringify(['docker','kubernetes','proxmox','linux']), 'temporarily absent sidebar platforms must keep their saved slot during a visible reorder');
+  assert.ok(i18n.includes("'All hosts':'Tüm hostlar'") && !i18n.includes("'Move up':'Yukarı taşı'") && !i18n.includes("'Move down':'Aşağı taşı'"), 'host filters must stay translated and removed ordering buttons must not leave dead labels');
   const proxmoxOverviewSource = dashboard.slice(dashboard.indexOf('function buildProxmox'), dashboard.indexOf('function buildLinux'));
   assert.ok(!proxmoxOverviewSource.includes('<div class="sb-csum-lbl">Ceph</div>'), 'Proxmox overview must not repeat the Ceph header badge in its summary metrics');
   assert.ok(proxmoxOverviewSource.includes('cephBad') && proxmoxOverviewSource.includes('Ceph ${ceph.health'), 'Proxmox overview must retain its Ceph header badge');
   assert.ok(proxmoxOverviewSource.includes('<div class="pve-head-main proxmox-head-main">') && dashboard.includes('.proxmox-head-main{flex-wrap:nowrap}') && dashboard.includes('.proxmox-head-main .pve-head-stat.has-spark{min-width:0}'), 'wide Proxmox node summaries must keep all metrics on one row');
   assert.ok(proxmoxOverviewSource.includes("<div class=\"pve-head-sub\">${node.online ? 'online' : 'offline'}</div>"), 'Proxmox node subtitle must show only its online state');
+  assert.ok(proxmoxOverviewSource.includes('sbMeta: `${online}/${total} hosts · ${vmRunning}/${allVms.length} VMs`'), 'Proxmox sidebar metadata must show host and VM availability like VMware');
+  const proxmoxHostHeader = proxmoxOverviewSource.slice(proxmoxOverviewSource.indexOf('<div class="node-hdr pve-node-hdr" onclick="toggleNode'), proxmoxOverviewSource.indexOf('<div class="node-body', proxmoxOverviewSource.indexOf('<div class="node-hdr pve-node-hdr" onclick="toggleNode')));
+  assert.ok(proxmoxHostHeader.includes("${bdg(node.online ? (svcFailed ? 'red' : 'green') : 'red'") && proxmoxHostHeader.includes('`${svcFailed} services failed`') && proxmoxOverviewSource.includes("detailSummary: relabelDetailSummary(sbSummaryHtml, 'Nodes', 'Hosts')") && !proxmoxOverviewSource.includes("detailBadge: ''") && proxmoxOverviewSource.includes("detailMeta: ''"), 'Proxmox host and top summaries must restore their far-right health badges');
+  assert.ok(proxmoxOverviewSource.includes('pve-cluster-status') && proxmoxOverviewSource.includes('clusterQuorumLost') && proxmoxOverviewSource.includes('Cluster quorum lost'), 'Proxmox details must show detected cluster membership and surface quorum loss');
+  assert.ok(proxmoxOverviewSource.includes('body: cephHtml + clusterHtml + nodesHtml'), 'Proxmox details must be ordered Ceph health, cluster, then hosts');
+  assert.ok(topology.includes('proxmox-cluster:') && topology.includes('clusterNodeIds.set(clusterName, clusterId)') && topology.includes("clusterNodeIds.get(n.clusterName || '')"), 'Proxmox topology must group hosts under their detected cluster');
+  assert.ok(server.includes('px:cluster:${name}:quorum') && server.includes('quorumLost.length > 0'), 'cluster quorum loss must enter alerts and public health');
+  assert.ok(linuxAgent.includes('pvesh get /cluster/status --output-format json') && linuxAgent.includes('\"clusterStatus\"'), 'Proxmox agents must report cluster identity, membership and quorum');
+  assert.ok(demoServer.includes("name: 'demo-cluster'") && docsEnglish.includes('real Proxmox cluster name, member nodes and quorum state'), 'demo data and documentation must cover automatic Proxmox cluster detection');
   assert.ok(proxmoxOverviewSource.includes('ceph-osd-metrics') && proxmoxOverviewSource.includes('OSDs Up') && proxmoxOverviewSource.includes('Total OSDs'), 'Ceph health must show separate Proxmox-style OSD counters');
   assert.ok(proxmoxOverviewSource.includes('latency.averageMs') && proxmoxOverviewSource.includes('AVG Latency') && proxmoxOverviewSource.includes('MON Quorum Status'), 'Ceph health must show average OSD latency and MON quorum status');
   assert.ok(proxmoxOverviewSource.includes("value < 1 ? '&lt;1 ms'"), 'sub-millisecond Ceph latency must be displayed as less than one millisecond');
-  assert.ok(proxmoxOverviewSource.includes('ceph-gauge-fill') && proxmoxOverviewSource.includes('Cluster Capacity Used'), 'Ceph capacity must use a Proxmox-style gauge');
-  assert.ok(dashboard.includes('.ceph-gauge-fill.is-ok{stroke:#3cb78a}') && dashboard.includes('M17 128 A113 113') && proxmoxOverviewSource.includes("usagePct >= 90 ? 'is-critical'"), 'Ceph gauge colors and arc spacing must preserve Proxmox-style threshold severity');
+  assert.ok(proxmoxOverviewSource.includes("capacityGaugeCard('Cluster Capacity Used'") && dashboard.includes('ceph-gauge-fill'), 'Ceph capacity must use the shared Proxmox-style gauge');
+  assert.ok(dashboard.includes('.ceph-gauge-fill.is-ok{stroke:#3cb78a}') && dashboard.includes('M17 128 A113 113') && dashboard.includes("usagePct >= 90 ? 'is-critical'"), 'capacity gauge colors and arc spacing must preserve Proxmox-style threshold severity');
   assert.ok(dashboard.includes('.ceph-health-grid{display:grid') && dashboard.includes('.ceph-health-grid{grid-template-columns:1fr}'), 'Ceph health cards must stack on narrow screens');
   assert.ok(i18n.includes("'Ceph Storage Health':'Ceph Depolama Sağlığı'") && i18n.includes("'Cluster Capacity Used':'Kullanılan Küme Kapasitesi'") && i18n.includes("'No active warnings or errors':'Aktif uyarı veya hata yok'"), 'Ceph health labels must follow the selected language');
   assert.ok(linuxAgent.includes('pvesh get "/nodes/$HOSTNAME_S/ceph/osd"'), 'Proxmox agents must report per-OSD latency data');
   const linuxOverviewSource = dashboard.slice(dashboard.indexOf('function buildLinux'), dashboard.indexOf('function buildWindows'));
   assert.ok(!linuxOverviewSource.includes('<div class="sb-csum-lbl">Updates</div>'), 'Linux overview must not repeat the updates header badge in its summary metrics');
   assert.ok(linuxOverviewSource.includes('agentUpdateState: { count: updateCount, visible: updateAttention }'), 'Linux overview must retain its updates header badge');
+  assert.ok(linuxOverviewSource.includes("allOk && !connecting && !updateAttention ? 'healthy'") && linuxOverviewSource.includes("detailMeta: ''") && !linuxOverviewSource.includes("detailBadge: ''"), 'Linux detail must show its health or update badge at the far right without repeated reachable metadata');
+  assert.ok(linuxOverviewSource.includes('sbMeta: `${reachable}/${linux.length} online`'), 'Linux sidebar metadata must use online instead of reachable');
+  assert.ok(linuxOverviewSource.includes("svcFailed?`${svcFailed} services failed`:srvReboot?'reboot required':srvUpdates?`${srvUpdates} updates`:'online'"), 'Linux host rows must retain their far-right online, update, reboot or service-failure badge');
   assert.ok(linuxOverviewSource.includes("pveHeadStat('Disk', `${srv.disk.percent}%`, bc(srv.disk.percent), '', 'is-disk-usage')"), 'Linux disk usage must remain visible as a compact percentage');
   assert.ok(linuxOverviewSource.indexOf("pveHeadStat('Disk I/O'") < linuxOverviewSource.indexOf("pveHeadStat('Disk',"), 'Linux disk usage must appear immediately after Disk I/O');
   assert.ok(!linuxOverviewSource.includes("miniSparkline(srv.history, 'disk'") && !linuxOverviewSource.includes("histChart(srv.history,'disk'"), 'Linux disk usage history charts must stay removed');
   assert.ok(dashboard.includes("title:'Linux Servers'") && dashboard.includes("title: 'Linux Servers'") && server.includes("title: 'Linux Servers'") && settings.includes('>Linux Servers</span>') && docsEnglish.includes('### Linux Servers') && docsTurkish.includes('### Linux Servers'), 'Linux platform naming must stay plural across product surfaces');
-  const windowsOverviewSource = dashboard.slice(dashboard.indexOf('function buildWindows'), dashboard.indexOf('function buildKubernetes'));
+  const windowsOverviewSource = dashboard.slice(dashboard.indexOf('function buildWindows'), dashboard.indexOf('function vmwareHealthDot'));
   assert.ok(windowsOverviewSource.includes("pveHeadStat('Disk', `${srv.disk.percent}%`, bc(srv.disk.percent), '', 'is-disk-usage')"), 'Windows disk usage must remain visible as a compact percentage');
   assert.ok(windowsOverviewSource.indexOf("pveHeadStat('Disk I/O'") < windowsOverviewSource.indexOf("pveHeadStat('Disk',"), 'Windows disk usage must appear immediately after Disk I/O');
   assert.ok(!windowsOverviewSource.includes("miniSparkline(srv.history, 'disk'") && !windowsOverviewSource.includes("histChart(srv.history,'disk'"), 'Windows disk usage history charts must stay removed');
+  const windowsHostHeader = windowsOverviewSource.slice(windowsOverviewSource.indexOf('<div class="node-hdr pve-node-hdr" onclick="toggleWindows'), windowsOverviewSource.indexOf('<div class="node-body', windowsOverviewSource.indexOf('<div class="node-hdr pve-node-hdr" onclick="toggleWindows')));
+  assert.ok(!windowsOverviewSource.includes("pveHeadStat('Reboot'") && windowsHostHeader.includes("svcFailed?`${svcFailed} services failed`:srvReboot?'reboot required':srvUpdates?`${srvUpdates} updates`:'online'") && windowsOverviewSource.includes("rebootCount ? `${rebootCount} reboot required`"), 'Windows reboot-required must remain in the platform header and each host row must retain its far-right status badge');
+  assert.ok(windowsOverviewSource.includes("detailMeta: ''") && !windowsOverviewSource.includes("detailBadge: ''"), 'Windows detail must remove repeated reachable metadata while retaining its far-right health or update badge');
+  assert.ok(windowsOverviewSource.includes('sbMeta: `${reachable}/${windows.length} online`'), 'Windows sidebar metadata must use online instead of reachable');
   assert.ok(dashboard.includes('.pve-head-stat.is-disk-usage{flex:0 0 auto;width:max-content;min-width:76px}'), 'Linux and Windows disk percentage cells must retain their slightly wider layout');
   assert.ok(dashboard.includes("title:'Windows Servers'") && dashboard.includes("title: 'Windows Servers'") && server.includes("title: 'Windows Servers'") && demoServer.includes("windows: 'Windows Servers'") && settings.includes('>Windows Servers</span>') && i18n.includes("'Windows Servers':'Windows Servers'"), 'Windows platform naming must stay plural across product surfaces');
   const synologySource = dashboard.slice(dashboard.indexOf('function buildSynology'), dashboard.indexOf('function buildUnifi'));
@@ -501,12 +793,30 @@ function testStaticRegressions() {
     assert.ok(start >= 0 && dashboard.slice(start, end > start ? end : undefined).includes('offlineRatioLabel('), `${functionName} must use the shared availability label`);
   }
   const dockerPanelSource = dashboard.slice(dashboard.indexOf('function buildDocker'), dashboard.indexOf('\nfunction ', dashboard.indexOf('function buildDocker') + 10));
+  const dockhandPanelSource = dashboard.slice(dashboard.indexOf('function buildDockhand'), dashboard.indexOf('\nfunction ', dashboard.indexOf('function buildDockhand') + 10));
+  const kubernetesPanelSource = dashboard.slice(dashboard.indexOf('function buildKubernetes'), dashboard.indexOf('function nasSummaryMetricHtml'));
+  const healthchecksPanelSource = dashboard.slice(dashboard.indexOf('function buildHealthchecks'), dashboard.indexOf('function normalizeUptimeStatus'));
+  const uptimeKumaPanelSource = dashboard.slice(dashboard.indexOf('function buildUptimeKuma'), dashboard.indexOf('function buildChecks'));
+  const serviceChecksPanelSource = dashboard.slice(dashboard.indexOf('function buildChecks'), dashboard.indexOf('function prometheusHealth'));
+  const prometheusPanelSource = dashboard.slice(dashboard.indexOf('function buildPrometheus'), dashboard.indexOf('function dockerHistoryKey'));
+  assert.ok(kubernetesPanelSource.includes('const detailSummaryHtml = `<div class="sb-csum">') && kubernetesPanelSource.includes('${s.running??0}/${totalPods}</div><div class="sb-csum-lbl">Pods</div>') && kubernetesPanelSource.includes("detailMeta: ''") && kubernetesPanelSource.includes('detailSummary: detailSummaryHtml'), 'Kubernetes detail must show the running/total pod ratio inside a summary cell instead of loose header metadata');
+  assert.ok(synologySource.includes("detailMeta: panelId === 'synology' || panelId === 'mikrotik' ? '' : undefined"), 'Synology and MikroTik detail headers must not repeat device availability beside their boxed device count');
+  assert.ok(healthchecksPanelSource.includes("detailMeta: ''") && uptimeKumaPanelSource.includes("detailMeta: ''") && serviceChecksPanelSource.includes("detailMeta: ''"), 'check platform detail headers must not repeat availability beside their boxed up count');
+  assert.ok(prometheusPanelSource.includes("detailMeta: ''"), 'Prometheus detail must not repeat target and server availability beside its boxed summary');
+  assert.ok(dockerPanelSource.includes("detailMeta: ''") && dockhandPanelSource.includes("detailMeta: ''"), 'Docker and Dockhand details must not repeat container availability beside their boxed summaries');
+  assert.ok(databaseSource.includes("detailMeta: ''"), 'database detail must not repeat online availability beside its boxed device count');
+  const panelDetailSource = dashboard.slice(dashboard.indexOf('function panelDetailHtml'), dashboard.indexOf('\nfunction ', dashboard.indexOf('function panelDetailHtml') + 10));
+  assert.ok(panelDetailSource.includes("const hasBoxedDetailSummary = !!(detailSummary && detailSummary.includes('sb-csum'))") && panelDetailSource.includes("hasBoxedDetailSummary ? '' : panel.meta"), 'all platform detail headers with boxed summaries must suppress repeated loose metadata by default');
   assert.ok(dashboard.includes('function dockerContainerStateCounts(containers)') && dashboard.includes("created: states.filter(state => state === 'created').length") && dashboard.includes("['restarting','paused','removing'].includes(state)"), 'Docker created containers must be classified separately from actionable pending states');
   assert.ok(dockerPanelSource.includes('containerIssueLabel') && dockerPanelSource.includes('hostInfoLabel') && dashboard.includes("return `${counts.created} ${trText('created')}`"), 'Docker created containers must remain visible without degrading platform health');
   assert.ok(dashboard.includes('return counts.failed > 0 || counts.stopped > 0 || counts.pending > 0'), 'global Docker health must ignore created containers and include actionable states');
   assert.ok(server.includes('const containerIssues = stopped + failed + pending') && server.includes('${created} created'), 'compact production health must report created containers without warning');
   assert.ok(demoServer.includes("state: i === 5 ? 'created' : 'running'") && demoServer.includes("created: containers.filter(c => c.state === 'created').length") && demoServer.includes("color: i === 5 ? 'gray' : 'green'"), 'demo Docker data must include a neutral created container example');
   assert.ok(demoServer.includes("const issueStates = new Set(['exited', 'dead', 'restarting', 'paused', 'removing'])") && demoServer.includes("return hasIssue ? 'degraded' : 'healthy'"), 'demo compact health must keep created-only Docker hosts healthy');
+  assert.ok(dockerPanelSource.includes('sbMeta: `${totalRunning}/${totalAll} containers · ${onlineHosts}/${docker.length} hosts`'), 'Docker sidebar metadata must show container and host availability counts');
+  assert.ok(dockhandPanelSource.includes('sbMeta: `${running}/${total} containers · ${onlineServers}/${totalServers} hosts`'), 'Dockhand sidebar metadata must show container and host availability counts');
+  assert.ok(server.includes('sidebarMeta = `${running}/${total} containers · ${up}/${data.docker.length} hosts`') && server.includes('sidebarMeta = `${sm.running || 0}/${sm.total || 0} containers · ${onlineServers}/${totalServers} hosts`') && server.includes('detail: s.sidebarMeta || s.detail || s.meta'), 'embedded production sidebars must retain Docker and Dockhand container and host counts');
+  assert.ok(demoServer.includes('containers · ${data.docker.filter(h => h.online).length}/${data.docker.length} hosts') && demoServer.includes('containers · ${data.dockhand.summary.serverUp}/${data.dockhand.summary.servers} hosts'), 'embedded demo sidebars must retain Docker and Dockhand container and host counts');
   assert.ok(server.includes('offline: s.offline') && server.includes('online: s.online') && server.includes('...platformAvailability(data, item.id)'), 'production summaries must retain platform availability ratios');
   assert.ok(demoServer.includes('...platformAvailability(data, id)'), 'demo summaries must retain platform offline ratios');
   assert.ok(dashboard.includes("const storageKnown = inst.available?.storage !== false"), 'unavailable QNAP storage metrics must not be displayed as zero');
@@ -538,8 +848,15 @@ function testStaticRegressions() {
   assert.ok(settings.includes('data-target="sessions" data-admin-section="1" onclick="showSettingsSection(\'sessions\')"><span class="settings-nav-dot" style="background:var(--blue)">'), 'Sessions navigation icon must match the blue System icon');
   const settingsInit = settings.slice(settings.lastIndexOf('(async () => {'));
   assert.ok(settingsInit.includes('await rolePromise;') && settingsInit.includes('loadSettingsSectionData(activeSettingsSection);'), 'the restored Settings section must load its data during initial startup');
-  assert.ok(agentsPage.includes('function commandPanelGuide(commands)') && agentsPage.includes('Run the query command first.') && agentsPage.includes('If the query reports a timeout, DNS, connection or TLS error'), 'agent repair panel must explain diagnosis-first workflow');
+  assert.ok(agentsPage.includes('function commandPanelGuide(commands, opts = {})') && agentsPage.includes('Check result → action') && agentsPage.includes('Service is active (running) and the HTTP result is 200.') && agentsPage.includes('Result contains timeout, DNS, connection or TLS error.'), 'agent repair panel must provide concise result-to-action guidance');
+  assert.ok(agentsPage.includes('/^1\\.3(?:\\.|$)/.test(agentVersion)') && agentsPage.includes('This v1.3.x agent uses the old scheduled task.') && agentsPage.includes("agentVersion: d.agentVersion || ''"), 'the v1.3 to v1.4 migration note must be conditional on the selected agent version');
+  assert.ok(server.includes('dashboard HTTP check passed.') && server.includes('Dashboard returned HTTP {0}; use Repair Windows agent.') && server.includes('Dashboard connection/TLS check failed;') && server.includes('Legacy scheduled-task agent detected. State={0}; use Repair Windows agent.') && server.includes("Write-Host 'Service History:'") && server.includes('Run only when the RESULT line says to use Repair Windows agent.'), 'Windows query must provide explicit results followed by clearly labelled service history');
+  assert.ok(server.includes("agentVersion: agent.agentVersion || ''") && server.includes('role: agentInstallRole(agent)'), 'repair command responses must include the selected agent version and role');
   assert.ok(agentsPage.includes("${t('Check / repair')}") && agentsPage.includes("t('Run on affected host')"), 'offline agent action must direct users to check before repairing');
+  assert.ok(agentsPage.includes('showUninstallAgentModal') && agentsPage.includes("closeUninstallAgentModal(true)") && agentsPage.includes("fetch('/api/agent/uninstall'"), 'Agents must provide an explicit Yes-confirmed uninstall action');
+  assert.ok(settings.includes("const endpoint = pendingInstall ? '/api/agent/remove' : '/api/agent/uninstall'") && settings.includes("confirmLabel: 'Yes'"), 'Settings agent removal must remotely uninstall installed agents while retaining pending-install cancellation');
+  assert.ok(docsEnglish.includes('### Remote Uninstall') && docsTurkish.includes('### Uzaktan Kaldırma') && docsEnglish.includes('independent local helper'), 'both documentation languages must explain connection-independent remote uninstall');
+  assert.ok(demoServer.includes("app.post('/api/agent/uninstall'") && demoServer.includes("latestVersion: '1.4.1'"), 'the demo must mirror remote uninstall and current agent protocol behavior');
   const i18nContext = { window: {} };
   vm.createContext(i18nContext);
   vm.runInContext(i18n, i18nContext);
@@ -616,6 +933,7 @@ function testStaticRegressions() {
   assert.ok(demoServer.includes(".filter(([, key]) => demoPlatformEnabled(key)).map(([id]) => id)"), 'demo dashboard must hide disabled platforms');
   assert.ok(server.includes("backgroundRefresh({ force: true, only: connectingPlatforms })"), 'settings saves must refresh only platforms whose connection config changed');
   assert.ok(server.includes("if (connectingPlatforms.has('proxmox') || !cache.data.proxmox)"), 'unrelated settings saves must preserve current Proxmox runtime data');
+  assert.ok(server.includes('ensureAgentDerivedCacheCurrent();') && server.includes("broadcastStatusEvent('updated')") && server.includes('function refreshAgentCacheAfterRemoval() {\n  refreshAgentDerivedCache();'), 'agent additions, reports and removals must invalidate and broadcast the derived sidebar state');
   assert.ok((settings.match(/class="btn-sm platform-add"/g) || []).length >= 5, 'non-standard platform add buttons must participate in the lock');
 }
 
@@ -626,6 +944,9 @@ async function run() {
   await testDockhandEnvironments();
   testSynologyCpuCounters();
   testProxmoxInstances();
+  testProxmoxClusterStatus();
+  testVmwareInventoryNormalization();
+  await testVmwareSoapFlow();
   testCephNormalization();
   testLatestStableVersion();
   testFullBackupEmptyFileCompatibility();
