@@ -32,7 +32,13 @@ const { getAllVeeamData, configuredInstances: veeamConfigInstances } = require('
 const { getAllProxmoxApiData, configuredInstances: proxmoxConfigInstances } = require('./src/proxmox');
 const { getAllVmwareData, configuredInstances: vmwareConfigInstances } = require('./src/vmware');
 const { getDockerApiData, dockerLogs: dockerApiLogs, dockerPrune: dockerApiPrune } = require('./src/docker');
-const { dispatchAlert, serverUpdateNotificationsEnabled, buildServerUpdateDetections } = require('./src/alerts');
+const {
+  dispatchAlert,
+  serverUpdateNotificationsEnabled,
+  buildServerUpdateDetections,
+  shouldDispatchProblem,
+  clearAlertCooldownsForType,
+} = require('./src/alerts');
 const { decryptConfig, encryptConfigValue, isEncrypted, SENSITIVE_KEYS, encryptionEnabled } = require('./src/crypto');
 const { mergePreservingSecrets } = require('./src/config-merge');
 const { loadHistoryMap, scheduleSaveHistoryMap, setHistorySaveDelay, flushHistorySaves, cancelHistorySaves } = require('./src/historyStore');
@@ -4619,11 +4625,17 @@ function dispatchTrackedAlert(alertConfig, alert, meta = {}, only) {
         if (entry.status === 'sent') alertSentAtBySignature.set(signature, Number(entry.t || Date.now()));
         else alertSentAtBySignature.delete(signature);
       }
+      if (entry.status !== 'sent' && meta.type === 'problem' && alertActiveSeverity.get(meta.key) === meta.severity) {
+        alertActiveSeverity.delete(meta.key);
+      }
       saveAlertHistory();
       logAlertResult(results);
     })
     .catch(err => {
       if (signature) alertSentAtBySignature.delete(signature);
+      if (meta.type === 'problem' && alertActiveSeverity.get(meta.key) === meta.severity) {
+        alertActiveSeverity.delete(meta.key);
+      }
       entry.status = 'failed';
       entry.error = err.message || String(err);
       saveAlertHistory();
@@ -4713,6 +4725,7 @@ function runAlertChecks(data) {
     const activeSeverity = alertActiveSeverity.get(key);
     const muted = notifyDisabledForKey(key) || isAlertMuted(key, now);
     if (c.ok) {
+      clearAlertCooldownsForType(alertSentAtBySignature, 'problem', key);
       alertProblemSince.delete(key);
       if (activeSeverity && !muted) sendRecovery(c);
       alertActiveSeverity.delete(key);
@@ -4723,6 +4736,8 @@ function runAlertChecks(data) {
     if (now - (alertFirstSeen.get(key) || now) < ALERT_STARTUP_GRACE_MS) continue;
     if (now - (alertProblemSince.get(key) || now) < alertDelayMs(key, c)) continue;
     const severity = (c.kind === 'threshold' || c.kind === 'anomaly' || c.kind === 'updates') ? c.severity : 'critical';
+    if (!shouldDispatchProblem(activeSeverity, severity)) continue;
+    clearAlertCooldownsForType(alertSentAtBySignature, 'recovery', key);
     sendProblem(c);
     alertActiveSeverity.set(key, severity || 'critical');
   }

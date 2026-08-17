@@ -10,10 +10,13 @@
   "type": "ct",
   "updateable": true,
   "privileged": false,
-  "has_arm": false,
   "interface_port": 3000,
   "documentation": "https://github.com/caglaryalcin/OmniSight/blob/main/DOCUMENTATION.md",
   "website": "https://github.com/caglaryalcin/OmniSight",
+  "repository": "https://github.com/caglaryalcin/OmniSight",
+  "platforms": [
+    "pve"
+  ],
   "logo": "https://raw.githubusercontent.com/caglaryalcin/OmniSight/main/public/assets/omnisight-logo.png",
   "description": "OmniSight is a self-hosted infrastructure monitoring dashboard for Proxmox, Linux, Docker, Kubernetes, SNMP devices, storage systems, firewalls, databases and external services.",
   "install_methods": [

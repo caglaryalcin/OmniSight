@@ -6,7 +6,13 @@ const assert = require('assert');
 
 async function main() {
   // 1) Core modules load
-  const { dispatchAlert, serverUpdateNotificationsEnabled, buildServerUpdateDetections } = require('../src/alerts');
+  const {
+    dispatchAlert,
+    serverUpdateNotificationsEnabled,
+    buildServerUpdateDetections,
+    shouldDispatchProblem,
+    clearAlertCooldownsForType,
+  } = require('../src/alerts');
   const { encryptConfigValue, isEncrypted, decryptConfig } = require('../src/crypto');
 
   assert.strictEqual(serverUpdateNotificationsEnabled({}), false);
@@ -25,6 +31,20 @@ async function main() {
   assert.deepStrictEqual(updateDetections.map(d => [d.key, d.ok, d.severity, d.value]), [
     ['lx:deb01:updates', false, 'warning', 2],
     ['win:win01:updates', true, 'normal', 0],
+  ]);
+  assert.strictEqual(shouldDispatchProblem(undefined, 'critical'), true);
+  assert.strictEqual(shouldDispatchProblem('warning', 'critical'), true);
+  assert.strictEqual(shouldDispatchProblem('critical', 'critical'), false);
+  const cooldowns = new Map([
+    ['problem|win:M4A1|critical', 1],
+    ['problem|win:M4A1|warning', 2],
+    ['recovery|win:M4A1|normal', 3],
+    ['problem|win:OTHER|critical', 4],
+  ]);
+  assert.strictEqual(clearAlertCooldownsForType(cooldowns, 'problem', 'win:M4A1'), 2);
+  assert.deepStrictEqual(Array.from(cooldowns.keys()), [
+    'recovery|win:M4A1|normal',
+    'problem|win:OTHER|critical',
   ]);
 
   // 2) Crypto round-trip for a sensitive key

@@ -121,6 +121,22 @@ function buildServerUpdateDetections(data = {}) {
   return detections;
 }
 
+function shouldDispatchProblem(activeSeverity, nextSeverity) {
+  return !activeSeverity || activeSeverity !== nextSeverity;
+}
+
+function clearAlertCooldownsForType(cooldowns, type, key) {
+  if (!(cooldowns instanceof Map) || !type || !key) return 0;
+  const prefix = `${type}|${key}|`;
+  let cleared = 0;
+  for (const signature of Array.from(cooldowns.keys())) {
+    if (!String(signature).startsWith(prefix)) continue;
+    cooldowns.delete(signature);
+    cleared += 1;
+  }
+  return cleared;
+}
+
 const CHANNELS = { ntfy: sendNtfy, telegram: sendTelegram, smtp: sendSmtp, mattermost: sendMattermost };
 
 async function dispatchAlert(alertConfig, alert, only) {
@@ -139,4 +155,10 @@ async function dispatchAlert(alertConfig, alert, only) {
   }));
 }
 
-module.exports = { dispatchAlert, serverUpdateNotificationsEnabled, buildServerUpdateDetections };
+module.exports = {
+  dispatchAlert,
+  serverUpdateNotificationsEnabled,
+  buildServerUpdateDetections,
+  shouldDispatchProblem,
+  clearAlertCooldownsForType,
+};

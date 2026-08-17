@@ -3,6 +3,7 @@ const assert = require('assert');
 const http = require('http');
 const path = require('path');
 const fs = require('fs');
+const vm = require('vm');
 
 function request(server, { method = 'GET', pathname = '/', headers = {}, body = '' } = {}) {
   return new Promise((resolve, reject) => {
@@ -34,10 +35,57 @@ function close(server) {
   return new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
 }
 
+function memoryStorage(initial = {}) {
+  const data = new Map(Object.entries(initial).map(([key, value]) => [String(key), String(value)]));
+  return {
+    get length() { return data.size; },
+    key(index) { return Array.from(data.keys())[index] ?? null; },
+    getItem(key) { return data.has(String(key)) ? data.get(String(key)) : null; },
+    setItem(key, value) { data.set(String(key), String(value)); },
+    removeItem(key) { data.delete(String(key)); },
+  };
+}
+
+function testDemoBrowserDailyReset() {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'public', 'demo-reset.js'), 'utf8');
+  const localStorage = memoryStorage({
+    os_theme: 'light',
+    os_token: 'keep-local-token',
+    omnisight_topology_positions: '{"changed":true}',
+    unrelated: 'keep',
+  });
+  const sessionStorage = memoryStorage({
+    os_status_cache_v2: '{"changed":true}',
+    os_token: 'keep-session-token',
+  });
+  const window = {};
+  vm.runInNewContext(source, {
+    window,
+    document: { cookie: 'omnisight_demo_day=2026-08-16' },
+    localStorage,
+    sessionStorage,
+  });
+
+  assert.strictEqual(localStorage.getItem('os_theme'), null);
+  assert.strictEqual(localStorage.getItem('omnisight_topology_positions'), null);
+  assert.strictEqual(sessionStorage.getItem('os_status_cache_v2'), null);
+  assert.strictEqual(localStorage.getItem('os_token'), 'keep-local-token');
+  assert.strictEqual(sessionStorage.getItem('os_token'), 'keep-session-token');
+  assert.strictEqual(localStorage.getItem('unrelated'), 'keep');
+  assert.strictEqual(localStorage.getItem('omnisight_demo_reset_day'), '2026-08-16');
+
+  localStorage.setItem('os_theme', 'light');
+  assert.strictEqual(window.omnisightApplyDemoDailyReset('2026-08-16'), false);
+  assert.strictEqual(localStorage.getItem('os_theme'), 'light');
+  assert.strictEqual(window.omnisightApplyDemoDailyReset('2026-08-17'), true);
+  assert.strictEqual(localStorage.getItem('os_theme'), null);
+}
+
 async function run() {
   const packageVersion = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8')).version;
-  const { app, demoAppVersion } = require('../demo-server');
+  const { app, demoAppVersion, demoConfig, topologyData, ensureDemoDailyReset } = require('../demo-server');
   assert.strictEqual(demoAppVersion(), packageVersion);
+  testDemoBrowserDailyReset();
 
   const server = await listen(app);
   try {
@@ -58,7 +106,9 @@ async function run() {
     const page = await request(server, { pathname: '/', headers: { Cookie: sessionCookie } });
     assert.strictEqual(page.statusCode, 200);
     assert.ok(page.body.includes(`const APP_VERSION = ${JSON.stringify(packageVersion)};`));
+    assert.ok(page.body.includes('<script src="/demo-reset.js"></script>'));
     assert.match(String(page.headers['cache-control'] || ''), /no-cache/);
+    assert.ok([].concat(page.headers['set-cookie'] || []).some(cookie => cookie.startsWith('omnisight_demo_day=')));
 
     for (const pathname of ['/healthz', '/api/about', '/api/auth-status']) {
       const response = await request(server, { pathname, headers: { Cookie: sessionCookie } });
@@ -68,9 +118,49 @@ async function run() {
 
     const summaryResponse = await request(server, { pathname: '/api/status/summary', headers: { Cookie: sessionCookie } });
     assert.strictEqual(summaryResponse.statusCode, 200);
-    const summaryById = Object.fromEntries(JSON.parse(summaryResponse.body).health.map(item => [item.id, item]));
+    const summary = JSON.parse(summaryResponse.body);
+    assert.match(summary.demoResetDay, /^\d{4}-\d{2}-\d{2}$/);
+    const summaryById = Object.fromEntries(summary.health.map(item => [item.id, item]));
     assert.deepStrictEqual({ offline: summaryById.unifi.offline, online: summaryById.unifi.online, total: summaryById.unifi.total }, { offline: 1, online: 3, total: 5 });
     assert.deepStrictEqual({ offline: summaryById.uptimekuma.offline, online: summaryById.uptimekuma.online, total: summaryById.uptimekuma.total }, { offline: 1, online: 3, total: 4 });
+
+    const changedConfig = JSON.stringify({ preferredLanguage: 'tr', publicStatus: true, publicTitle: 'Changed demo', publicDescription: 'Changed' });
+    const configUpdate = await request(server, {
+      method: 'POST',
+      pathname: '/api/config',
+      headers: { Cookie: sessionCookie, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(changedConfig) },
+      body: changedConfig,
+    });
+    assert.strictEqual(configUpdate.statusCode, 200);
+
+    const changedTopology = JSON.stringify({ links: [], nodes: ['changed-node'], hidden: [], positions: { 'changed-node': { x: 1, y: 2 } }, view: { scale: 1, x: 0, y: 0 } });
+    const topologyUpdate = await request(server, {
+      method: 'POST',
+      pathname: '/api/topology/links',
+      headers: { Cookie: sessionCookie, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(changedTopology) },
+      body: changedTopology,
+    });
+    assert.strictEqual(topologyUpdate.statusCode, 200);
+
+    const removeAgent = JSON.stringify({ id: 'demo-agent' });
+    const agentUpdate = await request(server, {
+      method: 'POST',
+      pathname: '/api/agent/remove',
+      headers: { Cookie: sessionCookie, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(removeAgent) },
+      body: removeAgent,
+    });
+    assert.strictEqual(agentUpdate.statusCode, 200);
+    assert.strictEqual(demoConfig().publicTitle, 'Changed demo');
+    assert.deepStrictEqual(topologyData().topologyNodes, ['changed-node']);
+
+    assert.strictEqual(ensureDemoDailyReset(Date.now() + (3 * 86400000)), true);
+    assert.strictEqual(demoConfig().publicTitle, 'OmniSight Demo Status');
+    assert.ok(topologyData().topologyNodes.includes('kubernetes:cluster'));
+    assert.ok(!topologyData().topologyNodes.includes('changed-node'));
+
+    const agentsAfterReset = await request(server, { pathname: '/api/agents', headers: { Cookie: sessionCookie } });
+    assert.strictEqual(JSON.parse(agentsAfterReset.body).agents.length, 2);
+    ensureDemoDailyReset(Date.now());
   } finally {
     await close(server);
   }

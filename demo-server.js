@@ -12,8 +12,15 @@ const DEMO_SESSION_COOKIE = 'omnisight_demo_session';
 const DEMO_USERNAME = String(process.env.OMNISIGHT_DEMO_USER || 'demo').trim() || 'demo';
 const DEMO_PASSWORD = String(process.env.OMNISIGHT_DEMO_PASSWORD || 'demo') || 'demo';
 const DEMO_DEFAULT_CREDENTIALS = DEMO_USERNAME === 'demo' && DEMO_PASSWORD === 'demo';
+const DEMO_DAY_COOKIE = 'omnisight_demo_day';
+const DEMO_RESET_TIMEZONE = String(process.env.OMNISIGHT_DEMO_RESET_TIMEZONE || 'Europe/Istanbul').trim() || 'Europe/Istanbul';
 
 app.use(express.json({ limit: '3mb' }));
+app.use((req, res, next) => {
+  ensureDemoDailyReset();
+  if (demoPageRequest(req)) res.append('Set-Cookie', demoDayCookie(req));
+  next();
+});
 app.use((req, res, next) => {
   if (req.path.startsWith('/api/') || req.method !== 'GET') {
     res.setHeader('Cache-Control', 'no-store');
@@ -273,9 +280,41 @@ let demoPrefs = {
     },
   },
 };
+const defaultDemoTopology = cloneJson(demoTopology);
+const defaultDemoPrefs = cloneJson(demoPrefs);
+let demoStateDay = demoDayKey();
 
 function nowIso(offsetMs = 0) {
   return new Date(Date.now() + offsetMs).toISOString();
+}
+
+function demoDayKey(now = Date.now()) {
+  try {
+    const parts = new Intl.DateTimeFormat('en', {
+      timeZone: DEMO_RESET_TIMEZONE,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(new Date(now));
+    const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+    return `${values.year}-${values.month}-${values.day}`;
+  } catch {
+    return new Date(now).toISOString().slice(0, 10);
+  }
+}
+
+function resetDemoMutableState(day = demoDayKey()) {
+  demoTopology = cloneJson(defaultDemoTopology);
+  demoPrefs = cloneJson(defaultDemoPrefs);
+  demoRemovedAgentIds.clear();
+  demoStateDay = day;
+}
+
+function ensureDemoDailyReset(now = Date.now()) {
+  const day = demoDayKey(now);
+  if (day === demoStateDay) return false;
+  resetDemoMutableState(day);
+  return true;
 }
 
 function clamp(n, min, max) {
@@ -529,6 +568,17 @@ function demoSessionCookie(value, maxAge, req) {
   return `${DEMO_SESSION_COOKIE}=${value}; Path=/; Max-Age=${maxAge}; HttpOnly; SameSite=Lax${secure}`;
 }
 
+function demoDayCookie(req) {
+  const secure = demoRequestIsHttps(req) ? '; Secure' : '';
+  return `${DEMO_DAY_COOKIE}=${encodeURIComponent(demoStateDay)}; Path=/; Max-Age=172800; SameSite=Lax${secure}`;
+}
+
+function demoPageRequest(req) {
+  if (req.method !== 'GET' && req.method !== 'HEAD') return false;
+  const pathname = String(req.path || '/');
+  return pathname === '/' || pathname.endsWith('.html') || (!pathname.startsWith('/api/') && !path.extname(pathname));
+}
+
 function demoAuthenticated(req) {
   const token = demoToken(req);
   const session = token ? demoSessions.get(token) : null;
@@ -644,6 +694,7 @@ function demoStatus() {
   const pxCpu = Number((((h1Now.cpu || 0) + (h2Now.cpu || 0) + (h5Now.cpu || 0)) / 3).toFixed(1));
   const pxMem = Number((((h1Now.mem || 0) + (h2Now.mem || 0) + (h5Now.mem || 0)) / 3).toFixed(1));
   const data = {
+    demoResetDay: demoStateDay,
     timestamp: nowIso(),
     loading: false,
     refreshing: false,
@@ -1582,6 +1633,7 @@ app.get('/api/auth-status', (req, res) => {
     passwordResetEnabled: true,
     version: demoAppVersion(),
     demo: true,
+    demoResetDay: demoStateDay,
     demoDefaultCredentials: DEMO_DEFAULT_CREDENTIALS,
   });
 });
@@ -1688,7 +1740,7 @@ app.get('/api/status', (req, res) => res.json(demoStatus()));
 app.get('/api/status/dashboard', (req, res) => res.json(demoStatus()));
 app.get('/api/status/summary', (req, res) => {
   const d = demoStatus();
-  res.json({ timestamp: d.timestamp, loading: false, refreshing: false, configured: d.configured, publicStatus: demoPrefs.config.publicStatus !== false, preferredLanguage: demoPrefs.config.preferredLanguage || 'en', appearance: d.appearance, ui: demoPrefs.ui, health: publicSummary(d) });
+  res.json({ demoResetDay: demoStateDay, timestamp: d.timestamp, loading: false, refreshing: false, configured: d.configured, publicStatus: demoPrefs.config.publicStatus !== false, preferredLanguage: demoPrefs.config.preferredLanguage || 'en', appearance: d.appearance, ui: demoPrefs.ui, health: publicSummary(d) });
 });
 app.get('/api/status/topology', (req, res) => res.json(topologyData()));
 app.get('/api/status/stream', (req, res) => {
@@ -1849,4 +1901,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { app, demoStatus, demoConfig, topologyData, demoAppVersion };
+module.exports = { app, demoStatus, demoConfig, topologyData, demoAppVersion, ensureDemoDailyReset };

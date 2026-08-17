@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
-source "$(dirname "${BASH_SOURCE[0]}")/../misc/build.func" 2>/dev/null || source <(curl -fsSL "${COMMUNITY_SCRIPTS_URL:-https://raw.githubusercontent.com/community-scripts/ProxmoxVED/main}/misc/build.func")
+# Engine comes from community-scripts/core; this repo only ships the scripts.
+# A local core checkout wins (COMMUNITY_SCRIPTS_CORE_DIR, else a sibling ../core),
+# so a fork or branch of core can be tested without editing this file.
+_cs_boot="${COMMUNITY_SCRIPTS_CORE_DIR:-$(dirname "${BASH_SOURCE[0]}")/../../core}/core/build.func"
+source "$_cs_boot" 2>/dev/null || source <(curl -fsSL "${COMMUNITY_SCRIPTS_CORE_URL:-https://raw.githubusercontent.com/community-scripts/core/main}/core/build.func")
 # Copyright (c) 2026 community-scripts ORG
 # Author: caglaryalcin
 # License: MIT | https://github.com/community-scripts/ProxmoxVED/raw/main/LICENSE
@@ -12,7 +16,7 @@ var_ram="${var_ram:-1024}"
 var_disk="${var_disk:-6}"
 var_os="${var_os:-debian}"
 var_version="${var_version:-13}"
-# var_arm64 is intentionally unset until native ARM64 installation is verified.
+#var_arm64="${var_arm64:-no}" # unset = ask the user; set yes/no only when verified
 var_unprivileged="${var_unprivileged:-1}"
 
 header_info "$APP"
@@ -37,13 +41,13 @@ function update_script() {
 
     create_backup /opt/omnisight/data
     CLEAN_INSTALL=1 fetch_and_deploy_gh_release "omnisight" "caglaryalcin/OmniSight" "tarball" "latest" "/opt/omnisight"
+    restore_backup
 
     msg_info "Installing Dependencies"
     cd /opt/omnisight
     $STD npm ci --omit=dev --no-audit --no-fund
     msg_ok "Installed Dependencies"
 
-    restore_backup
     chown -R omnisight:omnisight /opt/omnisight
 
     msg_info "Starting Service"

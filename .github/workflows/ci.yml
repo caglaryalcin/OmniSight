@@ -18,7 +18,6 @@ on:
       - '**/*.jpg'
       - '**/*.jpeg'
       - '**/*.webp'
-      - 'deploy/**'
       - '*.txt'
       - 'LICENSE'
       - '.gitignore'
@@ -40,7 +39,6 @@ on:
       - '**/*.jpg'
       - '**/*.jpeg'
       - '**/*.webp'
-      - 'deploy/**'
       - '*.txt'
       - 'LICENSE'
       - '.gitignore'
@@ -67,7 +65,7 @@ jobs:
           node --check server.js
           for f in src/*.js scripts/*.js; do node --check "$f"; done
       - name: Native installer shell syntax
-        run: bash -n scripts/install-lxc.sh scripts/proxmox-lxc.sh
+        run: bash -n scripts/install-lxc.sh scripts/proxmox-lxc.sh deploy/community-scripts/ct/omnisight.sh deploy/community-scripts/install/omnisight-install.sh
       - name: Smoke test
         run: node scripts/ci-smoke.js
 

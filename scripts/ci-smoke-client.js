@@ -23,6 +23,21 @@ function extract(source, name) {
   return source.slice(from + begin.length, to);
 }
 
+function extractFunction(source, name) {
+  const start = source.indexOf(`function ${name}(`);
+  assert.ok(start >= 0, `missing function "${name}" in public/index.html`);
+  const bodyStart = source.indexOf('{', start);
+  let depth = 0;
+  for (let index = bodyStart; index < source.length; index += 1) {
+    if (source[index] === '{') depth += 1;
+    else if (source[index] === '}') {
+      depth -= 1;
+      if (depth === 0) return source.slice(start, index + 1);
+    }
+  }
+  throw new Error(`unterminated function "${name}" in public/index.html`);
+}
+
 function run() {
   const html = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
   const ctx = {};
@@ -92,6 +107,21 @@ function run() {
     assert.strictEqual(fmtChartValue(bad), '--', `non-numeric ${String(bad)} -> --`);
   }
 
+  const scrollContext = {};
+  vm.createContext(scrollContext);
+  vm.runInContext(extractFunction(html, 'replaceOverviewHtml'), scrollContext);
+  const retainedLogs = { scrollTop: 137 };
+  const replacementLogs = { replaceWith(node) { detail.current = node; } };
+  const detail = {
+    current: retainedLogs,
+    querySelector: () => detail.current,
+    set innerHTML(value) { detail.rendered = value; detail.current = replacementLogs; },
+  };
+  scrollContext.replaceOverviewHtml(detail, '<section>updated</section>');
+  assert.strictEqual(detail.current, retainedLogs);
+  assert.strictEqual(detail.current.scrollTop, 137);
+  assert.match(html, /\.overview-log-list\{[^}]*scrollbar-width:thin[^}]*scrollbar-gutter:stable/);
+
   const prefetchStart = html.indexOf('let embedPrefetchStarted = false;');
   const prefetchEnd = html.indexOf('let demoEmbedWarmupStarted = false;', prefetchStart);
   assert.ok(prefetchStart >= 0 && prefetchEnd > prefetchStart, 'embed prefetch block must be extractable');
@@ -113,7 +143,7 @@ function run() {
     assert.doesNotThrow(() => prefetchContext.scheduleEmbedPrefetch(options), 'embed prefetch scheduling must run without undefined options');
   }
 
-  console.log('smoke ok — client helpers: fmtChartValue, localization, availability');
+  console.log('smoke ok — client helpers: fmtChartValue, localization, availability, scroll preservation');
 }
 
 module.exports = { run };

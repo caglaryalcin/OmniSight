@@ -66,10 +66,4 @@ msg_ok "Created Service"
 
 motd_ssh
 customize
-
-cat <<'EOF' >/usr/bin/update
-#!/usr/bin/env bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/caglaryalcin/OmniSight/main/deploy/community-scripts/ct/omnisight.sh)"
-EOF
-chmod +x /usr/bin/update
 cleanup_lxc

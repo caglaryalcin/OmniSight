@@ -33,10 +33,11 @@ function run() {
 
   assert.ok(installerSource.includes('GIT_ASKPASS'), 'private token must use GIT_ASKPASS');
   assert.ok(!installerSource.includes('reset --hard'), 'update must not silently discard local edits');
-  assert.ok(wrapperSource.includes('community-scripts/ProxmoxVE/main/misc/build.func'), 'wrapper must load the same stable framework as AdGuard');
-  assert.ok(wrapperSource.includes('start\nbuild_container\ndescription'), 'wrapper must use the standard Community Scripts lifecycle');
-  assert.ok(wrapperSource.includes('COMMUNITY_INSTALL_SOURCE') && wrapperSource.includes('OMNISIGHT_INSTALL_URL'), 'standalone wrapper must redirect only the missing upstream OmniSight installer');
-  assert.ok(wrapperSource.includes('%E2%9D%A4%EF%B8%8F') && wrapperSource.includes('%F0%9F%93%A6'), 'LXC Notes badge icons must use encoding-safe URLs');
+  assert.ok(wrapperSource.includes('COMMUNITY_SCRIPTS_URL'), 'wrapper must identify the OmniSight scripts root');
+  assert.ok(wrapperSource.includes('deploy/community-scripts'), 'wrapper must use the repository Community Scripts tree');
+  assert.ok(wrapperSource.includes('/ct/omnisight.sh'), 'wrapper must delegate to the canonical CT script');
+  assert.ok(!wrapperSource.includes('COMMUNITY_BUILD_FUNC'), 'wrapper must not patch the Community Scripts framework source');
+  assert.ok(!wrapperSource.includes('ProxmoxVE/main/misc/build.func'), 'wrapper must not use the retired monolithic framework path');
   assert.ok(!wrapperSource.includes('pct create'), 'wrapper must not maintain a separate LXC implementation');
   assert.ok(!wrapperSource.includes('read -r -p "Container ID'), 'wrapper must not use the legacy plain-text prompt flow');
   assert.match(readmeSource, /bash -c "\$\(curl -fsSL https:\/\/raw\.githubusercontent\.com\/caglaryalcin\/OmniSight\/main\/scripts\/proxmox-lxc\.sh\)"/);
@@ -44,8 +45,14 @@ function run() {
   assert.ok(documentationSource.includes('Community Scripts storage-pool dialog'));
   assert.strictEqual(communityMetadata.install_methods[0].config_path, '/opt/omnisight/data/config.yaml');
   assert.strictEqual(communityMetadata.install_methods[0].script, 'ct/omnisight.sh');
+  assert.strictEqual(communityMetadata.repository, 'https://github.com/caglaryalcin/OmniSight');
+  assert.deepStrictEqual(communityMetadata.platforms, ['pve']);
+  assert.ok(!Object.hasOwn(communityMetadata, 'has_arm'), 'legacy has_arm metadata must not be used');
+  assert.ok(!Object.hasOwn(communityMetadata, 'architectures'), 'untested ARM64 support must remain undeclared');
   assert.ok(communityInstall.includes('/opt/omnisight/data/config.yaml'));
-  assert.ok(communityInstall.includes('deploy/community-scripts/ct/omnisight.sh'), 'container update command must work before upstream acceptance');
+  assert.ok(!communityInstall.includes('/usr/bin/update'), 'the Community Scripts core must create the update command');
+  assert.ok(communityCt.includes('community-scripts/core/main'), 'CT script must load the current Community Scripts core');
+  assert.ok(communityCt.includes('COMMUNITY_SCRIPTS_CORE_DIR'), 'CT script must support a local core checkout');
   assert.ok(communityCt.includes('build_container') && communityCt.includes('update_script'));
   assert.ok(fs.existsSync(path.join(communityRoot, 'ct', 'headers', 'omnisight')));
 
