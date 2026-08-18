@@ -240,7 +240,6 @@ async function run() {
       publicStatus: true,
       publicTitle: 'Changed demo',
       publicDescription: 'Changed',
-      security: { passwordResetEnabled: false, selfRegistrationEnabled: false },
     });
     const configUpdate = await request(server, {
       method: 'POST',
@@ -249,6 +248,21 @@ async function run() {
       body: changedConfig,
     });
     assert.strictEqual(configUpdate.statusCode, 200);
+
+    const lockedSecurity = JSON.stringify({ security: { passwordResetEnabled: false, selfRegistrationEnabled: false } });
+    const lockedSecurityUpdate = await request(server, {
+      method: 'POST',
+      pathname: '/api/config',
+      headers: { Cookie: sessionCookie, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(lockedSecurity) },
+      body: lockedSecurity,
+    });
+    assert.strictEqual(lockedSecurityUpdate.statusCode, 403);
+    assert.deepStrictEqual(JSON.parse(lockedSecurityUpdate.body), {
+      ok: false,
+      demo: true,
+      code: 'DEMO_USER_MANAGEMENT_DISABLED',
+      error: 'User and role management is disabled in demo mode.',
+    });
 
     const changedTopology = JSON.stringify({ links: [], nodes: ['changed-node'], hidden: [], positions: { 'changed-node': { x: 1, y: 2 } }, view: { scale: 1, x: 0, y: 0 } });
     const topologyUpdate = await request(server, {

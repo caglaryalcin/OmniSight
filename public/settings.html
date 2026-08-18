@@ -5926,6 +5926,27 @@ function saveConfig(opts = {}) {
   return result;
 }
 
+function demoUserAccessLocked() {
+  return document.documentElement.getAttribute('data-demo-users-roles') === 'disabled'
+    || document.cookie.split(';').some(part => part.trim().startsWith('omnisight_demo_day='));
+}
+
+function demoUserAccessChanged(cfg) {
+  if (!demoUserAccessLocked()) return false;
+  const requested = cfg?.security || {};
+  const current = window._settingsConfig?.security || {};
+  return (requested.passwordResetEnabled !== false) !== (current.passwordResetEnabled !== false)
+    || (requested.selfRegistrationEnabled !== false) !== (current.selfRegistrationEnabled !== false);
+}
+
+function restoreDemoUserAccess() {
+  const current = window._settingsConfig?.security || {};
+  const passwordReset = document.getElementById('security-password-reset');
+  const selfRegistration = document.getElementById('security-self-registration');
+  if (passwordReset) passwordReset.checked = current.passwordResetEnabled !== false;
+  if (selfRegistration) selfRegistration.checked = current.selfRegistrationEnabled !== false;
+}
+
 async function performSaveConfig(opts = {}) {
   if (settingsReadOnly) {
     if (!opts.silent) toast(trText('Only admins can change settings'), 'err');
@@ -5941,6 +5962,11 @@ async function performSaveConfig(opts = {}) {
   btns.forEach(b => b.disabled = true);
   try {
     const cfgPayload = preservePlatformConfigSections(collect(), window._settingsConfig || {});
+    if (demoUserAccessChanged(cfgPayload)) {
+      restoreDemoUserAccess();
+      toast(trText('User and role management is disabled in demo mode.'), 'err');
+      return;
+    }
     if (opts.platformToggle === 'public') {
       cfgPayload.publicStatus = opts.enabled === true;
     } else if (opts.platformToggle) {

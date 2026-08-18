@@ -15,6 +15,8 @@ const DEMO_DEFAULT_CREDENTIALS = DEMO_USERNAME === 'demo' && DEMO_PASSWORD === '
 const DEMO_DAY_COOKIE = 'omnisight_demo_day';
 const DEMO_RESET_TIMEZONE = String(process.env.OMNISIGHT_DEMO_RESET_TIMEZONE || 'Europe/Istanbul').trim() || 'Europe/Istanbul';
 const DEMO_FILE_UPLOAD_ERROR = 'File uploads are disabled in demo mode.';
+const DEMO_USER_MANAGEMENT_ERROR = 'User and role management is disabled in demo mode.';
+const DEMO_SECURITY_DEFAULTS = Object.freeze({ passwordResetEnabled: true, selfRegistrationEnabled: true });
 
 function isDemoFileUploadWrite(req) {
   if (!['POST', 'PUT', 'PATCH'].includes(String(req.method || '').toUpperCase())) return false;
@@ -590,6 +592,14 @@ function demoSessionCookie(value, maxAge, req) {
   return `${DEMO_SESSION_COOKIE}=${value}; Path=/; Max-Age=${maxAge}; HttpOnly; SameSite=Lax${secure}`;
 }
 
+function demoUserAccessConfigChanged(body = {}) {
+  const security = body?.security;
+  if (!security || typeof security !== 'object') return false;
+  return Object.entries(DEMO_SECURITY_DEFAULTS).some(([key, value]) => (
+    Object.prototype.hasOwnProperty.call(security, key) && security[key] !== value
+  ));
+}
+
 function demoDayCookie(req) {
   const secure = demoRequestIsHttps(req) ? '; Secure' : '';
   return `${DEMO_DAY_COOKIE}=${encodeURIComponent(demoStateDay)}; Path=/; Max-Age=172800; SameSite=Lax${secure}`;
@@ -657,7 +667,7 @@ function demoConfig() {
     publicPlatforms: Array.isArray(cfg.publicPlatforms) ? [...cfg.publicPlatforms] : [],
     appearance: { dashboardSidePanel: false },
     performance: { lowIoMode: true },
-    security: { passwordResetEnabled: true, selfRegistrationEnabled: true },
+    security: { ...DEMO_SECURITY_DEFAULTS },
     proxmox: platform('proxmox', { url: 'https://192.0.2.10:8006', tokenId: '__demo__', tokenSecret: '__demo__', tls: 'verify', sshMetrics: [] }),
     vmware: platform('vmware', { instances: [{ name: 'vcenter-demo', url: 'https://vcenter.example.invalid', username: 'monitoring@vsphere.local', password: '__demo__', insecureTLS: false }] }),
     linux: platform('linux', { agentToken: '__demo_agent_token__' }),
@@ -1690,6 +1700,14 @@ app.post('/api/set-password', (req, res) => res.status(403).json({ ok: false, de
 
 app.get('/api/config', (req, res) => res.json(demoConfig()));
 app.post('/api/config', (req, res) => {
+  if (demoUserAccessConfigChanged(req.body)) {
+    return res.status(403).json({
+      ok: false,
+      demo: true,
+      code: 'DEMO_USER_MANAGEMENT_DISABLED',
+      error: DEMO_USER_MANAGEMENT_ERROR,
+    });
+  }
   rememberDemoConfig(req.body);
   res.json({ ok: true, fullData: false, data: demoStatus(), demo: true });
 });
