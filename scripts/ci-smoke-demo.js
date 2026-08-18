@@ -84,6 +84,7 @@ function testDemoBrowserDailyReset() {
 function testDemoFileUploadLock() {
   const source = fs.readFileSync(path.join(__dirname, '..', 'public', 'demo-upload-lock.js'), 'utf8');
   const attributes = new Map();
+  const localStorage = memoryStorage({ os_settings_active_section: 'users' });
   const fileInput = {
     nodeType: 1,
     disabled: false,
@@ -101,6 +102,28 @@ function testDemoFileUploadLock() {
     setAttribute: (name, value) => attributes.set(`button:${name}`, String(value)),
     querySelectorAll: () => [],
   };
+  const userControl = {
+    nodeType: 1,
+    disabled: false,
+    matches: selector => selector === 'input,select,textarea,button',
+    setAttribute: (name, value) => attributes.set(`user-control:${name}`, String(value)),
+    querySelectorAll: () => [],
+  };
+  const usersNav = {
+    nodeType: 1,
+    disabled: false,
+    dataset: {},
+    matches: selector => selector === '.settings-nav-btn[data-target="users"]',
+    setAttribute: (name, value) => attributes.set(`users-nav:${name}`, String(value)),
+    querySelectorAll: () => [],
+  };
+  const usersCard = {
+    nodeType: 1,
+    dataset: {},
+    matches: selector => selector === '#card-users',
+    setAttribute: (name, value) => attributes.set(`users-card:${name}`, String(value)),
+    querySelectorAll: selector => selector === 'input,select,textarea,button' ? [userControl] : [],
+  };
   const documentElement = {
     nodeType: 1,
     setAttribute: (name, value) => attributes.set(`html:${name}`, String(value)),
@@ -111,11 +134,17 @@ function testDemoFileUploadLock() {
     head: { appendChild: () => {} },
     createElement: () => ({ textContent: '' }),
     getElementById: id => id === 'cert-file' ? fileInput : null,
-    querySelectorAll: selector => selector === 'input[type="file"]' ? [fileInput] : selector === '[onclick]' ? [uploadButton] : [],
+    querySelectorAll: selector => {
+      if (selector === 'input[type="file"]') return [fileInput];
+      if (selector === '[onclick]') return [uploadButton];
+      if (selector === '.settings-nav-btn[data-target="users"]') return [usersNav];
+      if (selector === '#card-users') return [usersCard];
+      return [];
+    },
     addEventListener: () => {},
   };
   const window = {};
-  vm.runInNewContext(source, { window, document });
+  vm.runInNewContext(source, { window, document, localStorage });
 
   assert.strictEqual(fileInput.disabled, true);
   assert.strictEqual(fileInput.value, '');
@@ -123,6 +152,13 @@ function testDemoFileUploadLock() {
   assert.strictEqual(uploadButton.dataset.demoFileUploadTrigger, 'true');
   assert.strictEqual(attributes.get('html:data-demo-file-uploads'), 'disabled');
   assert.strictEqual(attributes.get('button:title'), 'File uploads are disabled in demo mode.');
+  assert.strictEqual(usersNav.disabled, true);
+  assert.strictEqual(usersNav.dataset.demoUsersLock, 'true');
+  assert.strictEqual(userControl.disabled, true);
+  assert.strictEqual(usersCard.dataset.demoUsersLock, 'true');
+  assert.strictEqual(attributes.get('html:data-demo-users-roles'), 'disabled');
+  assert.strictEqual(attributes.get('users-nav:title'), 'User and role management is disabled in demo mode.');
+  assert.strictEqual(localStorage.getItem('os_settings_active_section'), 'appearance');
 }
 
 async function run() {
