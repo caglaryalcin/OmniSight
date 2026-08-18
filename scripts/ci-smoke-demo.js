@@ -81,11 +81,56 @@ function testDemoBrowserDailyReset() {
   assert.strictEqual(localStorage.getItem('os_theme'), null);
 }
 
+function testDemoFileUploadLock() {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'public', 'demo-upload-lock.js'), 'utf8');
+  const attributes = new Map();
+  const fileInput = {
+    nodeType: 1,
+    disabled: false,
+    value: 'selected.pem',
+    matches: selector => selector === 'input[type="file"]',
+    setAttribute: (name, value) => attributes.set(`input:${name}`, String(value)),
+    querySelectorAll: () => [],
+  };
+  const uploadButton = {
+    nodeType: 1,
+    disabled: false,
+    dataset: {},
+    matches: () => false,
+    getAttribute: name => name === 'onclick' ? "document.getElementById('cert-file').click()" : '',
+    setAttribute: (name, value) => attributes.set(`button:${name}`, String(value)),
+    querySelectorAll: () => [],
+  };
+  const documentElement = {
+    nodeType: 1,
+    setAttribute: (name, value) => attributes.set(`html:${name}`, String(value)),
+  };
+  const document = {
+    readyState: 'complete',
+    documentElement,
+    head: { appendChild: () => {} },
+    createElement: () => ({ textContent: '' }),
+    getElementById: id => id === 'cert-file' ? fileInput : null,
+    querySelectorAll: selector => selector === 'input[type="file"]' ? [fileInput] : selector === '[onclick]' ? [uploadButton] : [],
+    addEventListener: () => {},
+  };
+  const window = {};
+  vm.runInNewContext(source, { window, document });
+
+  assert.strictEqual(fileInput.disabled, true);
+  assert.strictEqual(fileInput.value, '');
+  assert.strictEqual(uploadButton.disabled, true);
+  assert.strictEqual(uploadButton.dataset.demoFileUploadTrigger, 'true');
+  assert.strictEqual(attributes.get('html:data-demo-file-uploads'), 'disabled');
+  assert.strictEqual(attributes.get('button:title'), 'File uploads are disabled in demo mode.');
+}
+
 async function run() {
   const packageVersion = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8')).version;
   const { app, demoAppVersion, demoConfig, topologyData, ensureDemoDailyReset } = require('../demo-server');
   assert.strictEqual(demoAppVersion(), packageVersion);
   testDemoBrowserDailyReset();
+  testDemoFileUploadLock();
 
   const server = await listen(app);
   try {
@@ -107,6 +152,7 @@ async function run() {
     assert.strictEqual(page.statusCode, 200);
     assert.ok(page.body.includes(`const APP_VERSION = ${JSON.stringify(packageVersion)};`));
     assert.ok(page.body.includes('<script src="/demo-reset.js"></script>'));
+    assert.match(page.body, /<script src="\/demo-upload-lock\.js\?v=[^"]+"><\/script>/);
     assert.match(String(page.headers['cache-control'] || ''), /no-cache/);
     assert.ok([].concat(page.headers['set-cookie'] || []).some(cookie => cookie.startsWith('omnisight_demo_day=')));
 
@@ -160,6 +206,29 @@ async function run() {
 
     const agentsAfterReset = await request(server, { pathname: '/api/agents', headers: { Cookie: sessionCookie } });
     assert.strictEqual(JSON.parse(agentsAfterReset.body).agents.length, 2);
+
+    for (const pathname of [
+      '/api/upload/certificate',
+      '/API/upload/certificate/',
+      '/api/upload/icon',
+      '/api/upload/kubeconfig',
+      '/api/profile/avatar',
+      '/api/config/import',
+      '/api/backup/import',
+      '/api/onboarding/import',
+    ]) {
+      const blockedBody = JSON.stringify({ name: 'blocked', dataUrl: 'data:text/plain;base64,WA==', backup: 'blocked' });
+      const blocked = await request(server, {
+        method: 'POST',
+        pathname,
+        headers: { Cookie: sessionCookie, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(blockedBody) },
+        body: blockedBody,
+      });
+      assert.strictEqual(blocked.statusCode, 403, `${pathname} should be blocked in demo mode`);
+      const blockedResult = JSON.parse(blocked.body);
+      assert.strictEqual(blockedResult.code, 'DEMO_FILE_UPLOADS_DISABLED');
+      assert.strictEqual(blockedResult.error, 'File uploads are disabled in demo mode.');
+    }
     ensureDemoDailyReset(Date.now());
   } finally {
     await close(server);

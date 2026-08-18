@@ -58,21 +58,39 @@ function Invoke-Icacls([string[]]$Arguments, [string]$FailureMessage) {
   if ($exitCode -ne 0) { throw "$FailureMessage (exit $exitCode): $($output -join ' ')" }
 }
 
-function Repair-AgentDataAccess {
-  if (-not (Test-DirectoryEntry $script:DataDir)) { return }
-  $adminGrant = "*S-1-5-32-544:(OI)(CI)F"
-  $systemGrant = "*S-1-5-18:(OI)(CI)F"
+function Invoke-TakeOwnership([string]$Path) {
   $previousErrorActionPreference = $ErrorActionPreference
   try {
     $ErrorActionPreference = "Continue"
-    $takeownOutput = & "$env:SystemRoot\System32\takeown.exe" /F $script:DataDir /A /R /D Y 2>&1
+    $takeownOutput = & "$env:SystemRoot\System32\takeown.exe" /F $Path /A 2>&1
     $takeownExitCode = $LASTEXITCODE
   } finally {
     $ErrorActionPreference = $previousErrorActionPreference
   }
-  if ($takeownExitCode -ne 0) { throw "Could not recover OmniSight data ownership (exit $takeownExitCode): $($takeownOutput -join ' ')" }
-  Invoke-Icacls @($script:DataDir, "/grant:r", $adminGrant, "/T") "Could not restore Administrators access to the OmniSight data directory"
-  Invoke-Icacls @($script:DataDir, "/grant:r", $systemGrant, "/T") "Could not restore SYSTEM access to the OmniSight data directory"
+  if ($takeownExitCode -ne 0) { throw "Could not recover ownership of $Path (exit $takeownExitCode): $($takeownOutput -join ' ')" }
+}
+
+function Repair-AgentDataEntry([string]$Path, [bool]$IsDirectory) {
+  Invoke-TakeOwnership $Path
+  $permission = if ($IsDirectory) { "(OI)(CI)F" } else { "F" }
+  Invoke-Icacls @($Path, "/grant:r", "*S-1-5-32-544:$permission") "Could not restore Administrators access to $Path"
+  Invoke-Icacls @($Path, "/grant:r", "*S-1-5-18:$permission") "Could not restore SYSTEM access to $Path"
+  if (-not $IsDirectory) { return }
+
+  $entry = Get-Item -LiteralPath $Path -Force -ErrorAction Stop
+  if (-not $entry.PSIsContainer) { throw "Expected OmniSight data directory at $Path" }
+  if (($entry.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw "Refusing to follow reparse point in OmniSight data directory: $Path" }
+
+  $children = @(Get-ChildItem -LiteralPath $Path -Force -ErrorAction Stop)
+  foreach ($child in $children) {
+    if (($child.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw "Refusing to follow reparse point in OmniSight data directory: $($child.FullName)" }
+    Repair-AgentDataEntry $child.FullName ([bool]$child.PSIsContainer)
+  }
+}
+
+function Repair-AgentDataAccess {
+  if (-not (Test-DirectoryEntry $script:DataDir)) { return }
+  Repair-AgentDataEntry $script:DataDir $true
 }
 
 function Protect-AgentDataAcl {

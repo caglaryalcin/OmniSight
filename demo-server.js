@@ -14,6 +14,26 @@ const DEMO_PASSWORD = String(process.env.OMNISIGHT_DEMO_PASSWORD || 'demo') || '
 const DEMO_DEFAULT_CREDENTIALS = DEMO_USERNAME === 'demo' && DEMO_PASSWORD === 'demo';
 const DEMO_DAY_COOKIE = 'omnisight_demo_day';
 const DEMO_RESET_TIMEZONE = String(process.env.OMNISIGHT_DEMO_RESET_TIMEZONE || 'Europe/Istanbul').trim() || 'Europe/Istanbul';
+const DEMO_FILE_UPLOAD_ERROR = 'File uploads are disabled in demo mode.';
+
+function isDemoFileUploadWrite(req) {
+  if (!['POST', 'PUT', 'PATCH'].includes(String(req.method || '').toUpperCase())) return false;
+  const pathname = (String(req.path || '').replace(/\/+$/, '') || '/').toLowerCase();
+  return /\/(?:upload|import)(?:\/|$)/.test(pathname)
+    || pathname === '/api/profile/avatar';
+}
+
+app.use((req, res, next) => {
+  if (!isDemoFileUploadWrite(req)) return next();
+  res.setHeader('Cache-Control', 'no-store');
+  if (!demoAuthenticated(req)) return res.status(401).json({ ok: false, error: 'Unauthorized' });
+  return res.status(403).json({
+    ok: false,
+    demo: true,
+    code: 'DEMO_FILE_UPLOADS_DISABLED',
+    error: DEMO_FILE_UPLOAD_ERROR,
+  });
+});
 
 app.use(express.json({ limit: '3mb' }));
 app.use((req, res, next) => {
@@ -112,7 +132,9 @@ const DEMO_GZIP_TYPES = new Map([
 const demoGzipCache = new Map();
 const demoHtmlCache = new Map();
 function injectDemoRuntimeConstants(html) {
+  const uploadLockVersion = encodeURIComponent(demoAssetVersion('/demo-upload-lock.js'));
   return String(html)
+    .replace(/<head>/i, `<head>\n<script src="/demo-upload-lock.js?v=${uploadLockVersion}"></script>`)
     .replace(/__OMNISIGHT_VERSION_JSON__/g, JSON.stringify(demoAppVersion()))
     .replace(/__OMNISIGHT_EMBED_VERSIONS_JSON__/g, JSON.stringify(demoEmbedVersions()));
 }
