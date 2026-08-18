@@ -657,7 +657,7 @@ function demoConfig() {
     publicPlatforms: Array.isArray(cfg.publicPlatforms) ? [...cfg.publicPlatforms] : [],
     appearance: { dashboardSidePanel: false },
     performance: { lowIoMode: true },
-    security: { passwordResetEnabled: true },
+    security: { passwordResetEnabled: true, selfRegistrationEnabled: true },
     proxmox: platform('proxmox', { url: 'https://192.0.2.10:8006', tokenId: '__demo__', tokenSecret: '__demo__', tls: 'verify', sshMetrics: [] }),
     vmware: platform('vmware', { instances: [{ name: 'vcenter-demo', url: 'https://vcenter.example.invalid', username: 'monitoring@vsphere.local', password: '__demo__', insecureTLS: false }] }),
     linux: platform('linux', { agentToken: '__demo_agent_token__' }),
@@ -1732,10 +1732,12 @@ app.get('/api/agent/repair-commands', (req, res) => res.json({
 }));
 app.post('/api/agent/ping', (req, res) => res.json({ ok: true, demo: true, id: req.body?.id || '' }));
 app.get('/api/users', (req, res) => res.json([demoUser]));
-app.post('/api/users', (req, res) => res.status(403).json({ ok: false, demo: true, error: 'Demo users cannot be changed.' }));
-app.post('/api/users/batch', (req, res) => res.status(403).json({ ok: false, demo: true, error: 'Demo users cannot be changed.' }));
-app.put('/api/users/:id', (req, res) => res.status(403).json({ ok: false, demo: true, error: 'Demo users cannot be changed.', user: demoUser }));
-app.delete('/api/users/:id', (req, res) => res.status(403).json({ ok: false, demo: true, error: 'Demo users cannot be changed.' }));
+const rejectDemoUserMutation = (req, res) => res.status(403).json({ ok: false, demo: true, error: 'Demo users cannot be changed.' });
+app.post('/api/users', rejectDemoUserMutation);
+app.post('/api/users/batch', rejectDemoUserMutation);
+app.patch('/api/users/:id', rejectDemoUserMutation);
+app.put('/api/users/:id', rejectDemoUserMutation);
+app.delete('/api/users/:id', rejectDemoUserMutation);
 app.get('/api/sessions', (req, res) => res.json({
   currentPublicIp: '127.0.0.1',
   sessions: [{

@@ -109,6 +109,14 @@ function testDemoFileUploadLock() {
     setAttribute: (name, value) => attributes.set(`user-control:${name}`, String(value)),
     querySelectorAll: () => [],
   };
+  const dynamicSaveButton = {
+    nodeType: 1,
+    disabled: false,
+    matches: selector => selector === 'input,select,textarea,button',
+    closest: selector => selector === '#card-users' ? usersCard : null,
+    setAttribute: (name, value) => attributes.set(`dynamic-save:${name}`, String(value)),
+    querySelectorAll: () => [],
+  };
   const usersNav = {
     nodeType: 1,
     disabled: false,
@@ -159,6 +167,9 @@ function testDemoFileUploadLock() {
   assert.strictEqual(attributes.get('html:data-demo-users-roles'), 'disabled');
   assert.strictEqual(attributes.get('users-nav:title'), 'User and role management is disabled in demo mode.');
   assert.strictEqual(localStorage.getItem('os_settings_active_section'), 'appearance');
+  window.omnisightDemoFileUploadLock.applyUsersAndRoles(dynamicSaveButton);
+  assert.strictEqual(dynamicSaveButton.disabled, true);
+  assert.strictEqual(attributes.get('dynamic-save:title'), 'User and role management is disabled in demo mode.');
 }
 
 async function run() {
@@ -206,7 +217,31 @@ async function run() {
     assert.deepStrictEqual({ offline: summaryById.unifi.offline, online: summaryById.unifi.online, total: summaryById.unifi.total }, { offline: 1, online: 3, total: 5 });
     assert.deepStrictEqual({ offline: summaryById.uptimekuma.offline, online: summaryById.uptimekuma.online, total: summaryById.uptimekuma.total }, { offline: 1, online: 3, total: 4 });
 
-    const changedConfig = JSON.stringify({ preferredLanguage: 'tr', publicStatus: true, publicTitle: 'Changed demo', publicDescription: 'Changed' });
+    for (const [method, pathname] of [
+      ['POST', '/api/users'],
+      ['POST', '/api/users/batch'],
+      ['PATCH', '/api/users/demo'],
+      ['PUT', '/api/users/demo'],
+      ['DELETE', '/api/users/demo'],
+    ]) {
+      const mutationBody = JSON.stringify({ username: 'changed', role: 'read-only', disabled: true });
+      const mutation = await request(server, {
+        method,
+        pathname,
+        headers: { Cookie: sessionCookie, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(mutationBody) },
+        body: mutationBody,
+      });
+      assert.strictEqual(mutation.statusCode, 403, `${method} ${pathname} should be blocked in demo mode`);
+      assert.strictEqual(JSON.parse(mutation.body).error, 'Demo users cannot be changed.');
+    }
+
+    const changedConfig = JSON.stringify({
+      preferredLanguage: 'tr',
+      publicStatus: true,
+      publicTitle: 'Changed demo',
+      publicDescription: 'Changed',
+      security: { passwordResetEnabled: false, selfRegistrationEnabled: false },
+    });
     const configUpdate = await request(server, {
       method: 'POST',
       pathname: '/api/config',
@@ -233,6 +268,7 @@ async function run() {
     });
     assert.strictEqual(agentUpdate.statusCode, 200);
     assert.strictEqual(demoConfig().publicTitle, 'Changed demo');
+    assert.deepStrictEqual(demoConfig().security, { passwordResetEnabled: true, selfRegistrationEnabled: true });
     assert.deepStrictEqual(topologyData().topologyNodes, ['changed-node']);
 
     assert.strictEqual(ensureDemoDailyReset(Date.now() + (3 * 86400000)), true);
