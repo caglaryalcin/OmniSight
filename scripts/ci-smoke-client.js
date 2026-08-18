@@ -11,7 +11,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-const BLOCKS = ['fmtChartValue', 'localizeOperationalText', 'offlineRatioLabel', 'offlineRatioBadgeClass'];
+const BLOCKS = ['fmtChartValue', 'localizeOperationalText', 'offlineRatioLabel', 'offlineRatioBadgeClass', 'mergeNotifySnapshot'];
 
 function extract(source, name) {
   const begin = `/* ci-extract:begin ${name} */`;
@@ -43,7 +43,42 @@ function run() {
   const ctx = {};
   vm.createContext(ctx);
   vm.runInContext(BLOCKS.map(name => extract(html, name)).join('\n'), ctx);
-  const { fmtChartValue, localizeOperationalText, offlineRatioLabel, offlineRatioBadgeClass } = ctx;
+  const { fmtChartValue, localizeOperationalText, offlineRatioLabel, offlineRatioBadgeClass, mergeNotifySnapshot } = ctx;
+
+  const pendingEnabled = new Map([
+    ['lx:host-a', { off:true }],
+    ['snmp:switch-a', { off:false }],
+  ]);
+  const pendingTopics = new Map([['lx:host-a', { topic:'ops' }]]);
+  const mergedNotify = mergeNotifySnapshot(
+    ['snmp:switch-a'],
+    { 'lx:host-a':'default', 'snmp:switch-a':'network' },
+    7,
+    7,
+    pendingEnabled,
+    pendingTopics,
+  );
+  assert.deepStrictEqual(Array.from(mergedNotify.off), ['lx:host-a'], 'pending bell choices must override an in-flight status snapshot');
+  assert.strictEqual(mergedNotify.topics['lx:host-a'], 'ops', 'pending topic choices must override an in-flight status snapshot');
+  assert.strictEqual(mergeNotifySnapshot([], {}, 6, 7, new Map(), new Map()), null, 'an older refresh must not replace a confirmed notification revision');
+  const confirmedNotify = mergeNotifySnapshot(['lx:host-a'], {}, 8, 7, new Map(), new Map());
+  assert.deepStrictEqual(Array.from(confirmedNotify.off), ['lx:host-a'], 'a newer server revision must become canonical');
+
+  assert.match(html, /<button type="button" class="nbell/, 'notification bells must be real buttons so row dragging cannot capture their click');
+  assert.ok(html.includes('toggleNotify(this.dataset.notifyKey,this)') && html.includes('setNotifyTopic(this.dataset.notifyKey,this.value,this)'), 'notification keys must come from escaped data attributes instead of inline JavaScript strings');
+  assert.ok(html.includes('function deferDetailRenderForPointer(detail, panelId)') && html.includes('detailPointerReleasePending'), 'detail refreshes must wait until the native click after pointerup');
+  assert.ok(html.includes("if(oldNode.tagName === 'BUTTON') morphChildren(oldNode, newNode);") && html.includes("if(!statusStreamRefreshing) resetPbar();"), 'focused bells must reconcile in place and stale status fetches must not finish a newer refresh bar');
+  assert.ok(html.includes("queuedStatusStreamData = event.data || ''") && html.includes('if(queued) queueMicrotask'), 'notification events received during a status fetch must be replayed');
+  assert.ok(html.includes('closeStatusStream();\n    abortStatusFetches();\n    statusStreamRefreshing = false;'), 'pause and resume must not retain a stale refresh state after dropping stream events');
+
+  const focusContext = { document: { activeElement:null } };
+  vm.createContext(focusContext);
+  vm.runInContext(extractFunction(html, 'focusedDetailControl'), focusContext);
+  const focusedButton = { tagName:'BUTTON', isContentEditable:false };
+  const buttonContainer = { tagName:'DIV', isContentEditable:false };
+  focusContext.document.activeElement = focusedButton;
+  assert.strictEqual(focusContext.focusedDetailControl(focusedButton), true, 'the active notification button itself must be preserved during a morph');
+  assert.strictEqual(focusContext.focusedDetailControl(buttonContainer), false, 'an active child must not force a full detail replacement or freeze its siblings');
 
   const translations = { healthy: 'sağlıklı' };
   const translateText = text => translations[text] || text;
@@ -143,7 +178,7 @@ function run() {
     assert.doesNotThrow(() => prefetchContext.scheduleEmbedPrefetch(options), 'embed prefetch scheduling must run without undefined options');
   }
 
-  console.log('smoke ok — client helpers: fmtChartValue, localization, availability, scroll preservation');
+  console.log('smoke ok — client helpers: formatting, localization, availability, notification refresh guards, scroll preservation');
 }
 
 module.exports = { run };

@@ -163,8 +163,9 @@ body.os-resizing #detail .embed-frame{pointer-events:none}
 .md-blue{background:var(--blue)}
 .mon-name{font-size:14px;font-weight:550;width:160px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mon-sub{font-size:13px;color:var(--muted);width:110px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.nbell{display:inline-flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);flex-shrink:0;padding:3px;border-radius:7px;opacity:.65;transition:opacity .1s,color .1s,background .1s}
+.nbell{display:inline-flex;align-items:center;justify-content:center;appearance:none;border:0;background:transparent;font:inherit;line-height:0;cursor:pointer;color:var(--muted);flex-shrink:0;padding:3px;border-radius:7px;opacity:.65;transition:opacity .1s,color .1s,background .1s}
 .nbell:hover{color:var(--text);opacity:1;background:rgba(255,255,255,.07)}
+.nbell:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
 .nbell.off{color:var(--red);opacity:1}
 .notify-wrap{display:inline-flex;align-items:center;gap:4px;flex-shrink:0}
 .notify-topic{height:24px;max-width:96px;border:1px solid var(--border);background:var(--row);color:var(--muted);border-radius:7px;padding:2px 20px 2px 7px;font-size:11px;font-weight:700;cursor:pointer;outline:none}
@@ -1420,7 +1421,56 @@ let recentLogsRequest = null;
 let recentLogsLoaded = false;
 let notifyOff = new Set();
 let notifyTopicMap = {};
+let confirmedNotifyOff = new Set();
+let confirmedNotifyTopics = {};
 let ntfyTopics = [];
+let notifyRevision = 0;
+let notifyMutationSeq = 0;
+const pendingNotifyEnabled = new Map();
+const pendingNotifyTopics = new Map();
+/* ci-extract:begin mergeNotifySnapshot */
+function mergeNotifySnapshot(disabled, topics, revision, currentRevision = 0, pendingEnabled = new Map(), pendingTopics = new Map()) {
+  const parsedRevision = Number(revision);
+  const incomingRevision = Number.isFinite(parsedRevision) && parsedRevision >= 0 ? parsedRevision : 0;
+  const knownRevision = Number.isFinite(Number(currentRevision)) ? Number(currentRevision) : 0;
+  if(incomingRevision < knownRevision) return null;
+  const off = new Set((Array.isArray(disabled) ? disabled : []).map(String));
+  const topicMap = topics && typeof topics === 'object' && !Array.isArray(topics) ? { ...topics } : {};
+  pendingEnabled?.forEach?.((pending, key) => {
+    if(pending?.off) off.add(String(key));
+    else off.delete(String(key));
+  });
+  pendingTopics?.forEach?.((pending, key) => {
+    const topic = String(pending?.topic || '').trim();
+    if(topic) topicMap[String(key)] = topic;
+    else delete topicMap[String(key)];
+  });
+  return { off, topics:topicMap, revision:incomingRevision };
+}
+/* ci-extract:end mergeNotifySnapshot */
+function applyNotifySnapshot(disabled, topics, revision) {
+  const merged = mergeNotifySnapshot(disabled, topics, revision, notifyRevision, pendingNotifyEnabled, pendingNotifyTopics);
+  if(!merged) return false;
+  confirmedNotifyOff = new Set((Array.isArray(disabled) ? disabled : []).map(String));
+  confirmedNotifyTopics = topics && typeof topics === 'object' && !Array.isArray(topics) ? { ...topics } : {};
+  notifyOff = merged.off;
+  notifyTopicMap = merged.topics;
+  notifyRevision = merged.revision;
+  return true;
+}
+function rebuildPendingNotifyState(){
+  const merged = mergeNotifySnapshot(
+    [...confirmedNotifyOff],
+    confirmedNotifyTopics,
+    notifyRevision,
+    notifyRevision,
+    pendingNotifyEnabled,
+    pendingNotifyTopics,
+  );
+  if(!merged) return;
+  notifyOff = merged.off;
+  notifyTopicMap = merged.topics;
+}
 function currentLang(data = window._lastData) {
   if (window.OmniI18n?.currentLang) return window.OmniI18n.currentLang(data?.preferredLanguage || 'en');
   return data?.preferredLanguage || document.documentElement.lang || 'en';
@@ -1550,39 +1600,92 @@ window.applyLanguage = function(lang = currentLang()) {
 };
 const BELL_ON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>';
 const BELL_OFF = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13.73 21a2 2 0 0 1-3.46 0"/><path d="M18.63 13A17.89 17.89 0 0 1 18 8"/><path d="M6.26 6.26A5.86 5.86 0 0 0 6 8c0 7-3 9-3 9h14"/><path d="M18 8a6 6 0 0 0-9.33-5"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
-function notifyKey(key){
-  return String(key).replace(/\\/g,"\\\\").replace(/'/g,"\\'");
-}
 function notifyBellOnly(key){
   const off = notifyOff.has(key);
-  const k = notifyKey(key);
-  return `<span class="nbell${off?' off':''}" onclick="event.stopPropagation();toggleNotify('${k}',this)" title="${off?'Notifications off':'Notifications on'}">${off?BELL_OFF:BELL_ON}</span>`;
+  const stateTitle = off ? 'Notifications off' : 'Notifications on';
+  const actionLabel = off ? 'Enable notifications' : 'Disable notifications';
+  return `<button type="button" class="nbell${off?' off':''}" data-notify-key="${escAttr(key)}" data-morph-key="notify:${escAttr(key)}" onclick="event.stopPropagation();toggleNotify(this.dataset.notifyKey,this)" title="${stateTitle}" aria-label="${actionLabel}" aria-pressed="${off?'false':'true'}">${off?BELL_OFF:BELL_ON}</button>`;
 }
 function notifyTopicSelect(key){
-  const k = String(key).replace(/\\/g,"\\\\").replace(/'/g,"\\'");
   const topics = Array.isArray(ntfyTopics) ? ntfyTopics.filter(Boolean) : [];
   const selected = notifyTopicMap?.[key] || '';
-  return topics.length > 0 ? `<select class="notify-topic" title="ntfy topic" onclick="event.stopPropagation()" onchange="setNotifyTopic('${k}',this.value,this)">
+  return topics.length > 0 ? `<select class="notify-topic" data-notify-key="${escAttr(key)}" title="ntfy topic" onclick="event.stopPropagation()" onchange="setNotifyTopic(this.dataset.notifyKey,this.value,this)">
     ${topics.map(t => `<option value="${escAttr(t)}"${t===selected?' selected':''}>${escHtml(t)}</option>`).join('')}
   </select>` : '';
 }
 function notifyBell(key){
-  return `<span class="notify-wrap">${notifyBellOnly(key)}${notifyTopicSelect(key)}</span>`;
+  return `<span class="notify-wrap" data-morph-key="notify-wrap:${escAttr(key)}">${notifyBellOnly(key)}${notifyTopicSelect(key)}</span>`;
+}
+function setNotifyBellVisual(el, off){
+  if(!el) return;
+  el.classList.toggle('off', off);
+  el.innerHTML = off ? BELL_OFF : BELL_ON;
+  el.title = off ? 'Notifications off' : 'Notifications on';
+  el.setAttribute('aria-label', off ? 'Enable notifications' : 'Disable notifications');
+  el.setAttribute('aria-pressed', off ? 'false' : 'true');
+}
+function syncNotifyBellVisuals(key){
+  const off = notifyOff.has(String(key));
+  document.querySelectorAll('.nbell[data-notify-key]').forEach(el => {
+    if(el.dataset.notifyKey === String(key)) setNotifyBellVisual(el, off);
+  });
+}
+function syncNotifyTopicVisuals(key){
+  const topic = notifyTopicMap?.[String(key)] || '';
+  document.querySelectorAll('.notify-topic[data-notify-key]').forEach(el => {
+    if(el.dataset.notifyKey !== String(key)) return;
+    el.value = topic;
+    el.title = topic ? `ntfy topic: ${topic}` : 'ntfy topic';
+  });
 }
 async function toggleNotify(key, el){
+  key = String(key);
   const off = !notifyOff.has(key);
+  const seq = ++notifyMutationSeq;
+  pendingNotifyEnabled.set(key, { seq, off });
   if(off) notifyOff.add(key); else notifyOff.delete(key);
-  if(el){ el.classList.toggle('off', off); el.innerHTML = off?BELL_OFF:BELL_ON; el.title = off?'Notifications off':'Notifications on'; }
-  try{ await fetch('/api/notifications',{method:'POST',headers:{'Content-Type':'application/json',...authHeaders()},body:JSON.stringify({key, enabled:!off})}); }catch(e){}
+  setNotifyBellVisual(el, off);
+  try{
+    const r = await fetch('/api/notifications',{method:'POST',headers:{'Content-Type':'application/json',...authHeaders()},body:JSON.stringify({key, enabled:!off})});
+    const body = await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(body.error || `HTTP ${r.status}`);
+    if(Array.isArray(body.disabled)) {
+      const ownsPending = pendingNotifyEnabled.get(key)?.seq === seq;
+      if(ownsPending) pendingNotifyEnabled.delete(key);
+      const applied = applyNotifySnapshot(body.disabled, body.topics ?? confirmedNotifyTopics, body.notifyRevision);
+      if(ownsPending && !applied) rebuildPendingNotifyState();
+    }
+  }catch(e){
+    if(pendingNotifyEnabled.get(key)?.seq === seq){
+      pendingNotifyEnabled.delete(key);
+      rebuildPendingNotifyState();
+    }
+  }
+  syncNotifyBellVisuals(key);
 }
 async function setNotifyTopic(key, topic, el){
+  key = String(key);
+  const seq = ++notifyMutationSeq;
+  pendingNotifyTopics.set(key, { seq, topic });
   notifyTopicMap = { ...(notifyTopicMap || {}), [key]: topic };
   if(el) el.title = topic ? `ntfy topic: ${topic}` : 'ntfy topic';
   try{
     const r = await fetch('/api/notifications',{method:'POST',headers:{'Content-Type':'application/json',...authHeaders()},body:JSON.stringify({key, topic})});
     const b = await r.json().catch(()=>({}));
-    if(r.ok && b.topics) notifyTopicMap = b.topics;
-  }catch(e){}
+    if(!r.ok) throw new Error(b.error || `HTTP ${r.status}`);
+    if(Array.isArray(b.disabled)) {
+      const ownsPending = pendingNotifyTopics.get(key)?.seq === seq;
+      if(ownsPending) pendingNotifyTopics.delete(key);
+      const applied = applyNotifySnapshot(b.disabled, b.topics ?? confirmedNotifyTopics, b.notifyRevision);
+      if(ownsPending && !applied) rebuildPendingNotifyState();
+    }
+  }catch(e){
+    if(pendingNotifyTopics.get(key)?.seq === seq){
+      pendingNotifyTopics.delete(key);
+      rebuildPendingNotifyState();
+    }
+  }
+  syncNotifyTopicVisuals(key);
 }
 
 let osSelPointerHandledUntil = 0;
@@ -8682,9 +8785,49 @@ function restoreDetailScroll(root, state){
     });
   });
 }
+const activeDetailPointers = new Set();
+let detailRenderDeferred = false;
+let detailPointerReleasePending = false;
+let detailRenderResumeTimer = null;
+function resumeDeferredDetailRender(){
+  if(activeDetailPointers.size) return;
+  detailPointerReleasePending = true;
+  clearTimeout(detailRenderResumeTimer);
+  detailRenderResumeTimer = setTimeout(() => {
+    detailRenderResumeTimer = null;
+    if(activeDetailPointers.size){
+      detailPointerReleasePending = false;
+      return;
+    }
+    detailPointerReleasePending = false;
+    if(!detailRenderDeferred) return;
+    detailRenderDeferred = false;
+    if(window._lastData && activePanel && !dashboardOpen && !embedOpen) {
+      render(window._lastData, { soft:true, interactionResume:true });
+    }
+  }, 0);
+}
+function finishDetailPointer(event){
+  if(event?.pointerId == null || !activeDetailPointers.delete(event.pointerId)) return;
+  resumeDeferredDetailRender();
+}
+document.addEventListener('pointerdown', event => {
+  if(event.target?.closest?.('#detail')) activeDetailPointers.add(event.pointerId);
+}, true);
+window.addEventListener('pointerup', finishDetailPointer, true);
+window.addEventListener('pointercancel', finishDetailPointer, true);
+window.addEventListener('blur', () => {
+  activeDetailPointers.clear();
+  resumeDeferredDetailRender();
+});
+function deferDetailRenderForPointer(detail, panelId){
+  if((!activeDetailPointers.size && !detailPointerReleasePending) || detail?.dataset?.panelId !== panelId) return false;
+  detailRenderDeferred = true;
+  return true;
+}
 function focusedDetailControl(root){
   const a = document.activeElement;
-  if(!a || !root?.contains(a)) return false;
+  if(!a || a !== root) return false;
   return /^(INPUT|TEXTAREA|SELECT|BUTTON)$/i.test(a.tagName) || a.isContentEditable;
 }
 function sameMorphNode(a, b){
@@ -8725,8 +8868,11 @@ function morphNode(oldNode, newNode){
     return;
   }
   if(oldNode.nodeType !== Node.ELEMENT_NODE) return;
-  if(focusedDetailControl(oldNode)) return;
   syncAttrs(oldNode, newNode);
+  if(focusedDetailControl(oldNode)){
+    if(oldNode.tagName === 'BUTTON') morphChildren(oldNode, newNode);
+    return;
+  }
   morphChildren(oldNode, newNode);
 }
 function morphChildren(parent, nextParent){
@@ -8950,7 +9096,7 @@ function bindDetailSystemDragging(detail){
   detail.dataset.detailOrderBound = '1';
   detail.addEventListener('pointerdown', event => {
     if(event.button !== 0 || event.pointerType === 'touch') return;
-    if(event.target.closest('button,a,input,select,textarea,.os-sel,[contenteditable="true"]')) return;
+    if(event.target.closest('button,a,input,select,textarea,.os-sel,.nbell,.notify-wrap,[contenteditable="true"]')) return;
     const header = event.target.closest('[data-detail-system-key].detail-system-draggable');
     const panelId = detail.dataset.panelId || activePanel;
     if(!header || !panelId || !detail.contains(header)) return;
@@ -9089,6 +9235,7 @@ function selectPanel(id, opts = {}){
     return;
   }
   const detail = document.getElementById('detail');
+  if(deferDetailRenderForPointer(detail, id)) return;
   if(window._detailSystemDragging && detail.dataset.panelId === id) return;
   parkEmbedFrames(detail, { abortInflight: true });
   detail.dataset.embedUrl = '';
@@ -9245,8 +9392,7 @@ function render(data, opts = {}){
       keepExistingOnEmpty: embedOpen || !!data.loading || !!data.refreshing || !!data._snapshot,
     });
   }
-  if(Array.isArray(data.notifyDisabled)) notifyOff = new Set(data.notifyDisabled);
-  notifyTopicMap = data.notifyTopics && typeof data.notifyTopics === 'object' ? data.notifyTopics : {};
+  if(Array.isArray(data.notifyDisabled)) applyNotifySnapshot(data.notifyDisabled, data.notifyTopics, data.notifyRevision);
   ntfyTopics = Array.isArray(data.ntfyTopics) ? data.ntfyTopics : [];
 
   const platforms = [];
@@ -10938,8 +11084,18 @@ function togglePause(){
   icon.innerHTML = paused
     ? '<polygon points="5 3 19 12 5 21 5 3"/>'
     : '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>';
-  if(paused){ clearTimeout(timer); setPbarScale(0, 'none'); }
-  else { scheduleRefresh(); }
+  if(paused){
+    clearTimeout(timer);
+    closeStatusStream();
+    abortStatusFetches();
+    statusStreamRefreshing = false;
+    queuedStatusStreamData = '';
+    setPbarScale(0, 'none');
+  } else {
+    statusStreamRefreshing = false;
+    connectStatusStream();
+    pollOnce();
+  }
 }
 
 async function pollOnce(){
@@ -10963,26 +11119,44 @@ async function pollOnce(){
       return;
     }
   }catch{}
-  resetPbar();
+  if(!statusStreamRefreshing) resetPbar();
   scheduleRefresh();
 }
 let statusStream = null;
 let statusStreamOpen = false;
 let statusStreamFetchBusy = false;
+let statusStreamRefreshing = false;
+let queuedStatusStreamData = '';
 let lastStatusEventTs = '';
 async function handleStatusStreamEvent(event){
-  if(paused || pageHidden() || embedOpen || statusStreamFetchBusy) return;
+  if(paused || pageHidden() || embedOpen) return;
   let msg = {};
   try { msg = JSON.parse(event.data || '{}'); } catch {}
-  if(msg.type === 'refreshing') {
-    manualPbarStart();
+  if(!event.replayed){
+    if(msg.type === 'refreshing') {
+      statusStreamRefreshing = true;
+      manualPbarStart();
+      return;
+    }
+    if(typeof msg.refreshing === 'boolean'){
+      const wasRefreshing = statusStreamRefreshing;
+      statusStreamRefreshing = msg.refreshing;
+      if(statusStreamRefreshing && !wasRefreshing) manualPbarStart();
+    }
+    if(msg.type === 'updated') {
+      statusStreamRefreshing = false;
+      manualPbarDone();
+    }
+  }
+  if(statusStreamFetchBusy){
+    queuedStatusStreamData = event.data || '';
     return;
   }
-  if(msg.type === 'updated') manualPbarDone();
   const ts = String(msg.timestamp || '');
-  if(ts && ts === lastStatusEventTs) return;
+  const notificationChanged = Number(msg.notifyRevision || 0) > notifyRevision;
+  if(ts && ts === lastStatusEventTs && !notificationChanged) return;
   lastStatusEventTs = ts;
-  if(window._lastData?.timestamp && ts && ts === String(window._lastData.timestamp)) return;
+  if(window._lastData?.timestamp && ts && ts === String(window._lastData.timestamp) && !notificationChanged) return;
   statusStreamFetchBusy = true;
   try{
     const useSummary = shouldUseShellSummary();
@@ -10995,12 +11169,15 @@ async function handleStatusStreamEvent(event){
       if(data?.loading) scheduleInitialLoadRetry(0);
       else clearInitialLoadRetry();
     }
-    resetPbar();
+    if(!statusStreamRefreshing) resetPbar();
   }catch(e){
     if(e.message !== 'Unauthorized') console.warn('status stream refresh failed:', e.message || e);
   }finally{
     statusStreamFetchBusy = false;
+    const queued = queuedStatusStreamData;
+    queuedStatusStreamData = '';
     scheduleRefresh();
+    if(queued) queueMicrotask(() => handleStatusStreamEvent({ data:queued, replayed:true }));
   }
 }
 function connectStatusStream(){
@@ -11078,7 +11255,7 @@ async function doRefresh(){
   } finally {
     clearTimeout(to);
     untrackStatusController(ctrl);
-    manualPbarDone();
+    if(!statusStreamRefreshing) manualPbarDone();
     btn?.classList.remove('spin');
     refreshBusy = false;
     scheduleRefresh();

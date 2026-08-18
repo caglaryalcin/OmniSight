@@ -241,6 +241,9 @@ const demoUser = {
   twoFactorEnabled: false,
 };
 const demoSessions = new Map();
+const demoNotifyDisabled = new Set();
+const demoNotifyTopics = new Map();
+let demoNotifyRevision = 0;
 const DEMO_PLATFORM_IDS = ['proxmox', 'vmware', 'kubernetes', 'linux', 'windows', 'synology', 'mikrotik', 'unifi', 'snmp', 'healthchecks', 'uptimekuma', 'checks', 'prometheus', 'docker', 'dockhand', 'firewall', 'truenas', 'qnap', 'ugreen', 'pbs', 'cloudflare', 'cicd', 'veeam', 'portainer', 'database'];
 const DEMO_OVERVIEW_COLLAPSED = Object.fromEntries(DEMO_PLATFORM_IDS.map(id => [id, true]));
 
@@ -331,6 +334,9 @@ function resetDemoMutableState(day = demoDayKey()) {
   demoTopology = cloneJson(defaultDemoTopology);
   demoPrefs = cloneJson(defaultDemoPrefs);
   demoRemovedAgentIds.clear();
+  demoNotifyDisabled.clear();
+  demoNotifyTopics.clear();
+  demoNotifyRevision = 0;
   demoStateDay = day;
 }
 
@@ -749,8 +755,9 @@ function demoStatus() {
     performance: { lowIoMode: true },
     appearance: { dashboardSidePanel: false },
     ui: demoPrefs.ui,
-    notifyDisabled: [],
-    notifyTopics: {},
+    notifyDisabled: [...demoNotifyDisabled],
+    notifyTopics: Object.fromEntries(demoNotifyTopics),
+    notifyRevision: demoNotifyRevision,
     ntfyTopics: ['omnisight-demo', 'ops-demo'],
     alertMutes: {},
     topologyLinks: demoTopology.links,
@@ -1787,8 +1794,8 @@ app.get('/api/status/summary', (req, res) => {
 app.get('/api/status/topology', (req, res) => res.json(topologyData()));
 app.get('/api/status/stream', (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
-  res.write(`event: status\ndata: ${JSON.stringify({ type: 'hello', timestamp: nowIso(), refreshing: false })}\n\n`);
-  const timer = setInterval(() => res.write(`event: status\ndata: ${JSON.stringify({ type: 'status', timestamp: nowIso(), refreshing: false })}\n\n`), 15000);
+  res.write(`event: status\ndata: ${JSON.stringify({ type: 'hello', timestamp: nowIso(), notifyRevision: demoNotifyRevision, refreshing: false })}\n\n`);
+  const timer = setInterval(() => res.write(`event: status\ndata: ${JSON.stringify({ type: 'status', timestamp: nowIso(), notifyRevision: demoNotifyRevision, refreshing: false })}\n\n`), 15000);
   req.on('close', () => clearInterval(timer));
 });
 app.get('/api/refresh', (req, res) => res.json(demoStatus()));
@@ -1877,7 +1884,27 @@ app.post('/api/preferences', (req, res) => {
   }
   res.json({ ok: true, demo: true, ui: demoPrefs.ui, data: demoStatus() });
 });
-app.post(['/api/notifications', '/api/alerts/ack', '/api/alerts/mute', '/api/alerts/history/clear', '/api/logout', '/api/agent/update'], (req, res) => res.json({ ok: true, demo: true }));
+app.post('/api/notifications', (req, res) => {
+  const { key, enabled, topic } = req.body || {};
+  const cleanKey = String(key || '').trim();
+  if (!cleanKey) return res.status(400).json({ ok: false, demo: true, error: 'key required' });
+  if (enabled === false) demoNotifyDisabled.add(cleanKey);
+  else if (enabled === true) demoNotifyDisabled.delete(cleanKey);
+  if (topic !== undefined) {
+    const cleanTopic = String(topic || '').trim();
+    if (cleanTopic) demoNotifyTopics.set(cleanKey, cleanTopic);
+    else demoNotifyTopics.delete(cleanKey);
+  }
+  demoNotifyRevision = Math.max(Date.now(), demoNotifyRevision + 1);
+  res.json({
+    ok: true,
+    demo: true,
+    disabled: [...demoNotifyDisabled],
+    topics: Object.fromEntries(demoNotifyTopics),
+    notifyRevision: demoNotifyRevision,
+  });
+});
+app.post(['/api/alerts/ack', '/api/alerts/mute', '/api/alerts/history/clear', '/api/logout', '/api/agent/update'], (req, res) => res.json({ ok: true, demo: true }));
 app.all('/api/*', (req, res) => res.json({ ok: true, demo: true }));
 
 app.get('/sw.js', (req, res) => {

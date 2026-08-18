@@ -1,6 +1,6 @@
 {
   "name": "omnisight",
-  "version": "2.4.3",
+  "version": "2.4.4",
   "description": "Monitoring dashboard for Proxmox, VMware ESXi/vCenter, Linux, Docker, Kubernetes, SNMP, storage, services and databases",
   "main": "server.js",
   "scripts": {

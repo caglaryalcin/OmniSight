@@ -155,19 +155,21 @@ const AUDIT_PATH = path.join(__dirname, 'data', 'audit.yaml');
 function loadNotify() {
   try {
     const a = yaml.load(fs.readFileSync(NOTIFY_PATH, 'utf8'));
-    if (Array.isArray(a)) return { disabled: new Set(a), topics: new Map() };
+    if (Array.isArray(a)) return { disabled: new Set(a), topics: new Map(), revision: 0 };
     return {
       disabled: new Set(Array.isArray(a?.disabled) ? a.disabled : []),
       topics: new Map(Object.entries(a?.topics || {}).filter(([, v]) => String(v || '').trim())),
+      revision: Math.max(0, Number(a?.revision) || 0),
     };
   }
-  catch { return { disabled: new Set(), topics: new Map() }; }
+  catch { return { disabled: new Set(), topics: new Map(), revision: 0 }; }
 }
 function saveNotify() {
   try {
     writePrivateYaml(NOTIFY_PATH, {
       disabled: Array.from(notifyDisabled),
       topics: Object.fromEntries(notifyTopics),
+      revision: notifyRevision,
     });
   }
   catch (e) { console.warn('notifications save failed:', e.message); }
@@ -175,6 +177,7 @@ function saveNotify() {
 let notifyState = loadNotify();
 let notifyDisabled = notifyState.disabled;
 let notifyTopics = notifyState.topics;
+let notifyRevision = notifyState.revision;
 
 const ALERT_HISTORY_MAX = 2000;
 function loadAlertHistory() {
@@ -2456,6 +2459,7 @@ function runtimeViewSignature(data = cache.data || EMPTY) {
   return [
     configRevision,
     typeof agents.revision === 'function' ? agents.revision() : 0,
+    notifyRevision,
     data?.timestamp || '',
     data?.loading ? 'loading' : 'ready',
     refreshBusy() ? 'refreshing' : 'idle',
@@ -2466,6 +2470,7 @@ function runtimeDataViewSignature(data = cache.data || EMPTY) {
   return [
     configRevision,
     typeof agents.revision === 'function' ? agents.revision() : 0,
+    notifyRevision,
     data?.timestamp || '',
     data?.loading ? 'loading' : 'ready',
   ].join('|');
@@ -2597,6 +2602,7 @@ function broadcastStatusEvent(type = 'updated') {
   const payload = JSON.stringify({
     type,
     timestamp: cache.data?.timestamp || new Date().toISOString(),
+    notifyRevision,
     refreshing: refreshBusy(),
     snapshot: !!cache.data?._snapshot,
   });
@@ -2950,6 +2956,7 @@ function assignStatic(base) {
   base.configured = configuredList();
   base.notifyDisabled = Array.from(notifyDisabled);
   base.notifyTopics = Object.fromEntries(notifyTopics);
+  base.notifyRevision = notifyRevision;
   base.ntfyTopics = ntfyTopicList();
   base.alertMutes = Object.fromEntries([...alertMutes.entries()].filter(([, v]) => Number(v?.until || 0) > Date.now()));
   base.topologyLinks = topologyLinksConfig();
@@ -5126,6 +5133,7 @@ function backgroundRefresh(opts = {}) {
     base.dockhand = enrichDockhandWithDocker(base.dockhand, base.docker);
     base.loading = false;
     base.timestamp = new Date().toISOString();
+    assignStatic(base);
     runAlertChecks(base);
     const svcs = buildPublicSummary(base);
     svcs.forEach(s => {
@@ -6837,6 +6845,7 @@ app.get('/api/status/stream', (req, res) => {
   write(`event: status\ndata: ${JSON.stringify({
     type: 'hello',
     timestamp: cache.data?.timestamp || new Date().toISOString(),
+    notifyRevision,
     refreshing: refreshBusy(),
     snapshot: !!cache.data?._snapshot,
   })}\n\n`);
@@ -7118,6 +7127,8 @@ function importFullBackupText(text) {
   notifyState = loadNotify();
   notifyDisabled = notifyState.disabled;
   notifyTopics = notifyState.topics;
+  notifyRevision = Math.max(Date.now(), notifyRevision + 1, notifyState.revision);
+  saveNotify();
   alertHistory = loadAlertHistory();
   rebuildAlertSentCooldowns();
   auditLog = loadAuditLog();
@@ -8182,15 +8193,21 @@ app.get('/api/icons/:file', (req, res) => {
 app.post('/api/notifications', (req, res) => {
   try {
     const { key, enabled, topic } = req.body || {};
-    if (!key) return res.status(400).json({ error: 'key required' });
-    if (enabled === false) notifyDisabled.add(key); else notifyDisabled.delete(key);
+    const cleanKey = String(key || '').trim();
+    if (!cleanKey) return res.status(400).json({ error: 'key required' });
+    if (enabled === false) notifyDisabled.add(cleanKey);
+    else if (enabled === true) notifyDisabled.delete(cleanKey);
     if (topic !== undefined) {
       const cleanTopic = normalizeNotifyTopic(topic);
-      if (cleanTopic) notifyTopics.set(String(key), cleanTopic);
-      else notifyTopics.delete(String(key));
+      if (cleanTopic) notifyTopics.set(cleanKey, cleanTopic);
+      else notifyTopics.delete(cleanKey);
     }
+    notifyRevision = Math.max(Date.now(), notifyRevision + 1);
     saveNotify();
-    res.json({ ok: true, disabled: Array.from(notifyDisabled), topics: Object.fromEntries(notifyTopics) });
+    if (cache.data) assignStatic(cache.data);
+    clearViewCache();
+    broadcastStatusEvent('notification');
+    res.json({ ok: true, disabled: Array.from(notifyDisabled), topics: Object.fromEntries(notifyTopics), notifyRevision });
   } catch (err) { sendServerError(res, err); }
 });
 
