@@ -5927,7 +5927,7 @@ function saveConfig(opts = {}) {
 }
 
 function demoUserAccessLocked() {
-  return document.documentElement.getAttribute('data-demo-users-roles') === 'disabled'
+  return document.documentElement.getAttribute('data-demo-users-roles') === 'read-only'
     || document.cookie.split(';').some(part => part.trim().startsWith('omnisight_demo_day='));
 }
 

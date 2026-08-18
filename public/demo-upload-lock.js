@@ -2,8 +2,7 @@
   'use strict';
 
   const fileUploadMessage = 'File uploads are disabled in demo mode.';
-  const usersMessage = 'User and role management is disabled in demo mode.';
-  const settingsActiveSectionKey = 'os_settings_active_section';
+  const usersMessage = 'User and role management is read-only in demo mode.';
 
   function fileInputFromTrigger(trigger) {
     const inlineHandler = String(trigger?.getAttribute?.('onclick') || '');
@@ -37,15 +36,15 @@
 
   function disableUsersAndRoles(root = document) {
     eachMatch(root, '.settings-nav-btn[data-target="users"]', button => {
-      button.disabled = true;
-      button.dataset.demoUsersLock = 'true';
-      button.setAttribute('aria-disabled', 'true');
+      button.disabled = false;
+      button.dataset.demoUsersReadOnly = 'true';
+      button.removeAttribute?.('aria-disabled');
       button.setAttribute('title', usersMessage);
     });
 
     eachMatch(root, '#card-users', card => {
-      card.dataset.demoUsersLock = 'true';
-      card.setAttribute('aria-disabled', 'true');
+      card.dataset.demoUsersReadOnly = 'true';
+      card.setAttribute('aria-readonly', 'true');
       card.setAttribute('title', usersMessage);
       card.querySelectorAll('input,select,textarea,button').forEach(control => {
         control.disabled = true;
@@ -68,25 +67,18 @@
     disableUsersAndRoles(root);
   }
 
-  try {
-    if (typeof localStorage !== 'undefined' && localStorage.getItem(settingsActiveSectionKey) === 'users') {
-      localStorage.setItem(settingsActiveSectionKey, 'appearance');
-    }
-  } catch {}
-
   document.documentElement.setAttribute('data-demo-file-uploads', 'disabled');
-  document.documentElement.setAttribute('data-demo-users-roles', 'disabled');
+  document.documentElement.setAttribute('data-demo-users-roles', 'read-only');
 
   const style = document.createElement('style');
   style.textContent = [
     'html[data-demo-file-uploads="disabled"] [data-demo-file-upload-trigger="true"]{opacity:.5!important;cursor:not-allowed!important}',
-    'html[data-demo-users-roles="disabled"] .settings-nav-btn[data-target="users"]{opacity:.45!important;cursor:not-allowed!important;filter:saturate(.35)}',
-    'html[data-demo-users-roles="disabled"] #card-users{opacity:.6!important;pointer-events:none!important}',
+    'html[data-demo-users-roles="read-only"] #card-users input:disabled,html[data-demo-users-roles="read-only"] #card-users select:disabled,html[data-demo-users-roles="read-only"] #card-users textarea:disabled,html[data-demo-users-roles="read-only"] #card-users button:disabled{cursor:not-allowed!important}',
   ].join('');
   document.head.appendChild(style);
 
   document.addEventListener('click', event => {
-    if (event.target?.closest?.('.settings-nav-btn[data-target="users"],#card-users')) {
+    if (event.target?.closest?.('#card-users input,#card-users select,#card-users textarea,#card-users button')) {
       event.preventDefault();
       event.stopImmediatePropagation();
       return;

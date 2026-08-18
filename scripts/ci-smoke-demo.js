@@ -160,16 +160,16 @@ function testDemoFileUploadLock() {
   assert.strictEqual(uploadButton.dataset.demoFileUploadTrigger, 'true');
   assert.strictEqual(attributes.get('html:data-demo-file-uploads'), 'disabled');
   assert.strictEqual(attributes.get('button:title'), 'File uploads are disabled in demo mode.');
-  assert.strictEqual(usersNav.disabled, true);
-  assert.strictEqual(usersNav.dataset.demoUsersLock, 'true');
+  assert.strictEqual(usersNav.disabled, false);
+  assert.strictEqual(usersNav.dataset.demoUsersReadOnly, 'true');
   assert.strictEqual(userControl.disabled, true);
-  assert.strictEqual(usersCard.dataset.demoUsersLock, 'true');
-  assert.strictEqual(attributes.get('html:data-demo-users-roles'), 'disabled');
-  assert.strictEqual(attributes.get('users-nav:title'), 'User and role management is disabled in demo mode.');
-  assert.strictEqual(localStorage.getItem('os_settings_active_section'), 'appearance');
+  assert.strictEqual(usersCard.dataset.demoUsersReadOnly, 'true');
+  assert.strictEqual(attributes.get('html:data-demo-users-roles'), 'read-only');
+  assert.strictEqual(attributes.get('users-nav:title'), 'User and role management is read-only in demo mode.');
+  assert.strictEqual(localStorage.getItem('os_settings_active_section'), 'users');
   window.omnisightDemoFileUploadLock.applyUsersAndRoles(dynamicSaveButton);
   assert.strictEqual(dynamicSaveButton.disabled, true);
-  assert.strictEqual(attributes.get('dynamic-save:title'), 'User and role management is disabled in demo mode.');
+  assert.strictEqual(attributes.get('dynamic-save:title'), 'User and role management is read-only in demo mode.');
 }
 
 async function run() {
