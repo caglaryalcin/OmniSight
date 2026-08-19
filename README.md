@@ -295,7 +295,47 @@ docker stack deploy -c docker-stack.yml omnisight
 
 ### Kubernetes / Helm
 
-For Helm deployments, expose the main app on container port `3000`. The image also exposes `4000` for the bundled demo server. Use `OMNISIGHT_MODE=prod` for the normal app, or run a separate demo deployment with `OMNISIGHT_MODE=demo` and `OMNISIGHT_DEMO_PORT=4000` when you want the demo page reachable.
+OmniSight does not currently bundle an official Helm chart. When using your own chart, expose the main app on container port `3000`. The image also exposes `4000` for the bundled demo server. Use `OMNISIGHT_MODE=prod` for the normal app, or run a separate demo deployment with `OMNISIGHT_MODE=demo` and `OMNISIGHT_DEMO_PORT=4000` when you want the demo page reachable.
+
+The application keeps mutable configuration, authentication, session, encryption-key, agent and runtime data under `/app/data`. Mount that complete path from a persistent volume claim and keep `replicaCount: 1`; the file-backed state is not designed for concurrent writers. Prefer a `Recreate` deployment strategy so the old pod releases the volume before the replacement starts. If a rolling strategy is required, use `maxSurge: 0` and `maxUnavailable: 1` so two OmniSight pods never run at the same time. The rendered workload should be equivalent to:
+
+```yaml
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  template:
+    spec:
+      containers:
+        - name: omnisight
+          volumeMounts:
+            - name: data
+              mountPath: /app/data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: omnisight-data
+```
+
+OmniSight schedules collector work every 15 seconds by default and delivers completed snapshots to open dashboards over SSE, so increasing browser polling does not make source data fresher. Optional `performance.refreshIntervals` values control how often individual platform collectors become due; use multiples of 15 seconds because the scheduler checks due work on the 15-second cycle. A practical starting point is 15 seconds for local/core platforms, 30 seconds for SNMP, VMware, UniFi and storage APIs, and 30–60 seconds for cloud, CI and backup APIs:
+
+```yaml
+performance:
+  collectorConcurrency: 3
+  refreshIntervals:
+    snmp: 30
+    vmware: 30
+    unifi: 30
+    truenas: 30
+    qnap: 30
+    ugreen: 30
+    cloudflare: 60
+    cicd: 60
+    pbs: 60
+    veeam: 60
+```
+
+Shorter intervals improve detection latency but increase API, CPU, network and history-write load and can trigger upstream rate limits. Longer intervals reduce that load at the cost of slower status changes. Failed collectors already back off automatically.
 
 When running from source with `npm start`, `OMNISIGHT_START_DEMO=1` can start the demo listener alongside the main app.
 

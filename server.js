@@ -2207,14 +2207,22 @@ function loadUiPreferenceStore(fallback = {}) {
   return normalizeUiPreferenceStore(Object.keys(sidecar).length ? sidecar : fallback, fallback);
 }
 
-function uiPreferencesForRequest(req) {
-  const store = loadUiPreferenceStore(config.ui || {});
-  const key = uiPreferenceKeyFromRequest(req);
+function scopedUiPreferences(store = {}, key = '') {
   const userUi = key ? store.users?.[key] : null;
+  const globalUi = { ...(store.global || {}) };
+  // Hidden dashboard platforms are a personal choice. Legacy sidecars stored
+  // them globally, which made an old user's choice reappear for every signed-in
+  // user after a restart or rollout until that user saved their own override.
+  if (key) delete globalUi.dashboardHiddenPlatforms;
   return cleanUiPreferences({
-    ...(store.global || {}),
+    ...globalUi,
     ...(userUi || {}),
   });
+}
+
+function uiPreferencesForRequest(req) {
+  const store = loadUiPreferenceStore(config.ui || {});
+  return scopedUiPreferences(store, uiPreferenceKeyFromRequest(req));
 }
 
 function saveUiPreferencesForRequest(req, incoming = {}) {
@@ -2234,9 +2242,7 @@ function saveUiPreferencesForRequest(req, incoming = {}) {
   }
   writePrivateYaml(UI_PREFS_PATH, serializeUiPreferenceStore(store));
   invalidateYamlCache(UI_PREFS_PATH);
-  return key
-    ? cleanUiPreferences({ ...(store.global || {}), ...(store.users[key] || {}) })
-    : cleanUiPreferences(store.global || {});
+  return scopedUiPreferences(store, key);
 }
 
 function withRequestUiPreferences(req, payload = {}) {
@@ -2976,7 +2982,9 @@ function assignStatic(base) {
   base.appearance = {
     dashboardSidePanel: config.appearance?.dashboardSidePanel !== false,
   };
-  base.ui = cleanUiPreferences(config.ui || {});
+  // UI preferences are request-scoped and must never enter the shared runtime
+  // cache. Response endpoints attach the current user's preferences instead.
+  delete base.ui;
   base.icons = {
     proxmox: publicIconValue(config.proxmox?.icon), vmware: publicIconValue(config.vmware?.icon), linux: publicIconValue(config.linux?.icon), windows: publicIconValue(config.windows?.icon), kubernetes: publicIconValue(config.kubernetes?.icon),
     snmp: publicIconValue(config.snmp?.icon), healthchecks: publicIconValue(config.healthchecks?.icon), uptimekuma: publicIconValue(config.uptimekuma?.icon), checks: publicIconValue(config.checks?.icon), prometheus: publicIconValue(config.prometheus?.icon), docker: publicIconValue(config.docker?.icon), dockhand: publicIconValue(config.dockhand?.icon),
@@ -5455,6 +5463,7 @@ function writeRuntimeSnapshotNow(data = runtimeSnapshotPending || cache.data) {
     if (runtimeSnapshotLooksLikeConnectingShell(snapshot)) return;
     delete snapshot._snapshot;
     delete snapshot._snapshotLoadedAt;
+    delete snapshot.ui;
     const payload = JSON.stringify({
       version: appVersion(),
       savedAt: new Date().toISOString(),
@@ -6873,7 +6882,7 @@ app.get('/api/refresh', async (req, res) => {
     }
     const data = await getCachedData();
     const view = cachedView('status:dashboard', runtimeViewSignature(data), () => dashboardStatusData(data));
-    res.json(redactForRole(req, { ...view, refreshing: refreshBusy() }));
+    res.json(redactForRole(req, withRequestUiPreferences(req, { ...view, refreshing: refreshBusy() })));
   } catch (err) { sendServerError(res, err); }
 });
 
@@ -8023,7 +8032,7 @@ app.post('/api/services/exclude', (req, res) => {
       markConfigChanged();
     }
     patchCacheExclude(platform, host, service, true);
-    res.json({ ok: true, data: cache.data });
+    res.json({ ok: true, data: withRequestUiPreferences(req, cache.data) });
   } catch (err) {
     sendServerError(res, err);
   }
@@ -8043,7 +8052,7 @@ app.post('/api/services/include', (req, res) => {
       markConfigChanged();
     }
     patchCacheExclude(platform, host, service, false);
-    res.json({ ok: true, data: cache.data });
+    res.json({ ok: true, data: withRequestUiPreferences(req, cache.data) });
   } catch (err) {
     sendServerError(res, err);
   }
@@ -8765,7 +8774,7 @@ app.post('/api/agent/uninstall', async (req, res) => {
         ok,
         output: 'uninstall command delivered; result connection closed',
         deliveryUnconfirmed: true,
-        data: cache.data,
+        data: withRequestUiPreferences(req, cache.data),
       });
     }
     if (!/^uninstall scheduled\b/i.test(output)) {
@@ -8775,7 +8784,7 @@ app.post('/api/agent/uninstall', async (req, res) => {
     const ok = agents.retireAgent(agent.id);
     refreshAgentCacheAfterRemoval();
     auditEvent('agent.uninstall.scheduled', { id: agent.id, version: agent.agentVersion, ok }, req);
-    res.json({ ok, output, data: cache.data });
+    res.json({ ok, output, data: withRequestUiPreferences(req, cache.data) });
   } catch (err) {
     auditEvent('agent.uninstall.failed', { id: req.body?.id || '', error: err.message }, req);
     sendServerError(res, err);
@@ -8814,7 +8823,7 @@ app.post('/api/agent/pending', (req, res) => {
     const pending = agents.addPendingInstall(kind);
     refreshAgentDerivedCache();
     auditEvent('agent.pending.add', { kind, id: pending.id }, req);
-    res.json({ ok: true, pending, data: cache.data });
+    res.json({ ok: true, pending, data: withRequestUiPreferences(req, cache.data) });
   } catch (err) { sendServerError(res, err); }
 });
 
@@ -8826,7 +8835,7 @@ app.post('/api/agent/remove', (req, res) => {
     const ok = agents.removeAgent(id);
     refreshAgentCacheAfterRemoval();
     auditEvent('agent.remove', { id, ok }, req);
-    res.json({ ok, data: cache.data });
+    res.json({ ok, data: withRequestUiPreferences(req, cache.data) });
   } catch (err) { sendServerError(res, err); }
 });
 

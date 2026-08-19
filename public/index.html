@@ -44,7 +44,44 @@ body {
   user-select: text;
 }
 
-#pbar{position:fixed;top:0;left:0;width:100%;height:2px;background:linear-gradient(90deg,var(--accent),var(--cyan));z-index:8000;transform:scaleX(0);transform-origin:left center;transition:none;will-change:transform;contain:layout paint;box-shadow:0 0 8px rgba(99,102,241,.6)}
+#activity-line{
+  position:fixed;top:0;left:0;width:100%;height:2px;z-index:8000;
+  pointer-events:none;overflow:hidden;opacity:0;transition:opacity .18s ease;
+  contain:layout paint;transform:translateZ(0)
+}
+#activity-line::before{
+  content:'';position:absolute;inset:0 auto 0 0;width:40%;opacity:0;
+  transform:translateX(-120%);will-change:transform,opacity;
+  background:linear-gradient(90deg,transparent 0,var(--accent) 35%,var(--cyan) 72%,transparent 100%);
+  box-shadow:0 0 9px rgba(99,102,241,.65)
+}
+#activity-line.is-active,#activity-line.is-done,#activity-line.is-offline,#activity-line.is-error{opacity:1}
+#activity-line.is-active,#activity-line.is-done{box-shadow:0 0 8px rgba(99,102,241,.58)}
+#activity-line.is-offline{box-shadow:0 0 8px rgba(251,191,36,.5)}
+#activity-line.is-error{box-shadow:0 0 9px rgba(248,113,113,.6)}
+#activity-line.is-active::before{opacity:1;animation:activity-line-sweep 1.05s cubic-bezier(.4,0,.2,1) infinite}
+#activity-line.is-done::before{
+  width:100%;opacity:1;transform-origin:left center;
+  background:linear-gradient(90deg,var(--accent),var(--cyan));
+  animation:activity-line-complete .28s ease-out forwards
+}
+#activity-line.is-offline::before{
+  width:100%;opacity:.72;transform:none;background:var(--yellow);
+  box-shadow:0 0 8px rgba(251,191,36,.55);animation:activity-line-breathe 1.8s ease-in-out infinite
+}
+#activity-line.is-error::before{
+  width:100%;opacity:1;transform:none;background:var(--red);
+  box-shadow:0 0 9px rgba(248,113,113,.65)
+}
+
+@keyframes activity-line-sweep{from{transform:translateX(-120%)}to{transform:translateX(350%)}}
+@keyframes activity-line-complete{from{transform:scaleX(.28);opacity:.82}to{transform:scaleX(1);opacity:1}}
+@keyframes activity-line-breathe{0%,100%{opacity:.45}50%{opacity:.9}}
+@media (prefers-reduced-motion:reduce){
+  #activity-line.is-active::before,#activity-line.is-done::before,#activity-line.is-offline::before{
+    width:100%;transform:none;animation:none;opacity:.72
+  }
+}
 
 header{
   background:rgba(24,26,27,.82);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
@@ -58,15 +95,14 @@ header{
 .ldot{width:11px;height:11px;border-radius:50%;background:var(--green);animation:pg 2.5s infinite;box-shadow:0 0 10px rgba(52,211,153,.7)}
 .hdr-r{display:flex;align-items:center;gap:10px}
 #lupd{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
-#rbtn,#pbtn{
+#rbtn{
   background:var(--row);border:1px solid var(--border);color:var(--text);
   padding:7px 14px;border-radius:9px;cursor:pointer;font-size:13px;font-weight:500;
   display:flex;align-items:center;gap:7px;transition:border-color .15s,background .15s,transform .1s
 }
-#rbtn:hover,#pbtn:hover{border-color:var(--border2);background:var(--panel2)}
-#rbtn:active,#pbtn:active{transform:scale(.97)}
+#rbtn:hover{border-color:var(--border2);background:var(--panel2)}
+#rbtn:active{transform:scale(.97)}
 #rbtn.spin svg{animation:rot 1s linear infinite}
-#pbtn.paused{border-color:var(--yellow);color:var(--yellow)}
 
 @keyframes pg{0%,100%{box-shadow:0 0 0 0 rgba(52,211,153,.5)}50%{box-shadow:0 0 0 6px rgba(52,211,153,0)}}
 @keyframes rot{to{transform:rotate(360deg)}}
@@ -531,7 +567,7 @@ html[data-theme="light"] .k8s-stat{background:#eef1f6;border-color:#c9d5e5}
 html[data-theme="light"] .topbar{background:rgba(255,255,255,.78)}
 
 .ghealth{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:650;padding:6px 13px;border-radius:20px;border:1px solid var(--border);background:var(--row);white-space:nowrap;flex:0 0 auto;line-height:1}
-#rbtn svg,#pbtn svg,.menu-btn svg,#thbtn svg{width:15px;height:15px}
+#rbtn svg,.menu-btn svg,#thbtn svg{width:15px;height:15px}
 .ghealth .gh-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 .gh-green{color:var(--green);border-color:rgba(52,211,153,.3)} .gh-green .gh-dot{background:var(--green);animation:pg 2.5s infinite}
 .gh-yellow{color:var(--yellow);border-color:rgba(251,191,36,.3)} .gh-yellow .gh-dot{background:var(--yellow)}
@@ -774,7 +810,7 @@ html.nav-collapsed .nav-wrap .nav{max-height:0;opacity:0;padding-top:0;pointer-e
 .topbar{height:68px;position:relative;top:auto;z-index:3000;justify-content:flex-start}
 .topbar .pubstatus{height:36px;border-radius:8px;background:var(--panel);padding:0 12px}
 .topbar .ghealth{height:36px;border-radius:8px;padding:0 12px;justify-content:center}
-.topbar #pbtn,.topbar #rbtn{width:36px;height:36px;border-radius:8px;background:var(--panel);padding:0;display:inline-flex;align-items:center;justify-content:center;gap:0}
+.topbar #rbtn{width:36px;height:36px;border-radius:8px;background:var(--panel);padding:0;display:inline-flex;align-items:center;justify-content:center;gap:0}
 .topbar #thbtn{width:36px;height:36px;border-radius:8px;background:var(--panel);display:grid;place-items:center;flex-shrink:0}
 .topbar .menu-btn{width:36px;height:36px;border-radius:8px;background:var(--panel);display:grid;place-items:center;padding:0}
 .shell #sidebar{width:auto;min-width:0;min-height:0;max-width:none;border-right:0;background:transparent;backdrop-filter:none;position:relative;padding:0 12px 16px;overflow-y:hidden;flex:1 1 auto;display:flex;flex-direction:column;gap:8px;scrollbar-width:thin;scrollbar-color:var(--border) transparent}
@@ -1099,7 +1135,6 @@ html[data-theme="light"] .overview-card .sb-csum-item{background:transparent!imp
 }
 @media (max-width:520px){
   .topbar{padding:0 8px;gap:6px}
-  .topbar #pbtn{display:none}
   .topbar .ghealth{padding:0 9px;font-size:11.5px}
   .shell .det-platform-summary .sb-csum{grid-auto-columns:minmax(0,1fr);gap:3px}
   .shell .det-platform-summary .sb-csum-item{padding:0 2px}
@@ -1123,8 +1158,7 @@ html[data-theme="light"] .overview-card .sb-csum-item{background:transparent!imp
 <body>
 
 <script>(function(){try{var root=document.documentElement;var t=localStorage.getItem('os_theme')||'dark';root.setAttribute('data-theme',t);var rail=localStorage.getItem('os_rail_collapsed')==='1';var nav=localStorage.getItem('os_nav_collapsed')==='1';root.classList.toggle('rail-collapsed',rail);root.classList.toggle('nav-collapsed',nav);document.body.classList.toggle('rail-collapsed',rail);}catch(e){}})();</script>
-<div id="pbar"></div>
-
+<div id="activity-line" aria-hidden="true"></div>
 <div id="logmodal" class="logmodal" onclick="if(event.target===this)closeLogs()">
   <div class="logbox">
     <div class="loghdr">
@@ -1217,13 +1251,8 @@ html[data-theme="light"] .overview-card .sb-csum-item{background:transparent!imp
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
         <span>Public status</span>
       </a>
-      <span class="ghealth gh-green" id="ghealth"><span class="gh-dot"></span></span>
+      <span class="ghealth gh-green" id="ghealth"><span class="gh-dot"></span><span class="gh-text"></span></span>
       <button id="thbtn" class="icon-btn" onclick="toggleTheme()" title="Theme"></button>
-      <button id="pbtn" class="top-action" onclick="togglePause()" title="Pause" aria-label="Pause">
-        <svg id="pbtn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-          <rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>
-        </svg>
-      </button>
       <button id="rbtn" class="top-action" onclick="doRefresh()" title="Refresh" aria-label="Refresh">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="23 4 23 10 17 10"></polyline>
@@ -1320,19 +1349,52 @@ function saveOverviewGroupOpen(){
 const dockerOpen = {};
 let overviewCardCollapsed = {};
 try { overviewCardCollapsed = JSON.parse(localStorage.getItem('os_overview_card_collapsed') || '{}'); } catch {}
-const DASHBOARD_HIDDEN_KEY = 'os_dashboard_hidden_platforms';
-const DASHBOARD_HIDDEN_CLEARED_KEY = 'os_dashboard_hidden_platforms_cleared_at';
-let dashboardHiddenPlatforms = new Set();
-try { dashboardHiddenPlatforms = new Set(JSON.parse(localStorage.getItem(DASHBOARD_HIDDEN_KEY) || '[]')); } catch {}
+function browserUserStorageScope(){
+  let token = 'anon';
+  try { token = sessionStorage.getItem('os_token') || localStorage.getItem('os_token') || 'anon'; } catch {}
+  let hash = 2166136261;
+  const value = String(token);
+  for(let index = 0; index < value.length; index += 1){
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `${value.length.toString(36)}-${(hash >>> 0).toString(36)}`;
+}
+function scopedUserStorageKey(base){ return `${base}:${browserUserStorageScope()}`; }
+const DASHBOARD_HIDDEN_LEGACY_KEY = 'os_dashboard_hidden_platforms';
+const DASHBOARD_HIDDEN_CLEARED_LEGACY_KEY = 'os_dashboard_hidden_platforms_cleared_at';
+const DASHBOARD_HIDDEN_KEY = scopedUserStorageKey(DASHBOARD_HIDDEN_LEGACY_KEY);
+const DASHBOARD_HIDDEN_CLEARED_KEY = scopedUserStorageKey(DASHBOARD_HIDDEN_CLEARED_LEGACY_KEY);
+const DASHBOARD_HIDDEN_DIRTY_KEY = scopedUserStorageKey('os_dashboard_hidden_platforms_dirty_v1');
+function readScopedDashboardHiddenPlatforms(){
+  try {
+    const stored = JSON.parse(localStorage.getItem(DASHBOARD_HIDDEN_KEY) || '[]');
+    // Unscoped legacy state cannot be attributed safely to the current account.
+    // Drop both directions and wait for the request-scoped server preference.
+    localStorage.removeItem(DASHBOARD_HIDDEN_LEGACY_KEY);
+    localStorage.removeItem(DASHBOARD_HIDDEN_CLEARED_LEGACY_KEY);
+    return Array.isArray(stored) ? stored : [];
+  } catch {
+    return [];
+  }
+}
+let dashboardHiddenPlatforms = new Set(readScopedDashboardHiddenPlatforms());
 let dashboardHiddenLocalEditUntil = 0;
 let dashboardHiddenLocalEditRevision = 0;
 let dashboardHiddenSavedRevision = 0;
 function markDashboardHiddenLocalEdit(){
   dashboardHiddenLocalEditRevision += 1;
   dashboardHiddenLocalEditUntil = Date.now() + 10000;
+  try { localStorage.setItem(DASHBOARD_HIDDEN_DIRTY_KEY, '1'); } catch {}
+}
+function dashboardHiddenDirtyPending(){
+  try { return localStorage.getItem(DASHBOARD_HIDDEN_DIRTY_KEY) !== null; } catch { return false; }
+}
+function clearDashboardHiddenDirtyPending(){
+  try { localStorage.removeItem(DASHBOARD_HIDDEN_DIRTY_KEY); } catch {}
 }
 function dashboardHiddenLocalEditPending(){
-  return dashboardHiddenSavedRevision < dashboardHiddenLocalEditRevision || Date.now() < dashboardHiddenLocalEditUntil;
+  return dashboardHiddenDirtyPending() || dashboardHiddenSavedRevision < dashboardHiddenLocalEditRevision || Date.now() < dashboardHiddenLocalEditUntil;
 }
 function normalizedDashboardHiddenList(list){
   const values = list instanceof Set ? [...list] : (Array.isArray(list) ? list : []);
@@ -1351,11 +1413,18 @@ function clearDashboardHiddenClearPending(){
 }
 function dashboardHiddenClearPending(){
   try {
-    const ts = Number(localStorage.getItem(DASHBOARD_HIDDEN_CLEARED_KEY) || 0);
-    return Number.isFinite(ts) && ts > 0 && Date.now() - ts < 10 * 60 * 1000;
+    return localStorage.getItem(DASHBOARD_HIDDEN_CLEARED_KEY) !== null;
   } catch {
     return false;
   }
+}
+function acknowledgeDashboardHiddenPlatforms(savedList){
+  if(!sameDashboardHiddenList(savedList, dashboardHiddenPlatforms)) return false;
+  dashboardHiddenSavedRevision = dashboardHiddenLocalEditRevision;
+  dashboardHiddenLocalEditUntil = 0;
+  clearDashboardHiddenDirtyPending();
+  if(!normalizedDashboardHiddenList(savedList).length) clearDashboardHiddenClearPending();
+  return true;
 }
 function persistDashboardHiddenPlatforms(markClear = false){
   try {
@@ -1609,7 +1678,7 @@ function notifyBellOnly(key){
 function notifyTopicSelect(key){
   const topics = Array.isArray(ntfyTopics) ? ntfyTopics.filter(Boolean) : [];
   const selected = notifyTopicMap?.[key] || '';
-  return topics.length > 0 ? `<select class="notify-topic" data-notify-key="${escAttr(key)}" title="ntfy topic" onclick="event.stopPropagation()" onchange="setNotifyTopic(this.dataset.notifyKey,this.value,this)">
+  return topics.length > 0 ? `<select class="notify-topic" data-notify-key="${escAttr(key)}" data-morph-key="notify-topic:${escAttr(key)}" title="ntfy topic" onclick="event.stopPropagation()" onchange="setNotifyTopic(this.dataset.notifyKey,this.value,this)">
     ${topics.map(t => `<option value="${escAttr(t)}"${t===selected?' selected':''}>${escHtml(t)}</option>`).join('')}
   </select>` : '';
 }
@@ -2125,6 +2194,11 @@ let uiPrefsReady = false;
 let uiPrefsLastSignature = '';
 let uiPrefsSaveTimer = null;
 let uiPrefsSaveController = null;
+let uiPrefsDirty = false;
+let uiPrefsDirtyRevision = 0;
+let uiPrefsRetryAttempt = 0;
+const UI_PREFS_RETRY_BASE_MS = 750;
+const UI_PREFS_RETRY_MAX_MS = 30000;
 function validUiPlatform(id){ return ALL_IDS.includes(id); }
 function cleanUiOrder(list){
   const seen = new Set();
@@ -2217,16 +2291,77 @@ function uiPreferencesSnapshot(){
     railWidth: Number(railWidthPref) || 0,
   });
 }
+function uiPreferencesSignature(ui = {}){
+  const source = ui && typeof ui === 'object' && !Array.isArray(ui) ? ui : {};
+  return JSON.stringify(compactUiPreferences({
+    overviewGroupOpen: source.overviewGroupOpen,
+    overviewCardCollapsed: source.overviewCardCollapsed,
+    dashboardHiddenPlatforms: source.dashboardHiddenPlatforms,
+    sidebarPanelOrder: source.sidebarPanelOrder,
+    dashboardPanelOrder: source.dashboardPanelOrder,
+    overviewLayouts: source.overviewLayouts,
+    timeLimits: source.timeLimits,
+    dockerContainerSort: source.dockerContainerSort,
+    k8sPodSort: source.k8sPodSort,
+    k8sNamespaceFilter: source.k8sNamespaceFilter,
+    overviewKpiPlatforms: source.overviewKpiPlatforms,
+    overviewKpiHosts: source.overviewKpiHosts,
+    detailSystemOrder: source.detailSystemOrder,
+    userOverride: source.userOverride,
+    railCollapsed: source.railCollapsed,
+    navCollapsed: source.navCollapsed,
+    railWidth: source.railWidth,
+  }));
+}
+function queueUiPreferencesSave(delay){
+  clearTimeout(uiPrefsSaveTimer);
+  uiPrefsSaveTimer = setTimeout(saveUiPreferences, Math.max(0, Number(delay) || 0));
+}
 function scheduleUiPreferencesSave(immediate = false){
   if(uiPrefsHydrating) return;
-  clearTimeout(uiPrefsSaveTimer);
-  const delay = immediate ? 0 : 450;
-  uiPrefsSaveTimer = setTimeout(saveUiPreferences, delay);
+  uiPrefsDirty = true;
+  uiPrefsDirtyRevision += 1;
+  uiPrefsRetryAttempt = 0;
+  queueUiPreferencesSave(immediate ? 0 : 450);
+}
+function scheduleUiPreferencesRetry(revision){
+  if(!uiPrefsDirty || revision !== uiPrefsDirtyRevision) return;
+  const delay = Math.min(UI_PREFS_RETRY_MAX_MS, UI_PREFS_RETRY_BASE_MS * (2 ** Math.min(uiPrefsRetryAttempt, 16)));
+  uiPrefsRetryAttempt += 1;
+  queueUiPreferencesSave(delay);
+}
+function acknowledgeUiPreferences(savedUi = {}){
+  acknowledgeDashboardHiddenPlatforms(savedUi.dashboardHiddenPlatforms);
+  if(sameUiOrder(savedUi.sidebarPanelOrder, sidebarPanelOrder)) {
+    sidebarOrderSavedRevision = sidebarOrderLocalEditRevision;
+    sidebarOrderLocalEditUntil = 0;
+  }
+  if(sameUiOrder(savedUi.dashboardPanelOrder, dashboardPanelOrder)) {
+    dashboardOrderSavedRevision = dashboardOrderLocalEditRevision;
+    dashboardOrderLocalEditUntil = 0;
+  }
+  if(sameUiStringMap(savedUi.overviewKpiPlatforms, overviewKpiPlatforms) && sameUiStringMap(savedUi.overviewKpiHosts, overviewKpiHosts)) {
+    overviewKpiSavedRevision = overviewKpiLocalEditRevision;
+    overviewKpiLocalEditUntil = 0;
+  }
+  if(sameDetailSystemOrder(savedUi.detailSystemOrder, detailSystemOrder)) {
+    detailSystemOrderSavedRevision = detailSystemOrderLocalEditRevision;
+    detailSystemOrderLocalEditUntil = 0;
+  }
 }
 async function saveUiPreferences(){
+  uiPrefsSaveTimer = null;
   const ui = uiPreferencesSnapshot();
-  const signature = JSON.stringify(ui);
-  if(signature === uiPrefsLastSignature) return;
+  const signature = uiPreferencesSignature(ui);
+  const revision = uiPrefsDirtyRevision;
+  if(signature === uiPrefsLastSignature) {
+    acknowledgeUiPreferences(ui);
+    if(revision === uiPrefsDirtyRevision) {
+      uiPrefsDirty = false;
+      uiPrefsRetryAttempt = 0;
+    }
+    return;
+  }
   try{ uiPrefsSaveController?.abort?.(); }catch{}
   const ctrl = new AbortController();
   uiPrefsSaveController = ctrl;
@@ -2240,40 +2375,40 @@ async function saveUiPreferences(){
     });
     handleUnauth(r);
     const b = await r.json().catch(() => ({}));
-    if(r.ok && uiPrefsSaveController === ctrl) {
+    if(!r.ok) throw new Error(b.error || `HTTP ${r.status}`);
+    if(uiPrefsSaveController === ctrl) {
       const savedUi = b.ui || ui;
-      uiPrefsLastSignature = JSON.stringify(savedUi);
-      if(sameDashboardHiddenList(savedUi.dashboardHiddenPlatforms, dashboardHiddenPlatforms)) {
-        dashboardHiddenSavedRevision = dashboardHiddenLocalEditRevision;
-        dashboardHiddenLocalEditUntil = 0;
-      }
-      if(sameUiOrder(savedUi.sidebarPanelOrder, sidebarPanelOrder)) {
-        sidebarOrderSavedRevision = sidebarOrderLocalEditRevision;
-        sidebarOrderLocalEditUntil = 0;
-      }
-      if(sameUiOrder(savedUi.dashboardPanelOrder, dashboardPanelOrder)) {
-        dashboardOrderSavedRevision = dashboardOrderLocalEditRevision;
-        dashboardOrderLocalEditUntil = 0;
-      }
-      if(sameUiStringMap(savedUi.overviewKpiPlatforms, overviewKpiPlatforms) && sameUiStringMap(savedUi.overviewKpiHosts, overviewKpiHosts)) {
-        overviewKpiSavedRevision = overviewKpiLocalEditRevision;
-        overviewKpiLocalEditUntil = 0;
-      }
-      if(sameDetailSystemOrder(savedUi.detailSystemOrder, detailSystemOrder)) {
-        detailSystemOrderSavedRevision = detailSystemOrderLocalEditRevision;
-        detailSystemOrderLocalEditUntil = 0;
+      const savedSignature = uiPreferencesSignature(savedUi);
+      uiPrefsLastSignature = savedSignature;
+      acknowledgeUiPreferences(savedUi);
+      const unchanged = revision === uiPrefsDirtyRevision && uiPreferencesSignature(uiPreferencesSnapshot()) === savedSignature;
+      if(unchanged) {
+        uiPrefsDirty = false;
+        uiPrefsRetryAttempt = 0;
+      } else {
+        uiPrefsDirty = true;
+        if(!uiPrefsSaveTimer) queueUiPreferencesSave(0);
       }
     }
   }catch(e){
-    if(e.name !== 'AbortError' && e.message !== 'Unauthorized') console.warn('UI preference save failed:', e.message || e);
+    if(e.name !== 'AbortError' && e.message !== 'Unauthorized') {
+      console.warn('UI preference save failed:', e.message || e);
+      if(uiPrefsSaveController === ctrl) scheduleUiPreferencesRetry(revision);
+    }
   } finally {
     if(uiPrefsSaveController === ctrl) uiPrefsSaveController = null;
   }
 }
+window.addEventListener('online', () => {
+  if(!uiPrefsDirty) return;
+  uiPrefsRetryAttempt = 0;
+  queueUiPreferencesSave(0);
+});
 function applyServerUiPreferences(data = {}){
-  const ui = data.ui && typeof data.ui === 'object' ? data.ui : {};
-  const signature = JSON.stringify(ui || {});
-  if(uiPrefsReady && signature === uiPrefsLastSignature) return;
+  if(!data.ui || typeof data.ui !== 'object' || Array.isArray(data.ui)) return;
+  const ui = data.ui;
+  const signature = uiPreferencesSignature(ui);
+  if(uiPrefsReady && (uiPrefsDirty || signature === uiPrefsLastSignature)) return;
   let resaveAfterHydration = false;
   uiPrefsHydrating = true;
   try{
@@ -2293,8 +2428,7 @@ function applyServerUiPreferences(data = {}){
         resaveAfterHydration = true;
       } else {
         dashboardHiddenPlatforms = new Set(serverHidden);
-        dashboardHiddenSavedRevision = dashboardHiddenLocalEditRevision;
-        dashboardHiddenLocalEditUntil = 0;
+        acknowledgeDashboardHiddenPlatforms(serverHidden);
         if(!serverHidden.length) clearDashboardHiddenClearPending();
         persistDashboardHiddenPlatforms();
       }
@@ -2382,8 +2516,8 @@ function applyServerUiPreferences(data = {}){
     uiPrefsHydrating = false;
   }
   uiPrefsReady = true;
-  uiPrefsLastSignature = signature || '{}';
-  if(resaveAfterHydration || JSON.stringify(uiPreferencesSnapshot()) !== uiPrefsLastSignature) scheduleUiPreferencesSave(true);
+  uiPrefsLastSignature = signature;
+  if(resaveAfterHydration || uiPreferencesSignature(uiPreferencesSnapshot()) !== uiPrefsLastSignature) scheduleUiPreferencesSave(true);
 }
 
 let activePanel = null;
@@ -4329,11 +4463,11 @@ function buildVmware(vmware) {
       ${hostRows || '<div class="empty">No ESXi hosts reported</div>'}
     ` : `<div class="offline-row"><div class="mon-dot ${instance._connecting ? 'md-gray' : 'md-red'}"></div><div>${instance._connecting ? 'Connecting to VMware...' : 'VMware endpoint unreachable'}<div class="offline-err">${escHtml(instance._connecting ? (instance.url || '') : (instance.error || instance.url || ''))}</div>${instance.permissionHint ? `<div class="offline-err">${escHtml(instance.permissionHint)}</div>` : ''}</div></div>`;
 
-    if (instance.type === 'esxi') return `<section class="prom-instance vmware-standalone-instance">
+    if (instance.type === 'esxi') return `<section class="prom-instance vmware-standalone-instance" data-morph-key="vmware-endpoint:${escAttr(endpointKey)}">
       <div class="prom-instance-body open" id="vmware-body-${instanceIndex}">${instanceBody}</div>
     </section>`;
 
-    return `<section class="prom-instance">
+    return `<section class="prom-instance" data-morph-key="vmware-endpoint:${escAttr(endpointKey)}">
       <div class="prom-instance-h service-node-hdr ${endpointState}" onclick="toggleVmwareInstance(${instanceIndex},${jsStr(endpointKey)})">
         <div class="mon-dot ${instance._connecting ? 'md-gray' : instance.online ? (endpointWarning ? 'md-yellow' : 'md-green') : 'md-red'}"></div>
         <div class="prom-instance-main">
@@ -4547,7 +4681,7 @@ function buildKubernetes(k8s){
       <div class="k8s-grp-body ${depsOpen?'open':''}" id="kg-deps">
         ${colHdrDeployments}
         ${shownDeployments.map(d=>`
-          <div class="mon-row k8s-deploy-row">
+          <div class="mon-row k8s-deploy-row" data-morph-key="k8s-deployment:${escAttr(`${d.namespace || 'default'}:${d.uid || d.id || d.name}`)}">
             <div class="mon-dot ${d.healthy?'md-green':'md-yellow'}"></div>
             <div class="mon-name k8s-detail-cell" title="${escAttr(d.name)}">${escHtml(d.name)}</div>
             <div class="k8s-detail-cell muted" title="${escAttr(d.namespace)}">${escHtml(d.namespace)}</div>
@@ -4567,7 +4701,7 @@ function buildKubernetes(k8s){
         ${colHdrServices}
         ${shownServices.map(sv=>{
           const portStr = (sv.ports||[]).map(p=>p.nodePort?`${p.port}:${p.nodePort}`:`${p.port}`).join(', ');
-          return `<div class="mon-row k8s-service-row">
+          return `<div class="mon-row k8s-service-row" data-morph-key="k8s-service:${escAttr(`${sv.namespace || 'default'}:${sv.uid || sv.id || sv.name}`)}">
             <div class="mon-dot md-green"></div>
             <div class="mon-name k8s-detail-cell" title="${escAttr(sv.name)}">${escHtml(sv.name)}</div>
             <div class="k8s-detail-cell muted" title="${escAttr(sv.namespace)}">${escHtml(sv.namespace)}</div>
@@ -6394,7 +6528,8 @@ function buildCiCd(ci){
   const statusBadge = row => row.running ? bdg('gray','running') : row.failed ? bdg('yellow','failed') : row.success ? bdg('green','success') : bdg('gray', row.status || 'unknown');
   const pipelineRows = project => (project.pipelines || []).slice(0, 8).map(p => {
     const sub = [p.ref || project.branch || '', p.actor || '', p.title || '', p.updatedAt || p.createdAt || ''].filter(Boolean).join(' - ');
-    return `<div class="mon-row" style="grid-template-columns:18px minmax(180px,1.2fr) minmax(140px,1fr) 90px">
+    const pipelineKey = `${project.id || project.url || project.name || ''}:${p.id || p.pipelineId || p.runId || p.createdAt || p.name || p.workflowName || ''}`;
+    return `<div class="mon-row" data-morph-key="cicd-pipeline:${escAttr(pipelineKey)}" style="grid-template-columns:18px minmax(180px,1.2fr) minmax(140px,1fr) 90px">
       <div class="mon-dot ${p.running?'md-gray':p.failed?'md-yellow':p.success?'md-green':'md-gray'}"></div>
       <div class="mon-name" title="${escAttr(p.name || p.workflowName || 'pipeline')}">${escHtml(p.name || p.workflowName || 'pipeline')}</div>
       <span style="color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escAttr(sub)}">${escHtml(sub)}</span>
@@ -6406,7 +6541,7 @@ function buildCiCd(ci){
     const stateClass = project._connecting ? 'connecting' : !project.online ? 'offline' : failedProject || project.partial ? 'warn' : 'online';
     const provider = String(project.provider || '').toUpperCase();
     const meta = project.online ? `${(project.pipelines || []).filter(p=>p.success).length}/${(project.pipelines || []).length} green` : project._connecting ? 'waiting for first check' : 'unreachable';
-    return `<section class="prom-instance">
+    return `<section class="prom-instance" data-morph-key="cicd-project:${escAttr(project.id || project.url || project.name || idx)}">
       <div class="prom-instance-h service-node-hdr ${stateClass}">
         <div class="mon-dot ${project._connecting?'md-gray':project.online?(failedProject||project.partial?'md-yellow':'md-green'):'md-red'}"></div>
         <div class="prom-instance-main">
@@ -6451,7 +6586,8 @@ function buildVeeam(veeam){
   const sessionBadge = s => s.running ? bdg('gray','running') : s.failed ? bdg('yellow','failed') : s.warning ? bdg('yellow','warning') : s.result ? bdg('green', s.result) : bdg('gray', s.state || 'unknown');
   const sessionRows = inst => (inst.sessions || []).slice(0, 10).map(s => {
     const sub = [s.type, s.creationTime || '', s.endTime || '', hasNum(s.progressPercent) ? `${fmtPct(s.progressPercent)} progress` : ''].filter(Boolean).join(' - ');
-    return `<div class="mon-row veeam-session-row">
+    const sessionKey = `${inst.id || inst.url || inst.name || ''}:${s.id || s.sessionId || s.uuid || s.creationTime || s.name || ''}`;
+    return `<div class="mon-row veeam-session-row" data-morph-key="veeam-session:${escAttr(sessionKey)}">
       <div class="mon-dot ${s.running?'md-gray':s.failed?'md-yellow':s.warning?'md-yellow':'md-green'}"></div>
       <div style="flex:1 1 auto;min-width:0">
         <div class="veeam-session-name" title="${escAttr(s.name || 'session')}">${escHtml(s.name || 'session')}</div>
@@ -6462,7 +6598,8 @@ function buildVeeam(veeam){
   }).join('');
   const repoRows = inst => (inst.repositories || []).map(r => {
     const sub = [hasNum(r.usedPercent) ? `${fmtPct(r.usedPercent)} used` : '', r.path || '', r.error || ''].filter(Boolean).join(' - ');
-    return `<div class="mon-row" style="grid-template-columns:18px minmax(180px,1fr) minmax(140px,1fr) 90px">
+    const repoKey = `${inst.id || inst.url || inst.name || ''}:${r.id || r.uuid || r.path || r.name || ''}`;
+    return `<div class="mon-row" data-morph-key="veeam-repository:${escAttr(repoKey)}" style="grid-template-columns:18px minmax(180px,1fr) minmax(140px,1fr) 90px">
       <div class="mon-dot ${r.warning?'md-yellow':'md-green'}"></div>
       <div class="mon-name" title="${escAttr(r.name || 'repository')}">${escHtml(r.name || 'repository')}</div>
       <span style="color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escAttr(sub)}">${escHtml(sub)}</span>
@@ -6475,7 +6612,7 @@ function buildVeeam(veeam){
     const warn = inst.partial || failedInst || warnInst;
     const stateClass = inst._connecting ? 'connecting' : !inst.online ? 'offline' : warn ? 'warn' : 'online';
     const badge = inst._connecting ? bdg('gray','connecting...') : inst.online ? bdg(warn ? 'yellow' : 'green', failedInst ? 'failing' : warn ? 'attention' : 'online') : bdg('red','offline');
-    return `<section class="prom-instance">
+    return `<section class="prom-instance" data-morph-key="veeam-instance:${escAttr(inst.id || inst.url || inst.name || idx)}">
       <div class="prom-instance-h service-node-hdr ${stateClass}">
         <div class="mon-dot ${inst._connecting?'md-gray':inst.online?(warn?'md-yellow':'md-green'):'md-red'}"></div>
         <div class="prom-instance-main">
@@ -6742,7 +6879,7 @@ async function excludeService(platform, hostOrNode, service, btn){
     handleUnauth(r);
     const b = await r.json().catch(()=>({}));
     if(!r.ok) throw new Error(b.error || r.statusText);
-    if(b.data) render(b.data); 
+    if(b.data) render(b.data, { live:true });
   } catch(e) { 
     if(e.message !== 'Unauthorized') console.error(e); 
   } finally {
@@ -6763,7 +6900,7 @@ async function includeService(platform, hostOrNode, service, btn){
     handleUnauth(r);
     const b = await r.json().catch(()=>({}));
     if(!r.ok) throw new Error(b.error || r.statusText);
-    if(b.data) render(b.data); 
+    if(b.data) render(b.data, { live:true });
   } catch(e) { 
     if(e.message !== 'Unauthorized') console.error(e); 
   } finally {
@@ -6814,7 +6951,7 @@ async function dockerPrune(name, btn){
     if(!r.ok) throw new Error(b.error||r.statusText);
     const h=(window._lastData?.docker||[]).find(x=>x.name===name);
     if(h&&h.summary) h.summary.unused=0;
-    if(window._lastData) render(window._lastData);
+    if(window._lastData) render(window._lastData, { live:true });
     doRefresh();
   }catch(e){ if(btn){ btn.disabled=false; btn.textContent='Prune'; } if(e.message!=='Unauthorized') console.error(e); }
 }
@@ -6831,7 +6968,7 @@ async function removePendingAgent(id, btn){
     handleUnauth(r);
     const b = await r.json();
     if(!r.ok) throw new Error(b.error || r.statusText);
-    if(b.data) render(b.data);
+    if(b.data) render(b.data, { live:true });
     else doRefresh();
   }catch(e){
     if(btn){ btn.disabled = false; btn.textContent = 'Remove'; }
@@ -7216,6 +7353,12 @@ function initOverviewDrag(){
     scheduleDragFrame();
   };
   grid.addEventListener('pointermove', moveDrag);
+  const previousWindowHandlers = window._overviewDragWindowHandlers;
+  if(previousWindowHandlers){
+    window.removeEventListener('pointermove', previousWindowHandlers.moveDrag, true);
+    window.removeEventListener('pointerup', previousWindowHandlers.endDrag, true);
+    window.removeEventListener('pointercancel', previousWindowHandlers.endDrag, true);
+  }
   window.addEventListener('pointermove', moveDrag, true);
   const endDrag = e => {
     if(!drag || e.pointerId !== drag.id) return;
@@ -7232,7 +7375,10 @@ function initOverviewDrag(){
       card.classList.remove('dragging');
       card.style.cssText = '';
       saveOverviewLayout(grid);
-      setTimeout(() => { window._overviewDragging = false; }, 120);
+      setTimeout(() => {
+        window._overviewDragging = false;
+        if(detailRenderDeferred) resumeDeferredDetailRender();
+      }, 120);
     } else if(header) {
       toggleOverviewCard(card.dataset.id, e, header);
     }
@@ -7242,6 +7388,7 @@ function initOverviewDrag(){
   grid.addEventListener('pointercancel', endDrag);
   window.addEventListener('pointerup', endDrag, true);
   window.addEventListener('pointercancel', endDrag, true);
+  window._overviewDragWindowHandlers = { moveDrag, endDrag };
 }
 
 /* ── Platform icons (custom via dashboard-icons CDN, fallback to default) ── */
@@ -7322,15 +7469,15 @@ function updateSidebarCard(card, panel, isActive){
   if(meta){
     meta.style.display = metaText ? '' : 'none';
     const html = sidebarMetaHtml(metaText);
-    if(meta.innerHTML !== html) meta.innerHTML = html;
+    if(meta.innerHTML !== html) morphElementHtml(meta, html);
   }
   const badge = card.querySelector('.sb-badge-wrap');
-  if(badge && badge.innerHTML !== panel.badge) badge.innerHTML = panel.badge;
+  if(badge && badge.innerHTML !== panel.badge) morphElementHtml(badge, panel.badge);
   const summary = card.querySelector('.sb-summary');
   if(summary){
     const html = panel.sbSummary || '';
     summary.style.display = html ? '' : 'none';
-    if(summary.innerHTML !== html) summary.innerHTML = html;
+    if(summary.innerHTML !== html) morphElementHtml(summary, html);
   }
 }
 let sidebarBadgeLayoutFrame = 0;
@@ -7395,7 +7542,7 @@ function renderSidebar(ids, panels, activeId){
   if(window._sidebarDragging) return;
   const key = ids.join('|');
   if(sidebar.dataset.ids !== key){
-    sidebar.innerHTML = ids.map(id => sidebarCard(panels[id], id === activeId)).join('');
+    morphElementHtml(sidebar, ids.map(id => sidebarCard(panels[id], id === activeId)).join(''));
     sidebar.dataset.ids = key;
     sidebar.dataset.html = '';
     updateSidebarOverflow();
@@ -7855,7 +8002,7 @@ function overviewKpi(metric, label, data, ids, panels){
   const selector = supportsHostSelection
     ? drawOverviewKpiCascadeSelect(metric, current, currentHost, options, data)
     : drawOverviewKpiSelect(metric, current, options);
-  return `<div class="overview-kpi ${metric==='cpu'||metric==='mem'?'overview-kpi-gauge':metric==='disk'||metric==='bandwidth'?'overview-kpi-rate':''}" data-kpi="${metric}">
+  return `<div class="overview-kpi ${metric==='cpu'||metric==='mem'?'overview-kpi-gauge':metric==='disk'||metric==='bandwidth'?'overview-kpi-rate':''}" data-kpi="${metric}" data-morph-key="overview-kpi:${metric}">
     <div class="overview-kpi-head"><span>${trText(label)}</span><div class="overview-kpi-filters">${selector}</div></div>
     <div class="overview-kpi-body">${body}</div>
   </div>`;
@@ -7864,9 +8011,10 @@ function escAttr(s){ return escHtml(s).replace(/"/g,'&quot;'); }
 function jsStr(s){
   return `'${String(s ?? '').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\r/g,'\\r').replace(/\n/g,'\\n')}'`;
 }
-function overviewRow(panelId, name, sub, badgeCls, badgeTxt, dotCls, action, extraHtml=''){
+function overviewRow(panelId, name, sub, badgeCls, badgeTxt, dotCls, action, extraHtml='', entityKey=''){
   const click = action || `selectPanel('${panelId}')`;
-  return `<div class="overview-row" onclick="event.stopPropagation();${escAttr(click)}">
+  const rowKey = `${panelId}:${String(entityKey || name || '')}:${String(action || '')}`;
+  return `<div class="overview-row" data-morph-key="overview-row:${escAttr(rowKey)}" onclick="event.stopPropagation();${escAttr(click)}">
     <div class="mon-dot ${dotCls||'md-green'}"></div>
     <div class="overview-row-main">
       <div class="overview-row-name" title="${escAttr(name||'')}">${escHtml(name||'')}</div>
@@ -7901,7 +8049,7 @@ function overviewRows(id, data){
       const sub = srv._connecting ? (srv.host||'Waiting for agent') :
         srv.online ? [srv.ip||srv.host, hasNum(srv.cpu)?`CPU ${srv.cpu}%`:'', srv.ram?`Memory ${srv.ram.percent}%`:'', srv.temp!=null?`Temp ${srv.temp}°C`:'' ].filter(Boolean).join(' · ') :
         (srv.error || 'Agent offline');
-      return overviewRow('linux', srv.name, sub, srv._connecting?'gray':!srv.online?'red':failed?'yellow':'green', srv._connecting?'connecting':!srv.online?'offline':failed?`${failed} failed`:'healthy', srv._connecting?'md-gray':!srv.online?'md-red':failed?'md-yellow':'md-green');
+      return overviewRow('linux', srv.name, sub, srv._connecting?'gray':!srv.online?'red':failed?'yellow':'green', srv._connecting?'connecting':!srv.online?'offline':failed?`${failed} failed`:'healthy', srv._connecting?'md-gray':!srv.online?'md-red':failed?'md-yellow':'md-green', null, '', srv.id || srv.host || srv.name);
     });
     return rows.join('');
   }
@@ -7911,7 +8059,7 @@ function overviewRows(id, data){
       const sub = srv._connecting ? (srv.host||'Waiting for agent') :
         srv.online ? [srv.ip||srv.host, hasNum(srv.cpu)?`CPU ${srv.cpu}%`:'', srv.ram?`Memory ${srv.ram.percent}%`:'', srv.disk?`Disk ${srv.disk.percent}%`:'' ].filter(Boolean).join(' - ') :
         (srv.error || 'Agent offline');
-      return overviewRow('windows', srv.name, sub, srv._connecting?'gray':!srv.online?'red':failed?'yellow':'green', srv._connecting?'connecting':!srv.online?'offline':failed?`${failed} failed`:'healthy', srv._connecting?'md-gray':!srv.online?'md-red':failed?'md-yellow':'md-green');
+      return overviewRow('windows', srv.name, sub, srv._connecting?'gray':!srv.online?'red':failed?'yellow':'green', srv._connecting?'connecting':!srv.online?'offline':failed?`${failed} failed`:'healthy', srv._connecting?'md-gray':!srv.online?'md-red':failed?'md-yellow':'md-green', null, '', srv.id || srv.host || srv.name);
     });
     return rows.join('');
   }
@@ -7922,7 +8070,7 @@ function overviewRows(id, data){
       const sub = dev._connecting ? (dev.host||'Connecting') :
         dev.online ? [dev.host, dev.cpu!=null?`CPU ${dev.cpu}%`:'', dev.ram?`RAM ${dev.ram.percent}%`:'', (dev.cpuTemp ?? dev.systemTemp)!=null?`CPU temp ${dev.cpuTemp ?? dev.systemTemp}°C${dev.temperatureStale ? ' (last known)' : ''}`:'', primaryFan?`${snmpFanLabel(primaryFan)} ${primaryFan.value} RPM`:'' ].filter(Boolean).join(' · ') :
         (dev.error || 'SNMP unreachable');
-      return overviewRow(id, dev.name, sub, dev._connecting?'gray':dev.online?'green':'red', dev._connecting?'connecting':dev.online?'online':'offline', dev._connecting?'md-gray':dev.online?'md-green':'md-red');
+      return overviewRow(id, dev.name, sub, dev._connecting?'gray':dev.online?'green':'red', dev._connecting?'connecting':dev.online?'online':'offline', dev._connecting?'md-gray':dev.online?'md-green':'md-red', null, '', dev.id || dev.mac || dev.host || dev.name);
     }).join('');
     return overviewGroup(`${id}Devices`, 'Devices', rows, `No ${PLATFORM_META[id]?.title || 'SNMP'} devices found`);
   }
@@ -7938,7 +8086,7 @@ function overviewRows(id, data){
       const sub = connecting ? (host.host||'Connecting') :
         host.online ? [`${host.summary?.running||0} running`, `${host.summary?.total||0} total`, hasNum(host.summary?.cpu)?`CPU ${host.summary.cpu}%`:'', hasNum(host.summary?.memPercent)?`Mem ${host.summary.memPercent}%`:'' ].filter(Boolean).join(' · ') :
         (host.error || 'Connection failed');
-      return overviewRow('docker', host.name, sub, connecting||noContainers||infoLabel?'gray':!host.online||hasFailed?'red':issueLabel?'yellow':'green', connecting?'connecting':!host.online?'offline':noContainers?'no containers':issueLabel||infoLabel||'healthy', connecting||noContainers?'md-gray':!host.online||hasFailed?'md-red':issueLabel?'md-yellow':'md-green');
+      return overviewRow('docker', host.name, sub, connecting||noContainers||infoLabel?'gray':!host.online||hasFailed?'red':issueLabel?'yellow':'green', connecting?'connecting':!host.online?'offline':noContainers?'no containers':issueLabel||infoLabel||'healthy', connecting||noContainers?'md-gray':!host.online||hasFailed?'md-red':issueLabel?'md-yellow':'md-green', null, '', host.id || host.host || host.name);
     }).join('');
     const stateOrder = { running: 0, restarting: 1, paused: 2, created: 3, exited: 4, dead: 5 };
     const containerRows = hosts.filter(host => host.online).map(host => {
@@ -7969,7 +8117,7 @@ function overviewRows(id, data){
         inst.online ? (rows.length ? [`${rows.filter(c=>c.state==='running').length} running`, `${rows.length} total`, inst.url || ''].filter(Boolean).join(' · ') : ['No containers reported', inst.url || ''].filter(Boolean).join(' · ')) :
         (inst.error || 'Connection failed');
       const noContainers = inst.online && !rows.length;
-      return overviewRow('dockhand', inst.name || inst.url, sub, inst._connecting?'gray':!inst.online?'red':noContainers?'gray':stopped?'yellow':'green', inst._connecting?'connecting':!inst.online?'offline':noContainers?'no containers':stopped?`${stopped} stopped`:'healthy', inst._connecting?'md-gray':!inst.online?'md-red':stopped?'md-yellow':'md-green');
+      return overviewRow('dockhand', inst.name || inst.url, sub, inst._connecting?'gray':!inst.online?'red':noContainers?'gray':stopped?'yellow':'green', inst._connecting?'connecting':!inst.online?'offline':noContainers?'no containers':stopped?`${stopped} stopped`:'healthy', inst._connecting?'md-gray':!inst.online?'md-red':stopped?'md-yellow':'md-green', null, '', inst.id || inst.url || inst.name);
     }).join('');
     const containerRows = instances.filter(i => i.online).map(inst => {
       const rows = containers.filter(c => c.sourceName === inst.name || c.sourceUrl === inst.url).map(c => {
@@ -7998,14 +8146,14 @@ function overviewRows(id, data){
       return overviewRow('firewall', inst.name || inst.url || 'Firewall', sub,
         inst._connecting ? 'gray' : !inst.online ? 'red' : warn ? 'yellow' : 'green',
         inst._connecting ? 'connecting' : !inst.online ? 'offline' : warn ? warnTxt : 'healthy',
-        inst._connecting ? 'md-gray' : !inst.online ? 'md-red' : warn ? 'md-yellow' : 'md-green');
+        inst._connecting ? 'md-gray' : !inst.online ? 'md-red' : warn ? 'md-yellow' : 'md-green', null, '', inst.id || inst.url || inst.name);
     }).join('');
     const linkRows = instances.filter(i => i.online).map(inst => {
       const rows = (inst.interfaces || []).map(row => {
         const status = String(row.status || '').toLowerCase();
         const up = ['up','active','1','true'].includes(status);
         const sub = [inst.name || inst.url, row.address || row.description, row.inBytes != null ? `in ${fmtBytes(row.inBytes)}` : '', row.outBytes != null ? `out ${fmtBytes(row.outBytes)}` : ''].filter(Boolean).join(' · ');
-        return overviewRow('firewall', row.name || row.id || 'interface', sub, up ? 'green' : status ? 'yellow' : 'gray', status || 'unknown', up ? 'md-green' : status ? 'md-yellow' : 'md-gray');
+        return overviewRow('firewall', row.name || row.id || 'interface', sub, up ? 'green' : status ? 'yellow' : 'gray', status || 'unknown', up ? 'md-green' : status ? 'md-yellow' : 'md-gray', null, '', `${inst.id || inst.url || inst.name}:${row.id || row.ifIndex || row.name}`);
       }).join('');
       return `<div class="overview-nested-title"><div class="mon-dot ${inst.online?'md-green':'md-gray'}"></div><span>${escHtml(inst.name || inst.url || 'Firewall')}</span></div>${rows || '<div class="overview-empty">No links reported</div>'}`;
     }).join('');
@@ -8026,13 +8174,13 @@ function overviewRows(id, data){
       return overviewRow('truenas', inst.name || inst.url || 'TrueNAS', sub,
         inst._connecting ? 'gray' : !inst.online ? 'red' : warn ? 'yellow' : 'green',
         inst._connecting ? 'connecting' : !inst.online ? 'offline' : warn ? 'attention' : 'healthy',
-        inst._connecting ? 'md-gray' : !inst.online ? 'md-red' : warn ? 'md-yellow' : 'md-green');
+        inst._connecting ? 'md-gray' : !inst.online ? 'md-red' : warn ? 'md-yellow' : 'md-green', null, '', inst.id || inst.url || inst.name);
     }).join('');
     const poolRows = instances.filter(i => i.online).map(inst => {
       const rows = (inst.pools || []).map(pool => {
         const warn = pool.health !== 'online';
         const sub = [inst.name || inst.url, pool.status || pool.health, hasNum(pool.usedPercent) ? `used ${fmtPct(pool.usedPercent)}` : ''].filter(Boolean).join(' · ');
-        return overviewRow('truenas', pool.name || 'pool', sub, warn ? 'yellow' : 'green', warn ? (pool.status || 'warn') : 'online', warn ? 'md-yellow' : 'md-green');
+        return overviewRow('truenas', pool.name || 'pool', sub, warn ? 'yellow' : 'green', warn ? (pool.status || 'warn') : 'online', warn ? 'md-yellow' : 'md-green', null, '', `${inst.id || inst.url || inst.name}:${pool.id || pool.guid || pool.name}`);
       }).join('');
       return `<div class="overview-nested-title"><div class="mon-dot ${inst.online?'md-green':'md-gray'}"></div><span>${escHtml(inst.name || inst.url || 'TrueNAS')}</span></div>${rows || '<div class="overview-empty">No pools reported</div>'}`;
     }).join('');
@@ -8054,13 +8202,13 @@ function overviewRows(id, data){
       return overviewRow('pbs', inst.name || inst.url || 'Proxmox Backup', sub,
         inst._connecting ? 'gray' : !inst.online ? 'red' : warn ? 'yellow' : 'green',
         inst._connecting ? 'connecting' : !inst.online ? 'offline' : warn ? warnTxt : 'healthy',
-        inst._connecting ? 'md-gray' : !inst.online ? 'md-red' : warn ? 'md-yellow' : 'md-green');
+        inst._connecting ? 'md-gray' : !inst.online ? 'md-red' : warn ? 'md-yellow' : 'md-green', null, '', inst.id || inst.url || inst.name);
     }).join('');
     const storeRows = instances.filter(i => i.online).map(inst => {
       const rows = (inst.datastores || []).map(store => {
         const warn = store.health !== 'online';
         const sub = [inst.name || inst.url, hasNum(store.usedPercent) ? `used ${fmtPct(store.usedPercent)}` : '', store.snapshots != null ? `${store.snapshots} snapshots` : '', store.error || ''].filter(Boolean).join(' · ');
-        return overviewRow('pbs', store.name || 'datastore', sub, warn ? 'yellow' : 'green', warn ? 'warn' : 'online', warn ? 'md-yellow' : 'md-green');
+        return overviewRow('pbs', store.name || 'datastore', sub, warn ? 'yellow' : 'green', warn ? 'warn' : 'online', warn ? 'md-yellow' : 'md-green', null, '', `${inst.id || inst.url || inst.name}:${store.id || store.name}`);
       }).join('');
       return `<div class="overview-nested-title"><div class="mon-dot ${inst.online?'md-green':'md-gray'}"></div><span>${escHtml(inst.name || inst.url || 'Proxmox Backup')}</span></div>${rows || '<div class="overview-empty">No datastores reported</div>'}`;
     }).join('');
@@ -8071,7 +8219,7 @@ function overviewRows(id, data){
         .map(task => {
           const name = task.name || [task.type, task.taskId].filter(Boolean).join(' - ') || task.id || 'PBS task';
           const sub = [inst.name || inst.url, task.status, taskTimeText(task.starttime || task.startTime || '')].filter(Boolean).join(' · ');
-          return overviewRow('pbs', name, sub, 'yellow', task.status || 'failed', 'md-yellow');
+          return overviewRow('pbs', name, sub, 'yellow', task.status || 'failed', 'md-yellow', null, '', `${inst.id || inst.url || inst.name}:${task.id || task.taskId || name}`);
         }).join('');
       return rows ? `<div class="overview-nested-title"><div class="mon-dot md-yellow"></div><span>${escHtml(inst.name || inst.url || 'Proxmox Backup')}</span></div>${rows}` : '';
     }).join('');
@@ -8090,7 +8238,7 @@ function overviewRows(id, data){
       return overviewRow(id, inst.name || inst.url || title, sub,
         inst._connecting ? 'gray' : !inst.online ? 'red' : 'green',
         inst._connecting ? 'connecting' : !inst.online ? 'offline' : 'online',
-        inst._connecting ? 'md-gray' : inst.online ? 'md-green' : 'md-red');
+        inst._connecting ? 'md-gray' : inst.online ? 'md-green' : 'md-red', null, '', inst.id || inst.url || inst.name);
     }).join('');
     return overviewGroup(id + 'Systems', 'Systems', rows, `No ${title} systems configured`);
   }
@@ -8102,14 +8250,14 @@ function overviewRows(id, data){
       return overviewRow('cloudflare', z.name || 'zone', sub,
         z._connecting ? 'gray' : z.online ? 'green' : warn ? 'yellow' : 'gray',
         z._connecting ? 'connecting' : (z.status || 'unknown'),
-        z._connecting ? 'md-gray' : z.online ? 'md-green' : warn ? 'md-yellow' : 'md-gray');
+        z._connecting ? 'md-gray' : z.online ? 'md-green' : warn ? 'md-yellow' : 'md-gray', null, '', z.id || z.name);
     }).join('');
     const tunnelRows = (cf.tunnels || []).map(t => {
       const sub = [`${t.activeConnections || 0} active connections`, t.pendingReconnect ? `${t.pendingReconnect} reconnecting` : ''].filter(Boolean).join(' - ');
       return overviewRow('cloudflare', t.name || 'tunnel', sub,
         t.online ? 'green' : 'red',
         t.status || 'unknown',
-        t.online ? 'md-green' : 'md-red');
+        t.online ? 'md-green' : 'md-red', null, '', t.id || t.uuid || t.name);
     }).join('');
     const domainRows = (cf.domains || []).map(d => {
       const days = hasNum(d.daysToExpire) ? Number(d.daysToExpire) : null;
@@ -8118,7 +8266,7 @@ function overviewRows(id, data){
       return overviewRow('cloudflare', d.name || 'domain', sub,
         d.expired ? 'red' : d.expiring ? 'yellow' : 'green',
         status,
-        d.expired ? 'md-red' : d.expiring ? 'md-yellow' : 'md-green');
+        d.expired ? 'md-red' : d.expiring ? 'md-yellow' : 'md-green', null, '', d.id || d.name);
     }).join('');
     return [
       overviewGroup('cloudflareZones', 'Zones', zoneRows, 'No zones reported'),
@@ -8135,11 +8283,11 @@ function overviewRows(id, data){
       return overviewRow('cicd', p.name || 'CI Project', sub,
         p._connecting ? 'gray' : !p.online ? 'red' : failed || p.partial ? 'yellow' : 'green',
         p._connecting ? 'connecting' : !p.online ? 'offline' : failed ? 'failing' : 'healthy',
-        p._connecting ? 'md-gray' : !p.online ? 'md-red' : failed || p.partial ? 'md-yellow' : 'md-green');
+        p._connecting ? 'md-gray' : !p.online ? 'md-red' : failed || p.partial ? 'md-yellow' : 'md-green', null, '', p.id || p.url || p.name);
     }).join('');
     const pipelineRows = projects.flatMap(p => (p.pipelines || []).slice(0, 4).map(run => ({ ...run, project: p.name }))).slice(0, 20).map(run => {
       const sub = [run.project, run.ref, run.actor].filter(Boolean).join(' - ');
-      return overviewRow('cicd', run.name || 'pipeline', sub, run.failed ? 'yellow' : run.success ? 'green' : 'gray', run.status || 'unknown', run.failed ? 'md-yellow' : run.success ? 'md-green' : 'md-gray');
+      return overviewRow('cicd', run.name || 'pipeline', sub, run.failed ? 'yellow' : run.success ? 'green' : 'gray', run.status || 'unknown', run.failed ? 'md-yellow' : run.success ? 'md-green' : 'md-gray', null, '', `${run.project || ''}:${run.id || run.pipelineId || run.name}`);
     }).join('');
     return [
       overviewGroup('cicdProjects', 'Projects', projectRows, 'No CI/CD projects configured'),
@@ -8158,18 +8306,18 @@ function overviewRows(id, data){
       return overviewRow('veeam', inst.name || inst.url || 'Veeam', sub,
         inst._connecting ? 'gray' : !inst.online ? 'red' : warn ? 'yellow' : 'green',
         inst._connecting ? 'connecting' : !inst.online ? 'offline' : warn ? 'attention' : 'healthy',
-        inst._connecting ? 'md-gray' : !inst.online ? 'md-red' : warn ? 'md-yellow' : 'md-green');
+        inst._connecting ? 'md-gray' : !inst.online ? 'md-red' : warn ? 'md-yellow' : 'md-green', null, '', inst.id || inst.url || inst.name);
     }).join('');
     const sessionRows = instances.filter(i => i.online).flatMap(inst => (inst.sessions || []).slice(0, 5).map(s => ({ ...s, instance: inst.name || inst.url }))).slice(0, 24).map(s => {
       const sub = [s.instance, s.type, s.creationTime || ''].filter(Boolean).join(' Â· ');
       return overviewRow('veeam', s.name || 'session', sub,
         s.failed || s.warning ? 'yellow' : s.running ? 'gray' : 'green',
         s.failed ? 'failed' : s.warning ? 'warning' : s.running ? 'running' : (s.result || 'success'),
-        s.failed || s.warning ? 'md-yellow' : s.running ? 'md-gray' : 'md-green');
+        s.failed || s.warning ? 'md-yellow' : s.running ? 'md-gray' : 'md-green', null, '', `${s.instance || ''}:${s.id || s.sessionId || s.name}`);
     }).join('');
     const repoRows = instances.filter(i => i.online).flatMap(inst => (inst.repositories || []).map(r => ({ ...r, instance: inst.name || inst.url }))).slice(0, 24).map(r => {
       const sub = [r.instance, hasNum(r.usedPercent) ? `${fmtPct(r.usedPercent)} used` : '', r.path || ''].filter(Boolean).join(' Â· ');
-      return overviewRow('veeam', r.name || 'repository', sub, r.warning ? 'yellow' : 'green', r.status || 'online', r.warning ? 'md-yellow' : 'md-green');
+      return overviewRow('veeam', r.name || 'repository', sub, r.warning ? 'yellow' : 'green', r.status || 'online', r.warning ? 'md-yellow' : 'md-green', null, '', `${r.instance || ''}:${r.id || r.name}`);
     }).join('');
     return [
       overviewGroup('veeamServers', 'Servers', serverRows, 'No Veeam servers configured'),
@@ -8189,13 +8337,13 @@ function overviewRows(id, data){
       return overviewRow('portainer', inst.name || inst.url || 'Portainer', sub,
         inst._connecting ? 'gray' : !inst.online ? 'red' : warn ? 'yellow' : 'green',
         inst._connecting ? 'connecting' : !inst.online ? 'offline' : warn ? 'attention' : 'healthy',
-        inst._connecting ? 'md-gray' : !inst.online ? 'md-red' : warn ? 'md-yellow' : 'md-green');
+        inst._connecting ? 'md-gray' : !inst.online ? 'md-red' : warn ? 'md-yellow' : 'md-green', null, '', inst.id || inst.url || inst.name);
     }).join('');
     const envRows = instances.filter(i => i.online).map(inst => {
       const rows = (inst.environments || []).map(env => {
         const warn = env.online === false;
         const sub = [inst.name || inst.url, env.type, env.url || ''].filter(Boolean).join(' · ');
-        return overviewRow('portainer', env.name || 'environment', sub, warn ? 'red' : env.online === true ? 'green' : 'gray', env.status || 'unknown', warn ? 'md-red' : env.online === true ? 'md-green' : 'md-gray');
+        return overviewRow('portainer', env.name || 'environment', sub, warn ? 'red' : env.online === true ? 'green' : 'gray', env.status || 'unknown', warn ? 'md-red' : env.online === true ? 'md-green' : 'md-gray', null, '', `${inst.id || inst.url || inst.name}:${env.id || env.endpointId || env.name}`);
       }).join('');
       return `<div class="overview-nested-title"><div class="mon-dot ${inst.online?'md-green':'md-gray'}"></div><span>${escHtml(inst.name || inst.url || 'Portainer')}</span></div>${rows || '<div class="overview-empty">No environments reported</div>'}`;
     }).join('');
@@ -8219,11 +8367,11 @@ function overviewRows(id, data){
       const failed = services.filter(s=>!s.active&&!s.excluded).length;
       const ramPct = node.ram?.percent ?? node.memPct;
       const sub = node.online ? [node.ip, node.cpu!=null?`CPU ${node.cpu}%`:'', ramPct!=null?`RAM ${ramPct}%`:'', node.temp!=null?`${node.tempLabel || 'Temp'} ${node.temp}°C`:'' ].filter(Boolean).join(' · ') : 'Node offline';
-      return overviewRow('proxmox', node.name, sub, node.online?(failed?'yellow':'green'):'red', node.online?(failed?`${failed} failed`:'healthy'):'offline', node.online?(failed?'md-yellow':'md-green'):'md-red');
+      return overviewRow('proxmox', node.name, sub, node.online?(failed?'yellow':'green'):'red', node.online?(failed?`${failed} failed`:'healthy'):'offline', node.online?(failed?'md-yellow':'md-green'):'md-red', null, '', node.id || node.name);
     }).join('');
   }
   if(id === 'vmware'){
-    const rows = (data.vmware?.instances || []).flatMap(instance => (instance.hosts || []).map(host => ({ ...host, instanceName: instance.name || instance.url, endpointOnline: instance.online, endpointConnecting: instance._connecting })));
+    const rows = (data.vmware?.instances || []).flatMap(instance => (instance.hosts || []).map(host => ({ ...host, instanceName: instance.name || instance.url, instanceKey: instance.id || instance.url || instance.name, endpointOnline: instance.online, endpointConnecting: instance._connecting })));
     return rows.slice(0, 8).map(host => {
       const warning = host.maintenance || ['yellow', 'red'].includes(String(host.health || '').toLowerCase());
       const sub = host.endpointConnecting
@@ -8231,7 +8379,7 @@ function overviewRows(id, data){
         : host.online
           ? [host.clusterName || host.instanceName, hasNum(host.cpuPercent) ? `CPU ${fmtPct(host.cpuPercent)}` : '', hasNum(host.memoryPercent) ? `RAM ${fmtPct(host.memoryPercent)}` : '', `${(host.vmRefs || []).length} VMs`].filter(Boolean).join(' · ')
           : host.connectionState || 'ESXi host disconnected';
-      return overviewRow('vmware', host.name || 'ESXi host', sub, host.endpointConnecting ? 'gray' : !host.online ? 'red' : warning ? 'yellow' : 'green', host.endpointConnecting ? 'connecting' : !host.online ? 'offline' : host.maintenance ? 'maintenance' : warning ? 'attention' : 'healthy', host.endpointConnecting ? 'md-gray' : vmwareHealthDot(host.online, host.health, host.maintenance));
+      return overviewRow('vmware', host.name || 'ESXi host', sub, host.endpointConnecting ? 'gray' : !host.online ? 'red' : warning ? 'yellow' : 'green', host.endpointConnecting ? 'connecting' : !host.online ? 'offline' : host.maintenance ? 'maintenance' : warning ? 'attention' : 'healthy', host.endpointConnecting ? 'md-gray' : vmwareHealthDot(host.online, host.health, host.maintenance), null, '', `${host.instanceKey || ''}:${host.id || host.name}`);
     }).join('') || '<div class="overview-empty">No ESXi hosts reported</div>';
   }
   if(id === 'healthchecks'){
@@ -8239,7 +8387,7 @@ function overviewRows(id, data){
     return checks.map(c => {
       const cls = c.status==='up'?'green':c.status==='down'?'red':c.status==='grace'?'yellow':'gray';
       const dot = c.status==='up'?'md-green':c.status==='down'?'md-red':c.status==='grace'?'md-yellow':'md-gray';
-      return overviewRow('healthchecks', c.name, c.lastPing?`Last ping ${relTime(c.lastPing)}`:'No last ping', cls, c.status||'unknown', dot);
+      return overviewRow('healthchecks', c.name, c.lastPing?`Last ping ${relTime(c.lastPing)}`:'No last ping', cls, c.status||'unknown', dot, null, '', c.uuid || c.id || c.name);
     }).join('');
   }
   if(id === 'uptimekuma'){
@@ -8247,7 +8395,7 @@ function overviewRows(id, data){
       const v = uptimeVisual(m.status);
       const sub = [m.group, m.lastPing?`Last ${relTime(m.lastPing)}`:'No heartbeat', m.ping!=null?`${m.ping} ms`:'' ].filter(Boolean).join(' · ');
       const hours = platformPeriodHours('uptimekuma', data);
-      return overviewRow('uptimekuma', m.name, sub, v.badge, v.status, v.dot, null, `<div class="overview-uk-bars">${uptimeBars(m.history, v.status, { hours, maxPoints: Math.min(180, Math.ceil(hours * 60)) })}</div>`);
+      return overviewRow('uptimekuma', m.name, sub, v.badge, v.status, v.dot, null, `<div class="overview-uk-bars">${uptimeBars(m.history, v.status, { hours, maxPoints: Math.min(180, Math.ceil(hours * 60)) })}</div>`, m.id || m.uuid || m.name);
     }).join('');
   }
   if(id === 'checks'){
@@ -8258,7 +8406,7 @@ function overviewRows(id, data){
       const target = [c.target, c.port ? ':' + c.port : ''].filter(Boolean).join('');
       const sub = [String(c.type || '').toUpperCase(), target, c.responseMs != null ? `${Math.round(c.responseMs)} ms` : '', c.error || ''].filter(Boolean).join(' · ');
       const hours = platformPeriodHours('checks', data);
-      return overviewRow('checks', c.name, sub, cls, st, dot, null, `<div class="overview-uk-bars">${uptimeBars(c.history, st, { hours, maxPoints: Math.min(180, Math.ceil(hours * 60)) })}</div>`);
+      return overviewRow('checks', c.name, sub, cls, st, dot, null, `<div class="overview-uk-bars">${uptimeBars(c.history, st, { hours, maxPoints: Math.min(180, Math.ceil(hours * 60)) })}</div>`, c.id || `${c.type || ''}:${c.target || ''}:${c.port || ''}:${c.name || ''}`);
     }).join('');
     return overviewGroup('checksServices', 'Services', rows, 'No checks configured');
   }
@@ -8282,7 +8430,7 @@ function overviewRows(id, data){
       return overviewRow('prometheus', inst.name || inst.url || 'Prometheus', sub,
         connecting ? 'gray' : !inst.online ? 'red' : down > 0 || unknown > 0 ? 'yellow' : 'green',
         connecting ? 'connecting' : !inst.online ? 'offline' : down > 0 ? `${down} down` : unknown > 0 ? `${unknown} unknown` : 'healthy',
-        connecting ? 'md-gray' : !inst.online ? 'md-red' : down > 0 || unknown > 0 ? 'md-yellow' : 'md-green');
+        connecting ? 'md-gray' : !inst.online ? 'md-red' : down > 0 || unknown > 0 ? 'md-yellow' : 'md-green', null, '', inst.id || inst.url || inst.name);
     }).join('');
     const instanceTargetRows = instances.length ? instances.map(inst => {
       const rows = targets.filter(t => targetMatchesInstance(t, inst)).map(t => {
@@ -8290,7 +8438,7 @@ function overviewRows(id, data){
         const cls = prometheusTargetColor(state);
         const dot = prometheusTargetDot(state);
         const sub = [t.job || t.scrapePool, t.lastScrape?`Last ${relTime(t.lastScrape)}`:'No scrape', t.lastError].filter(Boolean).join(' · ');
-        return overviewRow('prometheus', t.name, sub, cls, state, dot);
+        return overviewRow('prometheus', t.name, sub, cls, state, dot, null, '', `${inst.id || inst.url || inst.name}:${t.id || t.url || t.name}`);
       }).join('');
       const dot = inst._connecting && !inst.online ? 'md-gray' : inst.online ? 'md-green' : 'md-red';
       return `<div class="overview-nested-title"><div class="mon-dot ${dot}"></div><span>${escHtml(inst.name || inst.url || 'Prometheus')}</span></div>${rows || '<div class="overview-empty">No active targets</div>'}`;
@@ -8299,7 +8447,7 @@ function overviewRows(id, data){
       const cls = prometheusTargetColor(state);
       const dot = prometheusTargetDot(state);
       const sub = [t.sourceName, t.job || t.scrapePool, t.lastScrape?`Last ${relTime(t.lastScrape)}`:'No scrape', t.lastError].filter(Boolean).join(' · ');
-      return overviewRow('prometheus', t.name, sub, cls, state, dot);
+      return overviewRow('prometheus', t.name, sub, cls, state, dot, null, '', `${t.sourceUrl || t.sourceName || ''}:${t.id || t.url || t.name}`);
     }).join('');
     return [
       overviewGroup('prometheusServers', 'Servers', serverRows, 'No Prometheus servers found'),
@@ -8337,7 +8485,7 @@ function overviewRows(id, data){
   if(id === 'database'){
     const rows = (data.database||[]).map(d => {
       const sub = [d.type, d.host, d.connections!=null?`${d.connections} conns`:'', d.sizeBytes?fmtBytes(d.sizeBytes):'' ].filter(Boolean).join(' · ');
-      return overviewRow('database', d.name, sub || 'Database', d._connecting?'gray':d.online?'green':'red', d._connecting?'connecting':d.online?'online':'offline', d._connecting?'md-gray':d.online?'md-green':'md-red');
+      return overviewRow('database', d.name, sub || 'Database', d._connecting?'gray':d.online?'green':'red', d._connecting?'connecting':d.online?'online':'offline', d._connecting?'md-gray':d.online?'md-green':'md-red', null, '', d.id || `${d.type || ''}:${d.host || ''}:${d.name || ''}`);
     }).join('');
     return overviewGroup('databaseServers', 'Servers', rows, 'No database servers found');
   }
@@ -8422,9 +8570,9 @@ function activeAlerts(data){
 function overviewSide(data){
   const alerts = activeAlerts(data);
   const alertRows = alerts.length ? alerts.map(([t,m])=>`<div class="overview-side-row"><div class="mon-dot md-red" style="margin-top:4px"></div><div class="overview-side-msg"><strong>${escHtml(t)}</strong>${escHtml(m||'')}</div></div>`).join('') : '<div class="overview-empty">No active alerts</div>';
-  return `<aside class="overview-side">
-    <section class="overview-side-card"><div class="overview-side-h">Active alerts</div>${alertRows}</section>
-    <section class="overview-side-card"><div class="overview-side-h">Recent logs</div><div id="recent-logs" class="overview-log-list" data-scroll-key="recent-logs" data-sig="${escAttr(recentLogsSig)}">${recentLogsHtml}</div></section>
+  return `<aside class="overview-side" data-morph-key="overview-side">
+    <section class="overview-side-card" data-morph-key="overview-alerts"><div class="overview-side-h">Active alerts</div>${alertRows}</section>
+    <section class="overview-side-card" data-morph-key="overview-logs"><div class="overview-side-h">Recent logs</div><div id="recent-logs" class="overview-log-list" data-scroll-key="recent-logs" data-sig="${escAttr(recentLogsSig)}">${recentLogsHtml}</div></section>
   </aside>`;
 }
 function dashboardSidePanelVisible(data = window._lastData){
@@ -8521,6 +8669,14 @@ function replaceOverviewHtml(detail, html){
   const replacement = detail.querySelector('#recent-logs');
   if(recentLogs && replacement) replacement.replaceWith(recentLogs);
 }
+function flattenOverviewMasonry(detail){
+  const grid = detail?.querySelector('.overview-grid');
+  if(!grid) return;
+  const columns = [...grid.querySelectorAll(':scope > .overview-col')];
+  if(!columns.length) return;
+  columns.forEach(column => [...column.querySelectorAll(':scope > .overview-card')].forEach(card => grid.appendChild(card)));
+  columns.forEach(column => column.remove());
+}
 function toggleOverviewCard(id, event, headerEl){
   event?.stopPropagation?.();
   if(window._overviewDragging) return;
@@ -8608,12 +8764,13 @@ function renderDashboardOverview(data, ids, panels, opts = {}){
     const title = id === 'snmp' ? 'SNMP' : panel.title;
     const rows = overviewRows(id, data);
     const listHtml = rows
-      ? `<div class="overview-list ${['healthchecks','database','checks','dockhand','portainer'].includes(id)?'is-scroll':''}" data-scroll-key="overview-${id}">${rows}</div>`
+      ? `<div class="overview-list ${['healthchecks','database','checks','dockhand','portainer'].includes(id)?'is-scroll':''}" data-morph-key="overview-list:${escAttr(id)}" data-scroll-key="overview-${id}">${rows}</div>`
       : id === 'windows'
         ? ''
-        : `<div class="overview-list ${['healthchecks','database','checks','dockhand','portainer'].includes(id)?'is-scroll':''}" data-scroll-key="overview-${id}"><div class="overview-empty">No rows to show yet</div></div>`;
+        : `<div class="overview-list ${['healthchecks','database','checks','dockhand','portainer'].includes(id)?'is-scroll':''}" data-morph-key="overview-list:${escAttr(id)}" data-scroll-key="overview-${id}"><div class="overview-empty">No rows to show yet</div></div>`;
+    const summaryHtml = dashboardSummaryHtml(panel.sbSummary);
     const collapsed = !!overviewCardCollapsed[id];
-    return `<section class="overview-card ${collapsed?'collapsed':''}" data-id="${id}">
+    return `<section class="overview-card ${collapsed?'collapsed':''}" data-id="${id}" data-morph-key="overview-card:${escAttr(id)}">
       <div class="overview-card-h" style="cursor:pointer" title="${escAttr(trText(collapsed?'Expand':'Collapse'))} ${escAttr(title)}">
         <div class="overview-icon">${iconSvg}</div>
         <div class="overview-head-main">
@@ -8626,12 +8783,14 @@ function renderDashboardOverview(data, ids, panels, opts = {}){
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
         </button>
       </div>
-      ${dashboardSummaryHtml(panel.sbSummary)}
+      ${summaryHtml ? `<div class="overview-summary" data-morph-key="overview-summary:${escAttr(id)}">${summaryHtml}</div>` : ''}
       ${listHtml}
     </section>`;
   }).join('');
   document.querySelectorAll('.sb-card.active').forEach(c=>c.classList.remove('active'));
   const detail = document.getElementById('detail');
+  if((opts.live || opts.soft) && window._overviewDragging){ detailRenderDeferred = true; return; }
+  if((opts.live || opts.soft) && deferDetailRenderForPointer(detail, '')) return;
   const openKpiMenus = captureOverviewKpiMenuState(detail);
   parkEmbedFrames(detail, { abortInflight: true });
   detail.dataset.panelId = '';
@@ -8640,18 +8799,18 @@ function renderDashboardOverview(data, ids, panels, opts = {}){
   const key = visibleIds.join('|') + '|hidden:' + hiddenIds.join('|') + '|side:' + (showSide ? '1' : '0');
   const scrollState = captureOverviewScroll(detail);
   const hiddenBar = hiddenIds.length
-    ? `<div class="overview-hidden-bar"><span>${hiddenIds.length} ${escHtml(trText(hiddenIds.length>1?'hidden dashboard platforms':'hidden dashboard platform'))}</span><button type="button" onclick="restoreDashboardPlatforms()">${escHtml(trText('Restore hidden platforms'))}</button></div>`
+    ? `<div class="overview-hidden-bar" data-morph-key="overview-hidden"><span>${hiddenIds.length} ${escHtml(trText(hiddenIds.length>1?'hidden dashboard platforms':'hidden dashboard platform'))}</span><button type="button" onclick="restoreDashboardPlatforms()">${escHtml(trText('Restore hidden platforms'))}</button></div>`
     : '';
-  const html = `<section class="overview">
+  const html = `<section class="overview" data-morph-key="overview-root">
     ${hiddenBar}
-    <div class="overview-kpis ${showSide?'':'no-side'}">
+    <div class="overview-kpis ${showSide?'':'no-side'}" data-morph-key="overview-kpis">
       ${overviewKpi('cpu', 'CPU usage', data, ids, panels)}
       ${overviewKpi('mem', 'RAM usage', data, ids, panels)}
       ${overviewKpi('disk', 'Disk I/O', data, ids, panels)}
       ${overviewKpi('bandwidth', 'Bandwidth', data, ids, panels)}
     </div>
-    <div class="overview-layout ${showSide?'':'no-side'}">
-      <div class="overview-grid">${cards || '<div class="overview-empty overview-grid-empty">All dashboard platforms are hidden</div>'}</div>
+    <div class="overview-layout ${showSide?'':'no-side'}" data-morph-key="overview-layout">
+      <div class="overview-grid" data-morph-key="overview-grid">${cards || '<div class="overview-empty overview-grid-empty">All dashboard platforms are hidden</div>'}</div>
       ${showSide ? overviewSide(data) : ''}
     </div>
   </section>`;
@@ -8659,7 +8818,20 @@ function renderDashboardOverview(data, ids, panels, opts = {}){
     updateOverviewKpis(data, ids, panels);
     return;
   }
-  if(detail.dataset.overviewHtml !== html && !overviewScrollLocked(detail)){
+  if((opts.live || opts.soft) && detail.querySelector(':scope > .overview') && !window._overviewDragging){
+    const structureChanged = detail.dataset.overviewIds !== key;
+    if(structureChanged) flattenOverviewMasonry(detail);
+    morphDetailHtml(detail, html);
+    detail.dataset.overviewHtml = html;
+    detail.dataset.overviewIds = key;
+    initOverviewScrollHold(detail);
+    initOverviewDrag();
+    restoreOverviewKpiMenuState(detail, openKpiMenus);
+    requestAnimationFrame(() => {
+      layoutOverviewMasonry(structureChanged);
+      restoreOverviewScroll(detail, scrollState);
+    });
+  } else if(detail.dataset.overviewHtml !== html && !overviewScrollLocked(detail)){
     replaceOverviewHtml(detail, html);
     detail.dataset.overviewHtml = html;
     detail.dataset.overviewIds = key;
@@ -8671,7 +8843,7 @@ function renderDashboardOverview(data, ids, panels, opts = {}){
       restoreOverviewScroll(detail, scrollState);
     });
   }
-  if(!opts.soft && showSide) loadRecentLogs();
+  if(!opts.soft && !opts.live && showSide) loadRecentLogs();
 }
 function clearOverviewCache(){
   const detail = document.getElementById('detail');
@@ -8693,7 +8865,7 @@ function updateOverviewKpis(data, ids, panels){
     const body = el.querySelector('.overview-kpi-body');
     if(body){
       const nextBody = overviewKpiBody(metric, stat, current, panels);
-      if(body.innerHTML !== nextBody) body.innerHTML = nextBody;
+      if(body.innerHTML !== nextBody) morphElementHtml(body, nextBody);
       return;
     }
     const val = el.querySelector('.overview-kpi-value');
@@ -8802,8 +8974,8 @@ function resumeDeferredDetailRender(){
     detailPointerReleasePending = false;
     if(!detailRenderDeferred) return;
     detailRenderDeferred = false;
-    if(window._lastData && activePanel && !dashboardOpen && !embedOpen) {
-      render(window._lastData, { soft:true, interactionResume:true });
+    if(window._lastData && !embedOpen) {
+      if(dashboardOpen || activePanel) render(window._lastData, { live:true, interactionResume:true });
     }
   }, 0);
 }
@@ -8821,7 +8993,8 @@ window.addEventListener('blur', () => {
   resumeDeferredDetailRender();
 });
 function deferDetailRenderForPointer(detail, panelId){
-  if((!activeDetailPointers.size && !detailPointerReleasePending) || detail?.dataset?.panelId !== panelId) return false;
+  const sameSurface = panelId ? detail?.dataset?.panelId === panelId : !!detail?.querySelector?.(':scope > .overview');
+  if((!activeDetailPointers.size && !detailPointerReleasePending) || !sameSurface) return false;
   detailRenderDeferred = true;
   return true;
 }
@@ -8830,33 +9003,74 @@ function focusedDetailControl(root){
   if(!a || a !== root) return false;
   return /^(INPUT|TEXTAREA|SELECT|BUTTON)$/i.test(a.tagName) || a.isContentEditable;
 }
+function morphNodeIdentity(node){
+  if(!node || node.nodeType !== Node.ELEMENT_NODE) return '';
+  const key = node.getAttribute('data-morph-key') || '';
+  if(key) return `key:${node.tagName}:${key}`;
+  const detailKey = node.getAttribute('data-detail-system-key') || '';
+  if(detailKey) return `detail:${node.tagName}:${detailKey}`;
+  const id = node.getAttribute('id') || '';
+  return id ? `id:${node.tagName}:${id}` : '';
+}
 function sameMorphNode(a, b){
   if(!a || !b || a.nodeType !== b.nodeType) return false;
   if(a.nodeType === Node.TEXT_NODE) return true;
   if(a.nodeType !== Node.ELEMENT_NODE) return a.nodeName === b.nodeName;
   if(a.tagName !== b.tagName) return false;
-  const aid = a.getAttribute('id') || '';
-  const bid = b.getAttribute('id') || '';
-  if(aid || bid) return aid === bid;
-  const akey = a.getAttribute('data-morph-key') || '';
-  const bkey = b.getAttribute('data-morph-key') || '';
-  return !akey && !bkey ? true : akey === bkey;
+  const aid = morphNodeIdentity(a);
+  const bid = morphNodeIdentity(b);
+  return aid || bid ? aid === bid : true;
 }
 function syncAttrs(oldEl, newEl){
+  const clientClasses = ['open','sel-open'].filter(name => oldEl.classList?.contains(name));
   [...oldEl.attributes].forEach(attr => {
-    if(!newEl.hasAttribute(attr.name)) oldEl.removeAttribute(attr.name);
+    if(attr.name === 'data-drag-ready') return;
+    if(!newEl.hasAttribute(attr.name)){
+      oldEl.removeAttribute(attr.name);
+      delete oldEl[`_osOrig_${attr.name}`];
+    }
   });
   [...newEl.attributes].forEach(attr => {
     if(oldEl.getAttribute(attr.name) !== attr.value) oldEl.setAttribute(attr.name, attr.value);
+    if(oldEl[`_osOrig_${attr.name}`] !== undefined || globalThis.OmniI18n?.ATTRS?.includes?.(attr.name)){
+      oldEl[`_osOrig_${attr.name}`] = attr.value;
+    }
   });
-  if(oldEl instanceof HTMLInputElement){
+  clientClasses.forEach(name => oldEl.classList?.add(name));
+  if(oldEl.tagName === 'INPUT'){
     if(oldEl.type === 'checkbox' || oldEl.type === 'radio') oldEl.checked = newEl.checked;
     else if(document.activeElement !== oldEl) oldEl.value = newEl.value;
-  } else if(oldEl instanceof HTMLTextAreaElement && document.activeElement !== oldEl) {
+  } else if(oldEl.tagName === 'TEXTAREA' && document.activeElement !== oldEl) {
     oldEl.value = newEl.value;
-  } else if(oldEl instanceof HTMLSelectElement && document.activeElement !== oldEl) {
+  } else if(oldEl.tagName === 'SELECT' && document.activeElement !== oldEl) {
     oldEl.value = newEl.value;
   }
+}
+function morphOverviewGrid(oldGrid, newGrid){
+  const existingCards = [...oldGrid.querySelectorAll('.overview-card')];
+  const desiredCards = [...newGrid.querySelectorAll(':scope > .overview-card')];
+  if(!desiredCards.length){
+    morphChildren(oldGrid, newGrid);
+    return;
+  }
+  const desiredKeys = new Set(desiredCards.map(morphNodeIdentity));
+  const byKey = new Map(existingCards.map(card => [morphNodeIdentity(card), card]));
+  const flat = existingCards.every(card => card.parentNode === oldGrid);
+  existingCards.forEach(card => {
+    if(!desiredKeys.has(morphNodeIdentity(card))) card.remove();
+  });
+  const ordered = desiredCards.map(nextCard => {
+    const current = byKey.get(morphNodeIdentity(nextCard));
+    if(current?.parentNode){
+      morphNode(current, nextCard);
+      return current;
+    }
+    const created = nextCard.cloneNode(true);
+    oldGrid.appendChild(created);
+    return created;
+  });
+  if(flat) ordered.forEach(card => oldGrid.appendChild(card));
+  oldGrid.querySelectorAll(':scope > .overview-grid-empty').forEach(empty => empty.remove());
 }
 function morphNode(oldNode, newNode){
   if(!sameMorphNode(oldNode, newNode)){
@@ -8864,11 +9078,21 @@ function morphNode(oldNode, newNode){
     return;
   }
   if(oldNode.nodeType === Node.TEXT_NODE){
-    if(oldNode.nodeValue !== newNode.nodeValue) oldNode.nodeValue = newNode.nodeValue;
+    const sourceText = newNode._osOrigText === undefined ? newNode.nodeValue : newNode._osOrigText;
+    if(oldNode.nodeValue !== newNode.nodeValue || oldNode._osOrigText !== sourceText){
+      oldNode.nodeValue = newNode.nodeValue;
+      oldNode._osOrigText = sourceText;
+    }
     return;
   }
   if(oldNode.nodeType !== Node.ELEMENT_NODE) return;
+  if(oldNode.id === 'recent-logs') return;
+  if(oldNode.tagName === 'BUTTON' && oldNode.disabled && !newNode.disabled) return;
   syncAttrs(oldNode, newNode);
+  if(oldNode.classList?.contains('overview-grid') && newNode.classList?.contains('overview-grid')){
+    morphOverviewGrid(oldNode, newNode);
+    return;
+  }
   if(focusedDetailControl(oldNode)){
     if(oldNode.tagName === 'BUTTON') morphChildren(oldNode, newNode);
     return;
@@ -8877,28 +9101,148 @@ function morphNode(oldNode, newNode){
 }
 function morphChildren(parent, nextParent){
   const nextKids = Array.from(nextParent.childNodes);
-  let cur = parent.firstChild;
-  nextKids.forEach(next => {
-    if(!cur){
-      parent.appendChild(next.cloneNode(true));
+  const oldKids = Array.from(parent.childNodes);
+  const oldCounts = new Map();
+  const nextCounts = new Map();
+  oldKids.forEach(child => {
+    const key = morphNodeIdentity(child);
+    if(key) oldCounts.set(key, (oldCounts.get(key) || 0) + 1);
+  });
+  nextKids.forEach(child => {
+    const key = morphNodeIdentity(child);
+    if(key) nextCounts.set(key, (nextCounts.get(key) || 0) + 1);
+  });
+  const uniqueKey = node => {
+    const key = morphNodeIdentity(node);
+    return key && (oldCounts.get(key) || 0) <= 1 && (nextCounts.get(key) || 0) <= 1 ? key : '';
+  };
+  const keyed = new Map();
+  oldKids.forEach(child => {
+    const key = uniqueKey(child);
+    if(key && !keyed.has(key)) keyed.set(key, child);
+  });
+  const remaining = new Map();
+  nextKids.forEach(child => {
+    const key = uniqueKey(child);
+    if(key) remaining.set(key, (remaining.get(key) || 0) + 1);
+  });
+  nextKids.forEach((next, index) => {
+    const nextKey = uniqueKey(next);
+    if(nextKey) remaining.set(nextKey, Math.max(0, (remaining.get(nextKey) || 0) - 1));
+    let old = parent.childNodes[index] || null;
+    const oldKey = uniqueKey(old);
+    if(nextKey && oldKey !== nextKey){
+      const match = keyed.get(nextKey);
+      if(match?.parentNode === parent){
+        parent.insertBefore(match, old);
+        old = match;
+      } else if(oldKey && (remaining.get(oldKey) || 0) > 0){
+        parent.insertBefore(next.cloneNode(true), old);
+        return;
+      }
+    } else if(!nextKey && oldKey && (remaining.get(oldKey) || 0) > 0){
+      parent.insertBefore(next.cloneNode(true), old);
       return;
     }
-    const old = cur;
-    cur = cur.nextSibling;
-    morphNode(old, next);
+    if(!old) parent.appendChild(next.cloneNode(true));
+    else morphNode(old, next);
   });
-  while(cur){
-    const n = cur.nextSibling;
-    cur.remove();
-    cur = n;
-  }
+  while(parent.childNodes.length > nextKids.length) parent.lastChild.remove();
+}
+function morphElementHtml(element, html){
+  if(!element) return false;
+  const tpl = document.createElement('template');
+  tpl.innerHTML = String(html || '').trim();
+  morphChildren(element, tpl.content);
+  return true;
+}
+function morphSourceText(node){
+  if(!node) return '';
+  if(node.nodeType === Node.TEXT_NODE) return String(node._osOrigText === undefined ? node.nodeValue || '' : node._osOrigText);
+  return Array.from(node.childNodes || []).map(morphSourceText).join('');
+}
+function annotateMorphTree(root, panelId){
+  if(!root) return;
+  detailSystemUnits(root, panelId);
+  root.querySelectorAll('[data-notify-key]').forEach(control => {
+    const notifyKey = String(control.getAttribute('data-notify-key') || '');
+    const entity = control.closest('.prom-instance,.offline-row,.node-hdr');
+    if(!entity || entity.hasAttribute('data-morph-key') || entity.hasAttribute('data-detail-system-key')) return;
+    const label = morphSourceText(entity.querySelector('.node-name')).replace(/\s+/g, ' ').trim();
+    const stablePart = (notifyKey.includes(':') ? notifyKey.slice(notifyKey.indexOf(':') + 1) : notifyKey) || label;
+    if(stablePart) entity.setAttribute('data-morph-key', `entity:${panelId}:${stablePart}`);
+  });
+  root.querySelectorAll('.node-hdr').forEach(entity => {
+    if(entity.hasAttribute('data-morph-key') || entity.hasAttribute('data-detail-system-key')) return;
+    const label = morphSourceText(entity.querySelector('.node-name')).replace(/\s+/g, ' ').trim();
+    if(label) entity.setAttribute('data-morph-key', `entity:${panelId}:${label}`);
+  });
+  root.querySelectorAll('.prom-instance').forEach(entity => {
+    if(entity.hasAttribute('data-morph-key')) return;
+    const notifyKey = String(entity.querySelector('[data-notify-key]')?.getAttribute('data-notify-key') || '');
+    const label = morphSourceText(entity.querySelector('.prom-instance-url,.prom-instance-title,.node-name')).replace(/\s+/g, ' ').trim();
+    const stablePart = notifyKey ? (notifyKey.includes(':') ? notifyKey.slice(notifyKey.indexOf(':') + 1) : notifyKey) : label;
+    if(stablePart) entity.setAttribute('data-morph-key', `entity:${panelId}:${stablePart}`);
+  });
+  root.querySelectorAll('button,input,textarea,select').forEach(control => {
+    if(control.hasAttribute('data-morph-key') || control.id) return;
+    const action = ['onclick','onchange','oninput'].map(name => control.getAttribute(name) || '').find(Boolean);
+    if(action) control.setAttribute('data-morph-key', `control:${String(action).slice(0, 300)}`);
+  });
+  root.querySelectorAll('.mon-row,.row,.chart-row,.vm-chip,.disk-chip,.prom-target-row,.tn-alert-row,.detail-kv-row').forEach(row => {
+    if(row.hasAttribute('data-morph-key') || row.id) return;
+    const ownAction = row.getAttribute('onclick') || '';
+    const nestedAction = row.querySelector('[onclick]:not(.nbell)')?.getAttribute('onclick') || '';
+    const label = morphSourceText(row.querySelector('.mon-name,.nb-label,.prom-target-name,.detail-kv-key')).replace(/\s+/g, ' ').trim();
+    const stablePart = ownAction || nestedAction || label;
+    if(stablePart) row.setAttribute('data-morph-key', `row:${String(stablePart).slice(0, 300)}`);
+  });
+}
+function captureMorphControls(root){
+  const nodes = new Map();
+  const duplicates = new Set();
+  root?.querySelectorAll('button[data-morph-key],input[data-morph-key],textarea[data-morph-key],select[data-morph-key]').forEach(node => {
+    const key = morphNodeIdentity(node);
+    if(!key || duplicates.has(key)) return;
+    if(nodes.has(key)){ nodes.delete(key); duplicates.add(key); }
+    else nodes.set(key, node);
+  });
+  const active = document.activeElement;
+  return {
+    nodes,
+    active,
+    value: active && 'value' in active ? active.value : undefined,
+    checked: active && 'checked' in active ? active.checked : undefined,
+    selectionStart: active?.selectionStart,
+    selectionEnd: active?.selectionEnd,
+  };
+}
+function restoreMorphControls(root, state){
+  if(!root || !state?.nodes?.size) return;
+  root.querySelectorAll('button[data-morph-key],input[data-morph-key],textarea[data-morph-key],select[data-morph-key]').forEach(next => {
+    const saved = state.nodes.get(morphNodeIdentity(next));
+    if(!saved || saved === next) return;
+    next.replaceWith(saved);
+    morphNode(saved, next);
+    if(saved !== state.active) return;
+    if(state.value !== undefined) saved.value = state.value;
+    if(state.checked !== undefined) saved.checked = state.checked;
+    try {
+      saved.focus({ preventScroll:true });
+      if(Number.isInteger(state.selectionStart) && saved.setSelectionRange) saved.setSelectionRange(state.selectionStart, state.selectionEnd);
+    } catch {}
+  });
 }
 function morphDetailHtml(detail, html){
-  if(!detail || focusedDetailControl(detail)) return false;
+  if(!detail) return false;
   const scroll = captureDetailScroll(detail);
+  annotateMorphTree(detail, detail.dataset.panelId || activePanel);
+  const controls = captureMorphControls(detail);
   const tpl = document.createElement('template');
-  tpl.innerHTML = html.trim();
+  tpl.innerHTML = String(html || '').trim();
+  annotateMorphTree(tpl.content, detail.dataset.panelId || activePanel);
   morphChildren(detail, tpl.content);
+  restoreMorphControls(detail, controls);
   restoreDetailScroll(detail, scroll);
   return true;
 }
@@ -8932,8 +9276,9 @@ function detailSystemUnits(detail, panelId){
     const key = detailSystemKey(header, body, index);
     if(!key || seen.has(key)) return null;
     seen.add(key);
-    header.dataset.detailSystemKey = key;
-    body.dataset.detailSystemKey = key;
+    header.dataset.detailSystemKey = `${key}:header`;
+    body.dataset.detailSystemKey = `${key}:body`;
+    if(section) section.dataset.morphKey = `detail-system:${key}`;
     return {
       key,
       header,
@@ -9159,30 +9504,31 @@ function prepareDetailSystemOrdering(detail, panelId){
 
 function panelDetailHtml(panel){
   const iconSvg = platformIcon(panel);
+  const panelKey = escAttr(panel.id || 'panel');
   const detailSummary = panel.detailSummary !== undefined ? panel.detailSummary : panel.sbSummary;
   const hasBoxedDetailSummary = !!(detailSummary && detailSummary.includes('sb-csum'));
   const headerSummary = hasBoxedDetailSummary
-    ? `<div class="det-platform-summary">${detailSummary}</div>`
+    ? `<div class="det-platform-summary" data-morph-key="panel:${panelKey}:platform-summary">${detailSummary}</div>`
     : '';
   const detailBadge = panel.detailBadge !== undefined ? panel.detailBadge : panel.badge;
   const detailMeta = panel.detailMeta !== undefined
     ? panel.detailMeta
     : hasBoxedDetailSummary ? '' : panel.meta;
   return `
-    <div class="det-hdr">
-      <div class="det-icon">${iconSvg}</div>
-      <span class="det-title">${panel.title}</span>
+    <div class="det-hdr" data-morph-key="panel:${panelKey}:header">
+      <div class="det-icon" data-morph-key="panel:${panelKey}:icon">${iconSvg}</div>
+      <span class="det-title" data-morph-key="panel:${panelKey}:title">${panel.title}</span>
       ${headerSummary}
-      <div class="det-summary">
+      <div class="det-summary" data-morph-key="panel:${panelKey}:summary">
         ${detailMeta?`<span class="det-meta">${detailMeta}</span>`:''}
         ${detailBadge}
       </div>
     </div>
-    <div class="det-body">${panel.body}</div>`;
+    <div class="det-body" data-morph-key="panel:${panelKey}:body">${panel.body}</div>`;
 }
 
 function selectPanel(id, opts = {}){
-  if(!opts.soft) setHashRoute(id, opts);
+  if(!opts.soft && !opts.live) setHashRoute(id, opts);
   const wasEmbedOpen = embedOpen;
   embedOpen = false;
   dashboardOpen = false;
@@ -9192,7 +9538,7 @@ function selectPanel(id, opts = {}){
   document.querySelectorAll('.sb-card').forEach(c=>c.classList.remove('active'));
   const card = document.getElementById(`sbcard-${id}`);
   if(card) card.classList.add('active');
-  if(window._lastData?._compact && !opts._fullRetry && !opts.soft){
+  if(window._lastData?._compact && !opts._fullRetry && !opts.soft && !opts.live){
     const detail = document.getElementById('detail');
     parkEmbedFrames(detail, { abortInflight: true });
     detail.dataset.embedUrl = '';
@@ -9215,8 +9561,7 @@ function selectPanel(id, opts = {}){
     fullStatusPromise
       .then(data => {
         if(data instanceof Error) throw data;
-        render(data);
-        selectPanel(id, { ...opts, _fullRetry: true });
+        render(data, { live:true });
       })
       .catch(err => {
         detail.innerHTML = `<div class="empty" style="padding:48px">Could not load platform details. ${escHtml(err?.message || '')}</div>`;
@@ -9230,7 +9575,7 @@ function selectPanel(id, opts = {}){
   if(!window._panels?.[id] && window._lastData) window._panels = buildPanels(window._lastData);
   const panel = window._panels?.[id];
   if(!panel){
-    if(window._lastData) render(window._lastData);
+    if(window._lastData) render(window._lastData, { live:true });
     applyLanguage(currentLang(window._lastData));
     return;
   }
@@ -9240,14 +9585,21 @@ function selectPanel(id, opts = {}){
   parkEmbedFrames(detail, { abortInflight: true });
   detail.dataset.embedUrl = '';
   const html = panelDetailHtml(panel);
-  const canSoftPatch = opts.soft && !wasEmbedOpen && detail.dataset.panelId === id && detail.dataset.panelHtml !== html;
-  if(canSoftPatch && morphDetailHtml(detail, html)){
-    if(!agentUpdateDetailConsistent(detail, panel)){
-      const scroll = captureDetailScroll(detail);
+  const canSoftPatch = (opts.soft || opts.live) && !wasEmbedOpen && detail.dataset.panelId === id && detail.dataset.panelHtml !== html;
+  if(canSoftPatch){
+    if(morphDetailHtml(detail, html)){
+      if(!opts.live && !agentUpdateDetailConsistent(detail, panel)){
+        const scroll = captureDetailScroll(detail);
+        detail.innerHTML = html;
+        restoreDetailScroll(detail, scroll);
+      }
+      detail.dataset.panelId = id;
+      detail.dataset.panelHtml = html;
+    } else if(!opts.live){
       detail.innerHTML = html;
-      restoreDetailScroll(detail, scroll);
+      detail.dataset.panelId = id;
+      detail.dataset.panelHtml = html;
     }
-    detail.dataset.panelHtml = html;
   } else if(wasEmbedOpen || detail.dataset.panelId !== id || detail.dataset.panelHtml !== html){
     detail.innerHTML = html;
     detail.dataset.panelId = id;
@@ -9367,8 +9719,70 @@ function toggleOverviewGroup(grpId){
 }
 
 /* ── Render ── */
+const LIVE_INVENTORY_ARRAY_KEYS = new Set([
+  'linux','windows','docker','database','snmp','instances','devices','nodes','hosts','vms','containers','pods','deployments',
+  'services','environments','projects','targets','monitors','checks','datastores','repositories','sessions','pipelines','zones',
+  'tunnels','domains','stacks','volumes','networks','interfaces','disks','sensors','jobs','pools','alerts','tasks',
+]);
+function mergeLiveInventory(previous, next, depth = 0, inheritedIncomplete = false){
+  if(!previous || !next || typeof previous !== 'object' || typeof next !== 'object' || depth > 12) return next;
+  // Transport/snapshot flags describe the entire subtree. Local collector
+  // errors only make this object's own inventory arrays non-authoritative;
+  // otherwise one failed instance could keep deleted items in healthy siblings.
+  const subtreeIncomplete = inheritedIncomplete || next.loading === true || next.refreshing === true || next._stale === true || next._connecting === true || next._snapshot === true || next.snapshot === true || next.complete === false;
+  const authoritativeEmpty = next._empty === true;
+  const incomplete = subtreeIncomplete || next.partial === true || next.devicesComplete === false || !!next.resourceError || (!!next.error && !authoritativeEmpty);
+  const out = incomplete ? { ...previous, ...next } : { ...next };
+  Object.keys(next).forEach(key => {
+    const oldValue = previous[key];
+    const newValue = next[key];
+    if(Array.isArray(oldValue) && Array.isArray(newValue)){
+      const completeFlag = key === 'devices' ? next.devicesComplete : next[`${key}Complete`];
+      const keepMissing = LIVE_INVENTORY_ARRAY_KEYS.has(key) && (incomplete || completeFlag === false);
+      const oldByKey = new Map(oldValue.map(item => [historyItemKey(item), item]).filter(([itemKey]) => itemKey != null));
+      const seen = new Set();
+      out[key] = newValue.map(item => {
+        const itemKey = historyItemKey(item);
+        if(itemKey != null) seen.add(itemKey);
+        const oldItem = itemKey != null ? oldByKey.get(itemKey) : null;
+        return oldItem && item && typeof item === 'object' ? mergeLiveInventory(oldItem, item, depth + 1, subtreeIncomplete) : item;
+      });
+      if(keepMissing){
+        oldValue.forEach(item => {
+          const itemKey = historyItemKey(item);
+          if(itemKey != null && !seen.has(itemKey)) out[key].push(item);
+        });
+      }
+    } else if(oldValue && newValue && typeof oldValue === 'object' && typeof newValue === 'object') {
+      out[key] = mergeLiveInventory(oldValue, newValue, depth + 1, subtreeIncomplete);
+    }
+  });
+  return out;
+}
 function render(data, opts = {}){
   if(applyDemoResetDay(data)) return;
+  if(opts.live && window._lastData){
+    const previousTime = Date.parse(window._lastData.timestamp || '');
+    const nextTime = Date.parse(data?.timestamp || '');
+    const notificationAdvanced = Number(data?.notifyRevision || 0) > Number(window._lastData.notifyRevision || 0);
+    if(Number.isFinite(previousTime) && Number.isFinite(nextTime) && nextTime < previousTime){
+      if(!notificationAdvanced || !Array.isArray(data?.notifyDisabled)) return;
+      // A delayed status response may still carry the newest notification
+      // revision. Keep the newer status/inventory snapshot and reconcile only
+      // the notification fields from that response.
+      data = {
+        ...window._lastData,
+        notifyDisabled: data.notifyDisabled,
+        notifyTopics: data.notifyTopics,
+        notifyRevision: data.notifyRevision,
+        ntfyTopics: Array.isArray(data.ntfyTopics) ? data.ntfyTopics : window._lastData.ntfyTopics,
+      };
+    }
+  }
+  if(opts.live && window._lastData && (data?.loading || data?.refreshing)){
+    data = { ...window._lastData, ...data };
+  }
+  if(opts.live && window._lastData) data = mergeLiveInventory(window._lastData, data);
   const pageScroll = capturePageScroll();
   if(currentHashRoute() === 'dashboard' && embedOpen){
     embedOpen = false;
@@ -9572,7 +9986,9 @@ function render(data, opts = {}){
     else if(degradedCount>0){ cls='yellow'; txt=degradedCount+' '+trText('degraded', lang); }
     else { cls='green'; txt=trText('All healthy', lang); }
     gh.className='ghealth gh-'+cls;
-    gh.innerHTML='<span class="gh-dot"></span>'+txt;
+    let text = gh.querySelector('.gh-text');
+    if(!text){ text = document.createElement('span'); text.className = 'gh-text'; gh.appendChild(text); }
+    text.textContent = txt;
   }
   const ps=document.getElementById('pubstatus');
   if(ps) {
@@ -9621,7 +10037,7 @@ function render(data, opts = {}){
     return;
   }
   if(!activePanel || !panels[activePanel]) activePanel = baseIds[0];
-  selectPanel(activePanel, { soft: !!opts.soft });
+  selectPanel(activePanel, { soft: !!opts.soft, live: !!opts.live });
   applyLanguage(currentLang(data));
   restorePageScroll(pageScroll);
 }
@@ -9737,38 +10153,73 @@ function toggleRail(){
   });
 })();
 
-/* ── Refresh activity bar ── */
-let pbarStarted = false;
-let pbarRestartTimer = null;
-function setPbarScale(scale, transition = 'none'){
-  const b=document.getElementById('pbar');
-  if(!b) return null;
-  b.style.transition = transition;
-  b.style.transform = `scaleX(${Math.max(0, Math.min(1, scale))})`;
-  return b;
+/* ── Activity line ── */
+const activityLineSources = new Set();
+let activityLineOffline = typeof navigator !== 'undefined' && navigator.onLine === false;
+let activityLineTransient = '';
+let activityLineTimer = null;
+function renderActivityLine(){
+  const line = document.getElementById('activity-line');
+  if(!line) return;
+  const state = activityLineTransient === 'error'
+    ? 'error'
+    : activityLineOffline
+      ? 'offline'
+      : activityLineSources.size
+        ? 'active'
+        : activityLineTransient === 'done'
+          ? 'done'
+          : '';
+  line.className = state ? `is-${state}` : '';
 }
-function startPbar(){
-  manualPbarStart();
+function activityLineStart(source = 'request'){
+  clearTimeout(activityLineTimer);
+  activityLineTimer = null;
+  activityLineTransient = '';
+  activityLineSources.add(String(source || 'request'));
+  renderActivityLine();
 }
-function resetPbar(){
-  manualPbarDone();
+function activityLineComplete(source = 'request'){
+  const removed = activityLineSources.delete(String(source || 'request'));
+  if(!removed || activityLineSources.size){
+    renderActivityLine();
+    return;
+  }
+  clearTimeout(activityLineTimer);
+  activityLineTransient = 'done';
+  renderActivityLine();
+  activityLineTimer = setTimeout(() => {
+    activityLineTimer = null;
+    activityLineTransient = '';
+    renderActivityLine();
+  }, 420);
 }
-function manualPbarStart(){
-  clearTimeout(pbarRestartTimer);
-  const b=setPbarScale(0, 'none');
-  if(!b) return;
-  pbarStarted = true;
-  b.getBoundingClientRect();
-  requestAnimationFrame(()=>setPbarScale(.82, 'transform .7s ease-out'));
+function activityLineFail(...sources){
+  const keys = sources.length ? sources : ['request'];
+  keys.forEach(source => activityLineSources.delete(String(source || 'request')));
+  clearTimeout(activityLineTimer);
+  activityLineTransient = 'error';
+  renderActivityLine();
+  activityLineTimer = setTimeout(() => {
+    activityLineTimer = null;
+    activityLineTransient = '';
+    renderActivityLine();
+  }, 850);
 }
-function manualPbarDone(){
-  const b=setPbarScale(1, 'transform .18s ease');
-  if(!b) return;
-  clearTimeout(pbarRestartTimer);
-  pbarRestartTimer = setTimeout(()=>{
-    setPbarScale(0, 'none');
-  }, 220);
+function activityLineSetOffline(value){
+  activityLineOffline = value === true;
+  renderActivityLine();
 }
+function activityLineReset(){
+  clearTimeout(activityLineTimer);
+  activityLineTimer = null;
+  activityLineTransient = '';
+  activityLineOffline = false;
+  activityLineSources.clear();
+  renderActivityLine();
+}
+window.addEventListener('online', () => activityLineSetOffline(false));
+window.addEventListener('offline', () => activityLineSetOffline(true));
 
 let faviconTimer = null;
 let hdotTimer = null;
@@ -10687,9 +11138,17 @@ function statusCachedFallback(data){
   if(!statusPayloadLooksTransientShell(data)) return data;
   const cached = readStatusCache();
   if(cached && statusPayloadHasUsefulData(cached)) {
-    return { ...cached, refreshing: !!data?.refreshing, _transientShellFallback: true };
+    const fallback = { ...cached, refreshing: !!data?.refreshing, _transientShellFallback: true };
+    if(data?.ui && typeof data.ui === 'object' && !Array.isArray(data.ui)) fallback.ui = data.ui;
+    return fallback;
   }
   return data;
+}
+function statusCacheDataWithoutUi(data){
+  if(!data || typeof data !== 'object' || Array.isArray(data) || !Object.prototype.hasOwnProperty.call(data, 'ui')) return data;
+  const sanitized = { ...data };
+  delete sanitized.ui;
+  return sanitized;
 }
 function readStatusCache(){
   try{
@@ -10697,20 +11156,32 @@ function readStatusCache(){
     const raw = sessionStorage.getItem(key) || localStorage.getItem(key);
     if(!raw) return null;
     const box = JSON.parse(raw);
-    if(!box || !box.data || Date.now() - Number(box.t || 0) > STATUS_CACHE_MAX_AGE) return null;
-    if(box.data.loading) return null;
-    if(statusPayloadLooksTransientShell(box.data)) return null;
-    return box.data;
+    if(!box || !box.data) return null;
+    const data = statusCacheDataWithoutUi(box.data);
+    if(data !== box.data){
+      const sanitizedRaw = JSON.stringify({ ...box, data });
+      sessionStorage.setItem(key, sanitizedRaw);
+      localStorage.setItem(key, sanitizedRaw);
+    }
+    if(Date.now() - Number(box.t || 0) > STATUS_CACHE_MAX_AGE){
+      sessionStorage.removeItem(key);
+      localStorage.removeItem(key);
+      return null;
+    }
+    if(data.loading) return null;
+    if(statusPayloadLooksTransientShell(data)) return null;
+    return data;
   }catch{ return null; }
 }
 let statusCacheWriteTimer = null;
 function writeStatusCache(data){
   if(!data || data.loading) return;
   if(statusPayloadLooksTransientShell(data)) return;
+  const cacheData = statusCacheDataWithoutUi(data);
   const run = () => {
     statusCacheWriteTimer = null;
     try{
-      const raw = JSON.stringify({ t: Date.now(), data });
+      const raw = JSON.stringify({ t: Date.now(), data: cacheData });
       if(raw.length > 2_500_000) return;
       const key = statusCacheKey();
       sessionStorage.setItem(key, raw);
@@ -10735,7 +11206,6 @@ function showDashboardLoading(message = 'Loading…'){
   detail.dataset.overviewIds = '';
   detail.classList.remove('embed-stack');
   detail.innerHTML = `<div class="empty" style="padding:48px">${escHtml(message)}</div>`;
-  if(!pbarStarted) startPbar();
 }
 function dashboardDetailIsBlank(){
   const detail = document.getElementById('detail');
@@ -10783,9 +11253,15 @@ const HISTORY_MERGE_MAX = 5760;
 function historyItemKey(item){
   if(!item || typeof item !== 'object') return null;
   if(item.node?.name) return `${item.clusterName || item.clusterUrl || ''}|node:${item.node.name}`;
-  const base = item.id ?? item.mac ?? item.host ?? item.url ?? item.name ?? null;
+  const base = item.uid ?? item.uuid ?? item.id ?? item.mac ?? item.host ?? item.url ?? item.name ?? null;
   if(base == null) return null;
-  return `${item.source || ''}|${item.environmentId || item.endpointId || ''}|${base}`;
+  const scope = [
+    item.source || item.sourceName || '',
+    item.environmentId || item.endpointId || item.instanceId || '',
+    item.namespace || item.project || item.accountId || '',
+    item.kind || item.type || '',
+  ].join('|');
+  return `${scope}|${base}`;
 }
 function mergeCompactHistories(next, prev, depth = 0){
   if(!next || !prev || typeof next !== 'object' || typeof prev !== 'object' || depth > 8) return next;
@@ -10879,12 +11355,13 @@ async function fetchStatus(opts = {}){
     if(!r.ok) throw new Error('HTTP ' + r.status);
     const ct = r.headers.get('content-type') || '';
     if(!ct.toLowerCase().includes('application/json')) throw new Error(`Expected JSON from ${url}, got ${ct || 'unknown content type'}`);
-    const data = statusCachedFallback(await r.json());
+    let data = statusCachedFallback(await r.json());
+    const previous = window._lastData || readStatusCache();
     if(!(opts.detail || opts.full)) {
-      const previous = window._lastData || readStatusCache();
       mergeCompactHistories(data, previous);
       data._viewHistoryLimit = Math.max(Number(data._viewHistoryLimit || 0), Number(previous?._viewHistoryLimit || 0));
     }
+    if(previous) data = mergeLiveInventory(previous, data);
     writeStatusCache(data);
     return data;
   }finally{
@@ -10917,7 +11394,7 @@ let shellSummaryFollowupTimer = null;
 let shellSummarySyncPromise = null;
 function scheduleShellSummarySync(delay = 0){
   clearTimeout(shellSummarySyncTimer);
-  if(!shouldUseShellSummary() || paused || pageHidden()) return;
+  if(!shouldUseShellSummary() || pageHidden()) return;
   shellSummarySyncTimer = setTimeout(() => {
     shellSummarySyncTimer = null;
     if(shellSummarySyncPromise) return;
@@ -11016,7 +11493,9 @@ function applyShellSummary(summary){
     else if(degradedCount>0){ cls='yellow'; txt=degradedCount+' '+trText('degraded', lang); }
     else { cls='green'; txt=trText('All healthy', lang); }
     gh.className='ghealth gh-'+cls;
-    gh.innerHTML='<span class="gh-dot"></span>'+txt;
+    let text = gh.querySelector('.gh-text');
+    if(!text){ text = document.createElement('span'); text.className = 'gh-text'; gh.appendChild(text); }
+    text.textContent = txt;
   }
   const ps=document.getElementById('pubstatus');
   if(ps) {
@@ -11062,7 +11541,6 @@ function applyShellSummary(summary){
   restorePageScroll(pageScroll);
 }
 
-let paused = false;
 const activeStatusControllers = new Set();
 function trackStatusController(ctrl){ activeStatusControllers.add(ctrl); }
 function untrackStatusController(ctrl){ activeStatusControllers.delete(ctrl); }
@@ -11073,34 +11551,10 @@ function abortStatusFetches(){
   activeStatusControllers.clear();
 }
 function pageHidden(){ return document.visibilityState === 'hidden'; }
-function togglePause(){
-  paused = !paused;
-  const btn = document.getElementById('pbtn');
-  const icon = document.getElementById('pbtn-icon');
-  btn.classList.toggle('paused', paused);
-  const label = trText(paused ? 'Resume' : 'Pause', currentLang());
-  btn.title = label;
-  btn.setAttribute('aria-label', label);
-  icon.innerHTML = paused
-    ? '<polygon points="5 3 19 12 5 21 5 3"/>'
-    : '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>';
-  if(paused){
-    clearTimeout(timer);
-    closeStatusStream();
-    abortStatusFetches();
-    statusStreamRefreshing = false;
-    queuedStatusStreamData = '';
-    setPbarScale(0, 'none');
-  } else {
-    statusStreamRefreshing = false;
-    connectStatusStream();
-    pollOnce();
-  }
-}
 
 async function pollOnce(){
-  if(paused || pageHidden()) return;
-  manualPbarStart();
+  if(pageHidden()) return;
+  activityLineStart('poll');
   try{
     const useSummary = shouldUseShellSummary();
     const data = useSummary
@@ -11108,56 +11562,60 @@ async function pollOnce(){
       : await fetchStatus({ timeoutMs: 8000 });
     if(useSummary) applyShellSummary(data);
     else {
-      render(data, { soft: true });
+      render(data, { live: true });
       if(data?.loading) scheduleInitialLoadRetry(0);
       else clearInitialLoadRetry();
     }
+    activityLineComplete('poll');
     if(data.loading){
-      manualPbarDone();
       clearTimeout(timer);
       timer = setTimeout(pollOnce, 5000);
       return;
     }
-  }catch{}
-  if(!statusStreamRefreshing) resetPbar();
+  }catch(e){
+    if(e?.name === 'AbortError' && (embedOpen || pageHidden())) activityLineReset();
+    else activityLineFail('poll');
+  }
   scheduleRefresh();
 }
 let statusStream = null;
 let statusStreamOpen = false;
 let statusStreamFetchBusy = false;
-let statusStreamRefreshing = false;
-let queuedStatusStreamData = '';
+let queuedStatusStreamEvents = [];
 let lastStatusEventTs = '';
 async function handleStatusStreamEvent(event){
-  if(paused || pageHidden() || embedOpen) return;
+  if(pageHidden() || embedOpen) return;
   let msg = {};
   try { msg = JSON.parse(event.data || '{}'); } catch {}
-  if(!event.replayed){
-    if(msg.type === 'refreshing') {
-      statusStreamRefreshing = true;
-      manualPbarStart();
-      return;
-    }
-    if(typeof msg.refreshing === 'boolean'){
-      const wasRefreshing = statusStreamRefreshing;
-      statusStreamRefreshing = msg.refreshing;
-      if(statusStreamRefreshing && !wasRefreshing) manualPbarStart();
-    }
-    if(msg.type === 'updated') {
-      statusStreamRefreshing = false;
-      manualPbarDone();
-    }
+  if(!event.replayed && msg.type === 'refreshing') {
+    activityLineStart('collector');
+    return;
+  }
+  if(msg.type === 'hello'){
+    if(msg.refreshing === true) activityLineStart('collector');
+    else activityLineComplete('collector');
   }
   if(statusStreamFetchBusy){
-    queuedStatusStreamData = event.data || '';
+    const queuedData = event.data || '';
+    if(queuedData){
+      queuedStatusStreamEvents.push(queuedData);
+      if(queuedStatusStreamEvents.length > 12) queuedStatusStreamEvents.splice(0, queuedStatusStreamEvents.length - 12);
+    }
     return;
   }
   const ts = String(msg.timestamp || '');
   const notificationChanged = Number(msg.notifyRevision || 0) > notifyRevision;
-  if(ts && ts === lastStatusEventTs && !notificationChanged) return;
+  if(ts && ts === lastStatusEventTs && !notificationChanged) {
+    if(msg.type === 'updated') activityLineComplete('collector');
+    return;
+  }
   lastStatusEventTs = ts;
-  if(window._lastData?.timestamp && ts && ts === String(window._lastData.timestamp) && !notificationChanged) return;
+  if(window._lastData?.timestamp && ts && ts === String(window._lastData.timestamp) && !notificationChanged) {
+    if(msg.type === 'updated') activityLineComplete('collector');
+    return;
+  }
   statusStreamFetchBusy = true;
+  activityLineStart('stream');
   try{
     const useSummary = shouldUseShellSummary();
     const data = useSummary
@@ -11165,60 +11623,71 @@ async function handleStatusStreamEvent(event){
       : await fetchStatus();
     if(useSummary) applyShellSummary(data);
     else {
-      render(data, { soft: true });
+      render(data, { live: true });
       if(data?.loading) scheduleInitialLoadRetry(0);
       else clearInitialLoadRetry();
     }
-    if(!statusStreamRefreshing) resetPbar();
+    activityLineComplete('stream');
+    if(msg.type === 'updated') activityLineComplete('collector');
   }catch(e){
+    if(e?.name === 'AbortError' && (embedOpen || pageHidden())) activityLineReset();
+    else if(msg.type === 'updated') activityLineFail('stream', 'collector');
+    else activityLineFail('stream');
     if(e.message !== 'Unauthorized') console.warn('status stream refresh failed:', e.message || e);
   }finally{
     statusStreamFetchBusy = false;
-    const queued = queuedStatusStreamData;
-    queuedStatusStreamData = '';
+    const queued = queuedStatusStreamEvents.splice(0);
     scheduleRefresh();
-    if(queued) queueMicrotask(() => handleStatusStreamEvent({ data:queued, replayed:true }));
+    if(queued.length) queueMicrotask(() => queued.forEach(data => handleStatusStreamEvent({ data, replayed:true })));
   }
 }
 function connectStatusStream(){
-  if(statusStream || !window.EventSource || pageHidden() || paused || embedOpen) return;
+  if(statusStream || !window.EventSource || pageHidden() || embedOpen) return;
   try{
-    statusStream = new EventSource('/api/status/stream');
-    statusStream.onopen = () => {
+    const stream = new EventSource('/api/status/stream');
+    statusStream = stream;
+    stream.onopen = () => {
+      if(statusStream !== stream) return;
       statusStreamOpen = true;
+      activityLineSetOffline(false);
       scheduleRefresh();
     };
-    statusStream.onerror = () => {
+    stream.onerror = () => {
+      if(statusStream !== stream) return;
       statusStreamOpen = false;
+      activityLineSetOffline(true);
       scheduleRefresh();
     };
-    statusStream.addEventListener('status', handleStatusStreamEvent);
+    stream.addEventListener('status', handleStatusStreamEvent);
   }catch(e){
     statusStreamOpen = false;
+    activityLineSetOffline(true);
   }
 }
 function scheduleRefresh(){
-  if(paused || pageHidden()) return;
+  if(pageHidden()) return;
   clearTimeout(timer);
   timer = setTimeout(pollOnce, statusStreamOpen ? INTERVAL * 3 : (shouldUseShellSummary() ? SHELL_SUMMARY_INTERVAL : INTERVAL));
 }
 function closeStatusStream(){
-  if(!statusStream) return;
-  try{ statusStream.close(); }catch(e){}
+  if(statusStream){
+    try{ statusStream.close(); }catch(e){}
+  }
   statusStream = null;
   statusStreamOpen = false;
+  queuedStatusStreamEvents.length = 0;
+  activityLineReset();
 }
 document.addEventListener('visibilitychange', () => {
   if(pageHidden()){
     clearTimeout(timer);
     closeStatusStream();
     abortStatusFetches();
+    activityLineReset();
     return;
   }
-  if(!paused){
-    connectStatusStream();
-    pollOnce();
-  }
+  connectStatusStream();
+  pollOnce();
 });
 
 let refreshBusy = false;
@@ -11226,36 +11695,50 @@ async function doRefresh(){
   const btn = document.getElementById('rbtn');
   if(refreshBusy) return;
   refreshBusy = true;
+  activityLineStart('manual');
   btn?.classList.add('spin'); clearTimeout(timer);
-  manualPbarStart();
   const ctrl = new AbortController();
   trackStatusController(ctrl);
   const to = setTimeout(() => ctrl.abort(), 1000);
+  let activitySucceeded = false;
+  let activityCancelled = false;
   try{
     const r = await fetch('/api/refresh?wait=700',{headers:authHeaders(), cache:'no-store', signal:ctrl.signal});
     handleUnauth(r);
-    const data = statusCachedFallback(await r.json());
-    render(data);
+    const body = await r.json().catch(() => ({}));
+    if(!r.ok) throw new Error(body.error || `HTTP ${r.status}`);
+    const data = statusCachedFallback(body);
+    render(data, { live: true });
     if(data?.loading) scheduleInitialLoadRetry(0);
     else clearInitialLoadRetry();
     try{ document.querySelector('#detail iframe.embed-frame.active')?.contentWindow?.refreshDots?.(); }catch(e){}
+    activitySucceeded = true;
   }catch(e){
     if(e.name === 'AbortError'){
-      try {
-        const useSummary = shouldUseShellSummary();
-        if(useSummary) applyShellSummary(await fetchStatusSummary({ timeoutMs: 4000 }));
-        else {
-          const data = await fetchStatus();
-          render(data);
-          if(data?.loading) scheduleInitialLoadRetry(0);
-          else clearInitialLoadRetry();
-        }
-      } catch {}
+      if(embedOpen || pageHidden()) activityCancelled = true;
+      else {
+        try {
+          const useSummary = shouldUseShellSummary();
+          if(useSummary) {
+            applyShellSummary(await fetchStatusSummary({ timeoutMs: 4000 }));
+            activitySucceeded = true;
+          }
+          else {
+            const data = await fetchStatus();
+            render(data, { live: true });
+            if(data?.loading) scheduleInitialLoadRetry(0);
+            else clearInitialLoadRetry();
+            activitySucceeded = true;
+          }
+        } catch {}
+      }
     } else if(e.message!=='Unauthorized') console.error(e);
   } finally {
     clearTimeout(to);
     untrackStatusController(ctrl);
-    if(!statusStreamRefreshing) manualPbarDone();
+    if(activityCancelled) activityLineReset();
+    else if(activitySucceeded) activityLineComplete('manual');
+    else activityLineFail('manual');
     btn?.classList.remove('spin');
     refreshBusy = false;
     scheduleRefresh();
@@ -11279,29 +11762,33 @@ function scheduleInitialLoadRetry(attempt = 0){
   }, delay);
 }
 async function initialLoad(preloadedData, attempt = 0){
+  activityLineStart('initial');
   try {
     let data = preloadedData;
     if(data && typeof data.then === 'function') data = await data;
     const route = currentHashRoute();
     const routeNeedsDashboardData = route === 'dashboard' || ALL_IDS.includes(route);
-    if(embedOpen || !routeNeedsDashboardData) return;
+    if(embedOpen || !routeNeedsDashboardData) {
+      activityLineComplete('initial');
+      return;
+    }
     if(data instanceof Error || !data) {
       if(window._lastData && !window._lastData.loading){
         connectStatusStream();
         scheduleRefresh();
+        activityLineComplete('initial');
         return;
       }
       data = await fetchStatus({ timeoutMs: 10000 });
     }
     const prevData = window._lastData;
     try {
-      render(data);
+      render(data, prevData ? { live: true } : {});
     } catch (renderErr) {
       window._lastData = prevData;
       throw renderErr;
     }
     ensureDashboardContent('initial-render');
-    manualPbarDone();
     if(window.location.hash && !initialRouteApplied){
       initialRouteApplied = true;
       applyHashRoute();
@@ -11310,14 +11797,16 @@ async function initialLoad(preloadedData, attempt = 0){
       connectStatusStream();
       scheduleRefresh();
       scheduleInitialLoadRetry(attempt);
+      activityLineComplete('initial');
       return;
     }
     clearInitialLoadRetry();
     connectStatusStream();
     scheduleRefresh();
     if(!embedOpen && !document.querySelector('.sb-card')) openEmbed('/settings');
+    activityLineComplete('initial');
   } catch(e){
-    manualPbarDone();
+    activityLineFail('initial');
     if(e.message!=='Unauthorized') {
       console.error(e);
       if(!window._lastData || window._lastData.loading){
@@ -11366,7 +11855,7 @@ window.addEventListener('popstate', () => { applyHashRoute(); });
   const applyFreshStatus = () => {
     if(startInEmbed) {
       return statusPromise.then(data => {
-        if(data && !(data instanceof Error)) render(data, { soft: true });
+        if(data && !(data instanceof Error)) render(data, { live: true });
       });
     }
     if(!cachedStatus) return firstRenderPromise;

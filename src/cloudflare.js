@@ -314,6 +314,7 @@ async function getCloudflareData(config = {}) {
   const online = zones.length > 0 || tunnels.length > 0 || domains.length > 0;
   return {
     online,
+    _empty: !online && errors.length === 0,
     error: online ? errors[0] || '' : errors[0] || 'No Cloudflare resources found',
     partial: errors.length > 0,
     errors: errors.slice(0, 8),

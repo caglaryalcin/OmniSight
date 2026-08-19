@@ -560,6 +560,55 @@ function testPlatformAvailability() {
   assert.deepStrictEqual(platformAvailability(data, 'vmware'), { offline: 0, online: 0, total: 2 });
 }
 
+function testUiPreferenceScoping() {
+  const server = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+  const scopedStart = server.indexOf('function scopedUiPreferences');
+  const requestEnd = server.indexOf('\nfunction saveUiPreferencesForRequest', scopedStart);
+  assert.ok(scopedStart >= 0 && requestEnd > scopedStart, 'request UI scoping helpers must remain testable');
+
+  const context = {
+    config: { ui: {} },
+    store: null,
+    loadUiPreferenceStore() { return context.store; },
+    uiPreferenceKeyFromRequest(req) { return req.userKey || ''; },
+    cleanUiPreferences(raw) {
+      return {
+        ...raw,
+        dashboardHiddenPlatforms: Array.isArray(raw.dashboardHiddenPlatforms)
+          ? [...raw.dashboardHiddenPlatforms]
+          : [],
+      };
+    },
+  };
+  vm.createContext(context);
+  vm.runInContext(`${server.slice(scopedStart, requestEnd)}\nglobalThis.uiPreferencesForRequest = uiPreferencesForRequest;`, context);
+
+  context.store = {
+    global: { dashboardHiddenPlatforms: ['kubernetes'], railCollapsed: true },
+    users: {},
+  };
+  let scoped = context.uiPreferencesForRequest({ userKey: 'alice' });
+  assert.deepStrictEqual(Array.from(scoped.dashboardHiddenPlatforms), [], 'legacy global hidden platforms must not hide cards for an authenticated user');
+  assert.strictEqual(scoped.railCollapsed, true, 'non-personal global UI defaults must still apply');
+
+  context.store.users.alice = { dashboardHiddenPlatforms: ['linux'] };
+  scoped = context.uiPreferencesForRequest({ userKey: 'alice' });
+  assert.deepStrictEqual(Array.from(scoped.dashboardHiddenPlatforms), ['linux'], 'an authenticated user must receive their explicit hidden platforms');
+
+  scoped = context.uiPreferencesForRequest({});
+  assert.deepStrictEqual(Array.from(scoped.dashboardHiddenPlatforms), ['kubernetes'], 'an unauthenticated/global request must retain legacy global behavior');
+
+  const assignStaticSource = server.slice(server.indexOf('function assignStatic'), server.indexOf('\nfunction kubernetesConnectingData'));
+  const snapshotWriterSource = server.slice(server.indexOf('function writeRuntimeSnapshotNow'), server.indexOf('\nfunction scheduleRuntimeSnapshotSave'));
+  const refreshEndpointSource = server.slice(server.indexOf("app.get('/api/refresh'"), server.indexOf("app.get('/api/config'"));
+  const saveUiSource = server.slice(server.indexOf('function saveUiPreferencesForRequest'), server.indexOf('\nfunction withRequestUiPreferences'));
+  assert.ok(assignStaticSource.includes('delete base.ui;') && !assignStaticSource.includes('base.ui ='), 'the shared runtime cache must not carry global UI preferences');
+  assert.ok(snapshotWriterSource.includes('delete snapshot.ui;'), 'runtime snapshots must strip any legacy UI preferences before persistence');
+  assert.ok(refreshEndpointSource.includes('withRequestUiPreferences(req,'), 'manual refresh responses must attach the current user UI preferences');
+  assert.ok(saveUiSource.includes('return scopedUiPreferences(store, key);'), 'preference saves must return the same request-scoped UI view');
+  assert.ok(!/\bdata:\s*cache\.data\b/.test(server), 'raw runtime-data mutation responses must not bypass request UI scoping');
+}
+
 function testStaticRegressions() {
   const root = path.join(__dirname, '..');
   const windowsAgent = fs.readFileSync(path.join(root, 'agent', 'omnisight-agent.ps1'), 'utf8');
@@ -664,15 +713,35 @@ function testStaticRegressions() {
   assert.ok(dashboard.includes('function toggleVmwareDatastores(instanceIndex, key)') && dashboard.includes('setOverride(`vmware:datastores:${key}`, open)') && vmwareOverviewSource.includes('panelOpenState(`vmware:datastores:${endpointKey}`, false)') && vmwareOverviewSource.includes('class="k8s-grp ceph-health-group vmware-datastore-group"') && vmwareOverviewSource.includes('onclick="toggleVmwareDatastores(${instanceIndex},${jsStr(endpointKey)})"'), 'VMware datastores must use a persistent Ceph-style expand and collapse group');
   const vmwareInstanceLayout = vmwareOverviewSource.slice(vmwareOverviewSource.indexOf('const instanceBody ='), vmwareOverviewSource.indexOf("if (instance.type === 'esxi')"));
   assert.ok(vmwareInstanceLayout.indexOf('<span>Datastores</span>') < vmwareInstanceLayout.indexOf('<span>Clusters</span>') && vmwareInstanceLayout.indexOf('<span>Clusters</span>') < vmwareInstanceLayout.indexOf('${hostRows') && !vmwareInstanceLayout.includes('<span>ESXi hosts</span>'), 'VMware detail must show datastores first, optional clusters second and host rows last without a redundant ESXi host count heading');
-  assert.ok(vmwareOverviewSource.includes("if (instance.type === 'esxi') return `<section class=\"prom-instance vmware-standalone-instance\">") && vmwareOverviewSource.includes('<div class="prom-instance-body open" id="vmware-body-${instanceIndex}">${instanceBody}</div>'), 'standalone ESXi details must omit the duplicate endpoint row while retaining datastore and host controls');
+  assert.ok(vmwareOverviewSource.includes("if (instance.type === 'esxi') return `<section class=\"prom-instance vmware-standalone-instance\" data-morph-key=\"vmware-endpoint:${escAttr(endpointKey)}\">") && vmwareOverviewSource.includes('<div class="prom-instance-body open" id="vmware-body-${instanceIndex}">${instanceBody}</div>'), 'standalone ESXi details must omit the duplicate endpoint row while retaining datastore and host controls under a stable endpoint morph key');
   assert.ok(vmwareOverviewSource.includes("badgeHtml: datastoreWarn ? bdg(datastoreBadgeClass, datastore.accessible === false ? 'inaccessible' : 'attention') : ''") && !vmwareOverviewSource.includes("datastore.accessible === false ? 'inaccessible' : 'online'"), 'healthy VMware datastore gauges must not repeat an online badge');
   assert.ok(server.includes("const vmwareHistory = loadHistoryMap('vmware-history'") && server.includes("key === 'vmware' ? preservePlatformOnTransient(key, mergeVmwareHistory(next))"), 'VMware host history must persist across refreshes and restarts');
-  assert.ok(!dashboard.includes('transform ${INTERVAL}ms linear') && dashboard.includes("if(msg.type === 'refreshing')") && dashboard.includes('manualPbarStart();') && dashboard.includes("if(msg.type === 'updated') {") && dashboard.includes('manualPbarDone();'), 'the top progress bar must represent actual refresh activity instead of a fixed 15-second countdown');
+  const activityLineCssStart = dashboard.indexOf('#activity-line{');
+  const activityLineCssEnd = dashboard.indexOf('}', activityLineCssStart);
+  const activityLineCss = activityLineCssStart >= 0 && activityLineCssEnd > activityLineCssStart
+    ? dashboard.slice(activityLineCssStart, activityLineCssEnd + 1)
+    : '';
+  assert.ok(dashboard.includes('<div id="activity-line" aria-hidden="true"></div>') && activityLineCss.includes('position:fixed') && activityLineCss.includes('height:2px') && activityLineCss.includes('pointer-events:none'), 'the top activity line must remain a decorative fixed 2px overlay with no layout or pointer impact');
+  assert.ok(dashboard.includes('#activity-line.is-active') && dashboard.includes('#activity-line.is-done') && dashboard.includes('#activity-line.is-offline') && dashboard.includes('#activity-line.is-error'), 'the activity line must retain distinct refresh, completion, offline and error states');
+  assert.ok(!dashboard.includes('id="pbtn"') && !dashboard.includes('#pbtn') && !dashboard.includes('onclick="togglePause()"') && !dashboard.includes('function togglePause(') && !dashboard.includes('let paused = false;'), 'the removed Pause control must not leave markup, CSS or refresh gating state behind');
+  const statusStreamEventSource = dashboard.slice(dashboard.indexOf('async function handleStatusStreamEvent'), dashboard.indexOf('function connectStatusStream'));
+  assert.ok(statusStreamEventSource.includes("msg.type === 'refreshing'") && statusStreamEventSource.includes("activityLineStart('collector')"), 'collector-start stream events must start the activity line');
+  assert.ok(statusStreamEventSource.includes("msg.type === 'hello'") && statusStreamEventSource.includes("msg.refreshing === true") && statusStreamEventSource.includes("activityLineComplete('collector')"), 'stream reconnect hello events must restore or clear collector activity');
+  assert.ok(statusStreamEventSource.includes("msg.type === 'updated'") && statusStreamEventSource.includes("activityLineComplete('collector')"), 'collector completion events must finish the activity line');
+  assert.ok(statusStreamEventSource.includes('queuedStatusStreamEvents.push(queuedData)') && statusStreamEventSource.includes('queuedStatusStreamEvents.length > 12') && statusStreamEventSource.includes('queuedStatusStreamEvents.splice(0)') && statusStreamEventSource.includes('queued.forEach(data => handleStatusStreamEvent({ data, replayed:true }))'), 'busy status fetches must keep a bounded ordered queue so later notifications cannot overwrite an updated event');
+  assert.ok(statusStreamEventSource.includes("activityLineStart('stream')") && statusStreamEventSource.includes("activityLineComplete('stream')") && statusStreamEventSource.includes("activityLineFail('stream', 'collector')"), 'the follow-up status fetch must preserve and settle overlapping collector activity');
+  assert.ok(!/msg\.refreshing[^\n]*return/.test(statusStreamEventSource), 'updated and notification events must still fetch when their payload carries refreshing:true');
+  const manualRefreshSource = dashboard.slice(dashboard.indexOf('async function doRefresh'), dashboard.indexOf('let initialRouteApplied'));
+  assert.ok(manualRefreshSource.includes("activityLineStart('manual')") && manualRefreshSource.includes("activityLineComplete('manual')") && manualRefreshSource.includes("activityLineFail('manual')") && manualRefreshSource.includes('if(activityCancelled) activityLineReset()'), 'manual refresh must drive success, error and quiet navigation-cancel states without restoring Pause');
+  const statusStreamConnectSource = dashboard.slice(dashboard.indexOf('function connectStatusStream'), dashboard.indexOf('function scheduleRefresh'));
+  assert.ok(statusStreamConnectSource.includes('if(statusStream !== stream) return') && statusStreamConnectSource.includes('activityLineSetOffline(false)') && statusStreamConnectSource.includes('activityLineSetOffline(true)'), 'guarded SSE reconnect and error callbacks must drive the offline line state without reviving a closed stream');
+  const closeStatusStreamSource = dashboard.slice(dashboard.indexOf('function closeStatusStream'), dashboard.indexOf("document.addEventListener('visibilitychange'"));
+  assert.ok(closeStatusStreamSource.includes('queuedStatusStreamEvents.length = 0') && closeStatusStreamSource.includes('activityLineReset()'), 'closing a status stream must clear queued events and every activity-line state');
   assert.ok(server.indexOf("broadcastStatusEvent('refreshing')") > server.indexOf('if (!taskFns.length)'), 'refresh activity must only be broadcast when collector tasks actually run');
   const refreshFinalizeSource = server.slice(server.indexOf('const finalize = () => {'), server.indexOf('if (!taskFns.length)', server.indexOf('const finalize = () => {')));
-  assert.ok(server.includes('base.notifyRevision = notifyRevision') && server.includes('notifyRevision = Math.max(Date.now(), notifyRevision + 1)') && server.includes("broadcastStatusEvent('notification')") && server.includes('else if (enabled === true) notifyDisabled.delete(cleanKey);') && refreshFinalizeSource.includes('assignStatic(base);'), 'notification changes made during a refresh must update the runtime snapshot, preserve topic-only bell state, invalidate cached views and notify connected dashboards without ending the refresh progress bar early');
+  assert.ok(server.includes('base.notifyRevision = notifyRevision') && server.includes('notifyRevision = Math.max(Date.now(), notifyRevision + 1)') && server.includes("broadcastStatusEvent('notification')") && server.includes('else if (enabled === true) notifyDisabled.delete(cleanKey);') && refreshFinalizeSource.includes('assignStatic(base);'), 'notification changes made during a refresh must update the runtime snapshot, preserve topic-only bell state, invalidate cached views and notify connected dashboards');
   assert.ok(server.includes("type: 'hello',\n    timestamp: cache.data?.timestamp || new Date().toISOString(),\n    notifyRevision,"), 'status stream reconnects must advertise the latest notification revision');
-  assert.ok(dashboard.includes('pendingNotifyEnabled') && dashboard.includes('applyNotifySnapshot(data.notifyDisabled, data.notifyTopics, data.notifyRevision)') && dashboard.includes('deferDetailRenderForPointer(detail, id)') && dashboard.includes("queuedStatusStreamData = event.data || ''"), 'in-flight refreshes must preserve pending bell choices, the native click target and queued notification events');
+  assert.ok(dashboard.includes('pendingNotifyEnabled') && dashboard.includes('applyNotifySnapshot(data.notifyDisabled, data.notifyTopics, data.notifyRevision)') && dashboard.includes('deferDetailRenderForPointer(detail, id)') && dashboard.includes('queuedStatusStreamEvents.push(queuedData)'), 'in-flight refreshes must preserve pending bell choices, the native click target and queued notification events');
   assert.ok(demoServer.includes('demoNotifyDisabled.clear();') && demoServer.includes('demoNotifyTopics.clear();') && demoServer.includes('notifyRevision: demoNotifyRevision'), 'demo notification state must participate in daily reset and status stream reconciliation');
   assert.ok(topology.includes('vmware-endpoint:') && topology.includes('vmware-cluster:') && topology.includes('vmware-host:') && topology.includes('vmware-guest:'), 'topology must map vCenter endpoints, clusters, ESXi hosts and VMs');
   assert.ok(demoServer.includes('const vmwareHosts = [') && demoServer.includes('history: history(96, 20, 35)') && demoServer.includes('data.vmware = {') && demoServer.includes("['vmware', 'vmware']"), 'demo mode must expose realistic VMware inventory and host history');
@@ -722,7 +791,9 @@ function testStaticRegressions() {
   assert.ok(dashboard.includes('if(!window._railResizing)') && dashboard.includes('window._railResizing = true') && dashboard.includes('window._railResizing = false'), 'status refreshes must not resize the sidebar during an active drag');
   assert.ok(dashboard.includes("window.addEventListener('pointermove', move, { capture:true, passive:false })") && dashboard.includes("window.removeEventListener('pointermove', move, true)"), 'sidebar resizing must keep tracking the pointer when it leaves the narrow resize handle');
   const embeddedPollSource = dashboard.slice(dashboard.indexOf('async function pollOnce()'), dashboard.indexOf('let statusStream = null'));
-  assert.ok(!embeddedPollSource.includes('embedOpen') && dashboard.includes('SHELL_SUMMARY_INTERVAL') && dashboard.includes('scheduleShellSummarySync(80)'), 'embedded pages must keep the sidebar health summary refreshed');
+  const embeddedPollStart = embeddedPollSource.indexOf("activityLineStart('poll')");
+  const embeddedPollEntry = embeddedPollSource.slice(0, embeddedPollStart);
+  assert.ok(embeddedPollStart > 0 && !embeddedPollEntry.includes('embedOpen') && dashboard.includes('SHELL_SUMMARY_INTERVAL') && dashboard.includes('scheduleShellSummarySync(80)'), 'embedded pages must enter polling so their sidebar health summary stays refreshed');
   assert.ok(server.includes("badge: failedSvcs > 0 ? `${failedSvcs} services failed`") && server.includes('badge: s.badge ||') && dashboard.includes('if(item?.badge)') && dashboard.includes('txt:String(item.badge)'), 'embedded pages must preserve detailed Linux and Windows failure, reboot and update badges');
   assert.ok(dashboard.includes("e.data?.type === 'omnisight-status-changed'") && settings.includes("type: 'omnisight-status-changed'"), 'settings status and agent changes must immediately notify the parent sidebar');
   assert.ok(dashboard.includes('const activeIds = new Set([...present, ...configuredIds])') && dashboard.includes('if(ALL_IDS.includes(id) && !activeIds.has(id)) delete panels[id]'), 'summary refreshes must remove platforms that no longer have configured systems');
@@ -952,6 +1023,18 @@ function testStaticRegressions() {
   assert.ok(settings.includes("const result = settingsSaveQueue.then(run, run);"), 'rapid settings saves must run in order');
   assert.ok(settings.includes("(opts.fast ? '&wait=0' : '')"), 'top-level toggle saves must return before platform collection completes');
   assert.ok(settings.includes("cfgPayload.publicStatus = opts.enabled === true;"), 'status page toggle must persist its disabled state');
+  const collectPerformanceSource = settings.match(/function collectPerformanceConfig\(currentConfig, lowIoMode\) \{[\s\S]*?\n\}/)?.[0];
+  assert.ok(collectPerformanceSource, 'settings must collect performance options through a testable merge helper');
+  const performanceContext = {};
+  vm.runInNewContext(`${collectPerformanceSource}\n` +
+    `globalThis.result = collectPerformanceConfig({ performance: { lowIoMode: false, collectorConcurrency: 6, refreshIntervals: { snmp: 30, veeam: 60 }, futureOption: 'keep' } }, true);`, performanceContext);
+  assert.strictEqual(performanceContext.result.lowIoMode, true, 'Save & Apply must update low-I/O mode');
+  assert.strictEqual(performanceContext.result.collectorConcurrency, 6, 'Save & Apply must preserve collector concurrency');
+  assert.strictEqual(JSON.stringify(performanceContext.result.refreshIntervals), JSON.stringify({ snmp: 30, veeam: 60 }), 'Save & Apply must preserve per-platform refresh intervals');
+  assert.strictEqual(performanceContext.result.futureOption, 'keep', 'Save & Apply must preserve future performance options it does not render');
+  assert.ok(settings.includes('cfg.performance = collectPerformanceConfig(\n    window._settingsConfig,'), 'the settings collector must merge the loaded performance section');
+  assert.ok(readme.includes('does not currently bundle an official Helm chart') && readme.includes('mountPath: /app/data') && readme.includes('replicas: 1') && readme.includes('type: Recreate') && readme.includes('maxSurge: 0') && readme.includes('maxUnavailable: 1'), 'Helm guidance must document the supported single-writer persistent deployment');
+  assert.ok(readme.includes('collector work every 15 seconds') && readme.includes('over SSE') && readme.includes('performance.refreshIntervals') && readme.includes('snmp: 30') && readme.includes('cloudflare: 60'), 'Helm guidance must explain refresh delivery and recommended per-platform intervals');
   assert.ok(settings.includes("? ['snmp', 'unifi']") && settings.includes("['synology', 'mikrotik'].includes(opts.platformToggle) ? ['snmp']"), 'brand SNMP toggles must persist through the shared collector');
   assert.ok(demoServer.includes("enabled: demoConfigFlag(body[key].enabled, true)"), 'demo settings must remember platform toggle state');
   assert.ok(demoServer.includes(".filter(([, key]) => demoPlatformEnabled(key)).map(([id]) => id)"), 'demo dashboard must hide disabled platforms');
@@ -1005,6 +1088,7 @@ async function run() {
   testLatestStableVersion();
   testFullBackupEmptyFileCompatibility();
   testPlatformAvailability();
+  testUiPreferenceScoping();
   testAgentRetirement();
   testStaticRegressions();
   console.log('smoke ok — issue regressions: #4 #5 #6 #7 #9 #10 #12 #18 #20 #22 #23 #24 #25');

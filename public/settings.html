@@ -4589,6 +4589,14 @@ function populate(cfg) {
 }
 
 /* ── Collect config ── */
+function collectPerformanceConfig(currentConfig, lowIoMode) {
+  const current = currentConfig?.performance;
+  return {
+    ...(current && typeof current === 'object' && !Array.isArray(current) ? current : {}),
+    lowIoMode: lowIoMode === true,
+  };
+}
+
 function collect() {
   const cfg = {};
   
@@ -4612,9 +4620,10 @@ function collect() {
   cfg.appearance = {
     dashboardSidePanel: document.getElementById('cfg-dashboard-side')?.checked !== false,
   };
-  cfg.performance = {
-    lowIoMode: document.getElementById('cfg-low-io')?.checked === true,
-  };
+  cfg.performance = collectPerformanceConfig(
+    window._settingsConfig,
+    document.getElementById('cfg-low-io')?.checked === true,
+  );
   cfg.security = {
     passwordResetEnabled: document.getElementById('security-password-reset')?.checked !== false,
     selfRegistrationEnabled: document.getElementById('security-self-registration')?.checked !== false,
