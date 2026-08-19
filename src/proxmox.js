@@ -526,12 +526,22 @@ function svcName(s) {
   return String(s.name || s.service || s.id || '').replace(/\.service$/, '');
 }
 
+function normalizeAptUpdates(rows, checkedAt = Math.floor(Date.now() / 1000)) {
+  if (!Array.isArray(rows)) return null;
+  const checked = Number(checkedAt);
+  return {
+    count: rows.length,
+    source: 'apt',
+    checkedAt: Number.isFinite(checked) && checked >= 0 ? Math.floor(checked) : Math.floor(Date.now() / 1000),
+  };
+}
+
 async function nodeData(cfg, node, excluded, resource = null) {
   const name = node.node || node.name;
   const clusterName = String(cfg.actualClusterName || cfg.name || cfg.label || cfg.url || 'Proxmox');
   const historyKey = `${cfg.instanceKey || normBase(cfg.url)}:${name}`;
   try {
-    const [status, qemu, lxc, storage, services, rrdHour, sensors] = await Promise.all([
+    const [status, qemu, lxc, storage, services, rrdHour, sensors, aptUpdates] = await Promise.all([
       pveFetch(cfg, `/api2/json/nodes/${encodeURIComponent(name)}/status`).catch(() => ({})),
       pveFetch(cfg, `/api2/json/nodes/${encodeURIComponent(name)}/qemu`).catch(() => []),
       pveFetch(cfg, `/api2/json/nodes/${encodeURIComponent(name)}/lxc`).catch(() => []),
@@ -539,6 +549,7 @@ async function nodeData(cfg, node, excluded, resource = null) {
       pveFetch(cfg, `/api2/json/nodes/${encodeURIComponent(name)}/services`).catch(() => []),
       pveFetch(cfg, `/api2/json/nodes/${encodeURIComponent(name)}/rrddata?timeframe=hour&cf=AVERAGE`).catch(() => []),
       pveFetch(cfg, `/api2/json/nodes/${encodeURIComponent(name)}/sensors`).catch(() => null),
+      pveFetch(cfg, `/api2/json/nodes/${encodeURIComponent(name)}/apt/update`).catch(() => null),
     ]);
     const cpuRaw = ratioValue(status.cpu);
     const cpu = percentValue(status.cpu);
@@ -596,6 +607,7 @@ async function nodeData(cfg, node, excluded, resource = null) {
         uptime: Number(status.uptime) || null,
       },
       host: cfg.url,
+      updates: normalizeAptUpdates(aptUpdates),
       metrics: { diskIO: finalDiskIO, diskIOSource, bandwidth, smart: sshMetrics?.smart || [] },
       metricsError: sshMetrics?.error || null,
       services: (services || []).map(s => {
@@ -638,7 +650,7 @@ async function nodeData(cfg, node, excluded, resource = null) {
       backup: null,
     };
   } catch (err) {
-    return { clusterName, clusterUrl: cfg.url, node: { name, online: false, cpuCores: 0, cpuRaw: 0, ram: { used: 0, total: 0 } }, host: cfg.url, services: [], vms: [], history: [...(pveHistory.get(historyKey) || [])], backup: null, storage: [], error: err.message };
+    return { clusterName, clusterUrl: cfg.url, node: { name, online: false, cpuCores: 0, cpuRaw: 0, ram: { used: 0, total: 0 } }, host: cfg.url, updates: null, services: [], vms: [], history: [...(pveHistory.get(historyKey) || [])], backup: null, storage: [], error: err.message };
   }
 }
 
@@ -747,4 +759,4 @@ async function getAllProxmoxApiData(config = {}) {
   };
 }
 
-module.exports = { getProxmoxApiData, getAllProxmoxApiData, configuredInstances, normalizeClusterStatus };
+module.exports = { getProxmoxApiData, getAllProxmoxApiData, configuredInstances, normalizeClusterStatus, normalizeAptUpdates };

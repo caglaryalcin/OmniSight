@@ -93,19 +93,25 @@ function serverUpdateNotificationsEnabled(alertConfig = {}) {
 
 function buildServerUpdateDetections(data = {}) {
   const detections = [];
-  const append = (servers, keyPrefix, labelPrefix) => {
+  const append = (servers, keyPrefix, labelPrefix, options = {}) => {
     if (!Array.isArray(servers)) return;
     servers.forEach(server => {
-      if (!server || server._connecting || !server.online || !server.updates || typeof server.updates !== 'object') return;
+      const online = typeof options.online === 'function' ? options.online(server) : server?.online;
+      if (!server || server._connecting || !online || !server.updates || typeof server.updates !== 'object') return;
       const rawCount = server.updates.count;
       if (rawCount === null || rawCount === undefined || rawCount === '') return;
       const parsedCount = Number(rawCount);
       if (!Number.isFinite(parsedCount) || parsedCount < 0) return;
-      const name = String(server.name || server.host || server.id || '').trim();
+      const name = String(typeof options.name === 'function'
+        ? options.name(server)
+        : (server.name || server.host || server.id || '')).trim();
       if (!name) return;
       const count = Math.floor(parsedCount);
+      const key = typeof keyPrefix === 'function'
+        ? keyPrefix(server, name)
+        : `${keyPrefix}:${name}:updates`;
       detections.push({
-        key: `${keyPrefix}:${name}:updates`,
+        key,
         ok: count === 0,
         label: `${labelPrefix} ${name}`,
         detail: `${count} operating system update${count === 1 ? '' : 's'} available`,
@@ -118,6 +124,14 @@ function buildServerUpdateDetections(data = {}) {
   };
   append(data.linux, 'lx', 'Linux server');
   append(data.windows, 'win', 'Windows server');
+  append(data.proxmox?.nodes, (node, name) => {
+    const clusterName = String(node.clusterName || '').trim();
+    const scope = clusterName ? `${clusterName}:${name}` : name;
+    return `px:${scope}:updates`;
+  }, 'Proxmox node', {
+    online: node => node?.node?.online,
+    name: node => node?.node?.name || node?.name || node?.host || node?.id || '',
+  });
   return detections;
 }
 

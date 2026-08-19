@@ -27,10 +27,22 @@ async function main() {
       { name: 'win01', online: true, updates: { count: 0 } },
       { name: 'connecting-windows', online: true, _connecting: true, updates: { count: 3 } },
     ],
+    proxmox: {
+      nodes: [
+        { clusterName: 'production', node: { name: 'pve01', online: true }, updates: { count: 7 } },
+        { clusterName: 'staging', node: { name: 'pve01', online: true }, updates: { count: 0 } },
+        { node: { name: 'standalone-pve', online: true }, updates: { count: '0' } },
+        { clusterName: 'production', node: { name: 'offline-pve', online: false }, updates: { count: 4 } },
+        { clusterName: 'production', node: { name: 'connecting-pve', online: true }, _connecting: true, updates: { count: 6 } },
+      ],
+    },
   });
   assert.deepStrictEqual(updateDetections.map(d => [d.key, d.ok, d.severity, d.value]), [
     ['lx:deb01:updates', false, 'warning', 2],
     ['win:win01:updates', true, 'normal', 0],
+    ['px:production:pve01:updates', false, 'warning', 7],
+    ['px:staging:pve01:updates', true, 'normal', 0],
+    ['px:standalone-pve:updates', true, 'normal', 0],
   ]);
   assert.strictEqual(shouldDispatchProblem(undefined, 'critical'), true);
   assert.strictEqual(shouldDispatchProblem('warning', 'critical'), true);

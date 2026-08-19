@@ -640,6 +640,7 @@ function getProxmoxData(config) {
     history: [],
     backup: null,
     storage: [],
+    updates: null,
     _connecting: true,
   }));
   if (!pveAgents.length) return { clusterSummary: null, nodes: pendingNodes, ceph: null, clusters: [] };
@@ -671,6 +672,7 @@ function getProxmoxData(config) {
           bandwidth: (Number(h.bandwidthRxBps) || 0) + (Number(h.bandwidthTxBps) || 0),
         })),
         metrics: { diskIO: a.metrics?.diskIO || null, bandwidth: a.metrics?.bandwidth || null, smart: a.metrics?.smart || [] },
+        updates: null,
         backup: null,
         storage: [],
         _connecting: connecting,
@@ -735,6 +737,7 @@ function getProxmoxData(config) {
         bandwidth: (Number(h.bandwidthRxBps) || 0) + (Number(h.bandwidthTxBps) || 0),
       })),
       metrics: { diskIO: a.metrics?.diskIO || null, bandwidth: a.metrics?.bandwidth || null, smart: a.metrics?.smart || [] },
+      updates: a.updates,
       backup,
       storage,
     };

@@ -480,6 +480,10 @@ html[data-theme="light"] .ceph-gauge-track{stroke:rgba(100,116,139,.22)}
   background:rgba(248,113,113,.06);border-bottom:1px solid var(--border);
 }
 .offline-err{font-size:12px;color:var(--muted);margin-top:2px;word-break:break-all}
+.pve-update-notice{display:flex;align-items:center;gap:8px;margin:0 0 10px;padding:8px 10px;border:1px solid rgba(251,191,36,.24);border-radius:8px;background:rgba(251,191,36,.065);font-size:12px;color:var(--text)}
+.pve-update-notice .mon-dot{flex:0 0 auto}
+.pve-update-notice-text{min-width:0;flex:1}
+html[data-theme="light"] .pve-update-notice{border-color:rgba(183,121,31,.28);background:rgba(251,191,36,.09)}
 .tn-alerts{margin:12px 0 0;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:rgba(0,0,0,.08)}
 .tn-alerts-h{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;border-bottom:1px solid var(--border);background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.01))}
 .tn-alerts-title{font-size:11px;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.07em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -3500,6 +3504,9 @@ function buildProxmox(px){
   const svcsFailed = failedSvcs.length;
   const offlineNodes = px.nodes.filter(n=>!n._connecting && !n.node?.online).length;
   const allOk = px.nodes.every(n=>n.node?.online) && !clusterQuorumLost;
+  const updateCount = px.nodes.reduce((sum, row) => sum + (row.node?.online ? Math.max(0, Math.floor(Number(row.updates?.count) || 0)) : 0), 0);
+  const rebootCount = px.nodes.filter(row => row.node?.online && row.updates?.rebootRequired).length;
+  const updateAttention = updateCount > 0 || rebootCount > 0;
   const allVms = px.nodes.flatMap(n=>n.vms||[]);
   const vmRunning = allVms.filter(v=>v.running).length;
   const ceph = px.ceph;
@@ -3667,7 +3674,7 @@ function buildProxmox(px){
     </div>`;
   }
 
-  const nodesHtml = px.nodes.map(({node,services=[],vms,history,host,backup,storage=[],metrics,metricsError,_connecting,clusterName})=>{
+  const nodesHtml = px.nodes.map(({node,services=[],vms,history,host,backup,storage=[],metrics,metricsError,updates,_connecting,clusterName})=>{
     const nodeKey = clusterName ? `${clusterName}:${node.name}` : node.name;
     if(_connecting) return `
     <div class="node-hdr" style="cursor:default">
@@ -3687,7 +3694,18 @@ function buildProxmox(px){
     const diskIOHistory = rateHistoryMBps(history, 'diskIO', 'diskIOMbps');
     const bandwidthHistory = rateHistoryMBps(history, 'bandwidth', 'bandwidthMbps');
     const svcFailed = services.filter(s=>!s.active && !s.excluded).length;
-    const hasIssue = !node.online || svcFailed>0;
+    const nodeUpdateCount = Math.max(0, Math.floor(Number(updates?.count) || 0));
+    const nodeRebootRequired = !!updates?.rebootRequired;
+    const nodeUpdateAttention = nodeUpdateCount > 0 || nodeRebootRequired;
+    const nodeStatus = !node.online
+      ? { cls: 'red', dot: 'md-red', label: 'offline' }
+      : svcFailed > 0
+        ? { cls: 'red', dot: 'md-red', label: `${svcFailed} service${svcFailed === 1 ? '' : 's'} failed` }
+        : nodeRebootRequired
+          ? { cls: 'yellow', dot: 'md-yellow', label: 'reboot required' }
+          : nodeUpdateCount > 0
+            ? { cls: 'yellow', dot: 'md-yellow', label: `${nodeUpdateCount} updates` }
+            : { cls: 'green', dot: 'md-green', label: 'online' };
     const isOpen = userOverride['node:'+nodeKey] !== undefined
       ? userOverride['node:'+nodeKey]
       : false;
@@ -3722,7 +3740,7 @@ function buildProxmox(px){
 
     return `
     <div class="node-hdr pve-node-hdr" onclick="toggleNode(${jsStr(nodeKey)})">
-      <div class="mon-dot ${dc(node.online)}"></div>
+      <div class="mon-dot ${nodeStatus.dot}"></div>
       <div class="pve-head-main proxmox-head-main">
         <div class="pve-head-title">
           <div class="node-name">${escHtml(node.name)}</div>
@@ -3730,11 +3748,16 @@ function buildProxmox(px){
         </div>
         ${pveStats}
       </div>
-      ${bdg(node.online ? (svcFailed ? 'red' : 'green') : 'red', node.online ? (svcFailed ? `${svcFailed} services failed` : 'online') : 'offline')}
+      ${bdg(nodeStatus.cls, nodeStatus.label)}
       ${notifyBell('px:'+nodeKey)}
     </div>
     <div class="node-body ${isOpen?'open':''}" id="nd-${escAttr(nodeKey)}">
       ${node.online ? `
+        ${nodeUpdateAttention ? `<div class="pve-update-notice" data-morph-key="pve-updates:${escAttr(nodeKey)}" role="status">
+          <span class="mon-dot md-yellow"></span>
+          <span class="pve-update-notice-text">${nodeUpdateCount ? `<strong>${nodeUpdateCount}</strong> OS update${nodeUpdateCount === 1 ? '' : 's'} available` : 'A reboot is required to finish installed updates'}</span>
+          ${nodeRebootRequired ? bdg('yellow', 'reboot required') : ''}
+        </div>` : ''}
         ${metricsError ? `<div class="offline-err" style="margin:0 0 8px">SSH metrics fallback: ${escHtml(metricsError)}</div>` : ''}
         ${(()=>{ const lim=historyLimitFor('px:'+nodeKey); return `${chartHeader('px:'+nodeKey, lim)}<div class="chart-row">
           <div class="chart-hdr"><span class="nb-label">CPU</span><span class="nb-pct" style="color:${bc(cpuPct)}">${fmtPct(cpuPct)}</span></div>
@@ -3844,8 +3867,8 @@ function buildProxmox(px){
     meta: `${online}/${total} online`,
     sbMeta: `${online}/${total} hosts · ${vmRunning}/${allVms.length} VMs`,
     badge: bdg(
-      allOk && svcsFailed===0 && !cephBad ? 'green' : offlineNodes ? offlineRatioBadgeClass(offlineNodes, total || px.nodes.length, online) : (clusterQuorumLost || svcsFailed>0 || online===0 || cephErr) ? 'red' : 'yellow',
-      allOk && svcsFailed===0 && !cephBad ? 'healthy' : offlineNodes ? offlineRatioLabel(offlineNodes, total || px.nodes.length, online) : clusterQuorumLost ? 'Cluster quorum lost' : cephBad ? `Ceph ${ceph.health.replace('HEALTH_','')}` : svcsFailed>0 ? `${svcsFailed} services failed` : online>0 ? `${online}/${total} online` : offlineRatioLabel(total || px.nodes.length, total || px.nodes.length, online)
+      allOk && svcsFailed===0 && !cephBad && !updateAttention ? 'green' : offlineNodes ? offlineRatioBadgeClass(offlineNodes, total || px.nodes.length, online) : (clusterQuorumLost || svcsFailed>0 || online===0 || cephErr) ? 'red' : 'yellow',
+      allOk && svcsFailed===0 && !cephBad && !updateAttention ? 'healthy' : offlineNodes ? offlineRatioLabel(offlineNodes, total || px.nodes.length, online) : clusterQuorumLost ? 'Cluster quorum lost' : cephBad ? `Ceph ${ceph.health.replace('HEALTH_','')}` : svcsFailed>0 ? `${svcsFailed} services failed` : rebootCount ? `${rebootCount} reboot required` : updateCount ? `${updateCount} updates` : online>0 ? `${online}/${total} online` : offlineRatioLabel(total || px.nodes.length, total || px.nodes.length, online)
     ),
     detailMeta: '',
     detailSummary: relabelDetailSummary(sbSummaryHtml, 'Nodes', 'Hosts'),

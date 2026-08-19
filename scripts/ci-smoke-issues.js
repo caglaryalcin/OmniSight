@@ -276,13 +276,19 @@ function testSynologyCpuCounters() {
 }
 
 function testProxmoxInstances() {
-  const { configuredInstances } = require('../src/proxmox');
+  const { configuredInstances, normalizeAptUpdates } = require('../src/proxmox');
   assert.strictEqual(configuredInstances({ url: 'https://pve-a:8006', tokenId: 'a', tokenSecret: 'x' }).length, 1);
   const rows = configuredInstances({ instances: [
     { name: 'a', url: 'https://pve-a:8006', tokenId: 'a', tokenSecret: 'x' },
     { name: 'b', url: 'https://pve-b:8006', tokenId: 'b', tokenSecret: 'y' },
   ] });
   assert.deepStrictEqual(rows.map(row => row.name), ['a', 'b']);
+  assert.deepStrictEqual(normalizeAptUpdates([{ Package: 'pve-manager' }, { Package: 'qemu-server' }], 1_700_000_000), {
+    count: 2,
+    source: 'apt',
+    checkedAt: 1_700_000_000,
+  });
+  assert.strictEqual(normalizeAptUpdates(null), null, 'a failed Proxmox update query must remain unknown');
 }
 
 function testProxmoxClusterStatus() {
@@ -629,6 +635,7 @@ function testStaticRegressions() {
   const onboarding = fs.readFileSync(path.join(root, 'public', 'onboarding.html'), 'utf8');
   const configExample = fs.readFileSync(path.join(root, 'config.example.yaml'), 'utf8');
   const packageJson = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+  const proxmoxCollector = fs.readFileSync(path.join(root, 'src', 'proxmox.js'), 'utf8');
   const vmwareCollector = fs.readFileSync(path.join(root, 'src', 'vmware.js'), 'utf8');
   const server = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
   const ci = fs.readFileSync(path.join(root, '.github', 'workflows', 'ci.yml'), 'utf8');
@@ -643,6 +650,8 @@ function testStaticRegressions() {
   assert.ok(windowsDownloadLines.length >= 5);
   assert.ok(windowsDownloadLines.every(line => /psTLS12|WINDOWS_TLS12_BOOTSTRAP|SecurityProtocolType\]::Tls12/.test(line)), 'every generated Windows download must enable TLS 1.2 before iwr runs');
   assert.ok(windowsAgent.includes('Get-UpdateStatus') && linuxAgent.includes('updates_json'));
+  assert.ok(proxmoxCollector.includes('/apt/update`).catch(() => null)') && proxmoxCollector.includes('updates: normalizeAptUpdates(aptUpdates)'), 'Proxmox API update failures must stay unknown without taking a node offline');
+  assert.ok(agentStore.includes('updates: a.updates'), 'Proxmox agent nodes must expose their normalized host update report');
   assert.ok(linuxAgent.includes('output=$(LC_ALL=C apt list --upgradable'), 'APT must list every available update, including kept-back packages');
   assert.ok(!linuxAgent.includes('apt-get -s -o Debug::NoLocking=1 upgrade'), 'APT update counts must not omit kept-back packages');
   const aptCounter = linuxAgent.match(/count_apt_update_lines\(\) \{[\s\S]*?\r?\n\}/);
@@ -807,10 +816,12 @@ function testStaticRegressions() {
   assert.ok(!proxmoxOverviewSource.includes('<div class="sb-csum-lbl">Ceph</div>'), 'Proxmox overview must not repeat the Ceph header badge in its summary metrics');
   assert.ok(proxmoxOverviewSource.includes('cephBad') && proxmoxOverviewSource.includes('Ceph ${ceph.health'), 'Proxmox overview must retain its Ceph header badge');
   assert.ok(proxmoxOverviewSource.includes('<div class="pve-head-main proxmox-head-main">') && dashboard.includes('.proxmox-head-main{flex-wrap:nowrap}') && dashboard.includes('.proxmox-head-main .pve-head-stat.has-spark{min-width:0}'), 'wide Proxmox node summaries must keep all metrics on one row');
+  assert.ok(!proxmoxOverviewSource.includes("pveHeadStat('Updates'") && !proxmoxOverviewSource.includes("pveHeadStat('Reboot'"), 'Proxmox update attention must reuse the far-right badge instead of adding a header metric that can wrap');
   assert.ok(proxmoxOverviewSource.includes("<div class=\"pve-head-sub\">${node.online ? 'online' : 'offline'}</div>"), 'Proxmox node subtitle must show only its online state');
   assert.ok(proxmoxOverviewSource.includes('sbMeta: `${online}/${total} hosts · ${vmRunning}/${allVms.length} VMs`'), 'Proxmox sidebar metadata must show host and VM availability like VMware');
   const proxmoxHostHeader = proxmoxOverviewSource.slice(proxmoxOverviewSource.indexOf('<div class="node-hdr pve-node-hdr" onclick="toggleNode'), proxmoxOverviewSource.indexOf('<div class="node-body', proxmoxOverviewSource.indexOf('<div class="node-hdr pve-node-hdr" onclick="toggleNode')));
-  assert.ok(proxmoxHostHeader.includes("${bdg(node.online ? (svcFailed ? 'red' : 'green') : 'red'") && proxmoxHostHeader.includes('`${svcFailed} services failed`') && proxmoxOverviewSource.includes("detailSummary: relabelDetailSummary(sbSummaryHtml, 'Nodes', 'Hosts')") && !proxmoxOverviewSource.includes("detailBadge: ''") && proxmoxOverviewSource.includes("detailMeta: ''"), 'Proxmox host and top summaries must restore their far-right health badges');
+  assert.ok(proxmoxOverviewSource.includes('const nodeStatus = !node.online') && proxmoxOverviewSource.includes("label: 'reboot required'") && proxmoxOverviewSource.includes('label: `${nodeUpdateCount} updates`') && proxmoxHostHeader.includes('${bdg(nodeStatus.cls, nodeStatus.label)}') && proxmoxOverviewSource.includes('nodeUpdateAttention ? `<div class="pve-update-notice" data-morph-key="pve-updates:${escAttr(nodeKey)}"') && proxmoxOverviewSource.includes("rebootCount ? `${rebootCount} reboot required` : updateCount ? `${updateCount} updates`") && proxmoxOverviewSource.includes("detailSummary: relabelDetailSummary(sbSummaryHtml, 'Nodes', 'Hosts')") && !proxmoxOverviewSource.includes("detailBadge: ''") && proxmoxOverviewSource.includes("detailMeta: ''"), 'Proxmox host and top summaries must preserve their far-right health badge and prioritize reboot or update attention without wrapping');
+  assert.ok(server.includes('const updateCount = activeNodes.reduce') && server.includes('badge: quorumLost.length > 0') && settings.includes('Proxmox node reports pending operating system updates'), 'embedded summaries and alert help must include Proxmox update attention');
   assert.ok(proxmoxOverviewSource.includes('pve-cluster-status') && proxmoxOverviewSource.includes('clusterQuorumLost') && proxmoxOverviewSource.includes('Cluster quorum lost'), 'Proxmox details must show detected cluster membership and surface quorum loss');
   assert.ok(proxmoxOverviewSource.includes('body: cephHtml + clusterHtml + nodesHtml'), 'Proxmox details must be ordered Ceph health, cluster, then hosts');
   assert.ok(topology.includes('proxmox-cluster:') && topology.includes('clusterNodeIds.set(clusterName, clusterId)') && topology.includes("clusterNodeIds.get(n.clusterName || '')"), 'Proxmox topology must group hosts under their detected cluster');

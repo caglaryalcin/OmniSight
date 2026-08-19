@@ -9072,6 +9072,8 @@ function buildPublicSummary(data) {
     const connecting = nodes.length - activeNodes.length;
     const online = activeNodes.filter(n => n.node?.online).length;
     const failedSvcs = activeNodes.reduce((a, n) => a + (n.services || []).filter(s => !s.active && !s.excluded).length, 0);
+    const updateCount = activeNodes.reduce((sum, node) => sum + (node.node?.online ? Math.max(0, Math.floor(Number(node.updates?.count) || 0)) : 0), 0);
+    const rebootCount = activeNodes.filter(node => node.node?.online && node.updates?.rebootRequired).length;
     const ceph = data.proxmox.ceph;
     const quorumLost = (data.proxmox.clusters || []).filter(cluster => cluster?.isCluster && cluster.quorate === false);
     
@@ -9080,14 +9082,39 @@ function buildPublicSummary(data) {
     
     if (!activeNodes.length && connecting) status = 'connecting';
     else if (online === 0) status = 'down';
-    else if (online < activeNodes.length || connecting || failedSvcs > 0 || quorumLost.length > 0 || (ceph && ceph.health !== 'HEALTH_OK')) status = 'warn';
+    else if (online < activeNodes.length || connecting || failedSvcs > 0 || updateCount > 0 || rebootCount > 0 || quorumLost.length > 0 || (ceph && ceph.health !== 'HEALTH_OK')) status = 'warn';
     if (ceph && ceph.health === 'HEALTH_ERR') status = 'down';
     
     if (failedSvcs > 0) metaParts.push(`${failedSvcs} failed services`);
     if (quorumLost.length > 0) metaParts.push(`Cluster ${quorumLost.map(cluster => cluster.name).join(', ')} quorum lost`);
     if (ceph && ceph.health !== 'HEALTH_OK') metaParts.push(`Ceph ${ceph.health.replace('HEALTH_', '')}`);
+    if (rebootCount > 0) metaParts.push(`${rebootCount} reboot required`);
+    if (updateCount > 0) metaParts.push(`${updateCount} updates`);
     
-    out.push({ id: 'proxmox', title: 'Proxmox', status, meta: metaParts.join(' · ') });
+    const cephBad = !!(ceph && ceph.health !== 'HEALTH_OK');
+    const cephError = !!(ceph && ceph.health === 'HEALTH_ERR');
+    out.push({
+      id: 'proxmox',
+      title: 'Proxmox',
+      status,
+      meta: metaParts.join(' · '),
+      badge: quorumLost.length > 0
+        ? 'Cluster quorum lost'
+        : cephBad
+          ? `Ceph ${ceph.health.replace('HEALTH_', '')}`
+          : failedSvcs > 0
+            ? `${failedSvcs} services failed`
+            : rebootCount > 0
+              ? `${rebootCount} reboot required`
+              : updateCount > 0
+                ? `${updateCount} updates`
+                : '',
+      badgeClass: quorumLost.length > 0 || cephError || failedSvcs > 0
+        ? 'red'
+        : cephBad || rebootCount > 0 || updateCount > 0
+          ? 'yellow'
+          : '',
+    });
   }
   const vmware = data.vmware;
   if (vmware && Array.isArray(vmware.instances) && vmware.instances.length) {
