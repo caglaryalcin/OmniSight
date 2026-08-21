@@ -9,6 +9,11 @@ For deeper architecture, operations and troubleshooting notes, see [DOCUMENTATIO
 ## Features
 
 - **Modern UI** — fully redesigned interface: glass header, soft-glow status indicators, card-grid summaries, draggable/collapsible dashboard cards, compact platform summaries in detail headers, Inter typography, refined dark & light themes and subtle micro-animations
+
+- **Topology** — relationship map for platforms, hosts and workloads
+
+![](https://github.com/caglaryalcin/OmniSight/blob/main/screenshots/gifs/topology.gif)
+
 - **One agent, one command** — Linux servers, Windows hosts, Proxmox nodes and Docker hosts can be monitored by a small push agent. In Settings just click **+ Add System / Windows Host / Node / Host**, copy the pre-filled command, run it on the server — the system self-registers and pops up online within seconds. No inbound firewall rules, NAT-friendly (see [The agent](#the-agent))
 - **Proxmox** — node CPU/RAM/temperature/uptime, Disk I/O and bandwidth when exposed by the API, agent or optional SSH metrics fallback, VM/LXC lists with clickable detail views, per-node service status with **start/stop/restart/exclude** actions, **last backup** (vzdump) status, **Ceph cluster storage health** with active alert summaries, node storage utilization and CPU/RAM/temperature history charts — collected via API token, locally by the agent via `pvesh`, or SSH fallback for host-only metrics
 
@@ -77,10 +82,6 @@ For deeper architecture, operations and troubleshooting notes, see [DOCUMENTATIO
 - **Backup & restore** — config backup export/restore plus password-gated full backup export for users, secret key, certs and history
 
 ![](https://raw.githubusercontent.com/caglaryalcin/OmniSight/refs/heads/main/screenshots/backup-export.png)
-
-- **Topology** — relationship map for platforms, hosts and workloads
-
-![](https://github.com/caglaryalcin/OmniSight/blob/main/screenshots/gifs/topology.gif)
 
 - **Event Center** — live runtime log/warning/error stream plus audit and alert history at `/event-center`; admins can export audit events from `/api/audit/export?format=json|csv|syslog`
 
