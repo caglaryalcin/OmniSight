@@ -45,6 +45,7 @@ const { loadHistoryMap, scheduleSaveHistoryMap, setHistorySaveDelay, flushHistor
 const { semverCompare, highestStableVersion } = require('./src/version');
 const { normalizeLegacyEmptyBase64Blocks, fullBackupContentHeader } = require('./src/fullBackupFormat');
 const { platformAvailability } = require('./src/platformAvailability');
+const { agentCommandWaitMs, requestSlowLimitMs, requestDiagnosticKind } = require('./src/requestDiagnostics');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -478,9 +479,14 @@ function requestDiagnostics(req, res, next) {
     finished = true;
     const ms = Date.now() - start;
     const status = Number(res.statusCode || 0);
-    const slowLimit = route.startsWith('/api/') ? DIAG_SLOW_API_MS : DIAG_SLOW_REQUEST_MS;
-    if (status >= 500 || ms >= slowLimit) {
-      const kind = status >= 500 ? 'error' : 'slow';
+    const slowLimit = requestSlowLimitMs(route, {
+      status,
+      slowApiMs: DIAG_SLOW_API_MS,
+      slowRequestMs: DIAG_SLOW_REQUEST_MS,
+      expectedWaitMs: res.locals?.diagnosticExpectedWaitMs,
+    });
+    const kind = requestDiagnosticKind(status, ms, slowLimit);
+    if (kind) {
       warnDiagnostic(`http:${kind}:${status}:${method}:${route}`, `[http] ${kind} status=${status} ${method} ${route} ${ms}ms ip=${requestLogIp(req)} actor=${requestDiagnosticActor(req)} role=${requestDiagnosticRole(req)} ${diagnosticSnapshot()}`);
     }
   });
@@ -8398,7 +8404,8 @@ app.get('/api/agent/commands', async (req, res) => {
   if (!agentAuth(req, res)) return;
   const id = String(req.query.id || '').replace(/[^\w.-]/g, '').slice(0, 128);
   if (!id) return res.status(400).json({ error: 'id required' });
-  const waitMs = Math.min(Math.max(Number(req.query.wait) || 10, 1), 55) * 1000;
+  const waitMs = agentCommandWaitMs(req.query.wait);
+  res.locals.diagnosticExpectedWaitMs = waitMs;
   const cmds = await agents.waitForCommands(id, waitMs);
   res.type('text/plain').send(agents.commandLines(cmds));
 });

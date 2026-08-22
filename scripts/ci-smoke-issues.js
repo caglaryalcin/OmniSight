@@ -1085,6 +1085,38 @@ function testAgentRetirement() {
   }
 }
 
+function testAgentCommandLongPollDiagnostics() {
+  const { agentCommandWaitMs, requestSlowLimitMs, requestDiagnosticKind } = require('../src/requestDiagnostics');
+  const server = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+  assert.strictEqual(agentCommandWaitMs(undefined), 10000, 'missing agent wait must retain the 10s default');
+  assert.strictEqual(agentCommandWaitMs(0), 10000, 'zero agent wait must retain the existing 10s fallback');
+  assert.strictEqual(agentCommandWaitMs(-5), 1000, 'agent wait must be clamped to at least 1s');
+  assert.strictEqual(agentCommandWaitMs(15), 15000, 'agent wait must remain expressed in seconds');
+  assert.strictEqual(agentCommandWaitMs(90), 55000, 'agent wait must be clamped to at most 55s');
+
+  const normalApiLimit = requestSlowLimitMs('/api/status', { slowApiMs: 1500, slowRequestMs: 5000 });
+  const longPollLimit = requestSlowLimitMs('/api/agent/commands', {
+    status: 200,
+    slowApiMs: 1500,
+    slowRequestMs: 5000,
+    expectedWaitMs: agentCommandWaitMs(15),
+  });
+  assert.strictEqual(normalApiLimit, 1500, 'ordinary API requests must retain the normal slow threshold');
+  assert.strictEqual(longPollLimit, 16500, 'expected long-polls must receive the normal API processing budget as grace');
+  assert.strictEqual(requestDiagnosticKind(200, 15001, longPollLimit), '', 'a healthy 15s long-poll must not emit a slow warning');
+  assert.strictEqual(requestDiagnosticKind(200, 16500, longPollLimit), 'slow', 'a long-poll that exceeds its wait budget and grace must still warn');
+  assert.strictEqual(requestDiagnosticKind(503, 1, longPollLimit), 'error', 'server errors must be logged regardless of the long-poll threshold');
+  assert.strictEqual(requestDiagnosticKind(200, 1500, normalApiLimit), 'slow', 'ordinary slow API warnings must remain unchanged');
+  assert.strictEqual(requestSlowLimitMs('/api/agent/commands', {
+    status: 403,
+    slowApiMs: 1500,
+    slowRequestMs: 5000,
+    expectedWaitMs: agentCommandWaitMs(55),
+  }), 1500, 'failed agent requests must not receive a long-poll allowance');
+  assert.ok(server.includes('const waitMs = agentCommandWaitMs(req.query.wait);') && server.includes('res.locals.diagnosticExpectedWaitMs = waitMs;'), 'the command route must publish its normalized wait budget to diagnostics');
+  assert.ok(server.includes('expectedWaitMs: res.locals?.diagnosticExpectedWaitMs') && server.includes('const kind = requestDiagnosticKind(status, ms, slowLimit);'), 'the HTTP finish logger must use the route-aware diagnostic decision');
+}
+
 async function run() {
   await testQnap();
   await testPbs();
@@ -1101,8 +1133,9 @@ async function run() {
   testPlatformAvailability();
   testUiPreferenceScoping();
   testAgentRetirement();
+  testAgentCommandLongPollDiagnostics();
   testStaticRegressions();
-  console.log('smoke ok — issue regressions: #4 #5 #6 #7 #9 #10 #12 #18 #20 #22 #23 #24 #25');
+  console.log('smoke ok — issue regressions: #4 #5 #6 #7 #9 #10 #12 #18 #20 #22 #23 #24 #25 #27');
 }
 
 module.exports = { run };
