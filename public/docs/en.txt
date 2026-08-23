@@ -17,7 +17,7 @@ This document explains what the platform is, how it works, where it stores state
 - [9. Alerts and Event Center](#9-alerts-and-event-center)
 - [10. Topology](#10-topology)
 - [11. Backup, Restore, and Disaster Recovery](#11-backup-restore-and-disaster-recovery)
-- [12. Demo, Production, and Deployment](#12-demo-production-and-deployment)
+- [12. Production and Deployment](#12-production-and-deployment)
 - [13. API and Integration Surface](#13-api-and-integration-surface)
 - [14. Troubleshooting](#14-troubleshooting)
 - [15. Operations Checklist](#15-operations-checklist)
@@ -835,7 +835,7 @@ Topology configuration is stored as sidecar state so layout data can be managed 
 5. Log in.
 6. Check Settings, Agents, and Event Center.
 
-## 12. Demo, Production, and Deployment
+## 12. Production and Deployment
 
 ### Local Node
 
@@ -844,10 +844,7 @@ npm install
 npm start
 ```
 
-Default ports:
-
-- Production dashboard: `3000`.
-- Demo listener: `4000` when enabled.
+Default dashboard port: `3000`.
 
 ### Native (LXC / bare metal, systemd)
 

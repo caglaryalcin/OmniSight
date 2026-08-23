@@ -6,7 +6,6 @@
   "scripts": {
     "start": "node --openssl-legacy-provider server.js",
     "dev": "node --openssl-legacy-provider --watch server.js",
-    "demo": "node demo-server.js",
     "encrypt-config": "node scripts/encrypt-config.js",
     "reset-password": "node src/reset-password.js"
   },

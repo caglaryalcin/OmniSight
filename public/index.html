@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<script src="/demo-reset.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>OmniSight</title>
@@ -1303,16 +1302,6 @@ const EMBED_VERSIONS = Object.freeze(
     ? {}
     : __OMNISIGHT_EMBED_VERSIONS_JSON__
 );
-const DEMO_MODE = location.port === '4000' || /^demo(?:-|\.|$)/i.test(location.hostname) || /^demo-omni/i.test(location.hostname);
-let runtimeDemoMode = DEMO_MODE;
-function applyDemoResetDay(data){
-  const day = String(data?.demoResetDay || '').trim();
-  if(!day || typeof window.omnisightApplyDemoDailyReset !== 'function') return false;
-  if(!window.omnisightApplyDemoDailyReset(day)) return false;
-  window.location.reload();
-  return true;
-}
-const EMBED_WARM_ROUTES = ['/topology','/agents','/settings','/event-center','/profile','/docs','/about'];
 function setFooterCurrentVersion(version = APP_VERSION){
   const clean = String(version || '1.0.0').replace(/^v/i, '');
   window._currentVersion = 'v' + clean;
@@ -9783,7 +9772,6 @@ function mergeLiveInventory(previous, next, depth = 0, inheritedIncomplete = fal
   return out;
 }
 function render(data, opts = {}){
-  if(applyDemoResetDay(data)) return;
   if(opts.live && window._lastData){
     const previousTime = Date.parse(window._lastData.timestamp || '');
     const nextTime = Date.parse(data?.timestamp || '');
@@ -10434,8 +10422,6 @@ function parkEmbedFrame(ifr, opts = {}){
 function abortInactiveEmbedLoads(keepKey = ''){
   const frames = document.querySelectorAll('#detail iframe.embed-frame,#embed-cache-bin iframe.embed-frame');
   frames.forEach(ifr => {
-    if(runtimeDemoMode && ifr.dataset.embedKey !== keepKey) return;
-    if(ifr.dataset.embedWarm === '1' && ifr.dataset.embedKey !== keepKey) return;
     if(ifr.dataset.embedKey !== keepKey && !embedFrameLoaded(ifr)) abortEmbedFrameLoad(ifr);
   });
 }
@@ -10498,7 +10484,7 @@ function returnDashboard(opts = {}){
   activePanel = null;
   clearOverviewCache();
   const detail = document.getElementById('detail');
-  parkEmbedFrames(detail, { abortInflight: !runtimeDemoMode });
+  parkEmbedFrames(detail, { abortInflight: true });
   if(detail) detail.dataset.embedUrl = '';
   setNavActive('nav-dashboard');
   if(window._lastData && !window._lastData.loading) render(window._lastData);
@@ -10752,7 +10738,7 @@ function openEmbed(url, opts = {}){
   });
   detail.querySelectorAll('iframe.embed-frame.active').forEach(ifr => {
     if(ifr.dataset.embedKey !== key) {
-      parkEmbedFrame(ifr, { abortInflight: !runtimeDemoMode });
+      parkEmbedFrame(ifr, { abortInflight: true });
     }
   });
   let ifr = embedFrameCache.get(key);
@@ -10789,32 +10775,6 @@ function scheduleEmbedPrefetch(opts = {}){
   if(opts.immediate) run();
   else if(window.requestIdleCallback) requestIdleCallback(run, { timeout: 2500 });
   else setTimeout(run, 1200);
-}
-let demoEmbedWarmupStarted = false;
-function warmEmbedRoute(url){
-  const key = embedCacheKey(url);
-  if(embedFrameCache.has(key)) return;
-  const ifr = createEmbedFrame(url, 'low');
-  ifr.dataset.embedWarm = '1';
-  embedCacheBin().appendChild(ifr);
-}
-function scheduleDemoEmbedWarmup(opts = {}){
-  if(demoEmbedWarmupStarted || !runtimeDemoMode || navigator.connection?.saveData) return;
-  demoEmbedWarmupStarted = true;
-  let index = 0;
-  const next = () => {
-    if(index >= EMBED_WARM_ROUTES.length) return;
-    if(pageHidden()){
-      setTimeout(next, 1200);
-      return;
-    }
-    warmEmbedRoute(EMBED_WARM_ROUTES[index++]);
-    setTimeout(next, opts.immediate ? 40 : 120);
-  };
-  const start = () => setTimeout(next, opts.immediate ? 0 : 250);
-  if(opts.immediate) start();
-  else if(window.requestIdleCallback) requestIdleCallback(start, { timeout: 2500 });
-  else start();
 }
 function toggleMenu(){ document.getElementById('menu-drop').classList.toggle('open'); }
 document.addEventListener('click', e => { if(!e.target.closest('.menu-wrap')) document.getElementById('menu-drop')?.classList.remove('open'); });
@@ -11103,13 +11063,12 @@ document.addEventListener('keydown', e => {
 });
 document.addEventListener('keydown',e=>{ if(e.key==='Escape')closeLogs(); });
 function authHeaders(){ const t=sessionStorage.getItem('os_token')||localStorage.getItem('os_token'); return t?{'x-session-token':t}:{}; }
-function handleUnauth(r){ if(r.status===401){ sessionStorage.removeItem('os_token'); localStorage.removeItem('os_token'); document.cookie='session=; path=/; max-age=0'; document.cookie='omnisight_demo_session=; path=/; max-age=0'; window.location.href='/login'; throw new Error('Unauthorized'); } }
+function handleUnauth(r){ if(r.status===401){ sessionStorage.removeItem('os_token'); localStorage.removeItem('os_token'); document.cookie='session=; path=/; max-age=0'; window.location.href='/login'; throw new Error('Unauthorized'); } }
 async function doLogout(){
   await fetch('/api/logout',{method:'POST',headers:authHeaders()}).catch(()=>{});
   sessionStorage.removeItem('os_token');
   localStorage.removeItem('os_token');
   document.cookie = 'session=; path=/; max-age=0';
-  document.cookie = 'omnisight_demo_session=; path=/; max-age=0';
   window.location.href='/login';
 }
 
@@ -11487,7 +11446,6 @@ function shellSummaryBadgeForItem(item, lang){
 }
 function applyShellSummary(summary){
   if(!summary || typeof summary !== 'object') return;
-  if(applyDemoResetDay(summary)) return;
   const pageScroll = capturePageScroll();
   applyServerUiPreferences(summary);
   if(Array.isArray(summary.configured)) {
@@ -11853,9 +11811,6 @@ window.addEventListener('popstate', () => { applyHashRoute(); });
 (async()=>{
   applyThemeIcon();
   scheduleEmbedPrefetch({ immediate: true });
-  if(runtimeDemoMode) {
-    scheduleDemoEmbedWarmup({ immediate: true });
-  }
   const cachedStatus = readStatusCache();
   const startRoute = currentHashRoute();
   const startInEmbed = startRoute !== 'dashboard' && !!embedRoutes[startRoute];
@@ -11884,24 +11839,14 @@ window.addEventListener('popstate', () => { applyHashRoute(); });
     if(!cachedStatus) return firstRenderPromise;
     return initialLoad(statusPromise);
   };
-  if(runtimeDemoMode){
-    if(cachedStatus) await applyFreshStatus();
-    else await firstRenderPromise;
-    scheduleDashboardLoadingGuards();
-    scheduleEmbedPrefetch();
-    scheduleDemoEmbedWarmup();
-    return;
-  }
   const r = await fetch('/api/auth-status', { headers: {...authHeaders(), 'Cache-Control':'no-store'}, cache:'no-store' }).catch(()=>null);
   if(!r){
     if(cachedStatus) applyFreshStatus();
     scheduleDashboardLoadingGuards();
     scheduleEmbedPrefetch();
-    scheduleDemoEmbedWarmup();
     return;
   }
   const d = await r.json().catch(()=>({}));
-  if(d.demo) runtimeDemoMode = true;
   if(d.required){
     if(!d.authenticated){ window.location.href='/login'; return; }
     loadTopProfile();
@@ -11912,7 +11857,6 @@ window.addEventListener('popstate', () => { applyHashRoute(); });
   else await firstRenderPromise;
   scheduleDashboardLoadingGuards();
   scheduleEmbedPrefetch();
-  scheduleDemoEmbedWarmup();
 })();
 
 const APP_UPDATE_FOOTER_CACHE_KEY = 'os_app_update_footer_v3';

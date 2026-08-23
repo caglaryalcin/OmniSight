@@ -1,6 +1,5 @@
 <html lang="en">
 <head>
-<script src="/demo-reset.js"></script>
 <script>try{document.documentElement.setAttribute("data-theme",localStorage.getItem("os_theme")||"dark")}catch(e){}</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
@@ -192,7 +191,6 @@ function applyLanguage(){
   document.title = currentLang() === 'tr' ? 'OmniSight - Ajanlar' : 'OmniSight - Agents';
 }
 function authHeaders(){ const t=sessionStorage.getItem('os_token')||localStorage.getItem('os_token'); return t?{'x-session-token':t}:{}; }
-const AGENTS_DEMO_MODE = location.port === '4000' || /^demo(?:-|\.|$)/i.test(location.hostname) || /^demo-omni/i.test(location.hostname);
 function handleUnauth(r){ if(r.status===401 || (r.redirected && r.url.includes('/login'))){ sessionStorage.removeItem('os_token'); localStorage.removeItem('os_token'); document.cookie='session=; path=/; max-age=0'; (window.top || window).location.href='/login'; throw new Error('Unauthorized'); } }
 async function readJson(r){
   const text = await r.text();
@@ -255,7 +253,6 @@ function copyText(text, btn){
 }
 const REMOTE_UNINSTALL_VERSION = '1.3.3';
 const LATEST_AGENT_VERSION = '1.4.2';
-const demoUninstalledAgentIds = new Set();
 let uninstallAgentModalResolver = null;
 function showUninstallAgentModal(name){
   return new Promise(resolve => {
@@ -276,55 +273,6 @@ function closeUninstallAgentModal(ok){
   uninstallAgentModalResolver = null;
   if(resolve) resolve(!!ok);
 }
-function demoAgentsData(){
-  const now = Date.now();
-  return {
-    latestVersion: LATEST_AGENT_VERSION,
-    demo: true,
-    agents: [
-      {
-        id: 'demo-agent',
-        name: 'demo-linux-01',
-        ip: '192.0.2.50',
-        os: 'Ubuntu 24.04 LTS',
-        kernel: '6.8.0-demo',
-        platform: 'linux',
-        role: 'linux',
-        online: true,
-        agentVersion: LATEST_AGENT_VERSION,
-        lastSeen: now - 15000,
-      },
-      {
-        id: 'demo-offline',
-        name: 'demo-offline-01',
-        ip: '192.0.2.51',
-        os: 'Debian 12',
-        kernel: '6.1.0-demo',
-        platform: 'linux',
-        role: 'linux',
-        online: false,
-        agentVersion: '1.1.0',
-        lastSeen: now - 3600_000,
-      },
-    ].filter(agent => !demoUninstalledAgentIds.has(agent.id)),
-  };
-}
-function demoAgentRepairCommands(id){
-  const safeId = id || 'demo-offline';
-  return [
-    {
-      title: 'Query agent',
-      description: 'Run first and check the service state and HTTP result.',
-      command: `sudo bash -lc 'systemctl status omnisight-agent --no-pager -l || true\njournalctl -u omnisight-agent -n 120 --no-pager || true\ncurl -sS -m 20 http://demo.local/api/agent/ping -H "X-Agent-Token: demo-token" -H "Content-Type: application/json" --data "{\"id\":\"${safeId}\"}"'`,
-    },
-    {
-      title: 'Repair systemd agent',
-      description: 'Use for a failed or missing service, or HTTP 401/403.',
-      command: `curl -fsSL http://demo.local/agent/install.sh | sudo OMNISIGHT_URL=http://demo.local OMNISIGHT_TOKEN=demo-token OMNISIGHT_AGENT_ID=${safeId} bash`,
-    },
-  ];
-}
-
 const ADD_AGENT_META = {
   linux: { title: 'Add Linux Agent', desc: 'Works on any systemd Linux: bare-metal/VM servers, NAS and other Linux devices. The agent pushes metrics + services; no inbound access to the server is needed.' },
   windows: { title: 'Add Windows Agent', desc: 'Run the PowerShell command in an elevated PowerShell window. It installs a real Windows service that pushes CPU, RAM, disk, network and service status with no inbound access.' },
@@ -748,18 +696,6 @@ async function loadAgents(options = {}){
     return;
   }
   if(!force && agentsLastLoadedAt && Date.now() - agentsLastLoadedAt < 5000) return;
-  if(AGENTS_DEMO_MODE){
-    renderAgents(demoAgentsData());
-    agentsLastLoadedAt = Date.now();
-    if(manual){
-      const msg = document.getElementById('msg');
-      msg.textContent = t('Agents refreshed.');
-      msg.className = 'msg ok';
-    } else {
-      clearMsg(true);
-    }
-    return;
-  }
   agentsLoading = true;
   const oldText = btn ? btn.textContent : '';
   if(btn){ btn.disabled = true; btn.textContent = t('Refreshing...'); }
@@ -803,12 +739,6 @@ async function loadAgents(options = {}){
 async function updateAgent(id, btn){
   const msg = document.getElementById('msg');
   clearMsg(true);
-  if(AGENTS_DEMO_MODE){
-    msg.textContent = t('Update command sent. Waiting for next report...');
-    msg.className = 'msg ok';
-    renderAgents(demoAgentsData());
-    return;
-  }
   const old = btn.textContent; btn.disabled = true; btn.textContent = t('Updating...');
   try{
     const r = await fetch('/api/agent/update',{method:'POST',headers:{'Content-Type':'application/json',...authHeaders()},body:JSON.stringify({id})});
@@ -833,14 +763,6 @@ async function uninstallAgent(id, name, btn){
   const old = btn.textContent;
   btn.disabled = true;
   btn.textContent = t('Uninstalling...');
-  if(AGENTS_DEMO_MODE){
-    demoUninstalledAgentIds.add(id);
-    agentsSignature = '';
-    renderAgents(demoAgentsData());
-    msg.textContent = t('Agent uninstall scheduled');
-    msg.className = 'msg ok';
-    return;
-  }
   try{
     const r = await fetch('/api/agent/uninstall', { method:'POST', headers:{ 'Content-Type':'application/json', ...authHeaders() }, body:JSON.stringify({ id }) });
     handleUnauth(r);
@@ -868,11 +790,6 @@ async function uninstallAgent(id, name, btn){
 async function showAgentRepair(id, btn){
   const msg = document.getElementById('msg');
   clearMsg(true);
-  if(AGENTS_DEMO_MODE){
-    const agent = demoAgentsData().agents.find(item => item.id === id);
-    showCommandPanel(t('Agent diagnostic and repair commands'), demoAgentRepairCommands(id), { subjectLabel: 'Hostname', subjectValue: id || 'demo-offline', agentVersion: agent?.agentVersion || '', latestVersion: LATEST_AGENT_VERSION, agentRole: roleText(agent || {}) });
-    return;
-  }
   const old = btn.textContent; btn.disabled = true; btn.textContent = t('Loading...');
   try{
     const d = await fetchJson(`/api/agent/repair-commands?id=${encodeURIComponent(id)}`, { headers:authHeaders() }, 6000);
@@ -886,21 +803,17 @@ async function showAgentRepair(id, btn){
   }
 }
 applyLanguage();
-if(AGENTS_DEMO_MODE) {
-  renderAgents(demoAgentsData());
+const cachedAgents = readAgentsCache();
+if(cachedAgents) {
+  agentsSignature = '';
+  renderAgents(cachedAgents);
+  setTimeout(() => {
+    if(!embedPaused) loadAgents();
+  }, 900);
 } else {
-  const cachedAgents = readAgentsCache();
-  if(cachedAgents) {
-    agentsSignature = '';
-    renderAgents(cachedAgents);
-    setTimeout(() => {
-      if(!embedPaused) loadAgents();
-    }, 900);
-  } else {
-    loadAgents();
-  }
-  scheduleAgentsPoll(15000);
+  loadAgents();
 }
+scheduleAgentsPoll(15000);
 </script>
 </body>
 </html>

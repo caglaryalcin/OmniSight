@@ -9700,31 +9700,8 @@ function startRuntimeDiagnostics() {
 
 startRuntimeDiagnostics();
 
-function startDemoAlongsideMain() {
-  if (!envFlag('OMNISIGHT_START_DEMO')) return;
-  const demoPort = Number(process.env.DEMO_PORT || process.env.OMNISIGHT_DEMO_PORT || 4000);
-  if (!Number.isFinite(demoPort) || demoPort <= 0 || String(demoPort) === String(PORT)) return;
-  try {
-    const demo = require('./demo-server');
-    const demoApp = demo.app || demo;
-    const demoServer = demoApp.listen(demoPort, () => {
-      console.log(`OmniSight demo running at http://localhost:${demoPort}`);
-    });
-    demoServer.on('error', err => {
-      if (err && err.code === 'EADDRINUSE') {
-        console.warn(`OmniSight demo port ${demoPort} is already in use; main app continues on ${PORT}.`);
-        return;
-      }
-      console.warn(`OmniSight demo server failed: ${err?.message || err}`);
-    });
-  } catch (err) {
-    console.warn(`OmniSight demo server failed to start: ${err?.message || err}`);
-  }
-}
-
 const mainServer = app.listen(PORT, () => {
   console.log(`OmniSight running at http://localhost:${PORT}`);
-  startDemoAlongsideMain();
 });
 mainServer.on('error', err => {
   console.error(`[runtime] server error on port ${PORT}: ${err?.stack || err?.message || err}\n[runtime] ${diagnosticSnapshot()}`);

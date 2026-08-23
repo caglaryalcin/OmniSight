@@ -547,7 +547,7 @@ function run() {
   const closeStreamSource = extractFunction(html, 'closeStatusStream');
   assert.ok(closeStreamSource.includes('queuedStatusStreamEvents.length = 0') && closeStreamSource.includes('activityLineReset()'), 'closing the stream must clear queued events and all activity state');
   assert.ok(streamEventSource.includes("e?.name === 'AbortError' && (embedOpen || pageHidden())") && streamEventSource.includes('activityLineReset()'), 'an intentionally aborted stream fetch must not flash an error after navigation');
-  assert.ok(html.includes('abortStatusFetches();\n    activityLineReset();'), 'hiding the page must clear stale activity after aborting status requests');
+  assert.match(html, /abortStatusFetches\(\);\r?\n\s+activityLineReset\(\);/, 'hiding the page must clear stale activity after aborting status requests');
   const renderSource = extractFunction(html, 'render');
   const staleGuardStart = renderSource.indexOf('if(opts.live && window._lastData){');
   const staleGuardEnd = renderSource.indexOf('if(opts.live && window._lastData && (data?.loading || data?.refreshing))', staleGuardStart);
@@ -1081,7 +1081,7 @@ function run() {
   assert.match(html, /\.overview-log-list\{[^}]*scrollbar-width:thin[^}]*scrollbar-gutter:stable/);
 
   const prefetchStart = html.indexOf('let embedPrefetchStarted = false;');
-  const prefetchEnd = html.indexOf('let demoEmbedWarmupStarted = false;', prefetchStart);
+  const prefetchEnd = html.indexOf('function toggleMenu()', prefetchStart);
   assert.ok(prefetchStart >= 0 && prefetchEnd > prefetchStart, 'embed prefetch block must be extractable');
   for (const options of [{ immediate: true }, undefined]) {
     const prefetchContext = {

@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<script src="/demo-reset.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>OmniSight — Login</title>
@@ -414,10 +413,6 @@ document.addEventListener('keydown', e => { if(e.key === 'Escape') closeInstruct
     registrationEndpoint = selfRegistrationEnabled ? '/api/register' : '/api/set-password';
     $('forgot-row').style.display = passwordResetEnabled && mode === 'login' ? '' : 'none';
     $('register-row').style.display = selfRegistrationEnabled && mode === 'login' ? '' : 'none';
-    if(d.demo && d.demoDefaultCredentials && mode === 'login'){
-      $('u').placeholder = 'demo';
-      $('p').placeholder = 'demo';
-    }
     if(r.ok && !d.required){
       registrationEndpoint = '/api/set-password';
       selfRegistrationEnabled = false;

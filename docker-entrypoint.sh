@@ -6,24 +6,8 @@ APP_GROUP="${OMNISIGHT_RUN_GROUP:-omnisight}"
 DATA_DIR="${OMNISIGHT_DATA_DIR:-/app/data}"
 
 if [ "$#" -eq 0 ] || [ "${1:-}" = "omnisight-run" ]; then
-  MODE="${OMNISIGHT_MODE:-prod}"
-  export OMNISIGHT_START_DEMO=0
-  case "$MODE" in
-    prod|production|server)
-      export PORT="${PORT:-3000}"
-      set -- npm start
-      ;;
-    demo)
-      if [ -z "${PORT:-}" ] || [ "$PORT" = "3000" ]; then
-        export PORT="${OMNISIGHT_DEMO_PORT:-4000}"
-      fi
-      set -- npm run demo
-      ;;
-    *)
-      echo "OmniSight error: unsupported OMNISIGHT_MODE=$MODE; use prod or demo" >&2
-      exit 64
-      ;;
-  esac
+  export PORT="${PORT:-3000}"
+  set -- npm start
 fi
 
 if [ "$(id -u)" = "0" ]; then

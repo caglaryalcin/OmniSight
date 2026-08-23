@@ -127,14 +127,6 @@ npm start
 
 Dashboard: `http://localhost:3000` — the app starts with no config; set up your account and configure platforms from the Settings UI.
 
-### Demo mode
-
-```bash
-npm run demo
-```
-
-Demo: `http://localhost:4000` — default credentials are `demo` / `demo` unless `OMNISIGHT_DEMO_USER` and `OMNISIGHT_DEMO_PASSWORD` are set.
-
 ## The agent
 
 Linux servers, and optionally Proxmox nodes and Docker hosts, are monitored by the **OmniSight agent** — a single bash script that **pushes** metrics to OmniSight over HTTP(S). Nothing to expose on the servers, no credentials stored in OmniSight for this mode, works behind NAT/firewalls as long as the server can reach the dashboard.
@@ -296,7 +288,7 @@ docker stack deploy -c docker-stack.yml omnisight
 
 ### Kubernetes / Helm
 
-OmniSight does not currently bundle an official Helm chart. When using your own chart, expose the main app on container port `3000`. The image also exposes `4000` for the bundled demo server. Use `OMNISIGHT_MODE=prod` for the normal app, or run a separate demo deployment with `OMNISIGHT_MODE=demo` and `OMNISIGHT_DEMO_PORT=4000` when you want the demo page reachable.
+OmniSight does not currently bundle an official Helm chart. When using your own chart, expose the app on container port `3000`.
 
 The application keeps mutable configuration, authentication, session, encryption-key, agent and runtime data under `/app/data`. Mount that complete path from a persistent volume claim and keep `replicaCount: 1`; the file-backed state is not designed for concurrent writers. Prefer a `Recreate` deployment strategy so the old pod releases the volume before the replacement starts. If a rolling strategy is required, use `maxSurge: 0` and `maxUnavailable: 1` so two OmniSight pods never run at the same time. The rendered workload should be equivalent to:
 
@@ -337,8 +329,6 @@ performance:
 ```
 
 Shorter intervals improve detection latency but increase API, CPU, network and history-write load and can trigger upstream rate limits. Longer intervals reduce that load at the cost of slower status changes. Failed collectors already back off automatically.
-
-When running from source with `npm start`, `OMNISIGHT_START_DEMO=1` can start the demo listener alongside the main app.
 
 > **Docker path note:** Windows paths don't work inside the container. Put `kube.bin` in `./data/` and reference it with a container path, e.g. `kubeconfig: /app/data/kube.bin`.
 
@@ -388,10 +378,6 @@ For disaster recovery, the safest flow is still: stop OmniSight, restore the fil
 | Variable | Required | Default | Description |
 |---|---|---|---|
 | `PORT` | No | `3000` | HTTP port |
-| `OMNISIGHT_MODE` | No | `prod` | Container entrypoint mode. `prod` runs the main app; `demo` runs the bundled demo server. |
-| `DEMO_PORT` / `OMNISIGHT_DEMO_PORT` | No | `4000` | Demo dashboard port |
-| `OMNISIGHT_DEMO_USER` / `OMNISIGHT_DEMO_PASSWORD` | No | `demo` / `demo` | Demo login credentials |
-| `OMNISIGHT_START_DEMO` | No | `0` | Source/local mode only: set to `1` to start the demo listener alongside the main app |
 | `OMNISIGHT_ALERT_COOLDOWN_MS` | No | `3600000` | Minimum time before the same alert notification can be sent again |
 | `TZ` | No | `UTC` | Server timezone for Node timestamps and notifications, e.g. `Europe/Istanbul`. `TIMEZONE` is also accepted as an alias. |
 | `OMNISIGHT_ENCRYPT` | No | `true` | Config encryption is **enabled by default**. Plaintext secrets require this to be disabled and `OMNISIGHT_ALLOW_PLAINTEXT_SECRETS=1`. |

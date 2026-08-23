@@ -17,7 +17,7 @@ Bu doküman platformun ne olduğunu, nasıl çalıştığını, verileri nerede 
 - [9. Bildirimler ve Olay Merkezi](#9-bildirimler-ve-olay-merkezi)
 - [10. Topoloji](#10-topoloji)
 - [11. Yedekleme, Geri Yükleme ve Felaket Kurtarma](#11-yedekleme-geri-yukleme-ve-felaket-kurtarma)
-- [12. Demo, Üretim ve Dağıtım](#12-demo-uretim-ve-dagitim)
+- [12. Üretim ve Dağıtım](#12-uretim-ve-dagitim)
 - [13. API ve Entegrasyon Yüzeyi](#13-api-ve-entegrasyon-yuzeyi)
 - [14. Sorun Giderme](#14-sorun-giderme)
 - [15. Operasyon Kontrol Listesi](#15-operasyon-kontrol-listesi)
@@ -770,7 +770,7 @@ UniFi verisi seyrek ve önbellekli okunur. Aynı cihaz SNMP ile de izleniyorsa t
 5. Giriş yapın.
 6. Ayarlar, Ajanlar ve Olay Merkezi'ni kontrol edin.
 
-## 12. Demo, Üretim ve Dağıtım
+## 12. Üretim ve Dağıtım
 
 ### Yerel Node.js
 
@@ -779,10 +779,7 @@ npm install
 npm start
 ```
 
-Varsayılan portlar:
-
-- Üretim paneli: `3000`.
-- Etkinse demo listener: `4000`.
+Varsayılan panel portu: `3000`.
 
 ### Native Kurulum (LXC / bare metal, systemd)
 

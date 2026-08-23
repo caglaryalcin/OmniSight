@@ -631,7 +631,6 @@ function testStaticRegressions() {
   const topology = fs.readFileSync(path.join(root, 'public', 'topology.html'), 'utf8');
   const i18n = fs.readFileSync(path.join(root, 'public', 'i18n.js'), 'utf8');
   const readme = fs.readFileSync(path.join(root, 'README.md'), 'utf8');
-  const demoServer = fs.readFileSync(path.join(root, 'demo-server.js'), 'utf8');
   const onboarding = fs.readFileSync(path.join(root, 'public', 'onboarding.html'), 'utf8');
   const configExample = fs.readFileSync(path.join(root, 'config.example.yaml'), 'utf8');
   const packageJson = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
@@ -749,11 +748,9 @@ function testStaticRegressions() {
   assert.ok(server.indexOf("broadcastStatusEvent('refreshing')") > server.indexOf('if (!taskFns.length)'), 'refresh activity must only be broadcast when collector tasks actually run');
   const refreshFinalizeSource = server.slice(server.indexOf('const finalize = () => {'), server.indexOf('if (!taskFns.length)', server.indexOf('const finalize = () => {')));
   assert.ok(server.includes('base.notifyRevision = notifyRevision') && server.includes('notifyRevision = Math.max(Date.now(), notifyRevision + 1)') && server.includes("broadcastStatusEvent('notification')") && server.includes('else if (enabled === true) notifyDisabled.delete(cleanKey);') && refreshFinalizeSource.includes('assignStatic(base);'), 'notification changes made during a refresh must update the runtime snapshot, preserve topic-only bell state, invalidate cached views and notify connected dashboards');
-  assert.ok(server.includes("type: 'hello',\n    timestamp: cache.data?.timestamp || new Date().toISOString(),\n    notifyRevision,"), 'status stream reconnects must advertise the latest notification revision');
+  assert.match(server, /type: 'hello',\r?\n\s+timestamp: cache\.data\?\.timestamp \|\| new Date\(\)\.toISOString\(\),\r?\n\s+notifyRevision,/, 'status stream reconnects must advertise the latest notification revision');
   assert.ok(dashboard.includes('pendingNotifyEnabled') && dashboard.includes('applyNotifySnapshot(data.notifyDisabled, data.notifyTopics, data.notifyRevision)') && dashboard.includes('deferDetailRenderForPointer(detail, id)') && dashboard.includes('queuedStatusStreamEvents.push(queuedData)'), 'in-flight refreshes must preserve pending bell choices, the native click target and queued notification events');
-  assert.ok(demoServer.includes('demoNotifyDisabled.clear();') && demoServer.includes('demoNotifyTopics.clear();') && demoServer.includes('notifyRevision: demoNotifyRevision'), 'demo notification state must participate in daily reset and status stream reconciliation');
   assert.ok(topology.includes('vmware-endpoint:') && topology.includes('vmware-cluster:') && topology.includes('vmware-host:') && topology.includes('vmware-guest:'), 'topology must map vCenter endpoints, clusters, ESXi hosts and VMs');
-  assert.ok(demoServer.includes('const vmwareHosts = [') && demoServer.includes('history: history(96, 20, 35)') && demoServer.includes('data.vmware = {') && demoServer.includes("['vmware', 'vmware']"), 'demo mode must expose realistic VMware inventory and host history');
   assert.ok(onboarding.includes('<option value="vmware">VMware ESXi / vCenter</option>') && server.includes("type === 'vmware' && url && input.username && input.password"), 'first-run onboarding must accept a VMware endpoint');
   assert.ok(configExample.includes('vmware:') && readme.includes('**VMware ESXi / vCenter**') && docsEnglish.includes('### VMware ESXi / vCenter') && docsTurkish.includes('### VMware ESXi / vCenter'), 'VMware configuration and operation must be documented in both languages');
   assert.ok(i18n.includes("'VMware endpoints':'VMware endpoint’leri'") && packageJson.description.includes('VMware ESXi/vCenter'), 'VMware UI strings and package metadata must identify the platform');
@@ -830,7 +827,7 @@ function testStaticRegressions() {
   assert.ok(topology.includes('Math.min(minDx, maxDx)') && topology.includes('Math.max(minDx, maxDx)'), 'wide topology groups must remain horizontally draggable when they exceed the visible viewport');
   assert.ok(server.includes('px:cluster:${name}:quorum') && server.includes('quorumLost.length > 0'), 'cluster quorum loss must enter alerts and public health');
   assert.ok(linuxAgent.includes('pvesh get /cluster/status --output-format json') && linuxAgent.includes('\"clusterStatus\"'), 'Proxmox agents must report cluster identity, membership and quorum');
-  assert.ok(demoServer.includes("name: 'demo-cluster'") && demoServer.includes('clusters: (d.proxmox.clusters || []).map') && demoServer.includes("clusterName: n.clusterName || ''") && docsEnglish.includes('real Proxmox cluster name, member nodes and quorum state'), 'demo topology data and documentation must cover automatic Proxmox cluster detection');
+  assert.ok(docsEnglish.includes('real Proxmox cluster name, member nodes and quorum state'), 'documentation must cover automatic Proxmox cluster detection');
   assert.ok(proxmoxOverviewSource.includes('ceph-osd-metrics') && proxmoxOverviewSource.includes('OSDs Up') && proxmoxOverviewSource.includes('Total OSDs'), 'Ceph health must show separate Proxmox-style OSD counters');
   assert.ok(proxmoxOverviewSource.includes('latency.averageMs') && proxmoxOverviewSource.includes('AVG Latency') && proxmoxOverviewSource.includes('MON Quorum Status'), 'Ceph health must show average OSD latency and MON quorum status');
   assert.ok(proxmoxOverviewSource.includes("value < 1 ? '&lt;1 ms'"), 'sub-millisecond Ceph latency must be displayed as less than one millisecond');
@@ -858,12 +855,11 @@ function testStaticRegressions() {
   assert.ok(windowsOverviewSource.includes("detailMeta: ''") && !windowsOverviewSource.includes("detailBadge: ''"), 'Windows detail must remove repeated reachable metadata while retaining its far-right health or update badge');
   assert.ok(windowsOverviewSource.includes('sbMeta: `${reachable}/${windows.length} online`'), 'Windows sidebar metadata must use online instead of reachable');
   assert.ok(dashboard.includes('.pve-head-stat.is-disk-usage{flex:0 0 auto;width:max-content;min-width:76px}'), 'Linux and Windows disk percentage cells must retain their slightly wider layout');
-  assert.ok(dashboard.includes("title:'Windows Servers'") && dashboard.includes("title: 'Windows Servers'") && server.includes("title: 'Windows Servers'") && demoServer.includes("windows: 'Windows Servers'") && settings.includes('>Windows Servers</span>') && i18n.includes("'Windows Servers':'Windows Servers'"), 'Windows platform naming must stay plural across product surfaces');
+  assert.ok(dashboard.includes("title:'Windows Servers'") && dashboard.includes("title: 'Windows Servers'") && server.includes("title: 'Windows Servers'") && settings.includes('>Windows Servers</span>') && i18n.includes("'Windows Servers':'Windows Servers'"), 'Windows platform naming must stay plural across product surfaces');
   const synologySource = dashboard.slice(dashboard.indexOf('function buildSynology'), dashboard.indexOf('function buildUnifi'));
   const synologyStatsSource = synologySource.slice(synologySource.indexOf('const snmpStatsArr = ['), synologySource.indexOf('].filter(Boolean)', synologySource.indexOf('const snmpStatsArr = [')));
   assert.ok(synologySource.includes('const uptimeStat = dev.uptimeSeconds != null') && synologyStatsSource.indexOf("pveHeadStat('Bandwidth'") < synologyStatsSource.indexOf('uptimeStat'), 'SNMP uptime must always remain the rightmost visible metric');
   assert.ok(synologySource.includes("const snmpHeadClass = snmpStatsArr.length >= 8 ? ' snmp-head-8' : ''") && synologySource.includes('snmp-head-main${snmpHeadClass}') && dashboard.includes('.snmp-head-main.snmp-head-8{grid-template-columns:'), 'MikroTik rows must accommodate uptime alongside temperature and fan metrics');
-  assert.ok(demoServer.includes("profile: 'mikrotik'") && demoServer.includes('uptimeSeconds: uptimeSeconds(26, 8, 17)'), 'demo MikroTik data must include uptime');
   assert.ok(dashboard.includes('.snmp-head-main>.pve-head-stat:last-child{width:auto}'), 'Synology summary rows must fill the complete metric grid width');
   const databaseSource = dashboard.slice(dashboard.indexOf('function buildDatabase'), dashboard.indexOf('function toggleDocker'));
   assert.ok(databaseSource.indexOf("pveHeadStat('Version'") < databaseSource.indexOf("pveHeadStat('Uptime', fmtUptime(d.uptimeSeconds)"), 'database uptime must remain the rightmost metric');
@@ -908,14 +904,10 @@ function testStaticRegressions() {
   assert.ok(dockerPanelSource.includes('containerIssueLabel') && dockerPanelSource.includes('hostInfoLabel') && dashboard.includes("return `${counts.created} ${trText('created')}`"), 'Docker created containers must remain visible without degrading platform health');
   assert.ok(dashboard.includes('return counts.failed > 0 || counts.stopped > 0 || counts.pending > 0'), 'global Docker health must ignore created containers and include actionable states');
   assert.ok(server.includes('const containerIssues = stopped + failed + pending') && server.includes('${created} created'), 'compact production health must report created containers without warning');
-  assert.ok(demoServer.includes("state: i === 5 ? 'created' : 'running'") && demoServer.includes("created: containers.filter(c => c.state === 'created').length") && demoServer.includes("color: i === 5 ? 'gray' : 'green'"), 'demo Docker data must include a neutral created container example');
-  assert.ok(demoServer.includes("const issueStates = new Set(['exited', 'dead', 'restarting', 'paused', 'removing'])") && demoServer.includes("return hasIssue ? 'degraded' : 'healthy'"), 'demo compact health must keep created-only Docker hosts healthy');
   assert.ok(dockerPanelSource.includes('sbMeta: `${totalRunning}/${totalAll} containers · ${onlineHosts}/${docker.length} hosts`'), 'Docker sidebar metadata must show container and host availability counts');
   assert.ok(dockhandPanelSource.includes('sbMeta: `${running}/${total} containers · ${onlineServers}/${totalServers} hosts`'), 'Dockhand sidebar metadata must show container and host availability counts');
   assert.ok(server.includes('sidebarMeta = `${running}/${total} containers · ${up}/${data.docker.length} hosts`') && server.includes('sidebarMeta = `${sm.running || 0}/${sm.total || 0} containers · ${onlineServers}/${totalServers} hosts`') && server.includes('detail: s.sidebarMeta || s.detail || s.meta'), 'embedded production sidebars must retain Docker and Dockhand container and host counts');
-  assert.ok(demoServer.includes('containers · ${data.docker.filter(h => h.online).length}/${data.docker.length} hosts') && demoServer.includes('containers · ${data.dockhand.summary.serverUp}/${data.dockhand.summary.servers} hosts'), 'embedded demo sidebars must retain Docker and Dockhand container and host counts');
   assert.ok(server.includes('offline: s.offline') && server.includes('online: s.online') && server.includes('...platformAvailability(data, item.id)'), 'production summaries must retain platform availability ratios');
-  assert.ok(demoServer.includes('...platformAvailability(data, id)'), 'demo summaries must retain platform offline ratios');
   assert.ok(dashboard.includes("const storageKnown = inst.available?.storage !== false"), 'unavailable QNAP storage metrics must not be displayed as zero');
   assert.ok(dashboard.includes("const disksKnown = inst.available?.disks !== false"), 'unavailable QNAP disk metrics must not be displayed as zero');
   assert.ok(settings.includes('The monitoring account must belong to the QNAP administrators group'), 'QNAP metric permissions must be documented in settings');
@@ -953,8 +945,6 @@ function testStaticRegressions() {
   assert.ok(agentsPage.includes('showUninstallAgentModal') && agentsPage.includes("closeUninstallAgentModal(true)") && agentsPage.includes("fetch('/api/agent/uninstall'"), 'Agents must provide an explicit Yes-confirmed uninstall action');
   assert.ok(settings.includes("const endpoint = pendingInstall || removeRecordOnly ? '/api/agent/remove' : '/api/agent/uninstall'") && settings.includes("const removeRecordOnly = !pendingInstall && agent?.online === false") && settings.includes("confirmLabel: 'Yes'"), 'Settings must remotely uninstall online agents and safely remove stale offline records or pending installs');
   assert.ok(docsEnglish.includes('### Remote Uninstall') && docsTurkish.includes('### Uzaktan Kaldırma') && docsEnglish.includes('independent local helper'), 'both documentation languages must explain connection-independent remote uninstall');
-  assert.ok(demoServer.includes("app.post('/api/agent/uninstall'") && demoServer.includes("latestVersion: '1.4.2'"), 'the demo must mirror remote uninstall and current agent protocol behavior');
-  assert.ok(demoServer.includes("{ name: 'edge-switch', host: '192.0.2.4', profile: 'generic'") && demoServer.includes("['unifi', 'snmp'], ['snmp', 'snmp']") && demoServer.includes("'unifi', 'snmp', 'healthchecks'"), 'the demo dashboard must include a visible generic SNMP platform card');
   const i18nContext = { window: {} };
   vm.createContext(i18nContext);
   vm.runInContext(i18n, i18nContext);
@@ -1003,9 +993,7 @@ function testStaticRegressions() {
     assert.ok(Object.prototype.hasOwnProperty.call(turkish, key), `Agent repair Turkish translation missing: ${key}`);
   }
   assert.ok(server.includes("staticAssetVersion('/i18n.js')") && server.includes("raw === staticAssetVersion(req?.path)"), 'production i18n URL must change when translation content changes');
-  assert.ok(demoServer.includes("demoAssetVersion('/i18n.js')") && demoServer.includes("raw === demoAssetVersion(req?.path)"), 'demo i18n URL must change when translation content changes');
   assert.ok(server.includes("'/docs': '/docs.html'") && server.includes('__OMNISIGHT_EMBED_VERSIONS_JSON__') && !server.includes("app.get('/docs.md'"), 'production documentation must use an injected content version without a Markdown route');
-  assert.ok(demoServer.includes("'/docs': '/docs.html'") && demoServer.includes('__OMNISIGHT_EMBED_VERSIONS_JSON__') && !demoServer.includes("app.get('/docs.md'"), 'demo documentation must use an injected content version without a Markdown route');
   assert.ok(server.includes('Number.isFinite(requested) && requested > 0'), 'invalid history point requests must use the safe dashboard default');
   assert.match(deploy, /linux\/amd64,linux\/arm64/);
   assert.strictEqual((ci.match(/screenshots\/\*\*/g) || []).length, 2, 'README screenshots and media-only pushes must skip both CI push and pull-request runs');
@@ -1043,15 +1031,13 @@ function testStaticRegressions() {
   assert.strictEqual(performanceContext.result.collectorConcurrency, 6, 'Save & Apply must preserve collector concurrency');
   assert.strictEqual(JSON.stringify(performanceContext.result.refreshIntervals), JSON.stringify({ snmp: 30, veeam: 60 }), 'Save & Apply must preserve per-platform refresh intervals');
   assert.strictEqual(performanceContext.result.futureOption, 'keep', 'Save & Apply must preserve future performance options it does not render');
-  assert.ok(settings.includes('cfg.performance = collectPerformanceConfig(\n    window._settingsConfig,'), 'the settings collector must merge the loaded performance section');
+  assert.match(settings, /cfg\.performance = collectPerformanceConfig\(\r?\n\s+window\._settingsConfig,/, 'the settings collector must merge the loaded performance section');
   assert.ok(readme.includes('does not currently bundle an official Helm chart') && readme.includes('mountPath: /app/data') && readme.includes('replicas: 1') && readme.includes('type: Recreate') && readme.includes('maxSurge: 0') && readme.includes('maxUnavailable: 1'), 'Helm guidance must document the supported single-writer persistent deployment');
   assert.ok(readme.includes('collector work every 15 seconds') && readme.includes('over SSE') && readme.includes('performance.refreshIntervals') && readme.includes('snmp: 30') && readme.includes('cloudflare: 60'), 'Helm guidance must explain refresh delivery and recommended per-platform intervals');
   assert.ok(settings.includes("? ['snmp', 'unifi']") && settings.includes("['synology', 'mikrotik'].includes(opts.platformToggle) ? ['snmp']"), 'brand SNMP toggles must persist through the shared collector');
-  assert.ok(demoServer.includes("enabled: demoConfigFlag(body[key].enabled, true)"), 'demo settings must remember platform toggle state');
-  assert.ok(demoServer.includes(".filter(([, key]) => demoPlatformEnabled(key)).map(([id]) => id)"), 'demo dashboard must hide disabled platforms');
   assert.ok(server.includes("backgroundRefresh({ force: true, only: connectingPlatforms })"), 'settings saves must refresh only platforms whose connection config changed');
   assert.ok(server.includes("if (connectingPlatforms.has('proxmox') || !cache.data.proxmox)"), 'unrelated settings saves must preserve current Proxmox runtime data');
-  assert.ok(server.includes('ensureAgentDerivedCacheCurrent();') && server.includes("broadcastStatusEvent('updated')") && server.includes('function refreshAgentCacheAfterRemoval() {\n  refreshAgentDerivedCache();'), 'agent additions, reports and removals must invalidate and broadcast the derived sidebar state');
+  assert.ok(server.includes('ensureAgentDerivedCacheCurrent();') && server.includes("broadcastStatusEvent('updated')") && /function refreshAgentCacheAfterRemoval\(\) \{\r?\n\s+refreshAgentDerivedCache\(\);/.test(server), 'agent additions, reports and removals must invalidate and broadcast the derived sidebar state');
   assert.ok((settings.match(/class="btn-sm platform-add"/g) || []).length >= 5, 'non-standard platform add buttons must participate in the lock');
 }
 
