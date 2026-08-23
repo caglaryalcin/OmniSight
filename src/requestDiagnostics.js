@@ -21,4 +21,21 @@ function requestDiagnosticKind(status, durationMs, slowLimitMs) {
   return Number(durationMs) >= Number(slowLimitMs) ? 'slow' : '';
 }
 
-module.exports = { agentCommandWaitMs, requestSlowLimitMs, requestDiagnosticKind };
+function requestDisconnectDiagnosticKind(eventKind, {
+  finished = false,
+  writableEnded = false,
+  alreadyHandled = false,
+  expectedDisconnect = false,
+} = {}) {
+  const kind = String(eventKind || '');
+  if (kind !== 'aborted' && kind !== 'closed') return '';
+  if (finished || writableEnded || alreadyHandled || expectedDisconnect) return '';
+  return kind;
+}
+
+module.exports = {
+  agentCommandWaitMs,
+  requestSlowLimitMs,
+  requestDiagnosticKind,
+  requestDisconnectDiagnosticKind,
+};

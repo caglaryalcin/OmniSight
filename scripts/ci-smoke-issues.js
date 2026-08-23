@@ -1085,8 +1085,13 @@ function testAgentRetirement() {
   }
 }
 
-function testAgentCommandLongPollDiagnostics() {
-  const { agentCommandWaitMs, requestSlowLimitMs, requestDiagnosticKind } = require('../src/requestDiagnostics');
+function testRequestDiagnostics() {
+  const {
+    agentCommandWaitMs,
+    requestSlowLimitMs,
+    requestDiagnosticKind,
+    requestDisconnectDiagnosticKind,
+  } = require('../src/requestDiagnostics');
   const server = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
   assert.strictEqual(agentCommandWaitMs(undefined), 10000, 'missing agent wait must retain the 10s default');
   assert.strictEqual(agentCommandWaitMs(0), 10000, 'zero agent wait must retain the existing 10s fallback');
@@ -1113,8 +1118,30 @@ function testAgentCommandLongPollDiagnostics() {
     slowRequestMs: 5000,
     expectedWaitMs: agentCommandWaitMs(55),
   }), 1500, 'failed agent requests must not receive a long-poll allowance');
+
+  assert.strictEqual(requestDisconnectDiagnosticKind('aborted'), 'aborted', 'ordinary aborted requests must remain diagnostic events');
+  assert.strictEqual(requestDisconnectDiagnosticKind('closed'), 'closed', 'ordinary unfinished response closes must remain diagnostic events');
+  assert.strictEqual(requestDisconnectDiagnosticKind('closed', { alreadyHandled: true }), '', 'one request disconnect must only be logged once');
+  let disconnectHandled = false;
+  const abortedKind = requestDisconnectDiagnosticKind('aborted', { alreadyHandled: disconnectHandled });
+  disconnectHandled = !!abortedKind;
+  const closedKind = requestDisconnectDiagnosticKind('closed', { alreadyHandled: disconnectHandled });
+  assert.deepStrictEqual([abortedKind, closedKind], ['aborted', ''], 'an aborted-then-closed request lifecycle must produce exactly one diagnostic event');
+  assert.strictEqual(requestDisconnectDiagnosticKind('aborted', { expectedDisconnect: true }), '', 'established long-lived streams must allow expected request aborts');
+  assert.strictEqual(requestDisconnectDiagnosticKind('closed', { expectedDisconnect: true }), '', 'established long-lived streams must allow expected response closes');
+  assert.strictEqual(requestDisconnectDiagnosticKind('aborted', { finished: true }), '', 'finished responses must not emit disconnect warnings');
+  assert.strictEqual(requestDisconnectDiagnosticKind('closed', { writableEnded: true }), '', 'ended responses must not emit disconnect warnings');
+  assert.strictEqual(requestDisconnectDiagnosticKind('unknown'), '', 'unknown terminal events must not become disconnect warnings');
+
   assert.ok(server.includes('const waitMs = agentCommandWaitMs(req.query.wait);') && server.includes('res.locals.diagnosticExpectedWaitMs = waitMs;'), 'the command route must publish its normalized wait budget to diagnostics');
   assert.ok(server.includes('expectedWaitMs: res.locals?.diagnosticExpectedWaitMs') && server.includes('const kind = requestDiagnosticKind(status, ms, slowLimit);'), 'the HTTP finish logger must use the route-aware diagnostic decision');
+  assert.ok(server.includes("req.on('aborted', () => emitDisconnectDiagnostic('aborted'));") && server.includes("res.on('close', () => emitDisconnectDiagnostic('closed'));"), 'request aborts and response closes must share one deduplicated terminal diagnostic path');
+  assert.ok(server.includes('expectedDisconnect: res.locals?.diagnosticExpectedDisconnect === true') && server.includes('disconnectHandled = true;'), 'disconnect diagnostics must honor expected stream closes and remember the first terminal event');
+  const statusStreamSource = server.slice(server.indexOf("app.get('/api/status/stream'"), server.indexOf("app.get('/api/refresh'"));
+  assert.ok(statusStreamSource.includes('res.locals.diagnosticExpectedDisconnect = true;'), 'the status stream must mark established client disconnects as expected');
+  const helloWriteIndex = statusStreamSource.indexOf("write(`event: status");
+  const expectedDisconnectIndex = statusStreamSource.indexOf('res.locals.diagnosticExpectedDisconnect = true;');
+  assert.ok(helloWriteIndex >= 0 && expectedDisconnectIndex > helloWriteIndex, 'the status stream must only allow expected disconnects after writing its hello event');
 }
 
 async function run() {
@@ -1133,7 +1160,7 @@ async function run() {
   testPlatformAvailability();
   testUiPreferenceScoping();
   testAgentRetirement();
-  testAgentCommandLongPollDiagnostics();
+  testRequestDiagnostics();
   testStaticRegressions();
   console.log('smoke ok — issue regressions: #4 #5 #6 #7 #9 #10 #12 #18 #20 #22 #23 #24 #25 #27');
 }

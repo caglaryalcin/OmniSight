@@ -45,7 +45,12 @@ const { loadHistoryMap, scheduleSaveHistoryMap, setHistorySaveDelay, flushHistor
 const { semverCompare, highestStableVersion } = require('./src/version');
 const { normalizeLegacyEmptyBase64Blocks, fullBackupContentHeader } = require('./src/fullBackupFormat');
 const { platformAvailability } = require('./src/platformAvailability');
-const { agentCommandWaitMs, requestSlowLimitMs, requestDiagnosticKind } = require('./src/requestDiagnostics');
+const {
+  agentCommandWaitMs,
+  requestSlowLimitMs,
+  requestDiagnosticKind,
+  requestDisconnectDiagnosticKind,
+} = require('./src/requestDiagnostics');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -458,6 +463,7 @@ function requestDiagnostics(req, res, next) {
   const method = req.method || '-';
   const route = String(req.path || req.url || '').split('?')[0] || '/';
   let finished = false;
+  let disconnectHandled = false;
   const originalWriteHead = res.writeHead;
   res.writeHead = function patchedWriteHead(...args) {
     const ms = Date.now() - start;
@@ -470,10 +476,20 @@ function requestDiagnostics(req, res, next) {
     return originalWriteHead.apply(this, args);
   };
 
-  req.on('aborted', () => {
+  const emitDisconnectDiagnostic = eventKind => {
+    const kind = requestDisconnectDiagnosticKind(eventKind, {
+      finished,
+      writableEnded: res.writableEnded,
+      alreadyHandled: disconnectHandled,
+      expectedDisconnect: res.locals?.diagnosticExpectedDisconnect === true,
+    });
+    if (!kind) return;
+    disconnectHandled = true;
     const ms = Date.now() - start;
-    warnDiagnostic(`http:aborted:${method}:${route}`, `[http] aborted ${method} ${route} ${ms}ms ip=${requestLogIp(req)} actor=${requestDiagnosticActor(req)} ${diagnosticSnapshot()}`);
-  });
+    warnDiagnostic(`http:${kind}:${method}:${route}`, `[http] ${kind} ${method} ${route} ${ms}ms ip=${requestLogIp(req)} actor=${requestDiagnosticActor(req)} ${diagnosticSnapshot()}`);
+  };
+
+  req.on('aborted', () => emitDisconnectDiagnostic('aborted'));
 
   res.on('finish', () => {
     finished = true;
@@ -491,11 +507,7 @@ function requestDiagnostics(req, res, next) {
     }
   });
 
-  res.on('close', () => {
-    if (finished || res.writableEnded) return;
-    const ms = Date.now() - start;
-    warnDiagnostic(`http:closed:${method}:${route}`, `[http] closed ${method} ${route} ${ms}ms ip=${requestLogIp(req)} actor=${requestDiagnosticActor(req)} ${diagnosticSnapshot()}`);
-  });
+  res.on('close', () => emitDisconnectDiagnostic('closed'));
 
   next();
 }
@@ -6864,6 +6876,7 @@ app.get('/api/status/stream', (req, res) => {
     refreshing: refreshBusy(),
     snapshot: !!cache.data?._snapshot,
   })}\n\n`);
+  res.locals.diagnosticExpectedDisconnect = true;
   const heartbeat = setInterval(() => {
     try { write(': ping\n\n'); } catch {}
   }, 25000);
