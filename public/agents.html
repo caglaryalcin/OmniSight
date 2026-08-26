@@ -188,7 +188,7 @@ function applyLanguage(){
     OmniI18n.apply(document, lang);
     appliedLang = lang;
   }
-  document.title = currentLang() === 'tr' ? 'OmniSight - Ajanlar' : 'OmniSight - Agents';
+  document.title = `OmniSight - ${t('Agents')}`;
 }
 function authHeaders(){ const t=sessionStorage.getItem('os_token')||localStorage.getItem('os_token'); return t?{'x-session-token':t}:{}; }
 function handleUnauth(r){ if(r.status===401 || (r.redirected && r.url.includes('/login'))){ sessionStorage.removeItem('os_token'); localStorage.removeItem('os_token'); document.cookie='session=; path=/; max-age=0'; (window.top || window).location.href='/login'; throw new Error('Unauthorized'); } }
@@ -229,12 +229,12 @@ async function fetchJson(url, options = {}, timeoutMs = 6000){
 function esc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function rel(ts){
   if(!ts) return t('never');
-  const tr = currentLang() === 'tr';
+  const lang = currentLang();
   const s=Math.max(0,Math.round((Date.now()-Number(ts))/1000));
-  if(s<60)return tr ? `${s}sn önce` : s+'s ago';
-  const m=Math.round(s/60); if(m<60)return tr ? `${m}dk önce` : m+'m ago';
-  const h=Math.round(m/60); if(h<48)return tr ? `${h}sa önce` : h+'h ago';
-  const d=Math.round(h/24); return tr ? `${d}g önce` : d+'d ago';
+  if(s<60)return lang === 'tr' ? `${s}sn önce` : lang === 'de' ? `vor ${s}s` : s+'s ago';
+  const m=Math.round(s/60); if(m<60)return lang === 'tr' ? `${m}dk önce` : lang === 'de' ? `vor ${m}m` : m+'m ago';
+  const h=Math.round(m/60); if(h<48)return lang === 'tr' ? `${h}sa önce` : lang === 'de' ? `vor ${h}h` : h+'h ago';
+  const d=Math.round(h/24); return lang === 'tr' ? `${d}g önce` : lang === 'de' ? `vor ${d}T` : d+'d ago';
 }
 function cmpVer(a,b){
   const pa=String(a||'0').split('.').map(n=>parseInt(n,10)||0), pb=String(b||'0').split('.').map(n=>parseInt(n,10)||0);

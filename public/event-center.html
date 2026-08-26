@@ -162,9 +162,9 @@ function applyLanguage(){
   OmniI18n.apply(document, lang);
   appliedLangKey = key;
   const titles = {
-    runtime: lang === 'tr' ? 'OmniSight — Olay Merkezi' : 'OmniSight — Event Center',
-    audit: lang === 'tr' ? 'OmniSight — Olay Merkezi / Denetim' : 'OmniSight — Event Center / Audit',
-    alerts: lang === 'tr' ? 'OmniSight — Olay Merkezi / Bildirimler' : 'OmniSight — Event Center / Alerts',
+    runtime: `OmniSight — ${t('Event Center')}`,
+    audit: `OmniSight — ${t('Event Center')} / ${t('Audit')}`,
+    alerts: `OmniSight — ${t('Event Center')} / ${t('Alerts')}`,
   };
   document.title = titles[viewMode] || titles.runtime;
 }
@@ -326,7 +326,7 @@ function fmt(ts){
 }
 
 function fmtFull(ts){
-  const lang = currentLang() === 'tr' ? 'tr-TR' : 'en-GB';
+  const lang = OmniI18n.locale ? OmniI18n.locale(currentLang()) : (currentLang() === 'tr' ? 'tr-TR' : currentLang() === 'de' ? 'de-DE' : 'en-GB');
   return new Date(ts).toLocaleString(lang, { year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false });
 }
 

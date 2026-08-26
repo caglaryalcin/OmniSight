@@ -45,8 +45,10 @@ html[data-theme="light"]{--bg:#f3f5f9;--panel:#ffffff;--row:#eef1f6;--border:#dd
 <script>
 const ABOUT_DESC_EN = 'OmniSight is a simple, single-glance monitoring dashboard for <b>Proxmox</b>, <b>Linux servers</b>, <b>Kubernetes</b>, <b>SNMP devices</b>, <b>Docker</b>, <b>databases</b>, <b>Healthchecks</b>, <b>Uptime Kuma</b> and <b>Prometheus</b>.';
 const ABOUT_DESC_TR = 'OmniSight; <b>Proxmox</b>, <b>Linux sunucuları</b>, <b>Kubernetes</b>, <b>SNMP cihazları</b>, <b>Docker</b>, <b>veritabanları</b>, <b>Healthchecks</b>, <b>Uptime Kuma</b> ve <b>Prometheus</b> için basit, tek bakışta izleme sağlayan bir paneldir.';
+const ABOUT_DESC_DE = 'OmniSight ist ein einfaches Monitoring-Dashboard auf einen Blick für <b>Proxmox</b>, <b>Linux-Server</b>, <b>Kubernetes</b>, <b>SNMP-Geräte</b>, <b>Docker</b>, <b>Datenbanken</b>, <b>Healthchecks</b>, <b>Uptime Kuma</b> und <b>Prometheus</b>.';
 const ABOUT_STACK_EN = 'Stack: Node.js + Express backend, single-file vanilla HTML/CSS/JS frontend. Alerts via ntfy, Telegram and SMTP.';
 const ABOUT_STACK_TR = 'Altyapı: Node.js + Express backend, tek dosyalı vanilla HTML/CSS/JS frontend. Bildirimler ntfy, Telegram ve SMTP üzerinden gönderilir.';
+const ABOUT_STACK_DE = 'Stack: Node.js + Express-Backend, Vanilla-HTML/CSS/JS-Frontend in einer Datei. Warnungen über ntfy, Telegram und SMTP.';
 let aboutVersion = null;
 let aboutAuthor = 'caglaryalcin';
 function currentLang(){ return OmniI18n.currentLang('en'); }
@@ -57,13 +59,15 @@ function renderAboutVersion(){
 }
 window.applyLanguage = function(){
   const lang = currentLang();
-  document.title = lang === 'tr' ? 'OmniSight - Hakkında' : 'OmniSight - About';
+  document.title = `OmniSight - ${t('About')}`;
   OmniI18n.apply(document, lang);
   const desc = document.getElementById('about-desc');
   const stack = document.getElementById('about-stack');
   const author = document.getElementById('author-label');
-  if(desc) desc.innerHTML = lang === 'tr' ? ABOUT_DESC_TR : ABOUT_DESC_EN;
-  if(stack) stack.textContent = lang === 'tr' ? ABOUT_STACK_TR : ABOUT_STACK_EN;
+  const descriptions = { en: ABOUT_DESC_EN, tr: ABOUT_DESC_TR, de: ABOUT_DESC_DE };
+  const stacks = { en: ABOUT_STACK_EN, tr: ABOUT_STACK_TR, de: ABOUT_STACK_DE };
+  if(desc) desc.innerHTML = descriptions[lang] || ABOUT_DESC_EN;
+  if(stack) stack.textContent = stacks[lang] || ABOUT_STACK_EN;
   if(author) author.textContent = t('Author:');
   renderAboutVersion();
 };

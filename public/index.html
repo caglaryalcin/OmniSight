@@ -1540,11 +1540,23 @@ function currentLang(data = window._lastData) {
 function trText(text, lang = currentLang()) {
   return window.OmniI18n?.t ? window.OmniI18n.t(text, lang) : String(text ?? '');
 }
+function normalizedLangKey(lang = currentLang()) {
+  if (window.OmniI18n?.normalizeLang) return window.OmniI18n.normalizeLang(lang);
+  return String(lang || 'en').trim().toLowerCase().split(/[._-]/)[0] || 'en';
+}
+function updatedTextLabel(timestamp, lang = currentLang()) {
+  const key = normalizedLangKey(lang);
+  const time = new Date(timestamp || Date.now()).toLocaleTimeString('en-GB');
+  if (key === 'tr') return `Son yenileme ${time}`;
+  if (key === 'de') return `Aktualisiert ${time}`;
+  return `Updated ${time}`;
+}
 /* ci-extract:begin localizeOperationalText */
 function localizeOperationalText(text, lang = 'en', translateText = null) {
   const raw = String(text ?? '');
-  if (String(lang || '').toLowerCase() !== 'tr') return raw;
-  const direct = typeof translateText === 'function' ? String(translateText(raw, lang)) : raw;
+  const key = String(lang || 'en').trim().toLowerCase().split(/[._-]/)[0] || 'en';
+  const direct = typeof translateText === 'function' ? String(translateText(raw, key)) : raw;
+  if (key !== 'tr') return direct;
   if (direct !== raw) return direct;
   const replacements = [
     [/\bStandalone ESXi\b/gi, 'Bağımsız ESXi'],
@@ -10006,9 +10018,7 @@ function render(data, opts = {}){
     ps.classList.toggle('on', !!data.publicStatus);
     ps.title = trText(data.publicStatus ? 'Public status page is enabled' : 'Open public status page', lang);
   }
-  const updatedText = lang === 'tr'
-    ? `Son yenileme ${new Date(data.timestamp).toLocaleTimeString('en-GB')}`
-    : `Updated ${new Date(data.timestamp).toLocaleTimeString('en-GB')}`;
+  const updatedText = updatedTextLabel(data.timestamp, lang);
   document.getElementById('lupd').textContent = updatedText;
   const railUpd = document.getElementById('rail-upd');
   if(railUpd) railUpd.textContent = updatedText;
@@ -11396,7 +11406,7 @@ function scheduleShellSummaryFollowup(){
 function shellSummaryBadge(status, lang){
   const s = String(status || '').toLowerCase();
   if(s === 'ok' || s === 'healthy') return { cls:'green', txt:trText('healthy', lang) };
-  if(s === 'warn' || s === 'warning' || s === 'degraded') return { cls:'yellow', txt:lang === 'tr' ? 'sorunlu' : 'degraded' };
+  if(s === 'warn' || s === 'warning' || s === 'degraded') return { cls:'yellow', txt:trText('degraded', lang) };
   if(s === 'connecting') return { cls:'gray', txt:trText('connecting…', lang) };
   if(s === 'down' || s === 'offline' || s === 'unreachable') return { cls:'red', txt:trText('offline', lang) };
   return { cls:'gray', txt:s || '--' };
@@ -11483,9 +11493,7 @@ function applyShellSummary(summary){
     ps.classList.toggle('on', !!summary.publicStatus);
     ps.title = trText(summary.publicStatus ? 'Public status page is enabled' : 'Open public status page', lang);
   }
-  const updatedText = lang === 'tr'
-    ? `Son yenileme ${new Date(summary.timestamp || Date.now()).toLocaleTimeString('en-GB')}`
-    : `Updated ${new Date(summary.timestamp || Date.now()).toLocaleTimeString('en-GB')}`;
+  const updatedText = updatedTextLabel(summary.timestamp || Date.now(), lang);
   const lupd = document.getElementById('lupd');
   if(lupd) lupd.textContent = updatedText;
   const railUpd = document.getElementById('rail-upd');

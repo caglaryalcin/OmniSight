@@ -10,6 +10,7 @@ timezone: "${TZ:-UTC}"
 timeFormat: "24h"
 defaultTimePeriodHours: 1
 historyRetentionDays: 7
+# Supported: en, tr, de
 preferredLanguage: "en"
 appearance:
   dashboardSidePanel: true

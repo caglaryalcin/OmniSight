@@ -68,6 +68,18 @@ const ONE_MB = 1024 * 1024;
 const MAX_ICON_BYTES = 512 * 1024;
 const MAX_AVATAR_BYTES = 512 * 1024;
 const MAX_CERT_BYTES = 5 * ONE_MB;
+const SUPPORTED_LANGUAGES = new Set(['en', 'tr', 'de']);
+
+function preferredLanguageCode(value) {
+  return String(value || '').trim().toLowerCase().split(/[._-]/)[0];
+}
+
+function normalizePreferredLanguage(value, fallback = 'en') {
+  const fallbackKey = preferredLanguageCode(fallback);
+  const fallbackLang = SUPPORTED_LANGUAGES.has(fallbackKey) ? fallbackKey : 'en';
+  const lang = preferredLanguageCode(value || fallbackLang);
+  return SUPPORTED_LANGUAGES.has(lang) ? lang : fallbackLang;
+}
 const MAX_KUBECONFIG_BYTES = ONE_MB;
 const DEBUG_ENABLED = ['1', 'true', 'yes', 'on'].includes(String(process.env.OMNISIGHT_DEBUG || '').toLowerCase());
 const API_GZIP_MIN_BYTES = Math.max(1024, Number(process.env.OMNISIGHT_API_GZIP_MIN_BYTES || 2048));
@@ -2992,7 +3004,7 @@ function assignStatic(base) {
   base.timeFormat = config.timeFormat || '24h';
   base.defaultTimePeriodHours = defaultTimePeriodHours();
   base.historyRetentionDays = historyRetentionDays();
-  base.preferredLanguage = config.preferredLanguage || 'en';
+  base.preferredLanguage = normalizePreferredLanguage(config.preferredLanguage);
   base.performance = {
     lowIoMode: lowIoModeEnabled(),
   };
@@ -6054,7 +6066,7 @@ app.post('/api/onboarding/complete', (req, res) => {
       ...existing,
       timezone: String(req.body?.timezone || existing.timezone || process.env.TZ || process.env.TIMEZONE || 'UTC'),
       timeFormat: req.body?.timeFormat === '12h' ? '12h' : '24h',
-      preferredLanguage: req.body?.preferredLanguage === 'tr' ? 'tr' : 'en',
+      preferredLanguage: normalizePreferredLanguage(req.body?.preferredLanguage, existing.preferredLanguage),
       defaultTimePeriodHours: Number(req.body?.defaultTimePeriodHours || existing.defaultTimePeriodHours || 1),
       historyRetentionDays: Number(req.body?.historyRetentionDays || existing.historyRetentionDays || 1),
       ...onboardingPlatformConfig(req.body?.platform || {}),
@@ -6827,7 +6839,7 @@ app.get('/api/status/summary', async (req, res) => {
       snapshot: !!data._snapshot,
       configured: data.configured || configuredList(),
       publicStatus: !!data.publicStatus,
-      preferredLanguage: data.preferredLanguage || config.preferredLanguage || 'en',
+      preferredLanguage: normalizePreferredLanguage(data.preferredLanguage || config.preferredLanguage),
       appearance: data.appearance || { dashboardSidePanel: config.appearance?.dashboardSidePanel !== false },
       ui: requestUi,
       health: buildPublicSummary(data).map(s => ({
@@ -7863,8 +7875,7 @@ app.post('/api/preferences', async (req, res) => {
     const previousUptimeKuma = config.uptimekuma ? { ...config.uptimekuma } : null;
 
     if (incoming.preferredLanguage !== undefined) {
-      const lang = String(incoming.preferredLanguage || 'en').toLowerCase();
-      existing.preferredLanguage = ['en', 'tr'].includes(lang) ? lang : 'en';
+      existing.preferredLanguage = normalizePreferredLanguage(incoming.preferredLanguage, existing.preferredLanguage);
     }
 
     if (incoming.defaultTimePeriodHours !== undefined) {
@@ -9454,7 +9465,7 @@ app.get('/api/public/status', (req, res) => {
   res.json({
     title: config.publicTitle || 'OmniSight Status',
     description: config.publicDescription || '',
-    preferredLanguage: config.preferredLanguage || 'en',
+    preferredLanguage: normalizePreferredLanguage(config.preferredLanguage),
     timestamp: data.timestamp || new Date().toISOString(),
     refreshing: refreshBusy(),
     version: appVersion(),

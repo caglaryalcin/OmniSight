@@ -79,6 +79,7 @@ let chartPoints = {};
 const POINT_INTERVAL_MS = 15000;
 const i18n = window.OmniI18n || {
   currentLang: fallback => fallback || 'en',
+  locale: lang => lang === 'tr' ? 'tr-TR' : lang === 'de' ? 'de-DE' : 'en-GB',
   t: text => text,
 };
 function pointMs(d, i, n) {
@@ -129,9 +130,16 @@ try { pageLang = i18n.currentLang('en'); } catch {}
 function t(text) {
   return i18n.t(text, pageLang);
 }
+function pageLocale() {
+  return i18n.locale ? i18n.locale(pageLang) : (pageLang === 'tr' ? 'tr-TR' : pageLang === 'de' ? 'de-DE' : 'en-GB');
+}
 const label  = s => s === 'ok' ? t('Operational') : s === 'warn' ? t('Degraded') : s === 'down' ? t('Down') : s === 'connecting' ? t('Connecting…') : t('Unknown');
 function escHtml(s) {
   return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+function footerHtml(version = '') {
+  const link = '<a href="https://github.com/caglaryalcin/OmniSight" target="_blank" rel="noopener" style="color:var(--green);text-decoration:none;font-weight:700">OmniSight</a>';
+  return `${escHtml(t('Auto-refreshes every 15s'))} · ${escHtml(t('Powered by OmniSight')).replace('OmniSight', link)}${version}`;
 }
 function metaHtml(meta) {
   const parts = String(meta || '').split(/\s*(?:[·•]|\r?\n)\s*/g).filter(Boolean);
@@ -188,13 +196,13 @@ function moveChartHover(e) {
     hDot.style.opacity = '1';
   }
   const d = new Date(p.time);
-  const dStr = d.toLocaleDateString([], { month: 'short', day: 'numeric' });
-  const tStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const dStr = d.toLocaleDateString(pageLocale(), { month: 'short', day: 'numeric' });
+  const tStr = d.toLocaleTimeString(pageLocale(), { hour: '2-digit', minute: '2-digit' });
   tt.innerHTML = `<div class="tt-time">${dStr}, ${tStr}</div>
     <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
       <div style="display:flex;align-items:center;gap:6px">
         <div style="width:10px;height:10px;border-radius:2px;background:${color}"></div>
-        <span>Status</span>
+        <span>${escHtml(t('Status'))}</span>
       </div>
       <span class="tt-val" style="color:${color}">${chartHealthLabel(p.health)} · ${Math.round(p.health)}%</span>
     </div>`;
@@ -240,12 +248,10 @@ async function load() {
     try { pageLang = i18n.currentLang(d.preferredLanguage || 'en'); } catch { pageLang = d.preferredLanguage || 'en'; }
     document.documentElement.lang = pageLang;
     const footerVersion = d.version ? ' · v' + escHtml(d.version) : '';
-    document.querySelector('.foot').innerHTML = pageLang === 'tr'
-      ? 'Her 15 saniyede otomatik yenilenir · <a href="https://github.com/caglaryalcin/OmniSight" target="_blank" rel="noopener" style="color:var(--green);text-decoration:none;font-weight:700">OmniSight</a> ile çalışır' + footerVersion
-      : 'Auto-refreshes every 15s · Powered by <a href="https://github.com/caglaryalcin/OmniSight" target="_blank" rel="noopener" style="color:var(--green);text-decoration:none;font-weight:700">OmniSight</a>' + footerVersion;
+    document.querySelector('.foot').innerHTML = footerHtml(footerVersion);
     document.getElementById('title').textContent = d.title || 'OmniSight Status';
     document.title = (d.title || 'OmniSight') + ' — ' + t('Status');
-    document.getElementById('updated').textContent = [d.description || '', t('Last updated') + ' ' + new Date(d.timestamp).toLocaleString()].filter(Boolean).join(' · ');
+    document.getElementById('updated').textContent = [d.description || '', t('Last updated') + ' ' + new Date(d.timestamp).toLocaleString(pageLocale())].filter(Boolean).join(' · ');
     const maintenanceBanner = document.getElementById('maintenance-banner');
     if (maintenanceBanner) {
       maintenanceBanner.innerHTML = maintenanceHtml(d.maintenance);
