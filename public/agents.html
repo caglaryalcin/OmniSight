@@ -513,11 +513,14 @@ function commandPanelGuide(commands, opts = {}){
     ? 'Run Query Windows agent on this host in PowerShell as administrator.'
     : 'Run Query agent on the affected host.';
   const healthyResult = isWindows
-    ? 'RESULT says the service is running, the dashboard HTTP check passed and the latest agent report is fresh.'
+    ? 'RESULT=HEALTHY'
     : 'Service is active (running) and the HTTP result is 200.';
   const repairResult = isWindows
-    ? 'RESULT says to use Repair Windows agent, including when the service is running but its report is stale or missing.'
+    ? 'RESULT=REPAIR_WINDOWS_AGENT'
     : 'Service is inactive, failed or missing, or HTTP is 401/403.';
+  const checkResult = isWindows
+    ? 'RESULT=CHECK_FAILED'
+    : 'Result contains timeout, DNS, connection or TLS error.';
   const repairAction = isWindows
     ? 'Run Repair Windows agent.'
     : hasDockerRepair
@@ -532,7 +535,7 @@ function commandPanelGuide(commands, opts = {}){
     <ol>
       <li><strong>${esc(t(healthyResult))}</strong> ${esc(t('No repair. Wait up to 30 seconds and refresh this page.'))}</li>
       <li><strong>${esc(t(repairResult))}</strong> ${esc(t(repairAction))}</li>
-      <li><strong>${esc(t('Result contains timeout, DNS, connection or TLS error.'))}</strong> ${esc(t('Do not repair. Check the network, OmniSight address or certificate.'))}</li>
+      <li><strong>${esc(t(checkResult))}</strong> ${esc(t('Do not repair. Check the network, OmniSight address or certificate.'))}</li>
     </ol>
     ${migrationNote}
   </div>`;
