@@ -941,8 +941,24 @@ function testStaticRegressions() {
   const settingsInit = settings.slice(settings.lastIndexOf('(async () => {'));
   assert.ok(settingsInit.includes('await rolePromise;') && settingsInit.includes('loadSettingsSectionData(activeSettingsSection);'), 'the restored Settings section must load its data during initial startup');
   assert.ok(agentsPage.includes('function commandPanelGuide(commands, opts = {})') && agentsPage.includes('Check result → action') && agentsPage.includes('latest agent report is fresh.') && agentsPage.includes('report is stale or missing.') && agentsPage.includes('Result contains timeout, DNS, connection or TLS error.'), 'agent repair panel must distinguish a fresh report from a Running service with a stale worker');
+  const commandPanelSource = agentsPage.slice(agentsPage.indexOf('function showCommandPanel'), agentsPage.indexOf('function agentHeaderHtml'));
+  assert.ok(commandPanelSource.includes('msgHoldUntil = Number.POSITIVE_INFINITY;') && commandPanelSource.includes("onclick=\"clearMsg(true)\"") && commandPanelSource.includes("t('Close')") && !commandPanelSource.includes('setTimeout'), 'diagnostic and repair commands must remain visible until the user closes the panel');
+  const loadAgentsSource = agentsPage.slice(agentsPage.indexOf('async function loadAgents'), agentsPage.indexOf('async function updateAgent'));
+  assert.ok(agentsPage.includes('let commandPanelOpen = false;') && loadAgentsSource.match(/if\(!manual && commandPanelOpen\) return;/g)?.length === 2, 'automatic refresh errors must not overwrite an open diagnostic and repair command panel');
   assert.ok(agentsPage.includes('/^1\\.3(?:\\.|$)/.test(agentVersion)') && agentsPage.includes('This v1.3.x agent uses the old scheduled task.') && agentsPage.includes("agentVersion: d.agentVersion || ''"), 'the v1.3 to v1.4 migration note must be conditional on the selected agent version');
   assert.ok(server.includes('latest agent report is fresh.') && server.includes('last agent report is stale ({0}); use Repair Windows agent.') && server.includes('this agent ID has no report; use Repair Windows agent.') && server.includes('Configured agent ID {0} does not match dashboard agent ID {1}; use Repair Windows agent.') && server.includes('Dashboard returned HTTP {0}; use Repair Windows agent.') && server.includes('Dashboard connection/TLS check failed;') && server.includes('Legacy scheduled-task agent detected. State={0}; use Repair Windows agent.') && server.includes("Write-Host 'Service History:'") && server.includes('Run only when the RESULT line says to use Repair Windows agent.'), 'Windows query must require a fresh report and provide explicit repair results followed by clearly labelled service history');
+  const windowsQueryArray = server.match(/if \(role === 'windows'\) \{\s*const queryScript = (\[[\s\S]*?\])\.join\('; '\);/)?.[1];
+  assert.ok(windowsQueryArray, 'Windows diagnostic command must be generated as a single PowerShell statement');
+  const windowsQueryParts = vm.runInNewContext(`(${windowsQueryArray})`, { id: 'M4A1-cc94c7b9' });
+  const windowsQuery = windowsQueryParts.join('; ');
+  assert.ok(!/[\r\n]/.test(windowsQuery), 'Windows diagnostic command must copy as one physical line');
+  assert.ok(windowsQuery.includes('WINDOWS SERVICE PROCESS STATE: {0} (process state only; not agent health)') && windowsQuery.includes('AGENT HEALTH: {0}') && windowsQuery.includes('ACTION: {0}'), 'Windows diagnostic output must distinguish the service process from agent health and show an explicit action');
+  assert.ok(windowsQuery.lastIndexOf("Write-Host ('AGENT HEALTH: {0}'") > windowsQuery.indexOf("Get-Content \"$env:ProgramData\\OmniSight\\logs\\agent.log\""), 'the actionable agent-health verdict must be the final output after service history');
+  if (process.platform === 'win32') {
+    const encodedQuery = Buffer.from(windowsQuery, 'utf16le').toString('base64');
+    const parserProbe = `$command = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String('${encodedQuery}')); $tokens = $null; $errors = $null; [void][System.Management.Automation.Language.Parser]::ParseInput($command, [ref]$tokens, [ref]$errors); if ($errors.Count) { $errors | ForEach-Object { Write-Error $_.Message }; exit 1 }`;
+    execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', parserProbe], { stdio: 'pipe' });
+  }
   assert.ok(server.includes('report: agents.reportStatus(id)') && server.includes('Math.floor(Date.now() / 5000)'), 'agent ping must expose non-mutating report freshness and cached online state must expire with time');
   assert.ok(server.includes("agentVersion: agent.agentVersion || ''") && server.includes('role: agentInstallRole(agent)'), 'repair command responses must include the selected agent version and role');
   assert.ok(agentsPage.includes("${t('Check / repair')}") && agentsPage.includes("t('Run on affected host')"), 'offline agent action must direct users to check before repairing');
@@ -1066,6 +1082,13 @@ function testAgentRetirement() {
     assert.strictEqual(stale.ageSeconds, 47);
     assert.strictEqual(stale.staleAfterSeconds, 47.5);
     assert.deepStrictEqual(agents.reportStatus('retire-test', lastSeen + 14 * 60 * 60 * 1000), { known: true, fresh: false, lastSeen, ageSeconds: 14 * 60 * 60, staleAfterSeconds: 47.5 });
+    const realDateNow = Date.now;
+    Date.now = () => lastSeen + 14 * 60 * 60 * 1000;
+    try {
+      assert.strictEqual(agents.listAgents().find(a => a.id === 'retire-test').online, false, 'a stale report must make the dashboard-facing agent row offline even when the Windows service process is still running');
+    } finally {
+      Date.now = realDateNow;
+    }
     assert.strictEqual(agents.findAgent('retire-test').lastSeen, lastSeen, 'reading report status must not create a heartbeat');
     assert.strictEqual(agents.retireAgent('retire-test'), true);
     assert.strictEqual(agents.findAgent('retire-test'), null);

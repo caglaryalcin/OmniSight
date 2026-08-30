@@ -55,6 +55,7 @@ h1{font-size:18px;font-weight:750;flex:1}
 .cmd.no-command{padding-right:12px}.cmd.no-command .cmd-title{right:12px}
 .cmd-panel-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
 .cmd-panel-title{font-weight:800;color:var(--text);font-size:14px}
+.cmd-panel-close{margin-left:auto}
 .cmd-host-chip{display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(96,165,250,.35);background:rgba(96,165,250,.10);color:var(--text);border-radius:9px;padding:7px 10px;font-weight:800;font-size:13px;box-shadow:inset 0 0 0 1px rgba(96,165,250,.08)}
 .cmd-host-chip span{color:var(--blue);font-size:10px;text-transform:uppercase;letter-spacing:.08em}
 .cmd-guide{border:1px solid rgba(96,165,250,.28);background:rgba(96,165,250,.07);border-radius:9px;padding:12px 14px;color:var(--text);font-size:12px;line-height:1.45}
@@ -478,16 +479,19 @@ function writeAgentsCache(data){
   }catch{}
 }
 let msgHoldUntil = 0;
+let commandPanelOpen = false;
 function clearMsg(force = false){
-  if(!force && Date.now() < msgHoldUntil) return;
+  if(!force && (commandPanelOpen || Date.now() < msgHoldUntil)) return;
   const msg = document.getElementById('msg');
   msg.textContent = '';
   msg.className = 'msg';
   msgHoldUntil = 0;
+  commandPanelOpen = false;
 }
 function showManualCommand(message, command){
   const msg = document.getElementById('msg');
   msg.className = 'msg err';
+  commandPanelOpen = false;
   msgHoldUntil = Date.now() + 60000;
   msg.innerHTML = `${esc(message)}<div class="cmd">${esc(command)}<button class="btn" onclick="copyText(this.parentElement.childNodes[0].textContent,this)">${t('Copy')}</button></div>`;
   setTimeout(() => clearMsg(), 60050);
@@ -536,9 +540,10 @@ function commandPanelGuide(commands, opts = {}){
 function showCommandPanel(title, commands, opts = {}){
   const msg = document.getElementById('msg');
   msg.className = 'msg';
-  msgHoldUntil = Date.now() + 120000;
+  commandPanelOpen = true;
+  msgHoldUntil = Number.POSITIVE_INFINITY;
   const subject = opts.subjectValue ? `<div class="cmd-host-chip"><span>${esc(t(opts.subjectLabel || 'Hostname'))}</span>${esc(opts.subjectValue)}</div>` : '';
-  const head = `<div class="cmd-panel-head"><div class="cmd-panel-title">${esc(title)}</div>${subject}</div>`;
+  const head = `<div class="cmd-panel-head"><div class="cmd-panel-title">${esc(title)}</div>${subject}<button class="btn cmd-panel-close" type="button" onclick="clearMsg(true)">${esc(t('Close'))}</button></div>`;
   const guide = commandPanelGuide(commands, opts);
   const blocks = (commands || []).map(c => {
     const recommendation = commandRecommendation(c);
@@ -548,7 +553,6 @@ function showCommandPanel(title, commands, opts = {}){
     return `<div class="cmd has-title${command ? '' : ' no-command'}"><div class="cmd-title">${esc(t(c.title || 'Command'))}</div>${body}${note}</div>`;
   }).join('');
   msg.innerHTML = `${head}${guide}${blocks}`;
-  setTimeout(() => clearMsg(), 120050);
 }
 function agentHeaderHtml(){
   return `<div class="row hdr">
@@ -717,6 +721,7 @@ async function loadAgents(options = {}){
     const cachedBox = readAgentsCacheBox(30 * 60 * 1000);
     if(cachedBox?.data){
       renderAgents(cachedBox.data);
+      if(!manual && commandPanelOpen) return;
       const msg = document.getElementById('msg');
       if(e.message === 'Agents request timed out'){
         const age = Math.max(0, Math.round((Date.now() - Number(cachedBox.t || Date.now())) / 1000));
@@ -728,6 +733,7 @@ async function loadAgents(options = {}){
       }
       return;
     }
+    if(!manual && commandPanelOpen) return;
     const msg = document.getElementById('msg');
     msg.textContent = e.message;
     msg.className = 'msg err';
