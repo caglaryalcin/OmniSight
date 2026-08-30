@@ -22,8 +22,8 @@ using Microsoft.Win32;
 [assembly: AssemblyDescription("OmniSight Windows monitoring service")]
 [assembly: AssemblyCompany("OmniSight")]
 [assembly: AssemblyProduct("OmniSight Agent")]
-[assembly: AssemblyVersion("1.4.2.0")]
-[assembly: AssemblyFileVersion("1.4.2.0")]
+[assembly: AssemblyVersion("1.4.3.0")]
+[assembly: AssemblyFileVersion("1.4.3.0")]
 
 namespace OmniSight.Agent
 {
@@ -31,7 +31,7 @@ namespace OmniSight.Agent
     {
         internal const string ServiceName = "OmniSightAgent";
         internal const string DisplayName = "OmniSight Agent";
-        internal const string Version = "1.4.2";
+        internal const string Version = "1.4.3";
         internal static readonly string DataDirectory = ResolveDirectory("OMNISIGHT_AGENT_DATA_DIR", Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "OmniSight"));
         internal static readonly string ConfigPath = Path.Combine(DataDirectory, "agent.json");
         internal static readonly string AgentIdPath = Path.Combine(DataDirectory, "agent.id");
@@ -53,6 +53,7 @@ namespace OmniSight.Agent
         {
             string mode = args != null && args.Length > 0 ? args[0] : string.Empty;
             if (string.Equals(mode, "--console", StringComparison.OrdinalIgnoreCase)) return RunConsole();
+            if (string.Equals(mode, "--windows-update-probe", StringComparison.OrdinalIgnoreCase)) return WindowsUpdateProbe.Run();
             if (string.Equals(mode, "--update-helper", StringComparison.OrdinalIgnoreCase)) return AgentMaintenance.RunUpdate();
             if (string.Equals(mode, "--uninstall-helper", StringComparison.OrdinalIgnoreCase)) return AgentMaintenance.RunUninstall();
             try
@@ -372,7 +373,6 @@ namespace OmniSight.Agent
                 http = new AgentHttp(config);
                 collector = new WindowsCollector(config);
                 AgentLog.Info("OmniSight agent " + AgentPaths.Version + " starting as Windows service (id=" + config.AgentId + ", interval=" + config.Interval + "s)");
-                LegacyTaskCleanup.Run();
             }
             catch (Exception error)
             {
@@ -380,6 +380,7 @@ namespace OmniSight.Agent
                 return;
             }
 
+            bool legacyCleanupPending = true;
             while (!stopEvent.WaitOne(0))
             {
                 bool reportSent = false;
@@ -388,6 +389,11 @@ namespace OmniSight.Agent
                     string response = http.Send("POST", "/api/agent/report", collector.BuildPayload(), 30);
                     HandleCommands(config, response);
                     reportSent = true;
+                    if (legacyCleanupPending)
+                    {
+                        LegacyTaskCleanup.Run();
+                        legacyCleanupPending = false;
+                    }
                 }
                 catch (Exception error)
                 {
@@ -498,16 +504,97 @@ namespace OmniSight.Agent
         }
     }
 
+    internal static class WindowsUpdateProbe
+    {
+        private const int MaxUpdateCount = 1000000;
+
+        internal static int Run()
+        {
+            object session = null;
+            object searcher = null;
+            object searchResult = null;
+            object updates = null;
+            int? count = null;
+            try
+            {
+                Type sessionType = Type.GetTypeFromProgID("Microsoft.Update.Session");
+                if (sessionType == null) throw new InvalidOperationException("Windows Update API is unavailable");
+                session = Activator.CreateInstance(sessionType);
+                searcher = session.GetType().InvokeMember("CreateUpdateSearcher", BindingFlags.InvokeMethod, null, session, null, CultureInfo.InvariantCulture);
+                searchResult = searcher.GetType().InvokeMember("Search", BindingFlags.InvokeMethod, null, searcher, new object[] { "IsInstalled=0 and IsHidden=0" }, CultureInfo.InvariantCulture);
+                updates = searchResult.GetType().InvokeMember("Updates", BindingFlags.GetProperty, null, searchResult, null, CultureInfo.InvariantCulture);
+                object rawCount = updates.GetType().InvokeMember("Count", BindingFlags.GetProperty, null, updates, null, CultureInfo.InvariantCulture);
+                count = Math.Min(Math.Max(0, Convert.ToInt32(rawCount, CultureInfo.InvariantCulture)), MaxUpdateCount);
+            }
+            catch { }
+            finally
+            {
+                ReleaseCom(updates);
+                ReleaseCom(searchResult);
+                ReleaseCom(searcher);
+                ReleaseCom(session);
+            }
+
+            bool rebootRequired = QueryRebootRequired();
+            int encodedCount = count.HasValue ? count.Value + 1 : 0;
+            return (encodedCount << 1) | (rebootRequired ? 1 : 0);
+        }
+
+        private static bool QueryRebootRequired()
+        {
+            object systemInfo = null;
+            try
+            {
+                Type type = Type.GetTypeFromProgID("Microsoft.Update.SystemInfo");
+                if (type != null)
+                {
+                    systemInfo = Activator.CreateInstance(type);
+                    object value = systemInfo.GetType().InvokeMember("RebootRequired", BindingFlags.GetProperty, null, systemInfo, null, CultureInfo.InvariantCulture);
+                    if (Convert.ToBoolean(value, CultureInfo.InvariantCulture)) return true;
+                }
+            }
+            catch { }
+            finally { ReleaseCom(systemInfo); }
+            try
+            {
+                using (RegistryKey componentServicing = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending"))
+                {
+                    if (componentServicing != null) return true;
+                }
+                using (RegistryKey windowsUpdate = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired"))
+                {
+                    if (windowsUpdate != null) return true;
+                }
+                using (RegistryKey key = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Session Manager"))
+                {
+                    return key != null && key.GetValue("PendingFileRenameOperations") != null;
+                }
+            }
+            catch { return false; }
+        }
+
+        private static void ReleaseCom(object value)
+        {
+            if (value == null || !Marshal.IsComObject(value)) return;
+            try { Marshal.FinalReleaseComObject(value); }
+            catch { }
+        }
+    }
+
     internal sealed class WindowsCollector
     {
+        private const int WmiQueryTimeoutSeconds = 3;
+        private const int UpdateProbeTimeoutSeconds = 45;
         private readonly AgentConfig config;
         private readonly object updateSync = new object();
         private Dictionary<string, object> updateStatus;
         private DateTime updateCheckedAt = DateTime.MinValue;
+        private bool updateRefreshInFlight;
 
         internal WindowsCollector(AgentConfig config)
         {
             this.config = config;
+            updateStatus = BuildUpdateStatus(null, false, "pending");
         }
 
         internal Dictionary<string, object> BuildPayload()
@@ -552,7 +639,7 @@ namespace OmniSight.Agent
             int loadSamples = 0;
             try
             {
-                using (ManagementObjectSearcher searcher = new ManagementObjectSearcher("SELECT LoadPercentage, NumberOfLogicalProcessors FROM Win32_Processor"))
+                using (ManagementObjectSearcher searcher = CreateWmiSearcher("SELECT LoadPercentage, NumberOfLogicalProcessors FROM Win32_Processor"))
                 using (ManagementObjectCollection rows = searcher.Get())
                 {
                     foreach (ManagementObject row in rows)
@@ -581,7 +668,7 @@ namespace OmniSight.Agent
             string selectedId = null;
             try
             {
-                using (ManagementObjectSearcher searcher = new ManagementObjectSearcher("SELECT DeviceID, Size, FreeSpace FROM Win32_LogicalDisk WHERE DriveType=3"))
+                using (ManagementObjectSearcher searcher = CreateWmiSearcher("SELECT DeviceID, Size, FreeSpace FROM Win32_LogicalDisk WHERE DriveType=3"))
                 using (ManagementObjectCollection rows = searcher.Get())
                 {
                     foreach (ManagementObject row in rows)
@@ -644,7 +731,7 @@ namespace OmniSight.Agent
             int count = 0;
             try
             {
-                using (ManagementObjectSearcher searcher = new ManagementObjectSearcher("SELECT Name, DiskReadBytesPerSec, DiskWriteBytesPerSec FROM Win32_PerfFormattedData_PerfDisk_PhysicalDisk"))
+                using (ManagementObjectSearcher searcher = CreateWmiSearcher("SELECT Name, DiskReadBytesPerSec, DiskWriteBytesPerSec FROM Win32_PerfFormattedData_PerfDisk_PhysicalDisk"))
                 using (ManagementObjectCollection rows = searcher.Get())
                 {
                     foreach (ManagementObject row in rows)
@@ -677,7 +764,7 @@ namespace OmniSight.Agent
             int count = 0;
             try
             {
-                using (ManagementObjectSearcher searcher = new ManagementObjectSearcher("SELECT Name, BytesReceivedPerSec, BytesSentPerSec FROM Win32_PerfFormattedData_Tcpip_NetworkInterface"))
+                using (ManagementObjectSearcher searcher = CreateWmiSearcher("SELECT Name, BytesReceivedPerSec, BytesSentPerSec FROM Win32_PerfFormattedData_Tcpip_NetworkInterface"))
                 using (ManagementObjectCollection rows = searcher.Get())
                 {
                     foreach (ManagementObject row in rows)
@@ -706,80 +793,90 @@ namespace OmniSight.Agent
 
         private Dictionary<string, object> GetUpdateStatus()
         {
+            bool startRefresh = false;
+            Dictionary<string, object> snapshot;
             lock (updateSync)
             {
-                if (updateStatus != null && DateTime.UtcNow - updateCheckedAt < TimeSpan.FromMinutes(30)) return updateStatus;
-                object session = null;
-                object searcher = null;
-                object searchResult = null;
-                object updates = null;
-                int? count = null;
-                string source = "windows-update";
+                if (!updateRefreshInFlight && (updateCheckedAt == DateTime.MinValue || DateTime.UtcNow - updateCheckedAt >= TimeSpan.FromMinutes(30)))
+                {
+                    updateRefreshInFlight = true;
+                    startRefresh = true;
+                }
+                snapshot = new Dictionary<string, object>(updateStatus);
+            }
+            if (startRefresh)
+            {
                 try
                 {
-                    Type sessionType = Type.GetTypeFromProgID("Microsoft.Update.Session");
-                    if (sessionType == null) throw new InvalidOperationException("Windows Update API is unavailable");
-                    session = Activator.CreateInstance(sessionType);
-                    searcher = session.GetType().InvokeMember("CreateUpdateSearcher", BindingFlags.InvokeMethod, null, session, null, CultureInfo.InvariantCulture);
-                    searchResult = searcher.GetType().InvokeMember("Search", BindingFlags.InvokeMethod, null, searcher, new object[] { "IsInstalled=0 and IsHidden=0" }, CultureInfo.InvariantCulture);
-                    updates = searchResult.GetType().InvokeMember("Updates", BindingFlags.GetProperty, null, searchResult, null, CultureInfo.InvariantCulture);
-                    object rawCount = updates.GetType().InvokeMember("Count", BindingFlags.GetProperty, null, updates, null, CultureInfo.InvariantCulture);
-                    count = Convert.ToInt32(rawCount, CultureInfo.InvariantCulture);
+                    Thread worker = new Thread(RefreshUpdateStatus);
+                    worker.IsBackground = true;
+                    worker.Name = "OmniSightWindowsUpdateProbe";
+                    worker.Start();
                 }
-                catch
+                catch (Exception error)
                 {
-                    source = "unavailable";
+                    CompleteUpdateRefresh(BuildUpdateStatus(null, false, "unavailable"));
+                    AgentLog.Error("Windows Update probe could not start: " + error.Message);
                 }
-                finally
-                {
-                    ReleaseCom(updates);
-                    ReleaseCom(searchResult);
-                    ReleaseCom(searcher);
-                    ReleaseCom(session);
-                }
-                bool rebootRequired = QueryRebootRequired();
-                long checkedAt = (long)(DateTime.UtcNow - new DateTime(1970, 1, 1)).TotalSeconds;
-                updateStatus = new Dictionary<string, object>();
-                updateStatus["count"] = count.HasValue ? (object)count.Value : null;
-                updateStatus["rebootRequired"] = rebootRequired;
-                updateStatus["source"] = source;
-                updateStatus["checkedAt"] = checkedAt;
-                updateCheckedAt = DateTime.UtcNow;
-                return updateStatus;
             }
+            return snapshot;
         }
 
-        private static bool QueryRebootRequired()
+        private void RefreshUpdateStatus()
         {
-            object systemInfo = null;
+            Dictionary<string, object> status = BuildUpdateStatus(null, false, "unavailable");
             try
             {
-                Type type = Type.GetTypeFromProgID("Microsoft.Update.SystemInfo");
-                if (type != null)
+                ProcessStartInfo start = new ProcessStartInfo();
+                start.FileName = Assembly.GetExecutingAssembly().Location;
+                start.Arguments = "--windows-update-probe";
+                start.UseShellExecute = false;
+                start.CreateNoWindow = true;
+                using (Process process = Process.Start(start))
                 {
-                    systemInfo = Activator.CreateInstance(type);
-                    object value = systemInfo.GetType().InvokeMember("RebootRequired", BindingFlags.GetProperty, null, systemInfo, null, CultureInfo.InvariantCulture);
-                    if (Convert.ToBoolean(value, CultureInfo.InvariantCulture)) return true;
+                    if (process == null) throw new InvalidOperationException("Windows Update probe process could not be started");
+                    if (!process.WaitForExit(UpdateProbeTimeoutSeconds * 1000))
+                    {
+                        try { process.Kill(); }
+                        catch { }
+                        try { process.WaitForExit(5000); }
+                        catch { }
+                        status = BuildUpdateStatus(null, false, "timeout");
+                    }
+                    else if (process.ExitCode >= 0)
+                    {
+                        int encodedCount = process.ExitCode >> 1;
+                        int? count = encodedCount > 0 ? (int?)(encodedCount - 1) : null;
+                        bool rebootRequired = (process.ExitCode & 1) == 1;
+                        status = BuildUpdateStatus(count, rebootRequired, count.HasValue ? "windows-update" : "unavailable");
+                    }
                 }
             }
             catch { }
-            finally { ReleaseCom(systemInfo); }
-            using (RegistryKey componentServicing = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending"))
+            finally
             {
-                if (componentServicing != null) return true;
+                CompleteUpdateRefresh(status);
             }
-            using (RegistryKey windowsUpdate = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired"))
+        }
+
+        private void CompleteUpdateRefresh(Dictionary<string, object> status)
+        {
+            lock (updateSync)
             {
-                if (windowsUpdate != null) return true;
+                updateStatus = status;
+                updateCheckedAt = DateTime.UtcNow;
+                updateRefreshInFlight = false;
             }
-            try
-            {
-                using (RegistryKey key = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Session Manager"))
-                {
-                    return key != null && key.GetValue("PendingFileRenameOperations") != null;
-                }
-            }
-            catch { return false; }
+        }
+
+        private static Dictionary<string, object> BuildUpdateStatus(int? count, bool rebootRequired, string source)
+        {
+            Dictionary<string, object> status = new Dictionary<string, object>();
+            status["count"] = count.HasValue ? (object)count.Value : null;
+            status["rebootRequired"] = rebootRequired;
+            status["source"] = source;
+            status["checkedAt"] = (long)(DateTime.UtcNow - new DateTime(1970, 1, 1)).TotalSeconds;
+            return status;
         }
 
         private static List<Dictionary<string, object>> QueryServices()
@@ -787,7 +884,7 @@ namespace OmniSight.Agent
             List<Dictionary<string, object>> services = new List<Dictionary<string, object>>();
             try
             {
-                using (ManagementObjectSearcher searcher = new ManagementObjectSearcher("SELECT Name, State, StartMode FROM Win32_Service WHERE State='Running' OR StartMode='Auto'"))
+                using (ManagementObjectSearcher searcher = CreateWmiSearcher("SELECT Name, State, StartMode FROM Win32_Service WHERE State='Running' OR StartMode='Auto'"))
                 using (ManagementObjectCollection rows = searcher.Get())
                 {
                     foreach (ManagementObject row in rows)
@@ -841,7 +938,7 @@ namespace OmniSight.Agent
             Dictionary<string, object> result = new Dictionary<string, object>();
             try
             {
-                using (ManagementObjectSearcher searcher = new ManagementObjectSearcher(query))
+                using (ManagementObjectSearcher searcher = CreateWmiSearcher(query))
                 using (ManagementObjectCollection rows = searcher.Get())
                 {
                     foreach (ManagementObject row in rows)
@@ -854,6 +951,15 @@ namespace OmniSight.Agent
             }
             catch { }
             return result;
+        }
+
+        private static ManagementObjectSearcher CreateWmiSearcher(string query)
+        {
+            ManagementObjectSearcher searcher = new ManagementObjectSearcher(query);
+            searcher.Options.Timeout = TimeSpan.FromSeconds(WmiQueryTimeoutSeconds);
+            searcher.Options.ReturnImmediately = true;
+            searcher.Options.Rewindable = false;
+            return searcher;
         }
 
         private static string ReadText(Dictionary<string, object> values, string key)
@@ -887,12 +993,6 @@ namespace OmniSight.Agent
             catch { return false; }
         }
 
-        private static void ReleaseCom(object value)
-        {
-            if (value == null || !Marshal.IsComObject(value)) return;
-            try { Marshal.FinalReleaseComObject(value); }
-            catch { }
-        }
     }
 
     internal static class AgentMaintenance

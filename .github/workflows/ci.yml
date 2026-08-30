@@ -98,5 +98,5 @@ jobs:
           & (Join-Path $framework 'csc.exe') /nologo /target:winexe /optimize+ /platform:anycpu "/out:$output" @references $source
           if ($LASTEXITCODE -ne 0 -or -not (Test-Path $output)) { exit 1 }
           $version = [Reflection.AssemblyName]::GetAssemblyName($output).Version.ToString(3)
-          if ($version -ne '1.4.2') { throw "Unexpected Windows agent version: $version" }
+          if ($version -ne '1.4.3') { throw "Unexpected Windows agent version: $version" }
           & scripts/ci-windows-agent.ps1 -ExecutablePath $output

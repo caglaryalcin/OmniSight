@@ -252,7 +252,7 @@ function copyText(text, btn){
   navigator.clipboard?.writeText(text).then(()=>{ const o=btn.textContent; btn.textContent=t('Copied'); setTimeout(()=>btn.textContent=o,1200); });
 }
 const REMOTE_UNINSTALL_VERSION = '1.3.3';
-const LATEST_AGENT_VERSION = '1.4.2';
+const LATEST_AGENT_VERSION = '1.4.3';
 let uninstallAgentModalResolver = null;
 function showUninstallAgentModal(name){
   return new Promise(resolve => {
@@ -509,10 +509,10 @@ function commandPanelGuide(commands, opts = {}){
     ? 'Run Query Windows agent on this host in PowerShell as administrator.'
     : 'Run Query agent on the affected host.';
   const healthyResult = isWindows
-    ? 'RESULT says the service is running and the dashboard HTTP check passed.'
+    ? 'RESULT says the service is running, the dashboard HTTP check passed and the latest agent report is fresh.'
     : 'Service is active (running) and the HTTP result is 200.';
   const repairResult = isWindows
-    ? 'RESULT says to use Repair Windows agent.'
+    ? 'RESULT says to use Repair Windows agent, including when the service is running but its report is stale or missing.'
     : 'Service is inactive, failed or missing, or HTTP is 401/403.';
   const repairAction = isWindows
     ? 'Run Repair Windows agent.'

@@ -218,20 +218,84 @@ function Write-AgentConfig([string]$Url, [string]$Token, [int]$Interval, [string
   Move-Item -LiteralPath $tempAgentIdPath -Destination $agentIdPath -Force
 }
 
-function Test-AgentApi([string]$Url, [string]$Token, [bool]$Insecure) {
+function Test-AgentApi([string]$Url, [string]$Token, [bool]$Insecure, [string]$AgentId) {
   $pingArgs = @{
     Method = "POST"
     Uri = "$Url/api/agent/ping"
     Headers = @{ "X-Agent-Token" = $Token }
     ContentType = "application/json"
-    Body = '{"id":"windows-service-install-check"}'
+    Body = (@{ id = $AgentId } | ConvertTo-Json -Compress)
     TimeoutSec = 15
     UseBasicParsing = $true
     ErrorAction = "Stop"
   }
   if ($Insecure -and $PSVersionTable.PSVersion.Major -ge 7) { $pingArgs.SkipCertificateCheck = $true }
-  try { Invoke-RestMethod @pingArgs | Out-Null }
+  try { return Invoke-RestMethod @pingArgs }
   catch { throw "OmniSight agent token check failed: $($_.Exception.Message)" }
+}
+
+function Get-AgentReportSnapshot($PingResponse) {
+  if ($null -eq $PingResponse) { return $null }
+  $reportProperty = $PingResponse.PSObject.Properties["report"]
+  if ($null -eq $reportProperty -or $null -eq $reportProperty.Value) { return $null }
+  $report = $reportProperty.Value
+  $knownProperty = $report.PSObject.Properties["known"]
+  $freshProperty = $report.PSObject.Properties["fresh"]
+  $ageProperty = $report.PSObject.Properties["ageSeconds"]
+  if ($null -eq $knownProperty -or $null -eq $freshProperty -or $null -eq $ageProperty) { return $null }
+
+  $known = [bool]$knownProperty.Value
+  $fresh = [bool]$freshProperty.Value
+  $ageSeconds = $null
+  if ($null -ne $ageProperty.Value) {
+    try {
+      $parsedAge = [double]$ageProperty.Value
+      if (-not [double]::IsNaN($parsedAge) -and -not [double]::IsInfinity($parsedAge) -and $parsedAge -ge 0) { $ageSeconds = $parsedAge }
+    } catch {}
+  }
+
+  $serverTime = [DateTime]::UtcNow
+  $serverTimeProperty = $PingResponse.PSObject.Properties["serverTime"]
+  if ($null -ne $serverTimeProperty -and $serverTimeProperty.Value) {
+    try { $serverTime = ([DateTime]::Parse([string]$serverTimeProperty.Value)).ToUniversalTime() } catch {}
+  }
+  $lastReportAt = if ($known -and $null -ne $ageSeconds) { $serverTime.AddSeconds(-$ageSeconds) } else { $null }
+  return [pscustomobject]@{
+    Known = $known
+    Fresh = $fresh
+    AgeSeconds = $ageSeconds
+    LastReportAtUtc = $lastReportAt
+  }
+}
+
+function Wait-OmniSightFreshReport([string]$Url, [string]$Token, [bool]$Insecure, [string]$AgentId, $BaselinePing, [int]$TimeoutSeconds = 90) {
+  $baseline = Get-AgentReportSnapshot $BaselinePing
+  $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+  $lastState = "the dashboard has not reported agent state"
+  do {
+    try {
+      $ping = Test-AgentApi $Url $Token $Insecure $AgentId
+      $snapshot = Get-AgentReportSnapshot $ping
+      if ($null -eq $snapshot) {
+        $lastState = "the dashboard ping response did not include report status"
+      } elseif (-not $snapshot.Known) {
+        $lastState = "the dashboard has not received a report for this agent ID"
+      } elseif (-not $snapshot.Fresh) {
+        $lastState = "the last dashboard report is stale (age $([Math]::Round([double]$snapshot.AgeSeconds, 1))s)"
+      } else {
+        $isNewReport = $true
+        if ($null -ne $baseline -and $baseline.Known -and $null -ne $baseline.LastReportAtUtc -and $null -ne $snapshot.LastReportAtUtc) {
+          $isNewReport = $snapshot.LastReportAtUtc -gt $baseline.LastReportAtUtc.AddSeconds(2)
+        }
+        if ($isNewReport) { return }
+        $lastState = "the dashboard still shows the report seen before the service restart"
+      }
+    } catch {
+      $lastState = $_.Exception.Message
+    }
+    Start-Sleep -Seconds 2
+  } while ([DateTime]::UtcNow -lt $deadline)
+  throw "No fresh OmniSight agent report was received within ${TimeoutSeconds}s: $lastState"
 }
 
 function Install-OmniSightService {
@@ -262,13 +326,12 @@ function Install-OmniSightService {
   if ($insecure) {
     try { [Net.ServicePointManager]::ServerCertificateValidationCallback = { $true } } catch {}
   }
-  Test-AgentApi $url $token $insecure
-
   $agentId = [string]$env:OMNISIGHT_AGENT_ID
   if (-not $agentId) { $agentId = [string](Get-ExistingConfigValue $existing "agentId") }
   $idPath = Join-Path $script:DataDir "agent.id"
   if (-not $agentId -and (Test-Path -LiteralPath $idPath)) { $agentId = (Get-Content -LiteralPath $idPath -Raw).Trim() }
   if (-not $agentId) { $agentId = "$($env:COMPUTERNAME)-$([guid]::NewGuid().ToString('N').Substring(0,8))" }
+  $preflightPing = Test-AgentApi $url $token $insecure $agentId
 
   $sourcePath = Join-Path $env:TEMP "OmniSight.Agent-$([guid]::NewGuid().ToString('N')).cs"
   $stagingPath = Join-Path $env:TEMP "OmniSight.Agent-$([guid]::NewGuid().ToString('N')).exe"
@@ -323,9 +386,6 @@ function Install-OmniSightService {
     & "$env:SystemRoot\System32\sc.exe" failureflag $script:ServiceName "1" 2>&1 | Out-Null
     Remove-Item -LiteralPath $startupDiagnosticPath -Force -ErrorAction SilentlyContinue
     Start-OmniSightService
-    Remove-LegacyAgentTask
-    Remove-Item -LiteralPath (Join-Path $script:DataDir "run-agent.ps1") -Force -ErrorAction SilentlyContinue
-    Remove-Item -LiteralPath (Join-Path $script:DataDir "omnisight-agent.ps1") -Force -ErrorAction SilentlyContinue
   } catch {
     $installFailure = $_
     $agentLogPath = Join-Path $script:DataDir "logs\agent.log"
@@ -368,6 +428,29 @@ function Install-OmniSightService {
     Remove-Item -LiteralPath $executableBackup -Force -ErrorAction SilentlyContinue
     Remove-Item -LiteralPath $configBackup -Force -ErrorAction SilentlyContinue
   }
+
+  try {
+    Wait-OmniSightFreshReport $url $token $insecure $agentId $preflightPing
+  } catch {
+    $verificationFailure = $_.Exception.Message
+    $serviceState = "missing"
+    try {
+      $installedService = Get-Service -Name $script:ServiceName -ErrorAction Stop
+      $serviceState = [string]$installedService.Status
+    } catch {}
+    $agentLogTail = ""
+    try {
+      $agentLogPath = Join-Path $script:DataDir "logs\agent.log"
+      if (Test-Path -LiteralPath $agentLogPath) { $agentLogTail = ((Get-Content -LiteralPath $agentLogPath -Tail 20 -ErrorAction Stop) -join " | ").Trim() }
+    } catch {}
+    $message = "Windows service was installed and left in place (state: $serviceState), but report verification failed: $verificationFailure"
+    if ($agentLogTail) { $message += " Agent log: $agentLogTail" }
+    throw $message
+  }
+
+  Remove-LegacyAgentTask
+  Remove-Item -LiteralPath (Join-Path $script:DataDir "run-agent.ps1") -Force -ErrorAction SilentlyContinue
+  Remove-Item -LiteralPath (Join-Path $script:DataDir "omnisight-agent.ps1") -Force -ErrorAction SilentlyContinue
 
   Write-Host "OmniSight Windows service agent installed and started (id: $agentId, version: $version, interval: ${interval}s)"
   Write-Host "Service: $script:ServiceName"

@@ -381,6 +381,28 @@ function isOnline(a, now) {
   return a.live && (now - (a.lastSeen || 0)) < staleMs;
 }
 
+function reportStatus(agentId, now = Date.now()) {
+  const a = agents.get(String(agentId || ''));
+  if (!a) {
+    return {
+      known: false,
+      fresh: false,
+      lastSeen: null,
+      ageSeconds: null,
+      staleAfterSeconds: null,
+    };
+  }
+  const lastSeen = Number(a.lastSeen || 0);
+  const staleAfterSeconds = (Number(a.interval || 15) * 2.5) + 10;
+  return {
+    known: true,
+    fresh: isOnline(a, now),
+    lastSeen: lastSeen || null,
+    ageSeconds: lastSeen ? Math.max(0, Math.floor((now - lastSeen) / 1000)) : null,
+    staleAfterSeconds,
+  };
+}
+
 function isConnecting(a, now) {
   return !isOnline(a, now) && Number(a._connectingUntil || 0) > now;
 }
@@ -938,4 +960,4 @@ function retireAgent(id) {
   return ok;
 }
 
-module.exports = { handleReport, getAllAgentData, getWindowsData, getDockerData, getProxmoxData, hasPve, hasDocker, hasLinux, hasWindows, queueCommand, takeCommands, waitForCommands, handleResult, removeAgent, retireAgent, findAgent, listAgents, commandLines, addPendingInstall, listPendingInstalls, setSaveDelay, flushSaves, reload, revision };
+module.exports = { handleReport, getAllAgentData, getWindowsData, getDockerData, getProxmoxData, hasPve, hasDocker, hasLinux, hasWindows, queueCommand, takeCommands, waitForCommands, handleResult, removeAgent, retireAgent, findAgent, listAgents, reportStatus, commandLines, addPendingInstall, listPendingInstalls, setSaveDelay, flushSaves, reload, revision };

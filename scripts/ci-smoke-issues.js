@@ -670,7 +670,7 @@ function testStaticRegressions() {
   const windowsServiceVersion = (windowsService.match(/internal const string Version = "([^"]+)"/) || [])[1];
   assert.strictEqual(linuxAgentVersion, windowsAgentVersion, 'Linux and Windows agent versions must stay synchronized');
   assert.strictEqual(linuxAgentVersion, windowsServiceVersion, 'Linux and Windows service agent versions must stay synchronized');
-  assert.strictEqual(linuxAgentVersion, '1.4.2', 'agents must advertise the uninstall-safe 1.4.2 protocol');
+  assert.strictEqual(linuxAgentVersion, '1.4.3', 'agents must advertise the report-liveness-safe 1.4.3 protocol');
   assert.ok(server.includes("const WINDOWS_SERVICE_AGENT_VERSION = '1.4.0'") && server.includes('versionCompare(agent.agentVersion, WINDOWS_SERVICE_AGENT_VERSION) < 0'), 'legacy Windows agents must receive a one-time service migration command instead of a remote update that can stop the scheduled task');
   assert.ok(windowsInstaller.includes('New-Service -Name $script:ServiceName') && windowsInstaller.includes('failureflag') && !windowsInstaller.includes('Register-ScheduledTask'), 'Windows installs must use Service Control Manager rather than a persistent scheduled task');
   assert.ok(windowsInstaller.includes('Repair-AgentDataAccess') && windowsInstaller.includes('Protect-AgentDataAcl') && windowsInstaller.lastIndexOf('    Protect-AgentDataAcl') < windowsInstaller.lastIndexOf('    Start-OmniSightService'), 'Windows agent ACL hardening must be recoverable and complete before the service starts writing logs');
@@ -679,6 +679,9 @@ function testStaticRegressions() {
   assert.ok(windowsInstaller.includes('Repair-AgentDataEntry') && windowsInstaller.includes('Repair-AgentDataEntry $child.FullName') && windowsInstaller.includes('agent.id.tmp') && windowsInstaller.includes('"/reset", "/T"') && !windowsInstaller.includes('"/inheritance:r", "/T"') && !windowsInstaller.includes('"/setowner"'), 'Windows migration must recover legacy ACL failures entry by entry, reset children to protected inherited access and replace the agent ID atomically');
   assert.ok(windowsAgent.includes('Invoke-WindowsServiceMigration') && windowsAgent.includes('$ReportedVersion = "1.3.4"') && windowsAgent.includes('legacy agent will continue'), 'legacy Windows agents must migrate automatically and retain a safe fallback');
   assert.ok(windowsService.includes('class OmniSightAgentService : ServiceBase') && windowsService.includes('protected override void OnStart') && windowsService.includes('protected override void OnStop'), 'the Windows agent must implement the Windows service lifecycle');
+  assert.ok(windowsService.includes('--windows-update-probe') && windowsService.includes('new Thread(RefreshUpdateStatus)') && windowsService.includes('WaitForExit(UpdateProbeTimeoutSeconds * 1000)') && windowsService.includes('process.Kill()'), 'Windows Update discovery must run outside the report worker and terminate after a bounded wait');
+  assert.ok(windowsService.includes('CreateWmiSearcher(') && windowsService.includes('searcher.Options.Timeout = TimeSpan.FromSeconds(WmiQueryTimeoutSeconds)') && windowsService.includes('private const int WmiQueryTimeoutSeconds = 3'), 'every native Windows WMI collector must have a bounded query timeout below the heartbeat deadline');
+  assert.ok(windowsInstaller.includes('function Wait-OmniSightFreshReport') && windowsInstaller.lastIndexOf('Wait-OmniSightFreshReport $url $token $insecure $agentId $preflightPing') > windowsInstaller.lastIndexOf('  } finally {') && windowsInstaller.indexOf('Wait-OmniSightFreshReport $url $token $insecure $agentId $preflightPing') < windowsInstaller.indexOf('installed and started (id:'), 'Windows repair must verify a new dashboard report after the rollback boundary and before claiming success');
   assert.ok(windowsInstaller.includes('Stop-ScheduledTask -TaskName $script:TaskName') && windowsService.includes('class LegacyTaskCleanup') && windowsService.includes('/End /TN') && windowsService.includes('/Delete /TN'), 'a successful Windows service migration must stop and remove every running legacy scheduled-task instance');
   assert.ok(windowsService.includes('service start failed:') && windowsService.includes('OmniSightAgent-startup.log') && windowsInstaller.includes('Windows service installation failed:') && windowsInstaller.includes('Agent log:') && windowsInstaller.includes('Startup diagnostic:'), 'Windows service startup failures must include actionable primary and fallback diagnostics');
   assert.ok(windowsService.includes('ScheduleHelper("--update-helper"') && windowsService.includes('ScheduleHelper("--uninstall-helper"') && windowsService.includes('RunUninstall()'), 'the Windows service must update and uninstall through detached native helpers');
@@ -937,9 +940,10 @@ function testStaticRegressions() {
   assert.ok(settings.includes('data-target="sessions" data-admin-section="1" onclick="showSettingsSection(\'sessions\')"><span class="settings-nav-dot" style="background:var(--blue)">'), 'Sessions navigation icon must match the blue System icon');
   const settingsInit = settings.slice(settings.lastIndexOf('(async () => {'));
   assert.ok(settingsInit.includes('await rolePromise;') && settingsInit.includes('loadSettingsSectionData(activeSettingsSection);'), 'the restored Settings section must load its data during initial startup');
-  assert.ok(agentsPage.includes('function commandPanelGuide(commands, opts = {})') && agentsPage.includes('Check result → action') && agentsPage.includes('Service is active (running) and the HTTP result is 200.') && agentsPage.includes('Result contains timeout, DNS, connection or TLS error.'), 'agent repair panel must provide concise result-to-action guidance');
+  assert.ok(agentsPage.includes('function commandPanelGuide(commands, opts = {})') && agentsPage.includes('Check result → action') && agentsPage.includes('latest agent report is fresh.') && agentsPage.includes('report is stale or missing.') && agentsPage.includes('Result contains timeout, DNS, connection or TLS error.'), 'agent repair panel must distinguish a fresh report from a Running service with a stale worker');
   assert.ok(agentsPage.includes('/^1\\.3(?:\\.|$)/.test(agentVersion)') && agentsPage.includes('This v1.3.x agent uses the old scheduled task.') && agentsPage.includes("agentVersion: d.agentVersion || ''"), 'the v1.3 to v1.4 migration note must be conditional on the selected agent version');
-  assert.ok(server.includes('dashboard HTTP check passed.') && server.includes('Dashboard returned HTTP {0}; use Repair Windows agent.') && server.includes('Dashboard connection/TLS check failed;') && server.includes('Legacy scheduled-task agent detected. State={0}; use Repair Windows agent.') && server.includes("Write-Host 'Service History:'") && server.includes('Run only when the RESULT line says to use Repair Windows agent.'), 'Windows query must provide explicit results followed by clearly labelled service history');
+  assert.ok(server.includes('latest agent report is fresh.') && server.includes('last agent report is stale ({0}); use Repair Windows agent.') && server.includes('this agent ID has no report; use Repair Windows agent.') && server.includes('Configured agent ID {0} does not match dashboard agent ID {1}; use Repair Windows agent.') && server.includes('Dashboard returned HTTP {0}; use Repair Windows agent.') && server.includes('Dashboard connection/TLS check failed;') && server.includes('Legacy scheduled-task agent detected. State={0}; use Repair Windows agent.') && server.includes("Write-Host 'Service History:'") && server.includes('Run only when the RESULT line says to use Repair Windows agent.'), 'Windows query must require a fresh report and provide explicit repair results followed by clearly labelled service history');
+  assert.ok(server.includes('report: agents.reportStatus(id)') && server.includes('Math.floor(Date.now() / 5000)'), 'agent ping must expose non-mutating report freshness and cached online state must expire with time');
   assert.ok(server.includes("agentVersion: agent.agentVersion || ''") && server.includes('role: agentInstallRole(agent)'), 'repair command responses must include the selected agent version and role');
   assert.ok(agentsPage.includes("${t('Check / repair')}") && agentsPage.includes("t('Run on affected host')"), 'offline agent action must direct users to check before repairing');
   assert.ok(agentsPage.includes('showUninstallAgentModal') && agentsPage.includes("closeUninstallAgentModal(true)") && agentsPage.includes("fetch('/api/agent/uninstall'"), 'Agents must provide an explicit Yes-confirmed uninstall action');
@@ -1003,7 +1007,7 @@ function testStaticRegressions() {
     assert.ok(dockerIgnore.includes(pattern), `${pattern} must not enter the Docker build context`);
   }
   assert.ok(deploy.includes("'screenshots/**'") && deploy.includes("'.github/workflows/ci.yml'"), 'non-runtime media and CI-only workflow changes must not publish a Docker image');
-  assert.ok(ci.includes("if ($version -ne '1.4.2')") && dockerIgnore.includes('**/*.txt') && dockerIgnore.includes('!public/docs/en.txt') && dockerIgnore.includes('!public/docs/tr.txt'), 'CI must validate agent 1.4.2 while Docker keeps only runtime documentation text files');
+  assert.ok(ci.includes("if ($version -ne '1.4.3')") && dockerIgnore.includes('**/*.txt') && dockerIgnore.includes('!public/docs/en.txt') && dockerIgnore.includes('!public/docs/tr.txt'), 'CI must validate agent 1.4.3 while Docker keeps only runtime documentation text files');
   assert.ok(docker.includes("reqJson(host, '/info')") && docker.includes("info --format '{{.MemTotal}}'"), 'Docker collectors must read host memory totals');
   assert.ok(fs.existsSync(path.join(root, 'src', 'unifi.js')));
   assert.ok(snmp.includes('session.subtree(oid, 20'), 'SNMP reads must stop at the requested OID subtree');
@@ -1052,7 +1056,17 @@ function testAgentRetirement() {
     const agents = require(${JSON.stringify(path.join(__dirname, '..', 'src', 'agents.js'))});
     const report = { id: 'retire-test', hostname: 'retire-test', platform: 'windows', role: 'windows', agentVersion: '1.4.1', interval: 15 };
     agents.handleReport(report);
-    assert.ok(agents.findAgent('retire-test'));
+    const stored = agents.findAgent('retire-test');
+    assert.ok(stored);
+    const lastSeen = stored.lastSeen;
+    assert.deepStrictEqual(agents.reportStatus('missing-agent', lastSeen), { known: false, fresh: false, lastSeen: null, ageSeconds: null, staleAfterSeconds: null });
+    assert.strictEqual(agents.reportStatus('retire-test', lastSeen + 47499).fresh, true);
+    const stale = agents.reportStatus('retire-test', lastSeen + 47500);
+    assert.strictEqual(stale.fresh, false);
+    assert.strictEqual(stale.ageSeconds, 47);
+    assert.strictEqual(stale.staleAfterSeconds, 47.5);
+    assert.deepStrictEqual(agents.reportStatus('retire-test', lastSeen + 14 * 60 * 60 * 1000), { known: true, fresh: false, lastSeen, ageSeconds: 14 * 60 * 60, staleAfterSeconds: 47.5 });
+    assert.strictEqual(agents.findAgent('retire-test').lastSeen, lastSeen, 'reading report status must not create a heartbeat');
     assert.strictEqual(agents.retireAgent('retire-test'), true);
     assert.strictEqual(agents.findAgent('retire-test'), null);
     assert.throws(() => agents.handleReport(report), /uninstall is in progress/);

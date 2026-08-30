@@ -2517,6 +2517,7 @@ function agentsViewSignature() {
     configRevision,
     typeof agents.revision === 'function' ? agents.revision() : 0,
     agentLatestVersion(),
+    Math.floor(Date.now() / 5000),
   ].join('|');
 }
 
@@ -8367,7 +8368,8 @@ app.get('/agent/OmniSight.Agent.cs', (req, res) => {
 
 app.post('/api/agent/ping', (req, res) => {
   if (!agentAuth(req, res)) return;
-  res.json({ ok: true, id: String(req.body?.id || '').replace(/[^\w.-]/g, '').slice(0, 128), serverTime: new Date().toISOString() });
+  const id = String(req.body?.id || '').replace(/[^\w.-]/g, '').slice(0, 128);
+  res.json({ ok: true, id, serverTime: new Date().toISOString(), report: agents.reportStatus(id) });
 });
 
 const AGENT_CACHE_UPDATE_DELAY_MS = Math.max(250, Number(process.env.OMNISIGHT_AGENT_CACHE_UPDATE_DELAY_MS || 1500));
@@ -8599,10 +8601,36 @@ function agentRepairCommands(req, agent) {
       '$service = Get-Service -Name OmniSightAgent -ErrorAction SilentlyContinue',
       '$task = Get-ScheduledTask -TaskName OmniSightAgent -ErrorAction SilentlyContinue',
       '$configPath = "$env:ProgramData\\OmniSight\\agent.json"',
+      `$expectedAgentId = "${id}"`,
       'Write-Host ""',
-      "if ($service -and $service.Status -eq 'Running') { if (-not (Test-Path -LiteralPath $configPath)) { Write-Host 'RESULT: Agent configuration is missing; use Repair Windows agent.' -ForegroundColor Yellow } else { try { $config = Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json; [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12; if ($config.insecureTls) { [Net.ServicePointManager]::ServerCertificateValidationCallback = { $true } }; $headers = @{ 'X-Agent-Token' = [string]$config.token }; $body = @{ id = [string]$config.agentId } | ConvertTo-Json -Compress; Invoke-RestMethod -Method Post -Uri (([string]$config.url).TrimEnd('/') + '/api/agent/ping') -Headers $headers -ContentType 'application/json' -Body $body -TimeoutSec 15 -ErrorAction Stop | Out-Null; Write-Host 'RESULT: OmniSightAgent service is running; dashboard HTTP check passed.' -ForegroundColor Green } catch { $statusCode = 0; try { if ($_.Exception.Response) { $statusCode = [int]$_.Exception.Response.StatusCode } } catch {}; if ($statusCode -eq 401 -or $statusCode -eq 403) { Write-Host (\"RESULT: Dashboard returned HTTP {0}; use Repair Windows agent.\" -f $statusCode) -ForegroundColor Yellow } else { Write-Host 'RESULT: Dashboard connection/TLS check failed; check the network, OmniSight address or certificate. Do not repair.' -ForegroundColor Red } } } } elseif ($task) { Write-Host (\"RESULT: Legacy scheduled-task agent detected. State={0}; use Repair Windows agent.\" -f $task.State) -ForegroundColor Yellow } elseif ($service) { Write-Host (\"RESULT: OmniSightAgent service is {0}; use Repair Windows agent.\" -f $service.Status) -ForegroundColor Yellow } else { Write-Host 'RESULT: OmniSightAgent service and legacy scheduled task are missing; use Repair Windows agent.' -ForegroundColor Red }",
+      "if ($service -and $service.Status -eq 'Running') {",
+      "  if (-not (Test-Path -LiteralPath $configPath)) {",
+      "    Write-Host 'RESULT: Agent configuration is missing; use Repair Windows agent.' -ForegroundColor Yellow",
+      '  } else {',
+      '    try {',
+      '      $config = Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json',
+      "      if ([string]$config.agentId -ne $expectedAgentId) { Write-Host (\"RESULT: Configured agent ID {0} does not match dashboard agent ID {1}; use Repair Windows agent.\" -f ([string]$config.agentId), $expectedAgentId) -ForegroundColor Yellow } else {",
+      '        [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12',
+      '        if ($config.insecureTls) { [Net.ServicePointManager]::ServerCertificateValidationCallback = { $true } }',
+      "        $headers = @{ 'X-Agent-Token' = [string]$config.token }",
+      '        $body = @{ id = [string]$config.agentId } | ConvertTo-Json -Compress',
+      "        $ping = Invoke-RestMethod -Method Post -Uri (([string]$config.url).TrimEnd('/') + '/api/agent/ping') -Headers $headers -ContentType 'application/json' -Body $body -TimeoutSec 15 -ErrorAction Stop",
+      "        if (-not $ping.report -or -not [bool]$ping.report.known) { Write-Host 'RESULT: OmniSightAgent service is running and dashboard HTTP check passed, but this agent ID has no report; use Repair Windows agent.' -ForegroundColor Yellow }",
+      "        elseif (-not [bool]$ping.report.fresh) { $age = if ($null -eq $ping.report.ageSeconds) { 'unknown age' } else { ('{0}s old' -f [int]$ping.report.ageSeconds) }; Write-Host (\"RESULT: OmniSightAgent service is running and dashboard HTTP check passed, but the last agent report is stale ({0}); use Repair Windows agent.\" -f $age) -ForegroundColor Yellow }",
+      "        else { Write-Host 'RESULT: OmniSightAgent service is running; dashboard HTTP check passed; latest agent report is fresh.' -ForegroundColor Green }",
+      '      }',
+      '    } catch {',
+      '      $statusCode = 0',
+      '      try { if ($_.Exception.Response) { $statusCode = [int]$_.Exception.Response.StatusCode } } catch {}',
+      "      if ($statusCode -eq 401 -or $statusCode -eq 403) { Write-Host (\"RESULT: Dashboard returned HTTP {0}; use Repair Windows agent.\" -f $statusCode) -ForegroundColor Yellow }",
+      "      else { Write-Host 'RESULT: Dashboard connection/TLS check failed; check the network, OmniSight address or certificate. Do not repair.' -ForegroundColor Red }",
+      '    }',
+      '  }',
+      "} elseif ($task) { Write-Host (\"RESULT: Legacy scheduled-task agent detected. State={0}; use Repair Windows agent.\" -f $task.State) -ForegroundColor Yellow }",
+      "elseif ($service) { Write-Host (\"RESULT: OmniSightAgent service is {0}; use Repair Windows agent.\" -f $service.Status) -ForegroundColor Yellow }",
+      "else { Write-Host 'RESULT: OmniSightAgent service and legacy scheduled task are missing; use Repair Windows agent.' -ForegroundColor Red }",
       "if ($service) { $service | Format-List Name,DisplayName,Status,StartType; Write-Host 'Service History:'; Write-Host ''; Get-Content \"$env:ProgramData\\OmniSight\\logs\\agent.log\" -Tail 100 -ErrorAction SilentlyContinue } elseif ($task) { Write-Host 'Legacy Scheduled Task:'; Write-Host ''; $task | Format-List TaskName,State }",
-    ].join('; ');
+    ].join('\n');
     const commands = [{
       title: 'Query Windows agent',
       description: 'Run first and read the RESULT line.',
