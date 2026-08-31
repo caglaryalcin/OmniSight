@@ -7,10 +7,12 @@ const assert = require('assert');
 const {
   configuredProjects,
   discoverCiProjects,
+  displayTitle,
   getGithubAllProjects,
   listGithubRepositories,
   listGitlabProjects,
   normalizeGitlabBaseUrl,
+  providerTitle,
 } = require('../src/cicd');
 const { mergePreservingSecrets } = require('../src/config-merge');
 
@@ -382,6 +384,18 @@ async function testValidation() {
   assert.strictEqual(normalizeGitlabBaseUrl('https://gitlab.example.test/api/v4/'), 'https://gitlab.example.test');
 }
 
+function testProviderTitle() {
+  assert.strictEqual(providerTitle({ projects: [{ provider: 'github' }] }), 'GitHub', 'GitHub-only public status must use the GitHub title');
+  assert.strictEqual(providerTitle({ instances: [{ provider: 'gitlab' }] }), 'GitLab', 'GitLab-only public status must use the GitLab title');
+  assert.strictEqual(providerTitle({ projects: [{ provider: 'github' }, { provider: 'gitlab' }] }), 'GitHub/GitLab CI', 'mixed public status providers must retain the combined title');
+  assert.strictEqual(providerTitle({ projects: [{ repo: 'owner/repo' }] }), 'GitHub', 'legacy public status rows must retain their GitHub default');
+  assert.strictEqual(providerTitle({ enabled: false, projects: [{ provider: 'github' }] }), 'GitHub/GitLab CI', 'a disabled CI configuration must keep the safe combined fallback');
+  assert.strictEqual(providerTitle({ projects: [{ provider: 'github', enabled: false }, { provider: 'gitlab' }] }), 'GitLab', 'disabled projects must not affect the public title');
+  assert.strictEqual(displayTitle({ projects: [{ provider: 'github' }] }, { projects: [{ provider: 'gitlab' }] }), 'GitHub', 'configured providers must take precedence over a stale public runtime snapshot');
+  assert.strictEqual(displayTitle({ projects: [] }, { projects: [{ provider: 'gitlab' }] }), 'GitLab', 'runtime providers must supply the public title before configuration rows are available');
+  assert.strictEqual(displayTitle({ enabled: false, projects: [{ provider: 'github' }] }, { projects: [{ provider: 'gitlab' }] }), 'GitLab', 'disabled configuration rows must not override the public runtime title');
+}
+
 function testConfigIdSecretPreservation() {
   const existing = {
     cicd: {
@@ -505,6 +519,7 @@ async function run() {
   await testGithubAllRepositoriesRateSafeCacheTtl();
   await testGitlabDiscovery();
   await testValidation();
+  testProviderTitle();
   testConfigIdSecretPreservation();
   console.log('smoke ok — GitHub/GitLab discovery');
 }

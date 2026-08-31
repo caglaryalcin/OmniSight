@@ -72,6 +72,43 @@ function configuredProjects(config = {}) {
     });
 }
 
+function providerTitle(...sources) {
+  const providers = new Set();
+  sources.forEach(source => {
+    if (!source) return;
+    const value = !Array.isArray(source) && source.cicd && !source.projects && !source.instances
+      ? source.cicd
+      : source;
+    if (!value || (!Array.isArray(value) && value.enabled === false)) return;
+    const rows = Array.isArray(value)
+      ? value
+      : Array.isArray(value.projects)
+        ? value.projects
+        : Array.isArray(value.instances)
+          ? value.instances
+          : value.provider !== undefined
+            ? [value]
+            : [];
+    rows.forEach(row => {
+      if (!row || row.enabled === false) return;
+      const provider = String(row.provider || row.type || 'github').trim().toLowerCase();
+      if (provider === 'github' || provider === 'gitlab') providers.add(provider);
+    });
+  });
+  if (providers.size !== 1) return 'GitHub/GitLab CI';
+  return providers.has('gitlab') ? 'GitLab' : 'GitHub';
+}
+
+function displayTitle(config = {}, runtime = null) {
+  const rows = Array.isArray(config?.projects)
+    ? config.projects
+    : Array.isArray(config?.instances)
+      ? config.instances
+      : [];
+  const hasConfiguredRows = config?.enabled !== false && rows.some(row => row && row.enabled !== false);
+  return providerTitle(hasConfiguredRows ? rows : runtime);
+}
+
 function appendQuery(url, params = {}) {
   const u = new URL(url);
   for (const [key, value] of Object.entries(params)) {
@@ -678,6 +715,8 @@ async function getAllCiData(config = {}) {
 module.exports = {
   getAllCiData,
   configuredProjects,
+  providerTitle,
+  displayTitle,
   tokenValue,
   normalizeGitlabBaseUrl,
   listGithubRepositories,

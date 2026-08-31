@@ -615,6 +615,190 @@ function testUiPreferenceScoping() {
   assert.ok(!/\bdata:\s*cache\.data\b/.test(server), 'raw runtime-data mutation responses must not bypass request UI scoping');
 }
 
+function testTopologyProxmoxGuestRows() {
+  const topology = fs.readFileSync(path.join(__dirname, '..', 'public', 'topology.html'), 'utf8');
+  const sourceStart = topology.indexOf('function safeId(');
+  const sourceEnd = topology.indexOf('function edgePath(');
+  assert.ok(sourceStart >= 0 && sourceEnd > sourceStart, 'topology layout helpers must remain testable');
+
+  const context = {
+    topologySpacing: { proxmoxVmGap: 150 },
+    topologyPositions: {},
+    topologyLinks: [],
+    topologyNodes: [],
+    topologyHidden: [],
+    topologyCandidates: [],
+    hideEmpty: true,
+    tr: value => value,
+  };
+  vm.runInNewContext(
+    `${topology.slice(sourceStart, sourceEnd)}\nglobalThis.buildGraph = buildGraph; globalThis.layoutNodes = layoutNodes; globalThis.hypervisorTreeNodes = hypervisorTreeNodes;`,
+    context,
+  );
+
+  const fixture = guestCounts => ({
+    configured: ['proxmox'],
+    proxmox: {
+      clusters: [{
+        isCluster: true,
+        name: 'cluster-a',
+        totalNodes: guestCounts.length,
+        nodesOnline: guestCounts.length,
+        online: true,
+        quorate: true,
+        members: guestCounts.map(() => ({ online: true })),
+      }],
+      nodes: guestCounts.map((guestCount, hostIndex) => ({
+        clusterName: 'cluster-a',
+        node: { name: `pve-${hostIndex + 1}`, online: true },
+        vms: Array.from({ length: guestCount }, (_, guestIndex) => ({
+          id: `${hostIndex + 1}${guestIndex + 1}`,
+          name: `guest-${hostIndex + 1}-${guestIndex + 1}`,
+          type: guestIndex % 2 ? 'lxc' : 'qemu',
+          status: 'running',
+        })),
+      })),
+    },
+  });
+  const rowsForHost = (nodes, host) => {
+    const rows = new Map();
+    Array.from(nodes).filter(node => node.parent === host.id).forEach(node => {
+      if(!rows.has(node.y)) rows.set(node.y, []);
+      rows.get(node.y).push(node);
+    });
+    return Array.from(rows.entries())
+      .sort(([a], [b]) => a - b)
+      .map(([y, row]) => ({ y, nodes: row.sort((a, b) => a.x - b.x) }));
+  };
+  const layoutFixture = guestCounts => {
+    const nodes = context.buildGraph(fixture(guestCounts));
+    const size = context.layoutNodes(nodes, 1100, 520);
+    const hosts = Array.from(nodes).filter(node => /^proxmox-host:/.test(node.ref)).sort((a, b) => a.x - b.x);
+    return { nodes, size, hosts, rows: hosts.map(host => rowsForHost(nodes, host)) };
+  };
+
+  assert.strictEqual(layoutFixture([3]).rows[0].map(row => row.nodes.length).join(','), '3', 'three Proxmox guests must remain on one row');
+  assert.strictEqual(layoutFixture([4]).rows[0].map(row => row.nodes.length).join(','), '3,1', 'the fourth Proxmox guest must start a second row');
+
+  const seven = layoutFixture([7]);
+  assert.strictEqual(seven.rows[0].map(row => row.nodes.length).join(','), '3,3,1', 'Proxmox guests must wrap into rows of at most three');
+  assert.strictEqual(seven.rows[0][0].y, seven.hosts[0].y + 150, 'the first Proxmox guest row must retain the configured host gap');
+  for(let index = 1; index < seven.rows[0].length; index += 1) {
+    assert.ok(seven.rows[0][index].y - seven.rows[0][index - 1].y >= 62, 'Proxmox guest rows must not overlap vertically');
+  }
+  seven.rows[0].forEach(row => {
+    assert.strictEqual(row.nodes[0].x + row.nodes.at(-1).x, seven.hosts[0].x * 2, 'each Proxmox guest row must stay centered below its host');
+  });
+  assert.ok(seven.size.height >= Math.max(...Array.from(seven.nodes).map(node => node.y)) + 35, 'the topology canvas must include the final Proxmox guest row');
+  assert.ok(seven.size.width < 1200, 'wrapping Proxmox guests must not retain a one-row canvas width');
+
+  const overForty = layoutFixture([41]);
+  const moreNode = Array.from(overForty.nodes).find(node => node.label === '1 more');
+  assert.ok(moreNode && /^proxmox-guest:/.test(moreNode.ref), 'the compact more card must retain a Proxmox guest identity');
+  assert.ok(Array.from(context.hypervisorTreeNodes(overForty.nodes, overForty.hosts[0])).includes(moreNode), 'the compact more card must move with its Proxmox family');
+
+  const twoHosts = layoutFixture([4, 4]);
+  assert.ok(twoHosts.rows.every(rows => rows.map(row => row.nodes.length).join(',') === '3,1'), 'each Proxmox host must wrap its own guests independently');
+  const leftFamily = [twoHosts.hosts[0], ...twoHosts.rows[0].flatMap(row => row.nodes)];
+  const rightFamily = [twoHosts.hosts[1], ...twoHosts.rows[1].flatMap(row => row.nodes)];
+  assert.ok(Math.max(...leftFamily.map(node => node.x)) + 74 <= Math.min(...rightFamily.map(node => node.x)) - 74, 'neighboring Proxmox host families must not overlap');
+
+  const vmwareNodes = [
+    { id: 'vmware-host', parent: null, ref: 'vmware-host:test', level: 0, kind: 'host' },
+    ...Array.from({ length: 4 }, (_, index) => ({ id: `vmware-guest-${index}`, parent: 'vmware-host', ref: `vmware-guest:test:${index}`, level: 1, kind: 'guest' })),
+  ];
+  context.layoutNodes(vmwareNodes, 1100, 520);
+  assert.strictEqual(new Set(vmwareNodes.slice(1).map(node => node.y)).size, 1, 'VMware guests must retain their existing single-row layout');
+}
+
+function testTopologyLinkPorts() {
+  const root = path.join(__dirname, '..');
+  const topology = fs.readFileSync(path.join(root, 'public', 'topology.html'), 'utf8');
+  const server = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
+  const edgeStart = topology.indexOf("const TOPOLOGY_EDGE_SIDES = new Set(");
+  const edgeEnd = topology.indexOf('function edgeClass(', edgeStart);
+  assert.ok(edgeStart >= 0 && edgeEnd > edgeStart, 'topology edge routing helpers must remain testable');
+  const edgeContext = { clamp: (value, min, max) => Math.max(min, Math.min(max, value)) };
+  vm.runInNewContext(
+    `${topology.slice(edgeStart, edgeEnd)}\nglobalThis.edgeAnchor = edgeAnchor; globalThis.edgeRoute = edgeRoute; globalThis.edgePath = edgePath; globalThis.hierarchyEdgeRoute = hierarchyEdgeRoute; globalThis.tempEdgePath = tempEdgePath;`,
+    edgeContext,
+  );
+
+  const source = { x: 100, y: 100, kind: 'host' };
+  const target = { x: 420, y: 260, kind: 'host' };
+  assert.deepStrictEqual(['top','right','bottom','left'].map(side => {
+    const anchor = edgeContext.edgeAnchor(source, side);
+    return [anchor.x, anchor.y];
+  }), [[100,69],[174,100],[100,131],[26,100]], 'normal topology cards must expose exact anchors on all four sides');
+  assert.deepStrictEqual([edgeContext.edgeAnchor({ x:100, y:100, kind:'leaf' }, 'top').y, edgeContext.edgeAnchor({ x:100, y:100, kind:'root' }, 'right').x], [74,188], 'leaf and root edge anchors must match their rendered card sizes');
+  const explicit = edgeContext.edgeRoute(source, target, 'top', 'left');
+  assert.strictEqual(explicit.fromSide, 'top');
+  assert.strictEqual(explicit.toSide, 'left');
+  assert.deepStrictEqual([explicit.start.x, explicit.start.y], [100, 69], 'the selected source port must determine the exact path start');
+  assert.deepStrictEqual([explicit.end.x, explicit.end.y], [346, 260], 'the selected target port must determine the exact path end');
+  assert.ok(explicit.control1.y < explicit.start.y && explicit.control2.x < explicit.end.x, 'Bezier controls must leave both selected ports in their outward directions');
+  assert.match(explicit.path, /^M .* C /, 'topology routes must be cubic curves');
+
+  const vertical = edgeContext.edgeRoute(source, { x: 100, y: 420, kind: 'host' }, 'bottom', 'top');
+  assert.notStrictEqual(vertical.control1.x, vertical.start.x, 'aligned vertical nodes must receive a visible lateral curve');
+  assert.ok(vertical.midpoint.x !== source.x, 'the delete action midpoint must follow the curved path');
+  const horizontal = edgeContext.edgeRoute(source, { x: 500, y: 100, kind: 'host' }, 'right', 'left');
+  assert.notStrictEqual(horizontal.control1.y, horizontal.start.y, 'aligned horizontal nodes must receive a visible vertical curve');
+  assert.strictEqual(horizontal.straight, false, 'aligned nodes must remain curved while their facing ports are far apart');
+  const nearbyHorizontal = edgeContext.edgeRoute(source, { x: 420, y: 100, kind: 'host' }, 'right', 'left');
+  assert.strictEqual(nearbyHorizontal.straight, true, 'nearby side-by-side nodes with facing ports may use a straight route');
+  assert.ok(nearbyHorizontal.control1.y === nearbyHorizontal.start.y && nearbyHorizontal.control2.y === nearbyHorizontal.end.y, 'a nearby horizontal route must stay on the shared center line');
+  const nearbyOffset = edgeContext.edgeRoute(source, { x: 420, y: 112, kind: 'host' }, 'right', 'left');
+  assert.strictEqual(nearbyOffset.straight, false, 'even nearby nodes must retain a curve when they are not aligned');
+  const nearbyVertical = edgeContext.edgeRoute(source, { x: 100, y: 330, kind: 'host' }, 'bottom', 'top');
+  assert.strictEqual(nearbyVertical.straight, false, 'nearby vertical parent-child routes must retain their curve');
+  const hierarchyChildren = [
+    { x:-180, y:320, kind:'host' },
+    { x:100, y:320, kind:'host' },
+    { x:520, y:320, kind:'host' },
+  ];
+  const hierarchyRoutes = hierarchyChildren.map(child => edgeContext.hierarchyEdgeRoute(source, child));
+  assert.ok(hierarchyRoutes.every(route => route.fromSide === 'bottom' && route.toSide === 'top'), 'all siblings must use the same bottom-to-top hierarchy ports regardless of horizontal distance');
+  assert.ok(hierarchyRoutes.every(route => route.start.y === 131 && route.end.y === 289), 'hierarchy links must anchor to the parent bottom and each child top');
+
+  const legacy = edgeContext.edgeRoute(source, { x: 500, y: 140, kind: 'host' });
+  assert.strictEqual(`${legacy.fromSide}:${legacy.toSide}`, 'right:left', 'legacy links without sides must infer facing ports dynamically');
+  const legacyMoved = edgeContext.edgeRoute(source, { x: 110, y: 700, kind: 'host' });
+  assert.strictEqual(`${legacyMoved.fromSide}:${legacyMoved.toSide}`, 'bottom:top', 'legacy link ports must adapt when a node moves across the dominant axis');
+  const movedPath = edgeContext.edgePath(source, { x: 260, y: 520, kind: 'host' }, 'right', 'top');
+  assert.notStrictEqual(movedPath, edgeContext.edgePath(source, target, 'right', 'top'), 'moving a node must recompute its curved route');
+  assert.ok(!/NaN|Infinity/.test(movedPath), 'arbitrary moved-node routes must retain finite coordinates');
+  assert.match(edgeContext.tempEdgePath(source, target, 'left'), /^M .* C /, 'the temporary drag preview must use the selected source side and curved routing');
+
+  assert.ok(topology.includes('data-side="top"') && topology.includes('data-side="right"') && topology.includes('data-side="bottom"') && topology.includes('data-side="left"'), 'every topology node must expose four selectable side ports');
+  assert.ok(topology.includes("const targetPort = document.elementFromPoint(e.clientX, e.clientY)?.closest?.('.node-port');") && topology.includes('const toSide = topologyEdgeSide(targetPort?.dataset.side);'), 'link completion must resolve the exact target port');
+  assert.ok(topology.includes('{ from: sourceRef, to: targetRef, fromSide, toSide }') && topology.includes('link.fromSide,link.toSide'), 'created and rendered topology links must retain both selected sides');
+  assert.ok(topology.includes("shell.addEventListener('pointercancel', e => endDrag(e,true));"), 'a cancelled pointer gesture must not create a topology link');
+  assert.ok(topology.includes('setEdgePathD(`edge-${i}`, hierarchyEdgePath(p, n)') && topology.includes('const path = hierarchyEdgePath(p,n);'), 'initial and live hierarchy rendering must keep sibling port routing consistent');
+
+  const animateStart = topology.indexOf('function edgeShouldAnimate(');
+  const animateEnd = topology.indexOf('function edgeFlowColor(', animateStart);
+  assert.ok(animateStart >= 0 && animateEnd > animateStart, 'topology animation policy must remain testable');
+  const animateContext = {};
+  vm.runInNewContext(`${topology.slice(animateStart, animateEnd)}\nglobalThis.edgeShouldAnimate = edgeShouldAnimate;`, animateContext);
+  assert.strictEqual(animateContext.edgeShouldAnimate({ status:'bad' }, { status:'idle' }), true, 'offline and idle topology endpoints must still render traffic animation');
+  assert.strictEqual(animateContext.edgeShouldAnimate({ status:'good' }, null), false, 'a missing topology endpoint must not render traffic animation');
+  assert.strictEqual(animateContext.edgeShouldAnimate(), false, 'an empty edge must not be considered animatable');
+  assert.ok((topology.match(/if\(!animate \|\| !trafficEnabled\) return '';/g) || []).length === 2 && topology.includes('@media (prefers-reduced-motion: reduce)'), 'Traffic toggle and reduced-motion preferences must remain the animation controls');
+  assert.ok(topology.includes('traffic: !!trafficEnabled,'), 'Traffic toggles must invalidate the topology render signature so every flow element is added or removed immediately');
+
+  const cleanStart = server.indexOf("const TOPOLOGY_LINK_SIDES = new Set(");
+  const cleanEnd = server.indexOf('function cleanTopologyConfig(', cleanStart);
+  assert.ok(cleanStart >= 0 && cleanEnd > cleanStart, 'topology link sanitizers must remain testable');
+  const cleanContext = {};
+  vm.runInNewContext(`${server.slice(cleanStart, cleanEnd)}\nglobalThis.cleanTopologyLink = cleanTopologyLink;`, cleanContext);
+  const cleaned = JSON.parse(JSON.stringify(cleanContext.cleanTopologyLink({ from: ' a ', to: ' b ', label: ' link ', fromSide: ' RIGHT ', toSide: 'top' })));
+  assert.deepStrictEqual(cleaned, { from: 'a', to: 'b', label: 'link', fromSide: 'right', toSide: 'top' }, 'valid topology sides must survive server sanitization');
+  const legacyCleaned = JSON.parse(JSON.stringify(cleanContext.cleanTopologyLink({ from: 'a', to: 'b', fromSide: 'diagonal', toSide: '<script>' })));
+  assert.deepStrictEqual(legacyCleaned, { from: 'a', to: 'b', label: '' }, 'missing or invalid topology sides must fall back safely without breaking legacy links');
+  assert.ok((server.match(/const link = cleanTopologyLink\(item\);/g) || []).length >= 2 && server.includes('.map(cleanTopologyLink)'), 'config loading, API saves and public topology output must all preserve sanitized link sides');
+}
+
 function testStaticRegressions() {
   const root = path.join(__dirname, '..');
   const windowsAgent = fs.readFileSync(path.join(root, 'agent', 'omnisight-agent.ps1'), 'utf8');
@@ -704,6 +888,7 @@ function testStaticRegressions() {
     assert.ok(!linuxAgent.includes(`count=$(${manager}`), `${manager} failures must not be converted to zero updates by a pipeline`);
   }
   assert.ok(server.includes("synology: 'Synology'"), 'public status title must say Synology');
+  assert.ok(server.includes("title: ciProviderTitle(config.cicd, ciPublic)") && server.includes("cicd: ciProviderTitle(config.cicd, data.cicd)"), 'public CI status rows and connecting fallbacks must use the provider-aware title');
   assert.ok(vmwareCollector.includes("client.call('RetrieveServiceContent'") && vmwareCollector.includes("client.call('CreateContainerView'") && vmwareCollector.includes("client.call('RetrievePropertiesEx'"), 'VMware collector must use the authenticated vSphere inventory flow');
   assert.ok(vmwareCollector.includes("'summary.config'") && vmwareCollector.includes("'summary.storage'") && !vmwareCollector.includes("'config.hardware'"), 'VMware VM inventory must collect compact configuration and storage summaries without downloading every virtual hardware device');
   assert.ok(vmwareCollector.includes('/<!DOCTYPE|<!ENTITY/i') && vmwareCollector.includes('maxResponseBytes'), 'VMware SOAP responses must reject unsafe XML and enforce a size limit');
@@ -789,6 +974,7 @@ function testStaticRegressions() {
   assert.ok(dashboard.includes('disk: sources.disk?.[platform]?.[index]') && dashboard.includes('bandwidth: sources.bandwidth?.[platform]?.[index]') && dashboard.includes('const metricHosts = metric ? hosts.filter(host => hasNum(host?.[metric])) : hosts'), 'rate KPI host menus must include only devices reporting the selected metric');
   assert.ok(dashboard.includes("const supportsHostSelection = ['cpu','mem','disk','bandwidth'].includes(metric)") && dashboard.includes("const hostOptions = ['cpu','mem','disk','bandwidth'].includes(metric) ? overviewKpiHostOptions(current, data, metric) : []"), 'all four overview KPIs must retain device selection during initial and incremental renders');
   assert.ok(dashboard.includes("function overviewRateHistory(data, platform, metric, host = 'all')") && dashboard.includes('const rateRows = selectedHost ? { [platform]: [selectedHost.row] } : sources.rateRows') && dashboard.includes('const metricValues = selectedHost ? [selectedHost.disk]') && dashboard.includes('const metricValues = selectedHost ? [selectedHost.bandwidth]'), 'Disk I/O and Bandwidth device selection must filter both current values and history');
+  assert.ok(dashboard.includes("{ areaChart:true, zeroBaseline:true, maxPoints:90 }") && dashboard.includes("const areaChart = opts?.areaChart === true") && dashboard.includes('fill-opacity=".16"') && !dashboard.includes('mini-hist-grid'), 'overview Disk I/O and Bandwidth charts must use a grid-free zero-baseline area history style');
   assert.ok(dashboard.includes('overviewKpiHosts: overviewKpiHosts || {}') && server.includes('ui.overviewKpiHosts = cleanStringMap(') && server.includes("'cpu','mem','memory','disk','bandwidth'"), 'KPI host filters and the RAM metric key must survive preference persistence');
   assert.ok(dashboard.includes('overviewResponsiveLayoutKey') && dashboard.includes('stableOverviewIds'), 'responsive resizing must preserve the dashboard card order');
   assert.ok(dashboard.includes('function bindDetailSystemDragging(detail)') && dashboard.includes("header.classList.toggle('detail-system-draggable', canDrag)") && dashboard.includes('moveDraggedDetailSystem(detailSystemDrag.detail'), 'collapsed detail systems must support pointer-based drag-and-drop ordering');
@@ -1474,6 +1660,8 @@ async function run() {
   testUiPreferenceScoping();
   testAgentRetirement();
   testRequestDiagnostics();
+  testTopologyProxmoxGuestRows();
+  testTopologyLinkPorts();
   testStaticRegressions();
   console.log('smoke ok — issue regressions: #4 #5 #6 #7 #9 #10 #12 #18 #20 #22 #23 #24 #25 #27');
 }

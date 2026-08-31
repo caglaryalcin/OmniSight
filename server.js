@@ -30,6 +30,7 @@ const { getCloudflareData } = require('./src/cloudflare');
 const {
   getAllCiData,
   configuredProjects: ciConfigProjects,
+  displayTitle: ciProviderTitle,
   tokenValue: ciTokenValue,
   normalizeGitlabBaseUrl,
   discoverCiProjects,
@@ -2287,18 +2288,39 @@ function withRequestUiPreferences(req, payload = {}) {
   return out;
 }
 
+const TOPOLOGY_LINK_SIDES = new Set(['top', 'right', 'bottom', 'left']);
+
+function cleanTopologyLinkSide(value) {
+  const side = String(value || '').trim().toLowerCase();
+  return TOPOLOGY_LINK_SIDES.has(side) ? side : '';
+}
+
+function cleanTopologyLink(item) {
+  const from = String(item?.from || '').trim().slice(0, 160);
+  const to = String(item?.to || '').trim().slice(0, 160);
+  if (!from || !to || from === to) return null;
+  const fromSide = cleanTopologyLinkSide(item?.fromSide);
+  const toSide = cleanTopologyLinkSide(item?.toSide);
+  return {
+    from,
+    to,
+    label: String(item?.label || '').trim().slice(0, 80),
+    ...(fromSide ? { fromSide } : {}),
+    ...(toSide ? { toSide } : {}),
+  };
+}
+
 function cleanTopologyConfig(raw = {}) {
   const src = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
   const links = [];
   const seenLinks = new Set();
   for (const item of Array.isArray(src.links) ? src.links : []) {
-    const from = String(item?.from || '').trim().slice(0, 160);
-    const to = String(item?.to || '').trim().slice(0, 160);
-    if (!from || !to || from === to) continue;
-    const key = `${from}->${to}`;
+    const link = cleanTopologyLink(item);
+    if (!link) continue;
+    const key = `${link.from}->${link.to}`;
     if (seenLinks.has(key)) continue;
     seenLinks.add(key);
-    links.push({ from, to, label: String(item?.label || '').trim().slice(0, 80) });
+    links.push(link);
     if (links.length >= 200) break;
   }
   const seenNodes = new Set();
@@ -3665,13 +3687,9 @@ function settingsAgentRows() {
 function topologyLinksConfig() {
   const links = Array.isArray(config.topology?.links) ? config.topology.links : [];
   return links
-    .filter(link => link && link.from && link.to && link.from !== link.to)
-    .slice(0, 200)
-    .map(link => ({
-      from: String(link.from).slice(0, 160),
-      to: String(link.to).slice(0, 160),
-      label: String(link.label || '').slice(0, 80),
-    }));
+    .map(cleanTopologyLink)
+    .filter(Boolean)
+    .slice(0, 200);
 }
 
 function topologyNodesConfig() {
@@ -8032,13 +8050,12 @@ app.post('/api/topology/links', (req, res) => {
     const seen = new Set();
     const links = [];
     for (const item of rawLinks) {
-      const from = String(item?.from || '').trim().slice(0, 160);
-      const to = String(item?.to || '').trim().slice(0, 160);
-      if (!from || !to || from === to) continue;
-      const key = `${from}->${to}`;
+      const link = cleanTopologyLink(item);
+      if (!link) continue;
+      const key = `${link.from}->${link.to}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      links.push({ from, to, label: String(item?.label || '').trim().slice(0, 80) });
+      links.push(link);
       if (links.length >= 200) break;
     }
     const rawNodes = Array.isArray(req.body?.nodes) ? req.body.nodes : (config.topology?.nodes || []);
@@ -9503,7 +9520,7 @@ function buildPublicSummary(data) {
     const status = ciPublic._connecting && !ciPublic.online ? 'connecting' : !ciPublic.online || up === 0 ? 'down' : (failed > 0 || partial ? 'warn' : 'ok');
     const runMeta = running ? ` - ${running} running` : '';
     const meta = ciPublic._connecting && !ciPublic.online ? 'connecting...' : ciPublic.online ? `${up}/${total} projects - ${sm.success || 0}/${sm.pipelines || 0} green${runMeta}` : 'unreachable';
-    out.push({ id: 'cicd', title: 'GitHub/GitLab CI', status, meta });
+    out.push({ id: 'cicd', title: ciProviderTitle(config.cicd, ciPublic), status, meta });
   }
   const veeam = data.veeam;
   if (veeam && veeam.online !== undefined) {
@@ -9541,7 +9558,7 @@ app.get('/api/public/status', (req, res) => {
     : null;
   const services = buildPublicSummary(data).filter(s => !visible || visible.has(s.id));
   const present = new Set(services.map(s => s.id));
-  const titles = { proxmox: 'Proxmox', vmware: 'VMware ESXi', linux: 'Linux Servers', windows: 'Windows Servers', kubernetes: 'Kubernetes', synology: 'Synology', mikrotik: 'MikroTik', unifi: 'UniFi', snmp: 'SNMP', healthchecks: 'Healthchecks', uptimekuma: 'Uptime Kuma', checks: 'Service checks', prometheus: 'Prometheus', docker: 'Docker', dockhand: 'Dockhand', database: 'Databases', firewall: 'Firewalls', truenas: 'TrueNAS', qnap: 'QNAP', ugreen: 'Ugreen', pbs: 'Proxmox Backup', cloudflare: 'Cloudflare', cicd: 'GitHub/GitLab CI', veeam: 'Veeam', portainer: 'Portainer' };
+  const titles = { proxmox: 'Proxmox', vmware: 'VMware ESXi', linux: 'Linux Servers', windows: 'Windows Servers', kubernetes: 'Kubernetes', synology: 'Synology', mikrotik: 'MikroTik', unifi: 'UniFi', snmp: 'SNMP', healthchecks: 'Healthchecks', uptimekuma: 'Uptime Kuma', checks: 'Service checks', prometheus: 'Prometheus', docker: 'Docker', dockhand: 'Dockhand', database: 'Databases', firewall: 'Firewalls', truenas: 'TrueNAS', qnap: 'QNAP', ugreen: 'Ugreen', pbs: 'Proxmox Backup', cloudflare: 'Cloudflare', cicd: ciProviderTitle(config.cicd, data.cicd), veeam: 'Veeam', portainer: 'Portainer' };
   configuredList().forEach(id => {
     if (visible && !visible.has(id)) return;
     if (!present.has(id)) services.push({ id, title: titles[id] || id, status: 'connecting', meta: 'connecting…' });

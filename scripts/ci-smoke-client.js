@@ -348,6 +348,39 @@ function run() {
       `${expectedTitle} must be rendered as the actual CI sidebar card label`,
     );
   }
+  const dashboardTitleContext = {};
+  vm.runInNewContext(extractFunction(html, 'dashboardCardTitle'), dashboardTitleContext);
+  for (const [projects, expectedTitle] of [
+    [[{ provider:'github' }], 'GitHub'],
+    [[{ provider:'gitlab' }], 'GitLab'],
+    [[{ provider:'github' }, { provider:'gitlab' }], 'GitHub/GitLab CI'],
+  ]) {
+    const sidebarTitle = ciSidebarTitle({ projects });
+    assert.strictEqual(
+      dashboardTitleContext.dashboardCardTitle('cicd', { title:'GitHub/GitLab CI', sidebarTitle }),
+      expectedTitle,
+      `${expectedTitle} must be rendered as the CI dashboard card title`,
+    );
+  }
+  assert.strictEqual(dashboardTitleContext.dashboardCardTitle('linux', { title:'Linux Servers', sidebarTitle:'Sidebar override' }), 'Linux Servers', 'provider-specific dashboard titles must remain scoped to CI/CD');
+  const sparkContext = {
+    hasNum:value => value !== null && value !== undefined && value !== '' && Number.isFinite(Number(value)),
+    bchex:() => '#22D3EE',
+    escAttr:value => String(value ?? ''),
+    window:{ REFRESH_INTERVAL:15000 },
+  };
+  vm.runInNewContext(extractFunction(html, 'miniSparkline'), sparkContext);
+  const sparkRows = Array.from({ length:200 }, (_, index) => ({ time:1_700_000_000_000 + index*15000, value:(index%20)+1 }));
+  const defaultSpark = sparkContext.miniSparkline(sparkRows, 'value', 20, ()=>'#22D3EE', 24, ' MB/s', 'Disk I/O');
+  assert.ok(!defaultSpark.includes('is-area-chart') && !defaultSpark.includes('mini-hist-area'), 'shared header sparklines must retain their compact line-only style');
+  const rateSpark = sparkContext.miniSparkline(sparkRows, 'value', 20, ()=>'#22D3EE', 24, ' MB/s', 'Disk I/O', { areaChart:true, zeroBaseline:true, maxPoints:90 });
+  assert.ok(rateSpark.includes('is-area-chart') && rateSpark.includes('mini-hist-area'), 'overview rate charts must render the Grafana-style area fill');
+  assert.ok(!rateSpark.includes('mini-hist-grid'), 'overview rate charts must not render background grid lines');
+  const rateSparkPoints = JSON.parse(rateSpark.match(/data-pts='([^']+)'/)?.[1] || '[]');
+  assert.strictEqual(rateSparkPoints.length, 90, 'overview rate charts must retain a denser history window than compact sparklines');
+  const zeroBaselineSpark = sparkContext.miniSparkline([{value:5},{value:10}], 'value', 10, ()=>'#34D399', 20, ' MB/s', 'Bandwidth', { areaChart:true, zeroBaseline:true });
+  const zeroBaselinePoints = JSON.parse(zeroBaselineSpark.match(/data-pts='([^']+)'/)?.[1] || '[]');
+  assert.strictEqual(zeroBaselinePoints[1].y, 27, 'Grafana-style rate charts must scale values from zero instead of stretching the observed minimum to the baseline');
   const updateSidebarCardSource = extractFunction(html, 'updateSidebarCard');
   assert.ok(
     updateSidebarCardSource.includes("const sidebarTitle = panel.sidebarTitle || panel.title || ''")
@@ -604,6 +637,7 @@ function run() {
   const overviewKpiSource = extractFunction(html, 'overviewKpi');
   const overviewRowSource = extractFunction(html, 'overviewRow');
   assert.ok(overviewCardSource.includes('data-morph-key') && overviewKpiSource.includes('data-morph-key') && overviewRowSource.includes('data-morph-key'), 'overview cards, KPIs and rows must have stable morph keys');
+  assert.ok(overviewCardSource.includes('const title = dashboardCardTitle(id, panel);'), 'dashboard overview cards must use the provider-specific CI title selected for the sidebar');
   assert.ok(overviewCardSource.includes('data-morph-key="overview-summary:${escAttr(id)}"') && overviewCardSource.includes('data-morph-key="overview-list:${escAttr(id)}"'), 'overview summaries and lists must be keyed per platform instead of shifting card children positionally');
   assert.match(overviewRowSource, /function overviewRow\([^)]*entityKey\s*=\s*''\)/, 'overview rows must accept an optional stable entity key');
   assert.ok(overviewRowSource.includes('entityKey || name ||'), 'overview row identity must prefer the stable entity key over mutable display text');

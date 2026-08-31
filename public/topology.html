@@ -75,7 +75,10 @@ header{height:64px;display:flex;align-items:center;justify-content:space-between
 .node-port.left{left:-7px;top:50%;transform:translateY(-50%)}.node-port.right{right:-7px;top:50%;transform:translateY(-50%)}
 .node-port.top{left:50%;top:-7px;transform:translateX(-50%)}.node-port.bottom{left:50%;bottom:-7px;transform:translateX(-50%)}
 .topo-node:hover .node-port{opacity:1;pointer-events:auto}
-.map-shell.linking .node-port,.map-shell.node-moving .node-port,.topo-node.node-dragging .node-port{opacity:0;pointer-events:none}
+.map-shell.node-moving .node-port,.topo-node.node-dragging .node-port{opacity:0;pointer-events:none}
+.map-shell.linking .node-port{opacity:.52;pointer-events:auto}
+.map-shell.linking .node-port.link-source,.map-shell.linking .node-port.link-target{opacity:1;border-color:var(--panel);box-shadow:0 0 0 2px rgba(167,139,250,.72),0 0 18px rgba(167,139,250,.62)}
+.map-shell.linking .node-port.link-source{background:var(--cyan);box-shadow:0 0 0 2px rgba(34,211,238,.62),0 0 18px rgba(34,211,238,.58)}
 .node-port:hover{box-shadow:0 0 0 2px rgba(167,139,250,.48),0 0 16px rgba(167,139,250,.44)}
 .node-delete{position:absolute;right:-10px;top:-10px;z-index:9;width:24px;height:24px;display:grid;place-items:center;border:1px solid rgba(248,113,113,.42);border-radius:8px;background:rgba(20,22,23,.90);color:var(--red);box-shadow:0 10px 26px rgba(0,0,0,.28);cursor:pointer;opacity:0;pointer-events:none;transition:opacity .14s ease,border-color .14s ease,background .14s ease}
 .topo-node:hover .node-delete{opacity:1;pointer-events:auto}
@@ -524,8 +527,8 @@ function addCandidate(nodes, c){
   return addNode(nodes, c.parent, c.level, c.key, c.label, c.meta, c.status, c.icon, c.kind, c.ref, c.platform);
 }
 function limited(items, max){return Array.isArray(items) ? items.slice(0,max) : []}
-function plusNode(nodes, parent, level, total, shown){
-  if(total > shown) addNode(nodes,parent,level,`${parent}-more`,`${total-shown} more`,'hidden in compact view','idle','node','leaf');
+function plusNode(nodes, parent, level, total, shown, refKey = '', platform = ''){
+  if(total > shown) addNode(nodes,parent,level,`${parent}-more`,`${total-shown} more`,'hidden in compact view','idle','node','leaf',refKey,platform);
 }
 function buildGraph(d){
   const nodes=[];
@@ -581,7 +584,7 @@ function buildGraph(d){
         const osLabel = [proxmoxGuestTypeLabel(v), v.status || ''].filter(Boolean).join(' - ');
         addNode(nodes,h,1,`vm-${vmKey}`,vmName,osLabel,isGood(v.status)?'good':isBad(v.status)?'bad':'warn',osIcon || 'node','guest',guestRef);
       });
-      plusNode(nodes,h,1,n.vms?.length||0,40);
+      plusNode(nodes,h,1,n.vms?.length||0,40,`proxmox-guest:${safeId(hostName)}:more`,'proxmox');
     });
     plusNode(nodes,null,0,px.length,20);
   }
@@ -675,26 +678,64 @@ function buildGraph(d){
   }
   return nodes;
 }
+const PROXMOX_GUESTS_PER_ROW = 3;
+const PROXMOX_GUEST_ROW_GAP = 82;
+function proxmoxGuestGridPoint(index, total, centerX, firstRowY, childGap = 154){
+  const row = Math.floor(index / PROXMOX_GUESTS_PER_ROW);
+  const rowStart = row * PROXMOX_GUESTS_PER_ROW;
+  const rowCount = Math.min(PROXMOX_GUESTS_PER_ROW, Math.max(0, total - rowStart));
+  const column = index - rowStart;
+  return {
+    row,
+    x: Math.round(centerX - ((rowCount - 1) * childGap) / 2 + column * childGap),
+    y: Math.round(firstRowY + row * PROXMOX_GUEST_ROW_GAP),
+  };
+}
+function packedHypervisorHostWidth(nodes){
+  const hosts = nodes.filter(n => /^(?:proxmox|vmware)-host:/.test(String(n.ref || '')));
+  if(!hosts.length) return 0;
+  const childGap = 154;
+  const clusterGap = 18;
+  return hosts.reduce((sum, host) => {
+    const children = nodes.filter(n => n.parent === host.id);
+    const visibleChildren = children.filter(n => !/more$/.test(String(n.ref || '')));
+    const count = Math.max(1, visibleChildren.length || children.length);
+    const columns = /^proxmox-host:/.test(String(host.ref || ''))
+      ? Math.min(PROXMOX_GUESTS_PER_ROW, count)
+      : count;
+    return sum + Math.max(148, columns * childGap - 22);
+  }, 0) + clusterGap * (hosts.length - 1);
+}
+function proxmoxGuestRowCount(nodes){
+  const hostIds = new Set(nodes.filter(n => /^proxmox-host:/.test(String(n.ref || ''))).map(n => n.id));
+  const counts = new Map();
+  nodes.forEach(node => {
+    if(hostIds.has(node.parent)) counts.set(node.parent, (counts.get(node.parent) || 0) + 1);
+  });
+  return Math.max(1, ...[...counts.values()].map(count => Math.ceil(count / PROXMOX_GUESTS_PER_ROW)));
+}
 function layoutNodes(nodes, viewportWidth, viewportHeight){
   const levels = new Map();
   nodes.forEach(n=>{ if(!levels.has(n.level)) levels.set(n.level,[]); levels.get(n.level).push(n); });
-  const maxCount = Math.max(...[...levels.values()].map(v=>v.length),1);
-  const width = Math.max(viewportWidth || 1100, maxCount * 154 + 140);
+  const maxCount = Math.max(...[...levels.values()].map(items => items.filter(n => !/^proxmox-guest:/.test(String(n.ref || ''))).length),1);
+  const width = Math.max(viewportWidth || 1100, maxCount * 154 + 140, packedHypervisorHostWidth(nodes) + 180);
   const levelGap = 150;
   const pxVmGap = proxmoxVmGap();
+  const extraProxmoxDepth = Math.max(0, proxmoxGuestRowCount(nodes) - 1) * PROXMOX_GUEST_ROW_GAP;
   const top = 64;
   const levelKeys = [...levels.keys()];
   const minLevel = Math.min(...levelKeys, 0);
   const maxLevel = Math.max(...levelKeys, 0);
-  const height = Math.max(viewportHeight || 520, 520, top * 2 + (maxLevel - minLevel) * levelGap + Math.max(0, pxVmGap - levelGap));
+  let height = Math.max(viewportHeight || 520, 520, top * 2 + (maxLevel - minLevel) * levelGap + Math.max(0, pxVmGap - levelGap) + (maxLevel > 1 ? extraProxmoxDepth : 0));
   levels.forEach((arr, level)=>{
-    const y = top + (level - minLevel) * levelGap;
+    const y = top + (level - minLevel) * levelGap + (level > 1 ? extraProxmoxDepth : 0);
     arr.forEach((n,i)=>{
       n.x = Math.round((i + 1) * width / (arr.length + 1));
       n.y = y;
     });
   });
-  packProxmoxClusters(nodes, width);
+  const packedBottom = packProxmoxClusters(nodes, width);
+  if(packedBottom) height = Math.max(height, packedBottom + top);
   applySavedTopologyPositions(nodes);
   return {width,height};
 }
@@ -780,53 +821,143 @@ function applySavedTopologyPositions(nodes){
 }
 function packProxmoxClusters(nodes, width){
   const hosts = nodes.filter(n => /^(?:proxmox|vmware)-host:/.test(String(n.ref || ''))).sort((a,b)=>a.x-b.x);
-  if(!hosts.length) return;
+  if(!hosts.length) return 0;
   const childGap = 154;
   const clusterGap = 18;
   const clusters = hosts.map(host => {
     const children = nodes.filter(n => n.parent === host.id).sort((a,b)=>a.x-b.x);
     const visibleChildren = children.filter(n => !/more$/.test(String(n.ref || '')));
     const count = Math.max(1, visibleChildren.length || children.length);
-    const width = Math.max(148, count * childGap - 22);
-    return { host, children, width };
+    const isProxmox = /^proxmox-host:/.test(String(host.ref || ''));
+    const columns = isProxmox ? Math.min(PROXMOX_GUESTS_PER_ROW, count) : count;
+    const width = Math.max(148, columns * childGap - 22);
+    return { host, children, width, isProxmox };
   });
   const totalWidth = clusters.reduce((sum,c)=>sum+c.width,0) + clusterGap * (clusters.length - 1);
   let left = Math.max(90, Math.round((width - totalWidth) / 2));
+  let packedBottom = 0;
   clusters.forEach(cluster => {
     const center = Math.round(left + cluster.width / 2);
     cluster.host.x = center;
     const children = cluster.children;
     if(children.length) {
-      const start = cluster.host.x - ((children.length - 1) * childGap) / 2;
-      children.forEach((child, i) => {
-        child.x = Math.round(start + i * childGap);
-        child.y = Math.round(cluster.host.y + proxmoxVmGap());
-      });
+      const firstRowY = cluster.host.y + proxmoxVmGap();
+      if(cluster.isProxmox && children.length > PROXMOX_GUESTS_PER_ROW){
+        children.forEach((child, i) => {
+          const point = proxmoxGuestGridPoint(i, children.length, cluster.host.x, firstRowY, childGap);
+          child.x = point.x;
+          child.y = point.y;
+        });
+      } else {
+        const start = cluster.host.x - ((children.length - 1) * childGap) / 2;
+        children.forEach((child, i) => {
+          child.x = Math.round(start + i * childGap);
+          child.y = Math.round(firstRowY);
+        });
+      }
+      packedBottom = Math.max(packedBottom, ...children.map(child => child.y));
     }
     left += cluster.width + clusterGap;
   });
   centerHypervisorParents(nodes);
+  return packedBottom;
 }
-function edgePath(a,b){
-  if(Math.abs(a.y - b.y) < 10){
-    const left = a.x <= b.x ? a : b;
-    const right = a.x <= b.x ? b : a;
-    const y = left.y;
-    const x1 = left.x + 74;
-    const x2 = right.x - 74;
-    const mid = Math.round((x1 + x2) / 2);
-    return `M ${x1} ${y} C ${mid} ${y - 70}, ${mid} ${y - 70}, ${x2} ${y}`;
+const TOPOLOGY_EDGE_SIDES = new Set(['top','right','bottom','left']);
+const TOPOLOGY_STRAIGHT_EDGE_GAP = 180;
+const TOPOLOGY_STRAIGHT_EDGE_ALIGNMENT = 8;
+function topologyEdgeSide(value){
+  const side = String(value || '').trim().toLowerCase();
+  return TOPOLOGY_EDGE_SIDES.has(side) ? side : '';
+}
+function automaticEdgeSides(a,b){
+  const dx = Number(b?.x || 0) - Number(a?.x || 0);
+  const dy = Number(b?.y || 0) - Number(a?.y || 0);
+  if(Math.abs(dx) > Math.abs(dy) * 1.08){
+    return dx >= 0 ? { fromSide:'right', toSide:'left' } : { fromSide:'left', toSide:'right' };
   }
-  const y1 = a.y + 31;
-  const y2 = b.y - 31;
-  const mid = Math.round((y1 + y2) / 2);
-  return `M ${a.x} ${y1} C ${a.x} ${mid}, ${b.x} ${mid}, ${b.x} ${y2}`;
+  return dy >= 0 ? { fromSide:'bottom', toSide:'top' } : { fromSide:'top', toSide:'bottom' };
 }
-function tempEdgePath(a,b){
-  const x1 = a.x + 74;
-  const y1 = a.y;
-  const mid = Math.round((x1 + b.x) / 2);
-  return `M ${x1} ${y1} C ${mid} ${y1}, ${mid} ${b.y}, ${b.x} ${b.y}`;
+function resolvedEdgeSides(a,b,fromSide = '',toSide = ''){
+  const automatic = automaticEdgeSides(a,b);
+  return {
+    fromSide: topologyEdgeSide(fromSide) || automatic.fromSide,
+    toSide: topologyEdgeSide(toSide) || automatic.toSide,
+  };
+}
+function edgeAnchor(node, side){
+  const halfWidth = node?.kind === 'leaf' ? 66 : node?.kind === 'root' ? 88 : 74;
+  const halfHeight = node?.kind === 'leaf' ? 26 : node?.kind === 'root' ? 35 : 31;
+  const x = Number(node?.x || 0);
+  const y = Number(node?.y || 0);
+  if(side === 'top') return { x, y:y-halfHeight };
+  if(side === 'right') return { x:x+halfWidth, y };
+  if(side === 'left') return { x:x-halfWidth, y };
+  return { x, y:y+halfHeight };
+}
+function edgeSideVector(side){
+  return ({ top:{x:0,y:-1}, right:{x:1,y:0}, bottom:{x:0,y:1}, left:{x:-1,y:0} })[side] || {x:0,y:1};
+}
+function cubicEdgePoint(start,control1,control2,end,t = .5){
+  const mt = 1-t;
+  return {
+    x: Math.round(mt*mt*mt*start.x + 3*mt*mt*t*control1.x + 3*mt*t*t*control2.x + t*t*t*end.x),
+    y: Math.round(mt*mt*mt*start.y + 3*mt*mt*t*control1.y + 3*mt*t*t*control2.y + t*t*t*end.y),
+  };
+}
+function shortAlignedFacingEdge(start,end,fromSide,toSide){
+  const dx = end.x-start.x;
+  const dy = end.y-start.y;
+  return Math.abs(dy) <= TOPOLOGY_STRAIGHT_EDGE_ALIGNMENT
+    && Math.abs(dx) <= TOPOLOGY_STRAIGHT_EDGE_GAP
+    && ((dx >= 0 && fromSide === 'right' && toSide === 'left') || (dx < 0 && fromSide === 'left' && toSide === 'right'));
+}
+function curvedEdgeRoute(start,end,fromSide,toSide){
+  const fromVector = edgeSideVector(fromSide);
+  const toVector = edgeSideVector(toSide);
+  const distance = Math.hypot(end.x-start.x,end.y-start.y);
+  const straight = shortAlignedFacingEdge(start,end,fromSide,toSide);
+  if(straight){
+    const control1 = { x:Math.round(start.x+(end.x-start.x)/3), y:Math.round(start.y+(end.y-start.y)/3) };
+    const control2 = { x:Math.round(start.x+(end.x-start.x)*2/3), y:Math.round(start.y+(end.y-start.y)*2/3) };
+    return {
+      start, end, control1, control2, straight,
+      path:`M ${start.x} ${start.y} C ${control1.x} ${control1.y}, ${control2.x} ${control2.y}, ${end.x} ${end.y}`,
+      midpoint:cubicEdgePoint(start,control1,control2,end),
+    };
+  }
+  const handle = Math.round(clamp(distance*.42,48,220));
+  const control1 = { x:start.x+fromVector.x*handle, y:start.y+fromVector.y*handle };
+  const control2 = { x:end.x+toVector.x*handle, y:end.y+toVector.y*handle };
+  const vertical = ['top','bottom'].includes(fromSide) && ['top','bottom'].includes(toSide) && Math.abs(start.x-end.x) < 2;
+  const horizontal = ['left','right'].includes(fromSide) && ['left','right'].includes(toSide) && Math.abs(start.y-end.y) < 2;
+  if(vertical){
+    const bend = Math.round(clamp(distance*.18,30,78)) * (fromSide === 'top' ? -1 : 1);
+    control1.x += bend;
+    control2.x += bend;
+  } else if(horizontal){
+    const bend = Math.round(clamp(distance*.18,30,78)) * (fromSide === 'left' ? -1 : 1);
+    control1.y += bend;
+    control2.y += bend;
+  }
+  return {
+    start, end, control1, control2, straight,
+    path:`M ${start.x} ${start.y} C ${control1.x} ${control1.y}, ${control2.x} ${control2.y}, ${end.x} ${end.y}`,
+    midpoint:cubicEdgePoint(start,control1,control2,end),
+  };
+}
+function edgeRoute(a,b,fromSide = '',toSide = ''){
+  const sides = resolvedEdgeSides(a,b,fromSide,toSide);
+  return {
+    ...curvedEdgeRoute(edgeAnchor(a,sides.fromSide),edgeAnchor(b,sides.toSide),sides.fromSide,sides.toSide),
+    ...sides,
+  };
+}
+function edgePath(a,b,fromSide = '',toSide = ''){return edgeRoute(a,b,fromSide,toSide).path}
+function hierarchyEdgeRoute(parent,child){return edgeRoute(parent,child,'bottom','top')}
+function hierarchyEdgePath(parent,child){return hierarchyEdgeRoute(parent,child).path}
+function tempEdgePath(a,b,fromSide = ''){
+  const sides = resolvedEdgeSides(a,b,fromSide,'');
+  return curvedEdgeRoute(edgeAnchor(a,sides.fromSide),{x:b.x,y:b.y},sides.fromSide,sides.toSide).path;
 }
 function edgeClass(node){
   return node.status === 'good' ? 'good' : node.status === 'warn' ? 'warn' : node.status === 'bad' ? 'bad' : 'idle';
@@ -861,7 +992,7 @@ function edgeSvg(id, path, cls, animate = true, attrs = ''){
   return `<path id="${id}" class="edge ${cls}" d="${path}" ${attrs}></path>${flowTraceSvg(id, path, cls, animate)}${flowDotsSvg(id, path, cls, animate)}`;
 }
 function edgeShouldAnimate(...nodes){
-  return nodes.every(n => n && n.status !== 'bad' && n.status !== 'idle');
+  return nodes.length > 0 && nodes.every(Boolean);
 }
 function edgeFlowColor(cls){
   if(/\blayer-switch\b/.test(cls)) return '#22D3EE';
@@ -1129,10 +1260,7 @@ function visibleTopologyLinkEntries(nodes){
 function visibleTopologyLinks(nodes){
   return visibleTopologyLinkEntries(nodes).map(entry=>entry.link);
 }
-function edgeMidpoint(a,b){
-  if(Math.abs(a.y - b.y) < 10) return { x: (a.x + b.x) / 2, y: a.y - 42 };
-  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-}
+function edgeMidpoint(a,b,fromSide = '',toSide = ''){return edgeRoute(a,b,fromSide,toSide).midpoint}
 function edgeDeleteButton(index, p){
   return `<button class="edge-delete" type="button" data-link-index="${index}" style="left:${p.x}px;top:${p.y}px" title="Delete link" onpointerdown="event.stopPropagation()" onclick="event.stopPropagation();removeTopologyLink(${index})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg></button>`;
 }
@@ -1165,16 +1293,14 @@ function refreshTopologyEdges(){
   const byRef = new Map(currentNodes.map(n=>[n.ref,n]));
   currentNodes.filter(n=>n.parent && byId.has(n.parent)).forEach((n,i)=>{
     const p = byId.get(n.parent);
-    setEdgePathD(`edge-${i}`, edgePath(p, n), edgeLayerClass(p, n, false));
+    setEdgePathD(`edge-${i}`, hierarchyEdgePath(p, n), edgeLayerClass(p, n, false));
   });
   visibleTopologyLinkEntries(currentNodes).forEach(({link,index}) => {
     const a = byRef.get(link.from);
     const b = byRef.get(link.to);
     if(!a || !b) return;
-    const top = a.y <= b.y ? a : b;
-    const bottom = a.y <= b.y ? b : a;
-    setEdgePathD(`manual-edge-${index}`, edgePath(top,bottom), edgeLayerClass(a, b, true));
-    const mid = edgeMidpoint(top,bottom);
+    setEdgePathD(`manual-edge-${index}`, edgePath(a,b,link.fromSide,link.toSide), edgeLayerClass(a, b, true));
+    const mid = edgeMidpoint(a,b,link.fromSide,link.toSide);
     const btn = inner.querySelector(`.edge-delete[data-link-index="${index}"]`);
     if(btn) {
       btn.style.left = `${mid.x}px`;
@@ -1184,9 +1310,10 @@ function refreshTopologyEdges(){
 }
 function topologyStructureSignature(nodes, links, size){
   return JSON.stringify({
+    traffic: !!trafficEnabled,
     size: [Math.round(size?.width || 0), Math.round(size?.height || 0)],
     nodes: (nodes || []).map(n => [n.ref, n.parent, n.level, Math.round(n.x || 0), Math.round(n.y || 0), n.kind, n.icon]),
-    links: (links || []).map(l => [l.from, l.to])
+    links: (links || []).map(l => [l.from, l.to, topologyEdgeSide(l.fromSide), topologyEdgeSide(l.toSide)])
   });
 }
 function patchTopologyNodes(nodes){
@@ -1268,7 +1395,7 @@ function renderTopology(d){
   const byRef = new Map(nodes.map(n=>[n.ref,n]));
   const edges = nodes.filter(n=>n.parent && byId.has(n.parent)).map((n,i)=>{
     const p = byId.get(n.parent);
-    const path = edgePath(p,n);
+    const path = hierarchyEdgePath(p,n);
     const c = edgeLayerClass(p,n,false);
     return edgeSvg(`edge-${i}`, path, c, edgeShouldAnimate(p,n));
   }).join('');
@@ -1276,13 +1403,11 @@ function renderTopology(d){
     const a = byRef.get(link.from);
     const b = byRef.get(link.to);
     if(!a || !b) return null;
-    const top = a.y <= b.y ? a : b;
-    const bottom = a.y <= b.y ? b : a;
-    const path = edgePath(top,bottom);
+    const path = edgePath(a,b,link.fromSide,link.toSide);
     const cls = edgeLayerClass(a,b,true);
     return {
-      edge: edgeSvg(`manual-edge-${index}`, path, cls, edgeShouldAnimate(top,bottom), `data-link-index="${index}"`),
-      action: edgeDeleteButton(index, edgeMidpoint(top,bottom)),
+      edge: edgeSvg(`manual-edge-${index}`, path, cls, edgeShouldAnimate(a,b), `data-link-index="${index}"`),
+      action: edgeDeleteButton(index, edgeMidpoint(a,b,link.fromSide,link.toSide)),
     };
   }).filter(Boolean);
   const customEdges = customEdgeParts.map(p => p.edge).join('');
@@ -1290,10 +1415,10 @@ function renderTopology(d){
   const nodeHtml = nodes.map(n=>`<div class="topo-node ${n.kind||''} ${edgeClass(n)}" data-ref="${esc(n.ref)}" style="left:${n.x}px;top:${n.y}px">
     <span class="node-dot"></span>
     ${canRemoveTopologyRef(n.ref) ? '<button class="node-delete" type="button" title="Remove from topology" aria-label="Remove from topology"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/></svg></button>' : ''}
-    <span class="node-port top" title="Drag to connect"></span>
-    <span class="node-port right" title="Drag to connect"></span>
-    <span class="node-port bottom" title="Drag to connect"></span>
-    <span class="node-port left" title="Drag to connect"></span>
+    <span class="node-port top" data-side="top" title="Drag to connect"></span>
+    <span class="node-port right" data-side="right" title="Drag to connect"></span>
+    <span class="node-port bottom" data-side="bottom" title="Drag to connect"></span>
+    <span class="node-port left" data-side="left" title="Drag to connect"></span>
     <div class="node-icon icon-${safeId(n.icon || n.kind || 'node')}" data-icon-key="${esc(`${n.icon || ''}:${n.kind || ''}`)}">${nodeIconHtml(n)}</div>
     <div class="node-main"><div class="node-name" title="${esc(n.label)}">${esc(n.label)}</div><div class="node-meta" title="${esc(n.meta)}">${esc(n.meta)}</div></div>
   </div>`).join('');
@@ -1387,6 +1512,7 @@ function initTopologyControls(){
   }
   function clearLinkTarget(){
     shell.querySelectorAll('.topo-node.link-target').forEach(el => el.classList.remove('link-target'));
+    shell.querySelectorAll('.node-port.link-target').forEach(el => el.classList.remove('link-target'));
   }
   function updateTempLink(e){
     if(!linkDragging) return;
@@ -1400,14 +1526,23 @@ function initTopologyControls(){
       temp.setAttribute('class', 'edge temp');
       layer.appendChild(temp);
     }
-    temp.setAttribute('d', tempEdgePath(linkDragging.source, p));
     clearLinkTarget();
-    const targetEl = document.elementFromPoint(e.clientX, e.clientY)?.closest?.('.topo-node');
-    if(targetEl && targetEl.dataset.ref !== linkDragging.source.ref) targetEl.classList.add('link-target');
+    const targetPort = document.elementFromPoint(e.clientX, e.clientY)?.closest?.('.node-port');
+    const targetEl = targetPort?.closest?.('.topo-node');
+    const targetNode = currentNodes.find(node => node.ref === targetEl?.dataset.ref);
+    const targetSide = topologyEdgeSide(targetPort?.dataset.side);
+    if(targetNode && targetNode.ref !== linkDragging.source.ref && targetSide){
+      targetEl.classList.add('link-target');
+      targetPort.classList.add('link-target');
+      temp.setAttribute('d', edgePath(linkDragging.source,targetNode,linkDragging.fromSide,targetSide));
+    } else {
+      temp.setAttribute('d', tempEdgePath(linkDragging.source,p,linkDragging.fromSide));
+    }
   }
   function removeTempLink(){
     shell.querySelector('#temp-edge')?.remove();
     clearLinkTarget();
+    shell.querySelectorAll('.node-port.link-source').forEach(el => el.classList.remove('link-source'));
   }
   function linkExists(a,b){
     return topologyLinks.some(l => (l.from === a && l.to === b) || (l.from === b && l.to === a));
@@ -1515,8 +1650,10 @@ function initTopologyControls(){
     if(port && e.button === 0){
       const nodeEl = port.closest('.topo-node');
       const node = currentNodes.find(n => n.ref === nodeEl?.dataset.ref);
-      if(!node) return;
-      linkDragging = { source: node };
+      const fromSide = topologyEdgeSide(port.dataset.side);
+      if(!node || !fromSide) return;
+      linkDragging = { source: node, fromSide };
+      port.classList.add('link-source');
       shell.classList.add('linking');
       hideEdgeDeleteButtons();
       e.preventDefault();
@@ -1582,17 +1719,20 @@ function initTopologyControls(){
     topoView.userMoved = true;
     applyTopologyTransform();
   });
-  function endDrag(e){
+  function endDrag(e,cancelled = false){
     if(linkDragging){
       const sourceRef = linkDragging.source.ref;
-      const targetEl = document.elementFromPoint(e.clientX, e.clientY)?.closest?.('.topo-node');
+      const fromSide = linkDragging.fromSide;
+      const targetPort = cancelled ? null : document.elementFromPoint(e.clientX, e.clientY)?.closest?.('.node-port');
+      const targetEl = targetPort?.closest?.('.topo-node');
       const targetRef = targetEl?.dataset.ref;
+      const toSide = topologyEdgeSide(targetPort?.dataset.side);
       removeTempLink();
       linkDragging = null;
       shell.classList.remove('linking');
       try { shell.releasePointerCapture(e.pointerId); } catch {}
-      if(targetRef && targetRef !== sourceRef && !linkExists(sourceRef, targetRef)){
-        saveTopologyLinks([...topologyLinks, { from: sourceRef, to: targetRef }])
+      if(targetRef && targetRef !== sourceRef && fromSide && toSide && !linkExists(sourceRef, targetRef)){
+        saveTopologyLinks([...topologyLinks, { from: sourceRef, to: targetRef, fromSide, toSide }])
           .catch(err => alert(err.message || 'Could not save topology link'));
       }
       return;
@@ -1618,7 +1758,7 @@ function initTopologyControls(){
     try { shell.releasePointerCapture(e.pointerId); } catch {}
   }
   shell.addEventListener('pointerup', endDrag);
-  shell.addEventListener('pointercancel', endDrag);
+  shell.addEventListener('pointercancel', e => endDrag(e,true));
   shell.addEventListener('mouseleave', hideEdgeDeleteButtons);
   shell.addEventListener('dblclick', () => {
     topoView.userMoved = false;

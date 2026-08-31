@@ -927,6 +927,7 @@ html[data-theme="light"] .ov-gauge-trend-base{stroke:rgba(71,85,105,.2)}
 .ov-rate-row .overview-kpi-value{margin-top:0}
 .ov-rate-chart{min-width:0}
 .overview-kpi-rate .mini-hist{height:38px;margin-top:6px;background:transparent}
+.overview-kpi-rate .mini-hist.is-area-chart{height:58px;margin-top:7px;opacity:1}
 .overview-kpi-rate .mini-hist-bg{fill:transparent}
 .overview-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;align-items:start}
 .overview-layout.no-side .overview-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
@@ -3529,9 +3530,11 @@ function toggleHC(){
 }
 
 /* ── Proxmox ── */
-function miniSparkline(data, key, current, colorFn = bchex, maxScale = 100, unit = '%', label = 'Usage') {
+function miniSparkline(data, key, current, colorFn = bchex, maxScale = 100, unit = '%', label = 'Usage', opts = {}) {
+  const areaChart = opts?.areaChart === true;
+  const pointLimit = Math.max(2, Math.min(240, Math.floor(Number(opts?.maxPoints) || 28)));
   let pairs = Array.isArray(data)
-    ? data.slice(-28).map(d => hasNum(d?.[key]) ? {
+    ? data.slice(-pointLimit).map(d => hasNum(d?.[key]) ? {
         v: Math.min(maxScale, Math.max(0, Number(d[key]))),
         t: d?.time ? (Number(d.time) > 1e11 ? Number(d.time) : Number(d.time) * 1000) : null,
       } : null).filter(Boolean)
@@ -3543,12 +3546,14 @@ function miniSparkline(data, key, current, colorFn = bchex, maxScale = 100, unit
   }
   let vals = pairs.map(p => p.v);
   if (vals.length < 2) return '';
-  let minV = Math.min(...vals), maxV = Math.max(...vals);
-  if (maxV - minV < 2) {
+  const zeroBaseline = areaChart && opts?.zeroBaseline !== false;
+  let minV = zeroBaseline ? 0 : Math.min(...vals);
+  let maxV = zeroBaseline ? Math.max(0.01, Number(maxScale) || 0, ...vals) : Math.max(...vals);
+  if (!zeroBaseline && maxV - minV < 2) {
     minV = Math.max(0, minV - 2);
     maxV = Math.min(maxScale, maxV + 2);
   }
-  const W = 94, H = 24, range = maxV - minV || 1;
+  const W = areaChart ? 300 : 94, H = areaChart ? 54 : 24, range = maxV - minV || 1;
   const pts = vals.map((v, i) => {
     const x = vals.length === 1 ? W : (i / (vals.length - 1)) * W;
     const y = H - ((v - minV) / range) * H;
@@ -3563,13 +3568,14 @@ function miniSparkline(data, key, current, colorFn = bchex, maxScale = 100, unit
   }));
   const ptsJson = JSON.stringify(tooltipPts).replace(/'/g, "&#39;");
   const line = pts.map((p, i) => `${i ? 'L' : 'M'}${p[0]},${p[1]}`).join('');
+  const area = areaChart ? `${line}L${W},${H}L0,${H}Z` : '';
   const clr = colorFn(hasNum(current) ? Number(current) : vals[vals.length - 1]);
-  return `<svg class="mini-hist" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true" style="cursor:default"
+  return `<svg class="mini-hist${areaChart?' is-area-chart':''}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true" style="cursor:default"
     onmousemove="showChartTooltip(event, this, '${clr}')" onmouseleave="hideChartTooltip()"
     data-pts='${ptsJson}' data-unit="${escAttr(unit)}" data-label="${escAttr(label)}" data-chart-h="${H}">
     <rect width="${W}" height="${H}" class="mini-hist-bg" rx="3"/>
-    <path d="M0,12 L${W},12" stroke="var(--border)" stroke-width="1" opacity=".55" vector-effect="non-scaling-stroke"/>
-    <path d="${line}" fill="none" stroke="${clr}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+    ${areaChart ? `<path class="mini-hist-area" d="${area}" fill="${clr}" fill-opacity=".16"/>` : `<path d="M0,12 L${W},12" stroke="var(--border)" stroke-width="1" opacity=".55" vector-effect="non-scaling-stroke"/>`}
+    <path class="mini-hist-line" d="${line}" fill="none" stroke="${clr}" stroke-width="${areaChart?'1.2':'1.7'}" stroke-linecap="${areaChart?'butt':'round'}" stroke-linejoin="${areaChart?'miter':'round'}" vector-effect="non-scaling-stroke"/>
   </svg>`;
 }
 function pveHeadStat(label, value, color = 'var(--text)', spark = '', extraClass = '') {
@@ -8202,7 +8208,7 @@ function overviewKpiBody(metric, stat, current, panels){
   if(metric === 'disk' || metric === 'bandwidth'){
     const hasHistory = Array.isArray(stat.history) && stat.history.some(p => hasNum(p?.value));
     const color = stat.rateColor || (metric === 'disk' ? '#22D3EE' : '#34D399');
-    const chart = (hasHistory || hasNum(stat.historyValue)) ? miniSparkline(stat.history, 'value', stat.historyValue, ()=>color, stat.historyMax || 1, ' MB/s', metric === 'disk' ? 'Disk I/O' : 'Bandwidth') : '';
+    const chart = (hasHistory || hasNum(stat.historyValue)) ? miniSparkline(stat.history, 'value', stat.historyValue, ()=>color, stat.historyMax || 1, ' MB/s', metric === 'disk' ? 'Disk I/O' : 'Bandwidth', { areaChart:true, zeroBaseline:true, maxPoints:90 }) : '';
     return `<div class="ov-rate-row">
       <div>
         <div class="overview-kpi-value" style="color:${stat.color||'var(--text)'}">${stat.value}</div>
@@ -8976,6 +8982,11 @@ function restoreOverviewKpiMenuState(detail, states){
     }
   });
 }
+function dashboardCardTitle(id, panel = {}){
+  if(id === 'snmp') return 'SNMP';
+  if(id === 'cicd') return panel.sidebarTitle || panel.title;
+  return panel.title;
+}
 function renderDashboardOverview(data, ids, panels, opts = {}){
   const showSide = dashboardSidePanelVisible(data);
   const visibleIds = ids.filter(id => !dashboardHiddenPlatforms.has(id));
@@ -8983,7 +8994,7 @@ function renderDashboardOverview(data, ids, panels, opts = {}){
   const cards = visibleIds.map(id => {
     const panel = panels[id];
     const iconSvg = platformIcon(panel);
-    const title = id === 'snmp' ? 'SNMP' : panel.title;
+    const title = dashboardCardTitle(id, panel);
     const rows = overviewRows(id, data);
     const listHtml = rows
       ? `<div class="overview-list ${['healthchecks','database','checks','dockhand','portainer'].includes(id)?'is-scroll':''}" data-morph-key="overview-list:${escAttr(id)}" data-scroll-key="overview-${id}">${rows}</div>`
