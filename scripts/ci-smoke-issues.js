@@ -882,6 +882,17 @@ function testStaticRegressions() {
   assert.ok(!dashboard.includes("DEVICE${offlineDevs.length>1?'S':''} OFFLINE"), 'UniFi offline badges must not repeat the platform context');
   const simpleNasPanelSource = dashboard.slice(dashboard.indexOf('function buildSimpleNasPanel'), dashboard.indexOf('\nfunction ', dashboard.indexOf('function buildSimpleNasPanel') + 10));
   assert.ok(simpleNasPanelSource.includes(": 'healthy'"), 'QNAP and Ugreen platform badges must use healthy when all systems are available');
+  const cloudflarePanelSource = dashboard.slice(dashboard.indexOf('function buildCloudflare'), dashboard.indexOf('\nfunction ', dashboard.indexOf('function buildCloudflare') + 10));
+  const overviewRowsSource = dashboard.slice(dashboard.indexOf('function overviewRows'), dashboard.indexOf('\nfunction ', dashboard.indexOf('function overviewRows') + 10));
+  const cloudflareOverviewStart = overviewRowsSource.indexOf("if(id === 'cloudflare'){");
+  const cloudflareOverviewSource = overviewRowsSource.slice(cloudflareOverviewStart, overviewRowsSource.indexOf("\n  if(id === 'cicd'){", cloudflareOverviewStart));
+  assert.strictEqual((dashboard.match(/\bformatDaysLeft\(days\)/g) || []).length, 2, 'Cloudflare day-left formatting must have exactly two render call sites');
+  assert.ok(cloudflarePanelSource.includes('formatDaysLeft(days)') && cloudflareOverviewSource.includes('formatDaysLeft(days)'), 'both Cloudflare domain render paths must use the shared day-left formatter');
+  assert.strictEqual((cloudflarePanelSource.match(/class="mon-row cloudflare-resource-row"/g) || []).length, 3, 'Cloudflare zone, tunnel, and domain rows must share one status-column layout');
+  assert.strictEqual((cloudflarePanelSource.match(/class="cloudflare-resource-status"/g) || []).length, 3, 'every Cloudflare resource row must place its badge in the shared status column');
+  assert.ok(dashboard.includes('.cloudflare-resource-row{display:grid;grid-template-columns:18px minmax(180px,560px) minmax(150px,500px) minmax(180px,max-content);justify-content:start'), 'Cloudflare detail rows must keep their shared columns compact and left-aligned while leaving room for long expiration labels');
+  assert.ok(dashboard.includes('.cloudflare-resource-status{min-width:180px;justify-self:start;text-align:left}'), 'Cloudflare active, healthy, and remaining-days badges must share the same left edge');
+  assert.ok(dashboard.includes('.cloudflare-resource-row{grid-template-columns:9px minmax(0,1fr) 180px;align-items:start') && dashboard.includes('.cloudflare-resource-status{grid-column:3;grid-row:1;min-width:180px}'), 'Cloudflare badges must retain their shared left edge in the narrow layout');
   const ratioFunctions = ['buildProxmox', 'buildLinux', 'buildWindows', 'buildKubernetes', 'buildSynology', 'buildUnifi', 'buildHealthchecks', 'uptimeKumaHealth', 'buildChecks', 'prometheusHealth', 'buildDocker', 'buildDockhand', 'buildFirewall', 'buildTrueNas', 'buildSimpleNasPanel', 'buildPbs', 'buildCloudflare', 'buildCiCd', 'buildVeeam', 'buildPortainer', 'buildDatabase'];
   for (const functionName of ratioFunctions) {
     const start = dashboard.indexOf(`function ${functionName}`);
@@ -940,11 +951,55 @@ function testStaticRegressions() {
   assert.ok(settings.includes('data-target="sessions" data-admin-section="1" onclick="showSettingsSection(\'sessions\')"><span class="settings-nav-dot" style="background:var(--blue)">'), 'Sessions navigation icon must match the blue System icon');
   const settingsInit = settings.slice(settings.lastIndexOf('(async () => {'));
   assert.ok(settingsInit.includes('await rolePromise;') && settingsInit.includes('loadSettingsSectionData(activeSettingsSection);'), 'the restored Settings section must load its data during initial startup');
-  assert.ok(agentsPage.includes('function commandPanelGuide(commands, opts = {})') && agentsPage.includes('Check result → action') && agentsPage.includes("? 'RESULT=HEALTHY'") && agentsPage.includes("? 'RESULT=REPAIR_WINDOWS_AGENT'") && agentsPage.includes("? 'RESULT=CHECK_FAILED'"), 'Windows agent repair guidance must map each exact RESULT value to its action');
+  const commandGuideSource = agentsPage.slice(agentsPage.indexOf('function commandPanelGuide'), agentsPage.indexOf('function showCommandPanel'));
+  const agentRepairContractSource = server.slice(server.indexOf('function agentRepairCommands'), server.indexOf("app.get('/api/agents'"));
+  const agentRepairContractContext = {
+    config: { linux: { agentToken: 'smoke-token' } },
+    browserRequestOrigin: () => 'https://demo.omnisight.test',
+    agentInstallRole: agent => agent.role,
+    shQuote: value => `'${String(value ?? '').replace(/'/g, `'\\''`)}'`,
+    WINDOWS_TLS12_BOOTSTRAP: '',
+    LATEST_AGENT_VERSION: '1.4.3',
+    t: text => text,
+    esc: text => String(text),
+  };
+  vm.runInNewContext(
+    `${agentRepairContractSource}\n${commandGuideSource}\n`
+      + 'globalThis.agentRepairCommands = agentRepairCommands; globalThis.commandPanelGuide = commandPanelGuide;',
+    agentRepairContractContext,
+  );
+  const systemdAgentCommands = agentRepairContractContext.agentRepairCommands({}, { id: 'M4A1-unix-cc94c7b9', role: 'linux' });
+  const dockerAgentCommands = agentRepairContractContext.agentRepairCommands({}, { id: 'M4A1-unix-cc94c7b9', role: 'docker' });
+  const windowsGuide = agentRepairContractContext.commandPanelGuide([{ title: 'Query Windows agent' }], { agentRole: 'windows' });
+  const systemdGuide = agentRepairContractContext.commandPanelGuide(systemdAgentCommands, { agentRole: 'linux' });
+  const dockerGuide = agentRepairContractContext.commandPanelGuide(dockerAgentCommands, { agentRole: 'docker' });
+  const guideRows = html => [...html.matchAll(/<li><strong>([^<]+)<\/strong> ([^<]+)<\/li>/g)].map(match => [match[1], match[2]]);
+  const healthyGuideRow = ['RESULT=HEALTHY', 'No repair. Wait up to 30 seconds and refresh this page.'];
+  const failedGuideRow = ['RESULT=CHECK_FAILED', 'Do not repair. Check the network, OmniSight address or certificate.'];
+  assert.deepStrictEqual(guideRows(windowsGuide), [healthyGuideRow, ['RESULT=REPAIR_WINDOWS_AGENT', 'Run Repair Windows agent.'], failedGuideRow], 'Windows guide must render each exact RESULT value beside the matching action');
+  assert.deepStrictEqual(guideRows(systemdGuide), [healthyGuideRow, ['RESULT=REPAIR_SYSTEMD_AGENT', 'Run Repair systemd agent.'], failedGuideRow], 'systemd guide must render only the applicable compact RESULT contract');
+  assert.deepStrictEqual(guideRows(dockerGuide), [healthyGuideRow, ['RESULT=REPAIR_SYSTEMD_AGENT', 'Run Repair systemd agent.'], ['RESULT=REPAIR_DOCKER_AGENT', 'Run Repair Docker container agent.'], failedGuideRow], 'Docker guide must distinguish systemd and container repair results');
+  const systemdQuery = systemdAgentCommands[0].command;
+  const dockerQuery = dockerAgentCommands[0].command;
+  for (const [role, query] of [['systemd', systemdQuery], ['Docker', dockerQuery]]) {
+    assert.ok(!/[\r\n]/.test(query), `${role} diagnostic command must copy as one physical line`);
+    assert.ok(query.length < 2000, `${role} diagnostic command must stay below the terminal paste limit; got ${query.length} characters`);
+    const resultCodes = [...new Set(query.match(/\b(?:HEALTHY|REPAIR_[A-Z_]+|CHECK_FAILED)\b/g) || [])].sort();
+    assert.ok(query.includes('RESULT=%s'), `${role} diagnostic command must print one compact RESULT line`);
+    assert.deepStrictEqual(resultCodes, ['CHECK_FAILED', 'HEALTHY', 'REPAIR_DOCKER_AGENT', 'REPAIR_SYSTEMD_AGENT'], `${role} diagnostic command must use only the exact Unix RESULT codes`);
+    assert.ok(query.includes('[ -n "$AGENT_ID" ]||AGENT_ID=') && query.includes('M4A1-unix-cc94c7b9'), `${role} diagnostic command must fall back to the selected dashboard agent ID`);
+    assert.ok(!/journalctl|omnisight-agent\.sh|script download|--post30[123]|\bcurl\s+-sSL\b/i.test(query), `${role} diagnostic command must not restore verbose logs, script downloads, or curl redirect handling`);
+  }
+  assert.ok(systemdQuery.includes("result='\\''REPAIR_SYSTEMD_AGENT") && dockerQuery.includes("result='\\''REPAIR_DOCKER_AGENT"), 'Unix query defaults must follow the configured systemd or Docker agent role');
+  assert.ok(systemdQuery.includes('mode=systemd;repair=REPAIR_SYSTEMD_AGENT') && systemdQuery.includes('mode=docker;repair=REPAIR_DOCKER_AGENT'), 'Unix query runtime detection must map systemd and Docker installations to distinct repair results');
   const commandPanelSource = agentsPage.slice(agentsPage.indexOf('function showCommandPanel'), agentsPage.indexOf('function agentHeaderHtml'));
   assert.ok(commandPanelSource.includes('msgHoldUntil = Number.POSITIVE_INFINITY;') && commandPanelSource.includes("onclick=\"clearMsg(true)\"") && commandPanelSource.includes("t('Close')") && !commandPanelSource.includes('setTimeout'), 'diagnostic and repair commands must remain visible until the user closes the panel');
   const loadAgentsSource = agentsPage.slice(agentsPage.indexOf('async function loadAgents'), agentsPage.indexOf('async function updateAgent'));
   assert.ok(agentsPage.includes('let commandPanelOpen = false;') && loadAgentsSource.match(/if\(!manual && commandPanelOpen\) return;/g)?.length === 2, 'automatic refresh errors must not overwrite an open diagnostic and repair command panel');
+  const showAgentRepairSource = agentsPage.slice(agentsPage.indexOf('async function showAgentRepair'), agentsPage.indexOf('applyLanguage();', agentsPage.indexOf('async function showAgentRepair')));
+  const repairFetchIndex = showAgentRepairSource.indexOf('await fetchJson');
+  assert.ok(repairFetchIndex >= 0 && showAgentRepairSource.indexOf('clearMsg(true)') > repairFetchIndex, 'Check / repair must keep the existing command panel in place while its asynchronous request is loading');
+  assert.ok(showAgentRepairSource.includes('const preserveViewport = update =>') && showAgentRepairSource.includes('requestAnimationFrame(restore)') && showAgentRepairSource.match(/preserveViewport\(\(\) =>/g)?.length === 2, 'Check / repair result rendering must preserve the iframe viewport on success and failure');
   assert.ok(agentsPage.includes('/^1\\.3(?:\\.|$)/.test(agentVersion)') && agentsPage.includes('This v1.3.x agent uses the old scheduled task.') && agentsPage.includes("agentVersion: d.agentVersion || ''"), 'the v1.3 to v1.4 migration note must be conditional on the selected agent version');
   assert.ok(server.includes("$result='REPAIR_WINDOWS_AGENT';") && server.includes("$result='HEALTHY'") && server.includes("$result='CHECK_FAILED'") && server.includes('[bool]$ping.report.fresh') && server.includes('$PSItem.Exception.Response') && server.includes('Run only when the RESULT line says to use Repair Windows agent.'), 'Windows query must require a fresh report and map repair, healthy and connection failures to exact RESULT values');
   const windowsQueryArray = server.match(/if \(role === 'windows'\) \{\s*const queryScript = (\[[\s\S]*?\])\.join\(''\);/)?.[1];
@@ -1045,6 +1100,238 @@ function testStaticRegressions() {
   assert.ok(settings.includes("const result = settingsSaveQueue.then(run, run);"), 'rapid settings saves must run in order');
   assert.ok(settings.includes("(opts.fast ? '&wait=0' : '')"), 'top-level toggle saves must return before platform collection completes');
   assert.ok(settings.includes("cfgPayload.publicStatus = opts.enabled === true;"), 'status page toggle must persist its disabled state');
+  const cloudflareSettingsSection = settings.slice(
+    settings.indexOf('<!-- Cloudflare -->'),
+    settings.indexOf('<!-- GitHub/GitLab CI -->'),
+  );
+  for (const [url, label] of [
+    ['https://dash.cloudflare.com/profile/api-tokens', 'Cloudflare API token'],
+    ['https://developers.cloudflare.com/fundamentals/account/find-account-and-zone-ids/', 'Cloudflare Account/Zone ID documentation'],
+  ]) {
+    const anchor = cloudflareSettingsSection.match(/<a\b[^>]*>/g)?.find(candidate => candidate.includes(`href="${url}"`));
+    assert.ok(anchor, `${label} link must remain in the Cloudflare settings section`);
+    assert.match(anchor, /\btarget="_blank"/, `${label} link must open in a new tab`);
+    assert.match(anchor, /\brel="noopener noreferrer"/, `${label} link must isolate the opener and referrer`);
+  }
+  const cloudflareTokenLabelStart = cloudflareSettingsSection.indexOf('<label for="cf-token">');
+  const cloudflareTokenLabelEnd = cloudflareSettingsSection.indexOf('</div>', cloudflareTokenLabelStart);
+  const cloudflareTokenLinkIndex = cloudflareSettingsSection.indexOf('href="https://dash.cloudflare.com/profile/api-tokens"');
+  assert.ok(cloudflareTokenLinkIndex > cloudflareTokenLabelStart && cloudflareTokenLinkIndex < cloudflareTokenLabelEnd, 'the Cloudflare token link must sit in the API token label row');
+  const cloudflareAccountLabelStart = cloudflareSettingsSection.indexOf('<label for="cf-account-id">');
+  const cloudflareAccountLabelEnd = cloudflareSettingsSection.indexOf('</div>', cloudflareAccountLabelStart);
+  const cloudflareAccountLinkIndex = cloudflareSettingsSection.indexOf('href="https://developers.cloudflare.com/fundamentals/account/find-account-and-zone-ids/"');
+  assert.ok(cloudflareAccountLinkIndex > cloudflareAccountLabelStart && cloudflareAccountLinkIndex < cloudflareAccountLabelEnd, 'the Account ID documentation link must sit in the Account ID label row');
+  assert.ok(cloudflareSettingsSection.includes("onclick=\"openSettingsInfo(event,'cloudflareToken')\""), 'the Cloudflare API token label must retain its permissions info button');
+  const cloudflareTokenInfo = settings.slice(
+    settings.indexOf('cloudflareToken: {'),
+    settings.indexOf('resourceThresholds:', settings.indexOf('cloudflareToken: {')),
+  );
+  for (const permission of [
+    'Zone → Zone → Read',
+    'Account → Cloudflare Tunnel → Read',
+    'Account → Cloudflare Registrar → Read',
+  ]) {
+    assert.ok(cloudflareTokenInfo.includes(permission), `Cloudflare token help must document ${permission}`);
+  }
+  assert.ok(
+    cloudflareTokenInfo.includes('items: [')
+      && settings.includes("document.createElement('ol')")
+      && settings.includes("document.createElement('li')")
+      && settings.includes('code.textContent = part'),
+    'Cloudflare token permissions must render as a safe numbered list',
+  );
+  const cicdSettingsSection = settings.slice(
+    settings.indexOf('<!-- GitHub/GitLab CI -->'),
+    settings.indexOf('<!-- Veeam -->'),
+  );
+  assert.ok(
+    cicdSettingsSection.includes('id="cicd-list"')
+      && settings.includes('class="ci-resource-select"')
+      && settings.includes('class="ci-resource-manual"'),
+    'CI/CD settings must offer a discovered-resource dropdown and a manual fallback',
+  );
+  const addCiProjectSource = settings.slice(
+    settings.indexOf('function addCiProject'),
+    settings.indexOf('function ciProvider'),
+  );
+  assert.ok(
+    /data\.allRepositories === true \|\| (?:configuredGithubRepo|githubRepo) === '\*'/.test(addCiProjectSource)
+      && addCiProjectSource.includes('class="ci-all-repositories"'),
+    'GitHub cards must restore both the explicit and legacy all-repositories selection',
+  );
+  assert.ok(settings.includes('function ciAllRepositoriesSelected(item)'), 'CI/CD settings must expose a single canonical all-repositories state helper');
+  const populateCiResourcesSource = settings.slice(
+    settings.indexOf('function populateCiResourceOptions'),
+    settings.indexOf('async function loadCiResources'),
+  );
+  assert.ok(
+    populateCiResourcesSource.includes("provider === 'github' && (includeAllRepositories || allRepositories)")
+      && populateCiResourcesSource.includes("option.value = '*'")
+      && populateCiResourcesSource.includes("option.dataset.allRepositories = '1'")
+      && populateCiResourcesSource.includes("setCiLocalizedText(option, 'All repositories')"),
+    'the discovered-resource dropdown must build a safe GitHub-only All repositories option',
+  );
+  const loadCiResourcesSource = settings.slice(
+    settings.indexOf('async function loadCiResources'),
+    settings.indexOf('function updateCiHeader'),
+  );
+  assert.ok(
+    loadCiResourcesSource.includes("includeAllRepositories: provider === 'github'"),
+    'GitLab discovery must never receive the GitHub All repositories option',
+  );
+  const collectCiConfigStart = settings.indexOf("const on = document.getElementById('en-cicd').checked");
+  const collectCiConfigSource = settings.slice(collectCiConfigStart, settings.indexOf("const on = document.getElementById('en-veeam').checked", collectCiConfigStart));
+  assert.ok(
+    collectCiConfigSource.includes("const allRepositories = provider === 'github'")
+      && collectCiConfigSource.includes("repo: provider === 'github' ? (allRepositories ? '*' : (repo || undefined)) : undefined")
+      && collectCiConfigSource.includes('allRepositories: allRepositories || undefined'),
+    'Save & Apply must persist the account-wide GitHub selection without applying it to GitLab',
+  );
+  const german = i18nContext.window.OmniI18n.dict('de');
+  assert.ok(
+    turkish['All repositories'] && german['All repositories']
+      && turkish['All repositories'] !== 'All repositories'
+      && german['All repositories'] !== 'All repositories',
+    'the GitHub All repositories option must be localized in Turkish and German',
+  );
+  assert.ok(addCiProjectSource.includes('oninput="onCiBranchInput(this)"'), 'CI branch inputs must distinguish user edits from auto-filled defaults');
+  const ciBranchSelectionSource = settings.slice(
+    settings.indexOf('function clearCiAutoFilledBranch'),
+    settings.indexOf('function normalizeCiDiscoveredResource'),
+  );
+  const branch = { value: '', dataset: {} };
+  const canonicalRepo = { value: '' };
+  const manualRepo = { value: '' };
+  const allRepositoriesFlag = { value: 'false' };
+  const projectPath = { value: '' };
+  const ciItem = {
+    querySelector(selector) {
+      return {
+        '.ci-branch': branch,
+        '.ci-resource-manual': manualRepo,
+        '.ci-all-repositories': allRepositoriesFlag,
+        '.ci-project-path': projectPath,
+      }[selector] || null;
+    },
+  };
+  const ciBranchContext = {
+    ciCanonicalResource: () => canonicalRepo,
+    ciProvider: () => 'github',
+    trText: text => text,
+    syncCiAllRepositoriesUi: () => {},
+    clearCiValidation: () => {},
+    updateCiHeader: () => {},
+  };
+  vm.runInNewContext(
+    `${ciBranchSelectionSource}\n`
+      + 'globalThis.ciBranchHandlers = { onCiBranchInput, onCiResourceSelected };',
+    ciBranchContext,
+  );
+  const selectCiResource = (value, dataset) => ciBranchContext.ciBranchHandlers.onCiResourceSelected({
+    value,
+    selectedIndex: 0,
+    options: [{ value, dataset }],
+    closest: () => ciItem,
+  });
+
+  selectCiResource('acme/api', { defaultBranch: 'main' });
+  assert.strictEqual(branch.value, 'main', 'selecting a repository must fill its default branch when the branch is empty');
+  assert.strictEqual(branch.dataset.ciAutoFilled, '1');
+  assert.strictEqual(branch.dataset.ciAutoFilledValue, 'main');
+  selectCiResource('*', { allRepositories: '1', defaultBranch: '' });
+  assert.strictEqual(branch.value, '', 'All repositories must clear an unchanged auto-filled branch');
+  assert.strictEqual(branch.dataset.ciAutoFilled, undefined);
+  assert.strictEqual(branch.dataset.ciAutoFilledValue, undefined);
+
+  selectCiResource('acme/api', { defaultBranch: 'main' });
+  branch.value = 'release/manual';
+  ciBranchContext.ciBranchHandlers.onCiBranchInput(branch);
+  selectCiResource('*', { allRepositories: '1', defaultBranch: '' });
+  assert.strictEqual(branch.value, 'release/manual', 'All repositories must preserve a branch explicitly entered by the user');
+  assert.strictEqual(branch.dataset.ciAutoFilled, undefined);
+  assert.strictEqual(branch.dataset.ciAutoFilledValue, undefined);
+  const githubTokenLink = settings.match(/<a\b[^>]*class="[^"]*ci-github-token-link[^"]*"[^>]*>/)?.[0] || '';
+  assert.ok(githubTokenLink.includes('href="https://github.com/settings/personal-access-tokens/new"'), 'GitHub CI cards must link to the fine-grained token creation page');
+  assert.match(githubTokenLink, /\btarget="_blank"/, 'the GitHub token link must open in a new tab');
+  assert.match(githubTokenLink, /\brel="noopener noreferrer"/, 'the GitHub token link must isolate the opener and referrer');
+  const addCiProjectStart = settings.indexOf('function addCiProject');
+  const githubTokenLabelStart = settings.indexOf('<div class="form-label-with-info">', settings.indexOf('ci-token-field', addCiProjectStart));
+  const githubTokenLabelEnd = settings.indexOf('</div>', githubTokenLabelStart);
+  const githubTokenLinkIndex = settings.indexOf('class="form-field-link ci-github-token-link"', githubTokenLabelStart);
+  assert.ok(githubTokenLinkIndex > githubTokenLabelStart && githubTokenLinkIndex < githubTokenLabelEnd, 'the GitHub token creation link must sit to the right of its permission button');
+  assert.ok(settings.includes("provider === 'github' ? 'github_pat_****'"), 'GitHub token inputs must show the fine-grained token prefix');
+  assert.ok(
+    settings.includes("provider === 'github' ? '<button type=\"button\" class=\"info-btn\" onclick=\"openSettingsInfo(event,\\'githubToken\\')\"")
+      && settings.includes('aria-label="GitHub token permissions"'),
+    'GitHub token labels must use the shared permission help button',
+  );
+  const githubTokenInfo = settings.slice(
+    settings.indexOf('githubToken: {'),
+    settings.indexOf('resourceThresholds:', settings.indexOf('githubToken: {')),
+  );
+  for (const setting of [
+    'Repository access → All repositories, or Only select repositories → Select the repositories OmniSight will monitor',
+    'Repository permissions → Actions → Read-only',
+    'Repository permissions → Metadata → Read-only',
+  ]) {
+    assert.ok(githubTokenInfo.includes(setting), `GitHub token help must document ${setting}`);
+  }
+  assert.ok(
+    settings.includes('function loadCiResources(button)')
+      && settings.includes("fetchJson('/api/cicd/discover'")
+      && settings.includes("method: 'POST'"),
+    'CI/CD resource loading must post tokens to the authenticated discovery endpoint',
+  );
+  assert.ok(
+    settings.includes('function toggleCiManualMode(button)')
+      && settings.includes("item.dataset.ciManual !== '1'")
+      && settings.includes('option.textContent = row.label || row.value'),
+    'CI/CD discovery must retain manual entry and build dropdown labels as text',
+  );
+  assert.ok(
+    settings.includes('class="ci-config-id"')
+      && settings.includes('class="ci-token-key"')
+      && settings.includes('configId: item.querySelector(\'.ci-config-id\').value || undefined')
+      && settings.includes('originalResource: item.querySelector(\'.ci-original-resource\').value || undefined')
+      && settings.includes('row[tokenKey] = token || undefined')
+      && settings.includes("uniqueConfigItems(projects, ['provider', 'configId', 'name', 'repo', 'projectId', 'projectPath'])"),
+    'CI/CD rows must persist their stable configId through settings collection and deduplication',
+  );
+  const cicdDiscoveryRouteStart = server.indexOf("app.post('/api/cicd/discover'");
+  const cicdDiscoveryRoute = server.slice(cicdDiscoveryRouteStart, server.indexOf("app.post('/api/config'", cicdDiscoveryRouteStart));
+  assert.ok(cicdDiscoveryRouteStart >= 0, 'the authenticated CI/CD discovery route must exist');
+  assert.ok(
+    cicdDiscoveryRoute.includes("sessionRole(req) !== 'admin'")
+      && cicdDiscoveryRoute.includes('storedCiProjectForDiscovery({ provider, configId, originalResource })')
+      && cicdDiscoveryRoute.includes('discoverCiProjects({ provider, token, baseUrl })'),
+    'CI/CD discovery must be admin-only and resolve masked tokens by stable config identity',
+  );
+  const ciStoredLookupStart = server.indexOf('function ciProjectProvider');
+  const ciStoredLookupSource = server.slice(ciStoredLookupStart, cicdDiscoveryRouteStart);
+  const ciStoredLookupContext = {
+    config: { cicd: {} },
+    ciConfigProjects: () => [
+      { provider: 'github', repo: 'legacy/shared-resource', token: 'github-secret' },
+      { provider: 'gitlab', projectId: 'legacy/shared-resource', token: 'gitlab-secret' },
+      { configId: 'modern-id', provider: 'github', repo: 'modern/resource', token: 'modern-secret' },
+    ],
+  };
+  vm.runInNewContext(
+    `${ciStoredLookupSource}\n`
+      + `globalThis.legacyCiMatch = storedCiProjectForDiscovery({ provider: 'github', configId: 'new-ui-config-id', originalResource: 'legacy/shared-resource' });`,
+    ciStoredLookupContext,
+  );
+  assert.strictEqual(
+    ciStoredLookupContext.legacyCiMatch?.token,
+    'github-secret',
+    'a legacy CI row without configId must fall back to exact provider + originalResource when the UI supplies a new unmatched configId',
+  );
+  vm.runInNewContext(
+    `globalThis.modernCiMismatch = storedCiProjectForDiscovery({ provider: 'github', configId: 'different-id', originalResource: 'modern/resource' });`,
+    ciStoredLookupContext,
+  );
+  assert.strictEqual(ciStoredLookupContext.modernCiMismatch, null, 'an unmatched configId must not borrow a modern CI row token through resource fallback');
+  assert.ok(settings.includes("result.truncated") && settings.includes('First 1000 resources loaded; use manual entry for others'), 'truncated CI/CD discovery must warn that manual entry remains available');
   const collectPerformanceSource = settings.match(/function collectPerformanceConfig\(currentConfig, lowIoMode\) \{[\s\S]*?\n\}/)?.[0];
   assert.ok(collectPerformanceSource, 'settings must collect performance options through a testable merge helper');
   const performanceContext = {};

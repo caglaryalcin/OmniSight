@@ -98,13 +98,16 @@ async function main() {
   // 4) UniFi collector against fixture controllers (no network, no config)
   await require('./ci-smoke-unifi').run();
 
-  // 5) Pure helpers extracted from public/index.html (no browser)
+  // 5) GitHub/GitLab resource discovery with injected headerless API fixtures
+  await require('./ci-smoke-cicd').run();
+
+  // 6) Pure helpers extracted from public/index.html (no browser)
   require('./ci-smoke-client').run();
 
-  // 6) Native installer defaults, input validation, and failed-LXC cleanup
+  // 7) Native installer defaults, input validation, and failed-LXC cleanup
   require('./ci-smoke-lxc').run();
 
-  // 7) Open-issue regressions and collector fixtures
+  // 8) Open-issue regressions and collector fixtures
   await require('./ci-smoke-issues').run();
 }
 

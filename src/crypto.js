@@ -54,7 +54,7 @@ function isEncrypted(value) {
 
 const SENSITIVE_KEYS = new Set([
   'password', 'privateKey', 'authPassword', 'privPassword',
-  'tokenSecret', 'apiKey', 'apiSecret', 'token', 'bearerToken', 'agentToken', 'sshPassword', 'sshKey', 'botToken', 'pingKey', 'webhookUrl',
+  'tokenSecret', 'apiKey', 'apiSecret', 'apiToken', 'accessToken', 'token', 'bearerToken', 'agentToken', 'sshPassword', 'sshKey', 'botToken', 'pingKey', 'webhookUrl',
   'community', 'authKey', 'privKey',
 ]);
 

@@ -27,7 +27,13 @@ const { getAllUgreenData, configuredInstances: ugreenConfigInstances } = require
 const { getAllPbsData, configuredInstances: pbsConfigInstances } = require('./src/pbs');
 const { getAllPortainerData, configuredInstances: portainerConfigInstances, portainerLogs } = require('./src/portainer');
 const { getCloudflareData } = require('./src/cloudflare');
-const { getAllCiData, configuredProjects: ciConfigProjects } = require('./src/cicd');
+const {
+  getAllCiData,
+  configuredProjects: ciConfigProjects,
+  tokenValue: ciTokenValue,
+  normalizeGitlabBaseUrl,
+  discoverCiProjects,
+} = require('./src/cicd');
 const { getAllVeeamData, configuredInstances: veeamConfigInstances } = require('./src/veeam');
 const { getAllProxmoxApiData, configuredInstances: proxmoxConfigInstances } = require('./src/proxmox');
 const { getAllVmwareData, configuredInstances: vmwareConfigInstances } = require('./src/vmware');
@@ -7603,6 +7609,84 @@ app.post('/api/unifi/test', async (req, res) => {
   }
 });
 
+const CI_DISCOVERY_MASKED_TOKENS = new Set(['', '__set__', '__encrypted__']);
+
+function ciDiscoveryBadRequest(message) {
+  const err = new Error(message);
+  err.clientStatus = 400;
+  return err;
+}
+
+function ciProjectProvider(row = {}) {
+  return String(row.provider || row.type || 'github').trim().toLowerCase();
+}
+
+function ciProjectResource(row = {}, provider = ciProjectProvider(row)) {
+  return String(provider === 'gitlab'
+    ? (row.projectId || row.project || row.projectPath || row.path || '')
+    : (row.repo || row.repository || '')).trim();
+}
+
+function storedCiProjectForDiscovery({ provider, configId, originalResource }) {
+  const projects = ciConfigProjects(config.cicd || {});
+  if (configId) {
+    const matches = projects.filter(row => ciProjectProvider(row) === provider && String(row.configId || '').trim() === configId);
+    if (matches.length === 1) return matches[0];
+    if (matches.length > 1) return null;
+  }
+  if (!originalResource) return null;
+  const matches = projects.filter(row =>
+    !String(row.configId || '').trim()
+      && ciProjectProvider(row) === provider
+      && ciProjectResource(row, provider) === originalResource);
+  return matches.length === 1 ? matches[0] : null;
+}
+
+app.post('/api/cicd/discover', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    if (sessionRole(req) !== 'admin') return res.status(403).json({ error: 'Forbidden' });
+    const input = req.body && typeof req.body === 'object' ? req.body : {};
+    const provider = String(input.provider || '').trim().toLowerCase();
+    if (!['github', 'gitlab'].includes(provider)) throw ciDiscoveryBadRequest('Provider must be github or gitlab');
+
+    const configId = String(input.configId || '').trim();
+    const originalResource = String(input.originalResource || '').trim();
+    const suppliedToken = String(input.token || '').trim();
+    if (configId.length > 200 || originalResource.length > 500 || suppliedToken.length > 8192) {
+      throw ciDiscoveryBadRequest('Invalid CI/CD discovery input');
+    }
+
+    let baseUrl;
+    if (provider === 'gitlab') {
+      try { baseUrl = normalizeGitlabBaseUrl(input.baseUrl || 'https://gitlab.com'); }
+      catch (err) { throw ciDiscoveryBadRequest(err.message); }
+    }
+
+    let token = CI_DISCOVERY_MASKED_TOKENS.has(suppliedToken) ? '' : suppliedToken;
+    if (!token) {
+      const stored = storedCiProjectForDiscovery({ provider, configId, originalResource });
+      if (!stored) throw ciDiscoveryBadRequest('Enter a token to load projects');
+      if (provider === 'gitlab') {
+        let storedBaseUrl;
+        try { storedBaseUrl = normalizeGitlabBaseUrl(stored.baseUrl || config.cicd?.gitlabBaseUrl || 'https://gitlab.com'); }
+        catch { throw ciDiscoveryBadRequest('Stored GitLab base URL is invalid'); }
+        if (storedBaseUrl !== baseUrl) throw ciDiscoveryBadRequest('Enter the token again after changing the GitLab base URL');
+      }
+      const storedToken = String(ciTokenValue(stored, config.cicd || {}) || '').trim();
+      if (CI_DISCOVERY_MASKED_TOKENS.has(storedToken)) throw ciDiscoveryBadRequest('Enter a token to load projects');
+      token = storedToken;
+    }
+
+    const result = await discoverCiProjects({ provider, token, baseUrl });
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    const status = Number(err?.clientStatus || 500);
+    const message = err?.clientStatus ? err.message : 'Could not load CI/CD projects';
+    res.status(status >= 400 && status <= 599 ? status : 500).json({ error: message });
+  }
+});
+
 app.post('/api/config', async (req, res) => {
   try {
     const incoming = req.body;
@@ -8640,35 +8724,24 @@ function agentRepairCommands(req, agent) {
     }
     return commands;
   }
+  const defaultRepairResult = role === 'docker' ? 'REPAIR_DOCKER_AGENT' : 'REPAIR_SYSTEMD_AGENT';
   const queryScript = [
-    'echo "== omnisight-agent service =="',
-    'systemctl status omnisight-agent --no-pager -l || true',
-    'echo',
-    'echo "== recent logs =="',
-    'journalctl -u omnisight-agent -n 120 --no-pager || true',
-    'echo',
-    'echo "== dashboard reachability =="',
-    'set -a',
-    '[ -f /etc/omnisight-agent/agent.env ] && . /etc/omnisight-agent/agent.env',
-    'set +a',
-    `BASE="\${OMNISIGHT_URL:-${base}}"`,
-    'TLS="${OMNISIGHT_INSECURE_TLS:+--insecure}"',
-    'echo "agent_id=${OMNISIGHT_AGENT_ID:-missing} role=${OMNISIGHT_AGENT_ROLE:-auto} url=${BASE}"',
-    'echo',
-    'echo "== script download =="',
-    'curl -sSL ${TLS} -m 20 -w "http=%{http_code} time=%{time_total}s\\n" "${BASE}/agent/omnisight-agent.sh" -o /tmp/omnisight-agent-check.sh || true',
-    'echo',
-    'echo "== agent api ping =="',
-    'ping_out="$(mktemp)"',
-    'ping_body="$(mktemp)"',
-    'printf \'{"id":"%s"}\' "${OMNISIGHT_AGENT_ID:-agent-check}" > "$ping_body"',
-    'curl -sSL --post301 --post302 --post303 ${TLS} -m 20 -w "http=%{http_code} time=%{time_total}s\\n" -o "$ping_out" -X POST -H "X-Agent-Token: ${OMNISIGHT_TOKEN:-}" -H "Content-Type: application/json" --data-binary @"$ping_body" "${BASE}/api/agent/ping" || true',
-    'cat "$ping_out"',
-    'rm -f "$ping_out" "$ping_body"',
-  ].join('\n');
+    `result=${shQuote(defaultRepairResult)};repair=$result;mode=;BASE=;TOKEN=;AGENT_ID=;INSECURE=;`,
+    'if systemctl is-active --quiet omnisight-agent 2>/dev/null && [ -f /etc/omnisight-agent/agent.env ];then ',
+    'mode=systemd;repair=REPAIR_SYSTEMD_AGENT;set -a;. /etc/omnisight-agent/agent.env;set +a;',
+    'BASE=${OMNISIGHT_URL:-};TOKEN=${OMNISIGHT_TOKEN:-};AGENT_ID=${OMNISIGHT_AGENT_ID:-};INSECURE=${OMNISIGHT_INSECURE_TLS:-};',
+    'elif command -v docker >/dev/null 2>&1 && [ "$(docker inspect -f \'{{.State.Running}}\' omnisight-agent 2>/dev/null)" = true ];then ',
+    'mode=docker;repair=REPAIR_DOCKER_AGENT;envs=$(docker inspect -f \'{{range .Config.Env}}{{println .}}{{end}}\' omnisight-agent 2>/dev/null);',
+    'getv(){ printf \'%s\\n\' "$envs"|sed -n "s/^$1=//p"|head -n1;};BASE=$(getv OMNISIGHT_URL);TOKEN=$(getv OMNISIGHT_TOKEN);AGENT_ID=$(getv OMNISIGHT_AGENT_ID);INSECURE=$(getv OMNISIGHT_INSECURE_TLS);fi;',
+    `result=$repair;[ -n "$BASE" ]||BASE=${shQuote(base)};[ -n "$AGENT_ID" ]||AGENT_ID=${shQuote(id)};`,
+    'if [ -n "$mode" ] && [ -n "$TOKEN" ];then out=$(mktemp);TLS=;[ -n "$INSECURE" ]&&TLS=--insecure;',
+    'code=$(curl -sS $TLS -m 15 -o "$out" -w \'%{http_code}\' -X POST -H "X-Agent-Token: $TOKEN" -H \'Content-Type: application/json\' --data "{\\"id\\":\\"$AGENT_ID\\"}" "${BASE%/}/api/agent/ping" 2>/dev/null);curl_status=$?;',
+    'if [ $curl_status -ne 0 ];then result=CHECK_FAILED;elif [ "$code" = 200 ];then grep -q \'"known":true,"fresh":true\' "$out"&&result=HEALTHY;',
+    'elif [ "$code" != 401 ] && [ "$code" != 403 ];then result=CHECK_FAILED;fi;rm -f "$out";fi;printf \'RESULT=%s\\n\' "$result"',
+  ].join('');
   const commands = [{
     title: 'Query agent',
-    description: 'Run first and check the service state and HTTP result.',
+    description: 'Run first and read the RESULT line.',
     command: `sudo bash -lc ${shQuote(queryScript)}`,
   }];
   if (token) {
@@ -8693,13 +8766,13 @@ function agentRepairCommands(req, agent) {
     ].join('\n');
     commands.push({
       title: 'Repair systemd agent',
-      description: 'Use for a failed or missing service, or HTTP 401/403.',
+      description: 'Run only when RESULT=REPAIR_SYSTEMD_AGENT.',
       command: `sudo bash -lc ${shQuote(repairScript)}`,
     });
     if (role === 'docker') {
       commands.push({
         title: 'Repair Docker container agent',
-        description: 'Use only when the agent runs as a Docker container.',
+        description: 'Run only when RESULT=REPAIR_DOCKER_AGENT.',
         command: [
           'docker rm -f omnisight-agent 2>/dev/null || true',
           'docker run -d --name omnisight-agent --restart unless-stopped \\',

@@ -504,7 +504,8 @@ function commandRecommendation(command){
 }
 function commandPanelGuide(commands, opts = {}){
   const titles = (commands || []).map(command => String(command?.title || ''));
-  const isWindows = titles.some(title => /Windows agent/i.test(title));
+  const agentRole = String(opts.agentRole || '').trim().toLowerCase();
+  const isWindows = agentRole === 'windows' || titles.some(title => /Windows agent/i.test(title));
   const hasDockerRepair = titles.includes('Repair Docker container agent');
   const agentVersion = String(opts.agentVersion || '');
   const latestVersion = String(opts.latestVersion || LATEST_AGENT_VERSION);
@@ -512,31 +513,25 @@ function commandPanelGuide(commands, opts = {}){
   const intro = isWindows
     ? 'Run Query Windows agent on this host in PowerShell as administrator.'
     : 'Run Query agent on the affected host.';
-  const healthyResult = isWindows
-    ? 'RESULT=HEALTHY'
-    : 'Service is active (running) and the HTTP result is 200.';
-  const repairResult = isWindows
-    ? 'RESULT=REPAIR_WINDOWS_AGENT'
-    : 'Service is inactive, failed or missing, or HTTP is 401/403.';
-  const checkResult = isWindows
-    ? 'RESULT=CHECK_FAILED'
-    : 'Result contains timeout, DNS, connection or TLS error.';
-  const repairAction = isWindows
-    ? 'Run Repair Windows agent.'
-    : hasDockerRepair
-      ? 'Run the repair command that matches the installation: Docker container or systemd.'
-      : 'Run Repair systemd agent.';
+  const resultRows = isWindows
+    ? [
+        ['RESULT=HEALTHY', 'No repair. Wait up to 30 seconds and refresh this page.'],
+        ['RESULT=REPAIR_WINDOWS_AGENT', 'Run Repair Windows agent.'],
+        ['RESULT=CHECK_FAILED', 'Do not repair. Check the network, OmniSight address or certificate.'],
+      ]
+    : [
+        ['RESULT=HEALTHY', 'No repair. Wait up to 30 seconds and refresh this page.'],
+        ['RESULT=REPAIR_SYSTEMD_AGENT', 'Run Repair systemd agent.'],
+        ...(hasDockerRepair ? [['RESULT=REPAIR_DOCKER_AGENT', 'Run Repair Docker container agent.']] : []),
+        ['RESULT=CHECK_FAILED', 'Do not repair. Check the network, OmniSight address or certificate.'],
+      ];
   const migrationNote = isWindows13
     ? `<div class="cmd-guide-migration"><strong>${esc(`v${agentVersion} → v${latestVersion}`)}</strong>${esc(t('This v1.3.x agent uses the old scheduled task. Repair Windows agent installs the v1.4 service, keeps the same identity and removes the old task after the service starts.'))}</div>`
     : '';
   return `<div class="cmd-guide">
     <div class="cmd-guide-title">${esc(t('Check result → action'))}</div>
     <div class="cmd-guide-intro">${esc(t(intro))}</div>
-    <ol>
-      <li><strong>${esc(t(healthyResult))}</strong> ${esc(t('No repair. Wait up to 30 seconds and refresh this page.'))}</li>
-      <li><strong>${esc(t(repairResult))}</strong> ${esc(t(repairAction))}</li>
-      <li><strong>${esc(t(checkResult))}</strong> ${esc(t('Do not repair. Check the network, OmniSight address or certificate.'))}</li>
-    </ol>
+    <ol>${resultRows.map(([result, action]) => `<li><strong>${esc(t(result))}</strong> ${esc(t(action))}</li>`).join('')}</ol>
     ${migrationNote}
   </div>`;
 }
@@ -798,17 +793,29 @@ async function uninstallAgent(id, name, btn){
 }
 async function showAgentRepair(id, btn){
   const msg = document.getElementById('msg');
-  clearMsg(true);
+  const restoreButtonFocus = document.activeElement === btn;
+  const preserveViewport = update => {
+    const viewport = { x: window.scrollX, y: window.scrollY };
+    update();
+    const restore = () => window.scrollTo(viewport.x, viewport.y);
+    restore();
+    requestAnimationFrame(restore);
+  };
   const old = btn.textContent; btn.disabled = true; btn.textContent = t('Loading...');
   try{
     const d = await fetchJson(`/api/agent/repair-commands?id=${encodeURIComponent(id)}`, { headers:authHeaders() }, 6000);
-    showCommandPanel(t('Agent diagnostic and repair commands'), d.commands || [], { subjectLabel: 'Hostname', subjectValue: d.name || id, agentVersion: d.agentVersion || '', latestVersion: d.latestVersion || LATEST_AGENT_VERSION, agentRole: d.role || '' });
+    preserveViewport(() => showCommandPanel(t('Agent diagnostic and repair commands'), d.commands || [], { subjectLabel: 'Hostname', subjectValue: d.name || id, agentVersion: d.agentVersion || '', latestVersion: d.latestVersion || LATEST_AGENT_VERSION, agentRole: d.role || '' }));
   }catch(e){
-    msg.textContent = e.message;
-    msg.className = 'msg err';
+    preserveViewport(() => {
+      clearMsg(true);
+      msg.textContent = e.message;
+      msg.className = 'msg err';
+    });
   }finally{
     btn.disabled = false;
     btn.textContent = old;
+    const focusIsIdle = !document.activeElement || document.activeElement === document.body || document.activeElement === document.documentElement;
+    if(restoreButtonFocus && btn.isConnected && focusIsIdle) btn.focus({ preventScroll:true });
   }
 }
 applyLanguage();

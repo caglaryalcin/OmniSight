@@ -613,7 +613,7 @@ html[data-theme="light"] .topbar{background:rgba(255,255,255,.78)}
 .prom-instance-h .chevron{
   width:22px;height:22px;border:1px solid var(--border);border-radius:7px;
   display:grid;place-items:center;background:rgba(255,255,255,.025);
-  color:var(--muted);margin-left:4px;line-height:1;
+  color:var(--muted);margin-left:4px;padding:0;line-height:1;font:inherit;cursor:pointer;
 }
 .prom-instance-h:hover .chevron{
   color:var(--text);border-color:rgba(96,165,250,.48);background:rgba(96,165,250,.09);
@@ -624,6 +624,19 @@ html[data-theme="light"] .topbar{background:rgba(255,255,255,.78)}
 .prom-instance-meta{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
 .prom-instance-body{display:none}
 .prom-instance-body.open{display:block}
+.cicd-pipeline-row{display:grid;grid-template-columns:9px minmax(220px,1.45fr) minmax(140px,1fr) max-content;align-items:center;gap:10px}
+.cicd-pipeline-row .mon-name{width:auto;min-width:0;white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;line-height:1.3}
+.cicd-pipeline-meta{min-width:0;color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cicd-pipeline-status{min-width:0;text-align:right}
+.cicd-project-picker{display:flex;align-items:center;gap:10px;padding:11px 16px;border-bottom:1px solid var(--border);background:rgba(255,255,255,.018)}
+.cicd-project-picker-label{flex:0 0 auto;color:var(--muted);font-size:11px;font-weight:750;letter-spacing:.05em;text-transform:uppercase}
+.cicd-project-select{min-width:0;width:min(460px,100%);height:34px;padding:0 34px 0 11px;border:1px solid var(--border);border-radius:8px;background:var(--row);color:var(--text);font:inherit;font-size:13px;font-weight:650;cursor:pointer;overflow:hidden;text-overflow:ellipsis}
+.cicd-project-select:hover,.cicd-project-select:focus{border-color:var(--border2);outline:none}
+.cicd-project-select:focus{box-shadow:0 0 0 2px rgba(96,165,250,.15)}
+.cloudflare-resource-row{display:grid;grid-template-columns:18px minmax(180px,560px) minmax(150px,500px) minmax(180px,max-content);justify-content:start;align-items:center;gap:10px}
+.cloudflare-resource-row .mon-name{width:auto;min-width:0;max-width:none}
+.cloudflare-resource-meta{min-width:0;color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cloudflare-resource-status{min-width:180px;justify-self:start;text-align:left}
 .prom-target-grid{display:grid;grid-template-columns:10px minmax(220px,1.45fr) minmax(120px,.72fr) minmax(120px,.72fr) minmax(100px,.56fr) minmax(82px,.44fr) 126px;align-items:center;gap:12px;min-width:0}
 .prom-target-grid.has-error{grid-template-columns:10px minmax(220px,1.45fr) minmax(116px,.62fr) minmax(112px,.62fr) minmax(96px,.5fr) minmax(78px,.38fr) 126px 92px}
 .prom-target-hdr{padding:7px 16px;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);border-bottom:1px solid var(--border)}
@@ -1135,6 +1148,16 @@ html[data-theme="light"] .overview-card .sb-csum-item{background:transparent!imp
   .k8s-colhdr.k8s-service-row,.mon-row.k8s-service-row{min-width:940px}
   .docker-row,.docker-head-row{min-width:980px}
   .pve-node-hdr,.snmp-node-hdr,.docker-host-hdr,.db-row{min-width:760px}
+  .cicd-pipeline-row{grid-template-columns:9px minmax(0,1fr) max-content;align-items:start;row-gap:5px}
+  .cicd-pipeline-row .mon-dot{margin-top:5px}
+  .cicd-pipeline-meta{grid-column:2 / 4;white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere}
+  .cicd-pipeline-status{grid-column:3;grid-row:1}
+  .cicd-project-picker{align-items:stretch;flex-direction:column;gap:6px;padding:10px 12px}
+  .cicd-project-select{width:100%}
+  .cloudflare-resource-row{grid-template-columns:9px minmax(0,1fr) 180px;align-items:start;row-gap:5px}
+  .cloudflare-resource-row .mon-dot{margin-top:5px}
+  .cloudflare-resource-meta{grid-column:2 / 4;white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere}
+  .cloudflare-resource-status{grid-column:3;grid-row:1;min-width:180px}
 }
 @media (max-width:520px){
   .topbar{padding:0 8px;gap:6px}
@@ -2527,6 +2550,97 @@ function applyServerUiPreferences(data = {}){
 
 let activePanel = null;
 
+/* ci-extract:begin ciProjectSelection */
+const CI_DETAIL_ALL_PROJECTS = '__all__';
+let ciDetailProjectSelection = '';
+
+function ciProjectProvider(project = {}){
+  return String(project.provider || project.type || 'github').trim().toLowerCase() === 'gitlab' ? 'gitlab' : 'github';
+}
+function ciProjectRepositoryLabel(project = {}){
+  const provider = ciProjectProvider(project);
+  if(provider === 'github'){
+    const owner = String(project.owner || '').trim();
+    const repo = String(project.repo || project.repository || '').trim();
+    if(owner && repo && !repo.includes('/')) return `${owner}/${repo}`;
+    if(repo && repo !== '*' && repo.includes('/')) return repo;
+    const urlMatch = String(project.url || project.webUrl || '').match(/^https?:\/\/github\.com\/([^/?#]+\/[^/?#]+)/i);
+    if(urlMatch) return urlMatch[1];
+    if(repo && repo !== '*') return repo;
+  } else {
+    const path = String(project.projectPath || project.pathWithNamespace || project.projectId || project.project || '').trim();
+    if(path) return path;
+    const urlMatch = String(project.url || project.webUrl || '').match(/^https?:\/\/[^/?#]+\/(.+?)(?:\.git)?(?:[?#]|$)/i);
+    if(urlMatch) return urlMatch[1];
+  }
+  return String(project.name || (provider === 'gitlab' ? 'GitLab project' : 'GitHub repository')).trim();
+}
+function ciProjectIdentity(project = {}, index = 0){
+  const provider = ciProjectProvider(project);
+  const repository = ciProjectRepositoryLabel(project);
+  const branch = String(project.branch || project.ref || '').trim();
+  const stable = repository || String(project.id || project.url || project.webUrl || '').trim();
+  return `${provider}:${stable || `project-${index}`}${branch ? `:${branch}` : ''}`;
+}
+function ciProjectOptionLabel(project = {}, providers = new Set()){
+  const provider = ciProjectProvider(project);
+  const repository = ciProjectRepositoryLabel(project);
+  const mixed = Number(providers?.size ?? (Array.isArray(providers) ? providers.length : 0)) > 1;
+  if(!mixed) return repository;
+  return `${provider === 'gitlab' ? 'GitLab' : 'GitHub'} · ${repository}`;
+}
+function ciDetailProjectEntries(projects = []){
+  const rows = Array.isArray(projects) ? projects.filter(project => project && typeof project === 'object') : [];
+  const providers = new Set(rows.map(ciProjectProvider));
+  const occurrences = new Map();
+  const entries = rows.map((project, index) => {
+    const baseKey = ciProjectIdentity(project, index);
+    const occurrence = occurrences.get(baseKey) || 0;
+    occurrences.set(baseKey, occurrence + 1);
+    return {
+      project,
+      index,
+      key: occurrence ? `${baseKey}#${occurrence + 1}` : baseKey,
+      label: ciProjectOptionLabel(project, providers),
+      all: false,
+    };
+  });
+  if(entries.length > 1){
+    entries.unshift({
+      project: null,
+      index: -1,
+      key: CI_DETAIL_ALL_PROJECTS,
+      label: providers.size === 1 && providers.has('github') ? 'All repositories' : 'All projects',
+      all: true,
+    });
+  }
+  return entries;
+}
+function selectedCiDetailProject(projects = []){
+  const entries = ciDetailProjectEntries(projects);
+  if(!entries.length){
+    ciDetailProjectSelection = '';
+    return null;
+  }
+  const selected = entries.find(entry => entry.key === ciDetailProjectSelection) || entries[0];
+  ciDetailProjectSelection = selected.key;
+  return selected;
+}
+function setCiDetailProject(value){
+  ciDetailProjectSelection = String(value || '');
+  return ciDetailProjectSelection;
+}
+/* ci-extract:end ciProjectSelection */
+
+document.addEventListener('change', event => {
+  const select = event.target?.closest?.('.cicd-project-select');
+  if(!select) return;
+  setCiDetailProject(select.value);
+  if(activePanel !== 'cicd' || !window._lastData) return;
+  window._panels = buildPanels(window._lastData);
+  selectPanel('cicd', { soft:true });
+});
+
 const SNMP_PANEL_IDS = ['synology','mikrotik','unifi','snmp'];
 const SNMP_BRAND_PANEL_IDS = ['synology','mikrotik','unifi'];
 const ALL_IDS = ['proxmox','vmware','kubernetes','linux','windows','synology','mikrotik','unifi','snmp','healthchecks','uptimekuma','checks','prometheus','docker','dockhand','firewall','truenas','qnap','ugreen','pbs','cloudflare','cicd','veeam','portainer','database'];
@@ -2534,6 +2648,34 @@ const CONFIGURED_CACHE_KEY = 'os_configured_ids_v1';
 function platformTitle(id, title){
   return String(title || id || '');
 }
+/* ci-extract:begin ciSidebarTitle */
+function ciSidebarTitle(...sources){
+  const providers = new Set();
+  sources.forEach(source => {
+    if(!source) return;
+    const value = !Array.isArray(source) && source.cicd && !source.projects && !source.instances
+      ? source.cicd
+      : source;
+    if(!value || (!Array.isArray(value) && value.enabled === false)) return;
+    const rows = Array.isArray(value)
+      ? value
+      : Array.isArray(value.projects)
+        ? value.projects
+        : Array.isArray(value.instances)
+          ? value.instances
+          : value.provider !== undefined
+            ? [value]
+            : [];
+    rows.forEach(row => {
+      if(!row || row.enabled === false) return;
+      const provider = String(row.provider || row.type || 'github').trim().toLowerCase();
+      if(provider === 'github' || provider === 'gitlab') providers.add(provider);
+    });
+  });
+  if(providers.size !== 1) return 'GitHub/GitLab CI';
+  return providers.has('gitlab') ? 'GitLab' : 'GitHub';
+}
+/* ci-extract:end ciSidebarTitle */
 function normalizeSnmpPanelProfile(profile){
   const p = String(profile || '').trim().toLowerCase();
   return SNMP_BRAND_PANEL_IDS.includes(p) ? p : 'snmp';
@@ -2626,6 +2768,21 @@ function offlineRatioBadgeClass(offline, total, online){
 }
 /* ci-extract:end offlineRatioBadgeClass */
 function hasNum(v){ return v !== null && v !== undefined && v !== '' && Number.isFinite(Number(v)); }
+/* ci-extract:begin formatDaysLeft */
+function formatDaysLeft(value){
+  if(value === null || value === undefined || value === '' || !Number.isFinite(Number(value))) return 'unknown';
+  let remaining = Math.max(0, Math.floor(Number(value)));
+  const years = Math.floor(remaining / 365);
+  remaining %= 365;
+  const months = Math.floor(remaining / 30);
+  const days = remaining % 30;
+  const parts = [];
+  if(years) parts.push(`${years}${years === 1 ? 'year' : 'years'}`);
+  if(months) parts.push(`${months}${months === 1 ? 'month' : 'months'}`);
+  if(days || !parts.length) parts.push(`${days}${days === 1 ? 'day' : 'days'}`);
+  return `${parts.join(' ')} left`;
+}
+/* ci-extract:end formatDaysLeft */
 function boundedPct(v){
   if(!hasNum(v)) return null;
   return Math.max(0, Math.min(100, Math.round(Number(v) * 10) / 10));
@@ -2733,6 +2890,7 @@ const PLATFORM_META = {
   database:    { title:'Databases',     iconKey:'database',     color:'var(--blue)' },
 };
 let configuredIds = [];
+let configuredCiSidebarTitle = '';
 function readConfiguredCache(){
   try{
     const ids = JSON.parse(localStorage.getItem(CONFIGURED_CACHE_KEY) || '[]');
@@ -2760,11 +2918,21 @@ function placeholderPanel(id){
     return { id, loading:true, title:m.title, iconKey:m.iconKey, color:m.color, meta:'', badge:bdg('gray','no agents'), sbSummary:'', summary:'', body:waitBody };
   }
   const connBody = `<div style="display:flex;align-items:center;justify-content:center;gap:10px;padding:60px;color:var(--muted);font-size:14px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>Connecting…</div>`;
-  return { id, loading:true, title:m.title, iconKey:m.iconKey, color:m.color, meta:'Connecting...', badge:bdg('gray','connecting...'), sbSummary:'', summary:'', body:connBody };
+  return { id, loading:true, title:m.title, sidebarTitle:id === 'cicd' ? platformTitle('cicd', configuredCiSidebarTitle || m.title) : m.title, iconKey:m.iconKey, color:m.color, meta:'Connecting...', badge:bdg('gray','connecting...'), sbSummary:'', summary:'', body:connBody };
 }
 function applyConfigured(ids, cfg){
   const nextIds = expandSnmpConfiguredIds(ids, cfg);
   setConfiguredIds(nextIds);
+  if(cfg){
+    const ciRows = Array.isArray(cfg.cicd?.projects)
+      ? cfg.cicd.projects
+      : Array.isArray(cfg.cicd?.instances)
+        ? cfg.cicd.instances
+        : [];
+    configuredCiSidebarTitle = ids.includes('cicd') && cfg.cicd?.enabled !== false && ciRows.some(row => row && row.enabled !== false)
+      ? ciSidebarTitle(ciRows)
+      : '';
+  }
   const d = window._lastData || { timestamp:new Date().toISOString(), proxmox:{nodes:[]}, vmware:null, linux:[], windows:[], kubernetes:null, snmp:[], healthchecks:null, uptimekuma:null, checks:null, prometheus:null, docker:[], dockhand:null, firewall:null, truenas:null, qnap:null, ugreen:null, pbs:null, cloudflare:null, cicd:null, veeam:null, portainer:null, database:[] };
   d.configured = nextIds;
   if(!ids.includes('proxmox')) d.proxmox = { clusterSummary:null, nodes:[] };
@@ -2891,7 +3059,7 @@ function applyConfigured(ids, cfg){
         _connecting: true,
         online: false,
         summary: { projects: projects.length, up: 0, down: 0, partial: 0, pipelines: 0, success: 0, failed: 0, running: 0, canceled: 0, jobs: 0, jobsFailed: 0, jobsRunning: 0 },
-        projects: projects.map((row, idx) => ({ name: row.name || row.repo || row.projectId || `CI Project ${idx + 1}`, provider: row.provider || 'github', branch: row.branch || row.ref || '', online: false, _connecting: true, pipelines: [], jobs: [] })),
+        projects: projects.map((row, idx) => ({ name: row.name || ((row.allRepositories === true || row.repo === '*') ? 'All repositories' : row.repo) || row.projectId || `CI Project ${idx + 1}`, provider: row.provider || 'github', repo: row.allRepositories === true || row.repo === '*' ? '' : (row.repo || row.repository || ''), projectPath: row.projectPath || row.path || '', projectId: row.projectId || row.project || '', branch: row.branch || row.ref || '', online: false, _connecting: true, pipelines: [], jobs: [] })),
       };
     }
     if(ids.includes('veeam') && !d.veeam){
@@ -6480,32 +6648,32 @@ function buildCloudflare(cf){
   const zoneRows = zones.map(z => {
     const warn = z.warn || !z.online;
     const sub = [z.status, z.paused ? 'paused' : '', z.plan || '', z.accountName || ''].filter(Boolean).join(' - ');
-    return `<div class="mon-row" style="grid-template-columns:18px minmax(180px,1.3fr) minmax(120px,1fr) 86px">
+    return `<div class="mon-row cloudflare-resource-row">
       <div class="mon-dot ${z._connecting?'md-gray':z.online?'md-green':warn?'md-yellow':'md-gray'}"></div>
       <div class="mon-name" title="${escAttr(z.name)}">${escHtml(z.name)}</div>
-      <span style="color:var(--muted);font-size:12px">${escHtml(sub || 'zone')}</span>
-      <span style="text-align:right">${bdg(z._connecting?'gray':z.online?'green':'yellow', z._connecting?'connecting':(z.status || 'unknown'))}</span>
+      <span class="cloudflare-resource-meta" title="${escAttr(sub || 'zone')}">${escHtml(sub || 'zone')}</span>
+      <span class="cloudflare-resource-status">${bdg(z._connecting?'gray':z.online?'green':'yellow', z._connecting?'connecting':(z.status || 'unknown'))}</span>
     </div>`;
   }).join('');
   const tunnelRows = tunnels.map(t => {
     const warn = !t.online;
     const sub = [`${t.activeConnections || 0} active connections`, t.pendingReconnect ? `${t.pendingReconnect} reconnecting` : ''].filter(Boolean).join(' - ');
-    return `<div class="mon-row" style="grid-template-columns:18px minmax(180px,1fr) minmax(150px,1fr) 90px">
+    return `<div class="mon-row cloudflare-resource-row">
       <div class="mon-dot ${t.online?'md-green':warn?'md-red':'md-gray'}"></div>
       <div class="mon-name" title="${escAttr(t.name)}">${escHtml(t.name || 'tunnel')}</div>
-      <span style="color:var(--muted);font-size:12px">${escHtml(sub || t.id || '')}</span>
-      <span style="text-align:right">${bdg(t.online?'green':'red', t.status || 'unknown')}</span>
+      <span class="cloudflare-resource-meta" title="${escAttr(sub || t.id || '')}">${escHtml(sub || t.id || '')}</span>
+      <span class="cloudflare-resource-status">${bdg(t.online?'green':'red', t.status || 'unknown')}</span>
     </div>`;
   }).join('');
   const domainRows = domains.map(d => {
     const days = hasNum(d.daysToExpire) ? Number(d.daysToExpire) : null;
-    const status = d.expired ? 'expired' : d.expiring ? `${days}d left` : days !== null ? `${days}d left` : 'unknown';
+    const status = d.expired ? 'expired' : days !== null ? formatDaysLeft(days) : 'unknown';
     const sub = [d.expiresAt ? `expires ${String(d.expiresAt).slice(0, 10)}` : '', d.autoRenew ? 'auto-renew' : '', d.currentRegistrar || ''].filter(Boolean).join(' - ');
-    return `<div class="mon-row" style="grid-template-columns:18px minmax(180px,1.1fr) minmax(150px,1fr) 96px">
+    return `<div class="mon-row cloudflare-resource-row">
       <div class="mon-dot ${d.expired?'md-red':d.expiring?'md-yellow':'md-green'}"></div>
       <div class="mon-name" title="${escAttr(d.name)}">${escHtml(d.name || 'domain')}</div>
-      <span style="color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escAttr(sub)}">${escHtml(sub || 'Cloudflare Registrar')}</span>
-      <span style="text-align:right">${bdg(d.expired?'red':d.expiring?'yellow':'green', status)}</span>
+      <span class="cloudflare-resource-meta" title="${escAttr(sub)}">${escHtml(sub || 'Cloudflare Registrar')}</span>
+      <span class="cloudflare-resource-status">${bdg(d.expired?'red':d.expiring?'yellow':'green', status)}</span>
     </div>`;
   }).join('');
   const body = cf.online || cf._connecting ? `<div class="node-hdr pve-node-hdr db-node-hdr ${healthCls === 'green' ? 'online' : healthCls === 'yellow' ? 'warn' : 'offline'}" style="cursor:default;margin:0 0 10px">
@@ -6553,20 +6721,31 @@ function buildCiCd(ci){
   const pipelineRows = project => (project.pipelines || []).slice(0, 8).map(p => {
     const sub = [p.ref || project.branch || '', p.actor || '', p.title || '', p.updatedAt || p.createdAt || ''].filter(Boolean).join(' - ');
     const pipelineKey = `${project.id || project.url || project.name || ''}:${p.id || p.pipelineId || p.runId || p.createdAt || p.name || p.workflowName || ''}`;
-    return `<div class="mon-row" data-morph-key="cicd-pipeline:${escAttr(pipelineKey)}" style="grid-template-columns:18px minmax(180px,1.2fr) minmax(140px,1fr) 90px">
+    return `<div class="mon-row cicd-pipeline-row" data-morph-key="cicd-pipeline:${escAttr(pipelineKey)}">
       <div class="mon-dot ${p.running?'md-gray':p.failed?'md-yellow':p.success?'md-green':'md-gray'}"></div>
       <div class="mon-name" title="${escAttr(p.name || p.workflowName || 'pipeline')}">${escHtml(p.name || p.workflowName || 'pipeline')}</div>
-      <span style="color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escAttr(sub)}">${escHtml(sub)}</span>
-      <span style="text-align:right">${statusBadge(p)}</span>
+      <span class="cicd-pipeline-meta" title="${escAttr(sub)}">${escHtml(sub)}</span>
+      <span class="cicd-pipeline-status">${statusBadge(p)}</span>
     </div>`;
   }).join('');
-  const body = projects.length ? projects.map((project, idx) => {
+  const projectEntries = ciDetailProjectEntries(projects);
+  const selectedProject = selectedCiDetailProject(projects);
+  const projectOptions = selectedProject ? projectEntries.map(entry => `<option value="${escAttr(entry.key)}"${entry.key === selectedProject.key ? ' selected' : ''}>${escHtml(entry.label)}</option>`).join('') : '';
+  const projectPicker = selectedProject ? `<div class="cicd-project-picker" data-morph-key="cicd-project-picker">
+    <label class="cicd-project-picker-label" for="cicd-project-select">Repository</label>
+    <select id="cicd-project-select" class="cicd-project-select" data-morph-key="cicd-project-select" aria-label="CI repository">${projectOptions}</select>
+  </div>` : '';
+  const visibleProjects = selectedProject?.all ? projects : selectedProject ? [selectedProject.project] : [];
+  const body = projects.length ? projectPicker + visibleProjects.map((project) => {
+    const idx = projects.indexOf(project);
+    const projectKey = projectEntries.find(entry => entry.index === idx)?.key || ciProjectIdentity(project, idx);
+    const isOpen = panelOpenState('cicd:' + projectKey, true);
     const failedProject = (project.pipelines || []).some(p=>p.failed) || (project.jobs || []).some(j=>j.failed);
     const stateClass = project._connecting ? 'connecting' : !project.online ? 'offline' : failedProject || project.partial ? 'warn' : 'online';
     const provider = String(project.provider || '').toUpperCase();
     const meta = project.online ? `${(project.pipelines || []).filter(p=>p.success).length}/${(project.pipelines || []).length} green` : project._connecting ? 'waiting for first check' : 'unreachable';
-    return `<section class="prom-instance" data-morph-key="cicd-project:${escAttr(project.id || project.url || project.name || idx)}">
-      <div class="prom-instance-h service-node-hdr ${stateClass}">
+    return `<section class="prom-instance" data-morph-key="cicd-project:${escAttr(projectKey)}">
+      <div class="prom-instance-h service-node-hdr ${stateClass}" data-cicd-project-key="${escAttr(projectKey)}" data-detail-order-key="${escAttr(projectKey)}" onclick="toggleCiCdProject(this,event)">
         <div class="mon-dot ${project._connecting?'md-gray':project.online?(failedProject||project.partial?'md-yellow':'md-green'):'md-red'}"></div>
         <div class="prom-instance-main">
           <div class="prom-instance-name">${escHtml(project.name || 'CI Project')}</div>
@@ -6575,14 +6754,31 @@ function buildCiCd(ci){
         <div class="prom-instance-meta">${escHtml(meta)}</div>
         ${project._connecting ? bdg('gray','connecting...') : project.online ? bdg(failedProject || project.partial ? 'yellow' : 'green', failedProject ? 'failing' : project.partial ? 'partial' : 'online') : bdg('red','offline')}
         ${notifyBell('cicd:' + (project.name || idx))}
+        <button type="button" class="chevron ${isOpen?'open':''}" aria-expanded="${isOpen?'true':'false'}" aria-controls="cicd-project-body-${idx}" aria-label="${isOpen?'Collapse repository':'Expand repository'}" onclick="event.stopPropagation();toggleCiCdProject(this.closest('.prom-instance-h'))">▼</button>
       </div>
-      <div class="prom-instance-body open">
+      <div class="prom-instance-body ${isOpen?'open':''}" id="cicd-project-body-${idx}">
         ${project.online ? (pipelineRows(project) || '<div class="empty">No pipelines reported</div>') : `<div class="offline-row"><div class="mon-dot ${project._connecting?'md-gray':'md-red'}"></div><div>${project._connecting?'Connecting to CI/CD...':'CI/CD project unreachable'}<div class="offline-err">${escHtml(project.error || '')}</div></div></div>`}
         ${project.partial && project.errors?.length ? `<div class="offline-err" style="margin-top:10px">Partial API data: ${escHtml(project.errors.join(' - '))}</div>` : ''}
       </div>
     </section>`;
   }).join('') : `<div class="offline-row"><div class="mon-dot md-gray"></div><div>Connecting to CI/CD...</div></div>`;
-  return { id: 'cicd', title: 'GitHub/GitLab CI', iconKey: 'cicd', color: 'var(--green)', meta: connecting && !up ? 'connecting...' : `${up}/${total} projects - ${sm.success || 0}/${sm.pipelines || 0} green`, badge: bdg(healthCls, healthTxt), sbSummary: sbSummaryHtml, summary: '', body };
+  return { id: 'cicd', title: 'GitHub/GitLab CI', sidebarTitle: platformTitle('cicd', configuredCiSidebarTitle || ciSidebarTitle(ci)), iconKey: 'cicd', color: 'var(--green)', meta: connecting && !up ? 'connecting...' : `${up}/${total} projects - ${sm.success || 0}/${sm.pipelines || 0} green`, badge: bdg(healthCls, healthTxt), sbSummary: sbSummaryHtml, summary: '', body };
+}
+
+function toggleCiCdProject(header, event){
+  if(!header) return;
+  if(event?.target?.closest?.('button,select,input,a,.notify-wrap')) return;
+  const body = header.nextElementSibling;
+  if(!body?.classList.contains('prom-instance-body')) return;
+  const open = !body.classList.contains('open');
+  setOverride('cicd:' + String(header.dataset.cicdProjectKey || ''), open);
+  body.classList.toggle('open', open);
+  const chevron = header.querySelector('.chevron');
+  if(chevron){
+    chevron.classList.toggle('open', open);
+    chevron.setAttribute('aria-expanded', open ? 'true' : 'false');
+    chevron.setAttribute('aria-label', open ? 'Collapse repository' : 'Expand repository');
+  }
 }
 
 function buildVeeam(veeam){
@@ -7470,12 +7666,13 @@ function sidebarMetaHtml(meta){
 function sidebarCard(panel, isActive){
   const iconSvg = platformIcon(panel);
   const meta = panel.sbMeta !== undefined ? panel.sbMeta : (panel.meta || '');
+  const sidebarTitle = panel.sidebarTitle || panel.title;
   return `
-  <div class="sb-card ${isActive?'active':''}" id="sbcard-${panel.id}" data-id="${panel.id}" draggable="false" title="${escAttr(panel.title)}" onclick="selectPanel('${panel.id}')">
+  <div class="sb-card ${isActive?'active':''}" id="sbcard-${panel.id}" data-id="${panel.id}" draggable="false" title="${escAttr(sidebarTitle)}" onclick="selectPanel('${panel.id}')">
     <div class="sb-hdr">
       <div class="sb-icon">${iconSvg}</div>
       <div class="sb-main">
-        <span class="sb-title">${panel.title}</span>
+        <span class="sb-title">${sidebarTitle}</span>
         <span class="sb-meta" style="${meta?'':'display:none'}">${sidebarMetaHtml(meta)}</span>
       </div>
       <span class="sb-badge-wrap" style="flex-shrink:0;margin-left:4px">${panel.badge}</span>
@@ -7485,9 +7682,10 @@ function sidebarCard(panel, isActive){
 }
 function updateSidebarCard(card, panel, isActive){
   card.classList.toggle('active', !!isActive);
-  card.title = panel.title || '';
+  const sidebarTitle = panel.sidebarTitle || panel.title || '';
+  card.title = sidebarTitle;
   const title = card.querySelector('.sb-title');
-  if(title && title.textContent !== panel.title) title.textContent = panel.title;
+  if(title && title.textContent !== sidebarTitle) title.textContent = sidebarTitle;
   const metaText = panel.sbMeta !== undefined ? panel.sbMeta : (panel.meta || '');
   const meta = card.querySelector('.sb-meta');
   if(meta){
@@ -8285,7 +8483,7 @@ function overviewRows(id, data){
     }).join('');
     const domainRows = (cf.domains || []).map(d => {
       const days = hasNum(d.daysToExpire) ? Number(d.daysToExpire) : null;
-      const status = d.expired ? 'expired' : d.expiring ? `${days}d left` : days !== null ? `${days}d left` : 'unknown';
+      const status = d.expired ? 'expired' : days !== null ? formatDaysLeft(days) : 'unknown';
       const sub = [d.expiresAt ? `expires ${String(d.expiresAt).slice(0, 10)}` : '', d.autoRenew ? 'auto-renew' : '', d.currentRegistrar || ''].filter(Boolean).join(' - ');
       return overviewRow('cloudflare', d.name || 'domain', sub,
         d.expired ? 'red' : d.expiring ? 'yellow' : 'green',
@@ -9283,10 +9481,11 @@ function agentUpdateDetailConsistent(detail, panel){
 }
 
 function detailSystemKey(header, body, index){
+  const explicit = String(header?.dataset?.detailOrderKey || '').trim();
   const source = String(header?.getAttribute('onclick') || '');
   const args = [...source.matchAll(/'((?:\\.|[^'])*)'/g)];
   const raw = args.length ? args[args.length - 1][1].replace(/\\(['\\])/g, '$1') : '';
-  return String(raw || body?.id || `system-${index}`).slice(0, 180);
+  return String(explicit || raw || body?.id || `system-${index}`).slice(0, 180);
 }
 
 function detailSystemUnits(detail, panelId){
@@ -9296,7 +9495,7 @@ function detailSystemUnits(detail, panelId){
     if(body.id === 'nd-pvesvcs') return null;
     const section = body.parentElement?.classList.contains('prom-instance') ? body.parentElement : null;
     const header = section ? body.previousElementSibling : body.previousElementSibling;
-    if(!header || !/\btoggle(?:Node|Linux|Windows|VmwareInstance|VmwareHost|Snmp|PrometheusInstance|Docker|DockhandInstance|FirewallInstance|TrueNasInstance|SimpleNasInstance|PbsInstance|PortainerInstance)\s*\(/.test(String(header.getAttribute('onclick') || ''))) return null;
+    if(!header || !/\btoggle(?:Node|Linux|Windows|VmwareInstance|VmwareHost|Snmp|PrometheusInstance|Docker|DockhandInstance|FirewallInstance|TrueNasInstance|SimpleNasInstance|PbsInstance|PortainerInstance|CiCdProject)\s*\(/.test(String(header.getAttribute('onclick') || ''))) return null;
     const key = detailSystemKey(header, body, index);
     if(!key || seen.has(key)) return null;
     seen.add(key);
@@ -9378,7 +9577,7 @@ function moveDetailUnitAfter(unit, target){
 function moveDraggedDetailSystem(detail, panelId, key, clientY){
   const units = detailSystemUnits(detail, panelId);
   const current = units.find(unit => unit.key === key);
-  if(!current || current.body.classList.contains('open')) return;
+  if(!current || (current.body.classList.contains('open') && panelId !== 'cicd')) return;
   const group = detailSystemGroups(units).find(items => items.includes(current));
   if(!group || group.length < 2) return;
   const candidates = group.filter(unit => unit !== current);
@@ -9398,7 +9597,7 @@ function refreshDetailSystemDraggability(detail, panelId){
   const units = detailSystemUnits(detail, panelId);
   detailSystemGroups(units).forEach(group => {
     group.forEach(unit => {
-      const canDrag = group.length > 1 && !unit.body.classList.contains('open');
+      const canDrag = group.length > 1 && (panelId === 'cicd' || !unit.body.classList.contains('open'));
       unit.header.classList.toggle('detail-system-draggable', canDrag);
     });
   });
@@ -9470,7 +9669,7 @@ function bindDetailSystemDragging(detail){
     const panelId = detail.dataset.panelId || activePanel;
     if(!header || !panelId || !detail.contains(header)) return;
     const unit = detailSystemUnits(detail, panelId).find(item => item.header === header);
-    if(!unit || unit.body.classList.contains('open')) return;
+    if(!unit || (unit.body.classList.contains('open') && panelId !== 'cicd')) return;
     const group = detailSystemGroups(detailSystemUnits(detail, panelId)).find(items => items.some(item => item.key === unit.key));
     if(!group || group.length < 2) return;
     detailSystemDrag = {

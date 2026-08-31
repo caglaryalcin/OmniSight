@@ -132,6 +132,10 @@ html.embed .settings-nav-btn.active{background:rgba(96,165,250,.15)}
 .form-group{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
 .form-group:last-child{margin-bottom:0}
 .form-group label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.form-label-with-info{display:flex;align-items:center;gap:7px;min-height:20px;flex-wrap:wrap}
+.form-field-link{align-self:flex-start;color:var(--blue);font-size:12px;font-weight:650;text-decoration:none}
+.form-label-with-info .form-field-link{align-self:center}
+.form-field-link:hover{text-decoration:underline}
 .form-group input,.form-group select,.form-group textarea{
   background:var(--row);border:1px solid var(--border);border-radius:6px;
   color:var(--text);padding:8px 12px;font-size:14px;transition:border-color .15s;
@@ -248,9 +252,17 @@ input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 .ci-grid .form-group{margin-bottom:0}
 .ci-provider-field{display:none}
 .ci-card.github .ci-github-field,.ci-card.gitlab .ci-gitlab-field{display:flex}
-.ci-token-field{grid-column:1/-1}
+.ci-token-field,.ci-resource-field{grid-column:1/-1}
+.ci-token-row,.ci-resource-row{display:flex;align-items:center;gap:8px;min-width:0}
+.ci-token-row input,.ci-resource-row select{flex:1;min-width:0}
+.ci-resource-manual{width:100%}
+.ci-discovery-status{min-height:16px;font-size:11px;line-height:1.35;color:var(--muted)}
+.ci-discovery-status.ok{color:var(--green)}
+.ci-discovery-status.warn{color:var(--yellow)}
+.ci-discovery-status.err{color:var(--red)}
+.ci-resource-select:disabled{cursor:not-allowed;opacity:.62}
 .ci-help{font-size:12px;color:var(--muted);line-height:1.4;margin-bottom:12px}
-@media (max-width:760px){.ci-grid{grid-template-columns:1fr}.ci-actions{width:100%}.ci-actions .btn-add{flex:1}}
+@media (max-width:760px){.ci-grid{grid-template-columns:1fr}.ci-actions{width:100%}.ci-actions .btn-add{flex:1}.ci-token-row,.ci-resource-row{align-items:stretch;flex-direction:column}.ci-token-row .btn-sm,.ci-resource-row .btn-sm{width:100%}}
 .session-row{align-items:flex-start;justify-content:space-between;gap:12px}
 .session-main{min-width:0;flex:1}
 .session-title{font-weight:750;color:var(--text);line-height:1.25}
@@ -280,6 +292,9 @@ body.settings-readonly .btn-save{display:none}
 .amodal-body{padding:18px 20px}
 .confirm-box{width:min(430px,94vw)}
 .confirm-copy{font-size:13px;color:var(--muted);line-height:1.45;margin-bottom:14px}
+.confirm-copy ol{margin:0;padding-left:24px}
+.confirm-copy li+li{margin-top:8px}
+.confirm-copy code{color:var(--text);background:var(--row);border:1px solid var(--border);border-radius:5px;padding:2px 5px;font-size:12px}
 .confirm-target{border:1px solid var(--border);background:var(--row);border-radius:10px;padding:10px 12px;font-size:14px;font-weight:700;color:var(--text);margin-bottom:16px;word-break:break-word}
 .confirm-actions{display:flex;justify-content:flex-end;gap:8px}
 .atabs{display:flex;gap:6px;background:var(--row);border:1px solid var(--border);border-radius:10px;padding:4px;margin-bottom:14px;width:fit-content}
@@ -1307,8 +1322,21 @@ html[data-theme="light"] .ci-help{color:#53657c}
       </div>
     </div>
     <div class="grid two">
-      <div class="form-group"><label>API token</label><input type="password" id="cf-token" placeholder="cfut_*****"></div>
-      <div class="form-group"><label>Account ID (optional)</label><input type="text" id="cf-account-id" placeholder="required for tunnel health"></div>
+      <div class="form-group">
+        <div class="form-label-with-info">
+          <label for="cf-token">API token</label>
+          <button type="button" class="info-btn" onclick="openSettingsInfo(event,'cloudflareToken')" aria-label="Cloudflare API token permissions">?</button>
+          <a class="form-field-link" href="https://dash.cloudflare.com/profile/api-tokens" target="_blank" rel="noopener noreferrer">Create Cloudflare API token ↗</a>
+        </div>
+        <input type="password" id="cf-token" placeholder="cfut_*****">
+      </div>
+      <div class="form-group">
+        <div class="form-label-with-info">
+          <label for="cf-account-id">Account ID (optional)</label>
+          <a class="form-field-link" href="https://developers.cloudflare.com/fundamentals/account/find-account-and-zone-ids/" target="_blank" rel="noopener noreferrer">Find Account ID ↗</a>
+        </div>
+        <input type="text" id="cf-account-id" placeholder="required for tunnel health">
+      </div>
     </div>
     <div class="form-group"><label>Zone filter (optional)</label><textarea id="cf-zones" rows="4" placeholder="example.com&#10;another-zone-id"></textarea></div>
     <div class="grid two">
@@ -2341,6 +2369,11 @@ function changeLanguageNow(lang) {
   const next = OmniI18n.normalizeLang ? OmniI18n.normalizeLang(lang) : (lang || 'en');
   localStorage.setItem('os_lang', next);
   applyLanguage(next);
+  document.querySelectorAll('#cicd-list .arr-item').forEach(item => {
+    if (!ciAllRepositoriesSelected(item)) return;
+    syncCiAllRepositoriesUi(item, { syncManual: item.dataset.ciManual === '1' });
+    updateCiHeader(item.querySelector('.ci-name'));
+  });
   if (Array.isArray(lastSessionRows)) renderSessions(lastSessionRows);
   try {
     const p = window.parent;
@@ -2423,7 +2456,7 @@ function previewConnectingPlatform(data, id, cfg = {}) {
     data.cloudflare = { _connecting: true, online: false, summary: { zones: zones.length, zonesActive: 0, zonesWarn: 0, tunnels: 0, tunnelsHealthy: 0, tunnelsDown: 0, domains: 0, domainsExpiring: 0, domainsExpired: 0, domainsAutoRenew: 0 }, zones: zones.map(name => ({ name, status: 'connecting', online: false, _connecting: true })), tunnels: [], domains: [] };
   } else if (id === 'cicd') {
     const projects = Array.isArray(cfg.cicd?.projects) ? cfg.cicd.projects : (Array.isArray(cfg.cicd?.instances) ? cfg.cicd.instances : []);
-    data.cicd = { _connecting: true, online: false, summary: { projects: projects.length, up: 0, down: 0, partial: 0, pipelines: 0, success: 0, failed: 0, running: 0, canceled: 0, jobs: 0, jobsFailed: 0, jobsRunning: 0 }, projects: projects.map((row, idx) => ({ name: row.name || row.repo || row.projectId || `CI Project ${idx + 1}`, provider: row.provider || 'github', branch: row.branch || row.ref || '', online: false, _connecting: true, pipelines: [], jobs: [] })) };
+    data.cicd = { _connecting: true, online: false, summary: { projects: projects.length, up: 0, down: 0, partial: 0, pipelines: 0, success: 0, failed: 0, running: 0, canceled: 0, jobs: 0, jobsFailed: 0, jobsRunning: 0 }, projects: projects.map((row, idx) => ({ name: row.name || ((row.allRepositories === true || row.repo === '*') ? 'All repositories' : row.repo) || row.projectId || `CI Project ${idx + 1}`, provider: row.provider || 'github', branch: row.branch || row.ref || '', online: false, _connecting: true, pipelines: [], jobs: [] })) };
   } else if (id === 'veeam') {
     const instances = Array.isArray(cfg.veeam?.instances) ? cfg.veeam.instances : (cfg.veeam?.url ? [cfg.veeam] : []);
     data.veeam = { _connecting: true, online: false, summary: { instances: instances.length, up: 0, down: 0, partial: 0, jobs: 0, jobsDisabled: 0, sessions: 0, failedSessions: 0, warningSessions: 0, runningSessions: 0, repositories: 0, repositoriesWarn: 0 }, instances: instances.map((inst, idx) => ({ name: inst.name || inst.url || `Veeam ${idx + 1}`, url: inst.url || '', online: false, _connecting: true, jobs: [], sessions: [], repositories: [], summary: { jobs: 0, sessions: 0, repositories: 0, failedSessions: 0, warningSessions: 0, runningSessions: 0, repositoriesWarn: 0 } })) };
@@ -3070,34 +3103,365 @@ function addPbsInstance(data = {}) {
   applyLanguageFragment(item);
 }
 
+function newCiConfigId() {
+  try { if (window.crypto?.randomUUID) return window.crypto.randomUUID(); } catch {}
+  return `ci-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 function addCiProject(data = {}) {
   const idx = cicdCount++;
   const id = `cicd-${idx}`;
   const provider = (data.provider || data.type || 'github').toLowerCase();
+  const configuredGithubRepo = String(data.repo || data.repository || '').trim();
+  const allRepositories = provider !== 'gitlab' && (data.allRepositories === true || configuredGithubRepo === '*');
+  const githubRepo = allRepositories ? '*' : configuredGithubRepo;
+  const gitlabProject = String(data.projectId || data.project || data.projectPath || '').trim();
+  const resource = provider === 'gitlab' ? gitlabProject : githubRepo;
+  const projectPath = provider === 'gitlab'
+    ? String(data.projectPath || (!/^\d+$/.test(gitlabProject) ? gitlabProject : '')).trim()
+    : '';
+  const resourceLabel = provider === 'gitlab' ? (projectPath || gitlabProject) : (allRepositories ? 'All repositories' : githubRepo);
+  const tokenKeys = ['token', 'apiToken', 'accessToken', 'bearerToken'];
+  const tokenKey = tokenKeys.find(key => data[key]) || tokenKeys.find(key => Object.hasOwn(data, key)) || 'token';
+  const tokenData = data[tokenKey] || '';
+  const configId = String(data.configId || newCiConfigId()).trim();
+  const originalResource = String(data.originalResource || resource).trim();
+  const hasStoredToken = !!tokenData;
   const item = document.createElement('div');
   item.className = `arr-item ci-card ${provider === 'gitlab' ? 'gitlab' : 'github'}`;
   item.innerHTML = `
     <div class="arr-hdr">
       <span class="ci-provider-badge ${provider === 'gitlab' ? 'gitlab' : 'github'}">${provider === 'gitlab' ? 'GitLab' : 'GitHub'}</span>
-      <span class="arr-hdr-name">${escHtml(data.name||data.repo||data.projectId||data.project||data.projectPath||(provider === 'gitlab' ? 'GitLab Project' : 'GitHub Repo'))}</span>
+      <span class="arr-hdr-name">${escHtml(data.name||resourceLabel||(provider === 'gitlab' ? 'GitLab Project' : 'GitHub Repo'))}</span>
       <button class="btn-rm" type="button" onclick="this.closest('.arr-item').remove()">x</button>
     </div>
     <div class="arr-body ci-body">
       <input type="hidden" class="ci-provider" value="${provider === 'gitlab' ? 'gitlab' : 'github'}">
+      <input type="hidden" class="ci-config-id" value="${escHtml(configId)}">
+      <input type="hidden" class="ci-original-resource" value="${escHtml(originalResource)}">
+      <input type="hidden" class="ci-token-key" value="${escHtml(tokenKey)}">
+      <input type="hidden" class="ci-repo" value="${escHtml(githubRepo)}">
+      <input type="hidden" class="ci-all-repositories" value="${allRepositories ? 'true' : 'false'}">
+      <input type="hidden" class="ci-project" value="${escHtml(gitlabProject)}">
+      <input type="hidden" class="ci-project-path" value="${escHtml(projectPath)}">
       <div class="ci-help">${provider === 'gitlab' ? 'GitLab pipelines are read from a project path or numeric project ID.' : 'GitHub Actions runs are read from a repository in owner/repo format.'}</div>
       <div class="ci-grid">
         <div class="form-group"><label>Name</label><input type="text" class="ci-name" value="${escHtml(data.name||'')}" placeholder="${provider === 'gitlab' ? 'gitlab-app' : 'github-app'}" oninput="updateCiHeader(this)"></div>
-        <div class="form-group ci-provider-field ci-github-field"><label>GitHub repo <span class="req">*</span></label><input type="text" class="ci-repo" value="${escHtml(data.repo||data.repository||'')}" placeholder="owner/repo" required oninput="clearCiValidation(this);updateCiHeader(this)"><div class="field-error">GitHub repo is required</div></div>
-        <div class="form-group ci-provider-field ci-gitlab-field"><label>GitLab project <span class="req">*</span></label><input type="text" class="ci-project" value="${escHtml(data.projectId||data.project||data.projectPath||'')}" placeholder="group/project or numeric id" required oninput="clearCiValidation(this);updateCiHeader(this)"><div class="field-error">GitLab project is required</div></div>
-        <div class="form-group"><label>Branch/ref</label><input type="text" class="ci-branch" value="${escHtml(data.branch||data.ref||'')}" placeholder="main"></div>
-        <div class="form-group ci-provider-field ci-gitlab-field"><label>GitLab base URL</label><input type="text" class="ci-base-url" value="${escHtml(data.baseUrl||'')}" placeholder="https://gitlab.com"></div>
+        <div class="form-group ci-provider-field ci-gitlab-field"><label>GitLab base URL</label><input type="text" class="ci-base-url" value="${escHtml(data.baseUrl||'')}" placeholder="https://gitlab.com" oninput="invalidateCiDiscovery(this)"></div>
+        <div class="form-group ci-token-field">
+          <div class="form-label-with-info">
+            <label>Token</label>
+            ${provider === 'github' ? '<button type="button" class="info-btn" onclick="openSettingsInfo(event,\'githubToken\')" aria-label="GitHub token permissions">?</button>' : ''}
+            ${provider === 'github' ? '<a class="form-field-link ci-github-token-link" href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer">Create GitHub fine-grained token ↗</a>' : ''}
+          </div>
+          <div class="ci-token-row">
+            <input type="password" class="ci-token" placeholder="${provider === 'github' ? 'github_pat_****' : 'leave blank to keep current token'}" oninput="invalidateCiDiscovery(this)">
+            <button type="button" class="btn-sm ci-discover-btn" onclick="loadCiResources(this)">${provider === 'gitlab' ? 'Load projects' : 'Load repositories'}</button>
+          </div>
+          <div class="ci-discovery-status" aria-live="polite"></div>
+        </div>
+        <div class="form-group ci-resource-field">
+          <label>${provider === 'gitlab' ? 'GitLab project' : 'GitHub repo'} <span class="req">*</span></label>
+          <div class="ci-resource-row">
+            <select class="ci-resource-select" required onchange="onCiResourceSelected(this)"></select>
+            <button type="button" class="btn-sm ci-resource-mode" onclick="toggleCiManualMode(this)">Enter manually</button>
+          </div>
+          <input type="text" class="ci-resource-manual" value="${escHtml(allRepositories ? 'All repositories' : resource)}" placeholder="${provider === 'gitlab' ? 'group/project or numeric id' : 'owner/repo'}" oninput="onCiManualResource(this)" hidden>
+          <div class="ci-discovery-status warn ci-all-repositories-warning" aria-live="polite" ${allRepositories ? '' : 'hidden'}>All repositories means every repository accessible to this token. GitHub API usage grows with the repository count.</div>
+          <div class="field-error">${provider === 'gitlab' ? 'GitLab project is required' : 'GitHub repo is required'}</div>
+        </div>
+        <div class="form-group"><label>Branch/ref</label><input type="text" class="ci-branch" value="${escHtml(data.branch||data.ref||'')}" placeholder="main" oninput="onCiBranchInput(this)"></div>
         <div class="form-group ci-provider-field ci-gitlab-field"><label>Jobs</label><select class="ci-jobs"><option value="true" ${data.includeJobs!==false?'selected':''}>Include jobs</option><option value="false" ${data.includeJobs===false?'selected':''}>Pipelines only</option></select></div>
-        <div class="form-group ci-token-field"><label>Token</label><input type="password" class="ci-token" placeholder="leave blank to keep current token"></div>
       </div>
     </div>`;
   document.getElementById('cicd-list').appendChild(item);
-  if (data.token || data.apiToken || data.accessToken || data.bearerToken) secVal(data.token || data.apiToken || data.accessToken || data.bearerToken, item.querySelector('.ci-token'));
+  if (tokenData) secVal(tokenData, item.querySelector('.ci-token'));
+  populateCiResourceOptions(item, [], { preserveOnly: true });
+  setCiManualMode(item, !hasStoredToken && !!resource, { focus: false });
+  syncCiDiscoveryControls(item);
   applyLanguageFragment(item);
+  syncCiAllRepositoriesUi(item, { syncManual: true });
+  updateCiHeader(item.querySelector('.ci-name'));
+}
+
+function ciProvider(item) {
+  return item?.querySelector('.ci-provider')?.value === 'gitlab' ? 'gitlab' : 'github';
+}
+
+function ciCanonicalResource(item) {
+  return item?.querySelector(ciProvider(item) === 'gitlab' ? '.ci-project' : '.ci-repo');
+}
+
+function ciAllRepositoriesSelected(item) {
+  if (ciProvider(item) !== 'github') return false;
+  return item?.querySelector('.ci-all-repositories')?.value === 'true'
+    || item?.querySelector('.ci-repo')?.value === '*';
+}
+
+function syncCiAllRepositoriesUi(item, { syncManual = false } = {}) {
+  if (!item) return;
+  const selected = ciAllRepositoriesSelected(item);
+  const flag = item.querySelector('.ci-all-repositories');
+  if (flag) flag.value = selected ? 'true' : 'false';
+  const warning = item.querySelector('.ci-all-repositories-warning');
+  if (warning) {
+    warning.hidden = !selected;
+    setCiLocalizedText(warning, 'All repositories means every repository accessible to this token. GitHub API usage grows with the repository count.');
+  }
+  if (syncManual && selected) {
+    const input = item.querySelector('.ci-resource-manual');
+    if (input) input.value = trText('All repositories');
+  }
+}
+
+function ciLoadLabel(item) {
+  return ciProvider(item) === 'gitlab' ? 'Load projects' : 'Load repositories';
+}
+
+function setCiLocalizedText(el, key) {
+  if (!el) return;
+  el.textContent = trText(key);
+  if (el.firstChild) el.firstChild._osOrigText = key;
+}
+
+function setCiDiscoveryStatus(item, text = '', kind = '') {
+  const status = item?.querySelector('.ci-discovery-status');
+  if (!status) return;
+  status.textContent = text;
+  status.className = `ci-discovery-status${kind ? ` ${kind}` : ''}`;
+}
+
+function syncCiDiscoveryControls(item) {
+  const button = item?.querySelector('.ci-discover-btn');
+  const token = item?.querySelector('.ci-token');
+  if (!button || !token) return;
+  const hasToken = !!String(token.value || '').trim() || token.dataset.masked === '1';
+  const cardLocked = !!item.closest('.card')?.classList.contains('platform-mutations-locked');
+  button.disabled = item.dataset.ciDiscoveryLoading === '1' || !hasToken || settingsReadOnly || cardLocked;
+  if (item.dataset.ciDiscoveryLoading !== '1') setCiLocalizedText(button, ciLoadLabel(item));
+}
+
+function invalidateCiDiscovery(el) {
+  const item = el?.closest?.('.arr-item');
+  if (!item) return;
+  item.dataset.ciDiscoverySeq = String(Number(item.dataset.ciDiscoverySeq || 0) + 1);
+  item.dataset.ciDiscoveryLoading = '';
+  setCiDiscoveryStatus(item, '');
+  syncCiDiscoveryControls(item);
+}
+
+function setCiManualMode(item, manual, { focus = true } = {}) {
+  const select = item?.querySelector('.ci-resource-select');
+  const input = item?.querySelector('.ci-resource-manual');
+  const button = item?.querySelector('.ci-resource-mode');
+  const row = item?.querySelector('.ci-resource-row');
+  if (!select || !input || !button) return;
+  select.hidden = !!manual;
+  input.hidden = !manual;
+  row?.classList.toggle('manual', !!manual);
+  item.dataset.ciManual = manual ? '1' : '';
+  setCiLocalizedText(button, manual ? 'Use loaded list' : 'Enter manually');
+  if (manual) {
+    input.value = ciAllRepositoriesSelected(item)
+      ? trText('All repositories')
+      : (ciCanonicalResource(item)?.value || input.value || '');
+    if (focus) input.focus();
+  }
+}
+
+function toggleCiManualMode(button) {
+  const item = button?.closest?.('.arr-item');
+  if (!item) return;
+  setCiManualMode(item, item.dataset.ciManual !== '1');
+}
+
+function onCiManualResource(input) {
+  const item = input?.closest?.('.arr-item');
+  const canonical = ciCanonicalResource(item);
+  if (!item || !canonical) return;
+  canonical.value = input.value.trim();
+  const allRepositories = ciProvider(item) === 'github' && canonical.value === '*';
+  const flag = item.querySelector('.ci-all-repositories');
+  if (flag) flag.value = allRepositories ? 'true' : 'false';
+  if (allRepositories) input.value = trText('All repositories');
+  if (ciProvider(item) === 'gitlab') {
+    item.querySelector('.ci-project-path').value = /^\d+$/.test(canonical.value) ? '' : canonical.value;
+  }
+  syncCiAllRepositoriesUi(item);
+  clearCiValidation(input);
+  updateCiHeader(input);
+  invalidateCiDiscovery(input);
+}
+
+function clearCiAutoFilledBranch(branch, { clearValue = false } = {}) {
+  if (!branch) return false;
+  const trackedValue = String(branch.dataset.ciAutoFilledValue || '');
+  const isTrackedValue = branch.dataset.ciAutoFilled === '1'
+    && !!trackedValue
+    && branch.value === trackedValue;
+  if (clearValue && isTrackedValue) branch.value = '';
+  delete branch.dataset.ciAutoFilled;
+  delete branch.dataset.ciAutoFilledValue;
+  return isTrackedValue;
+}
+
+function onCiBranchInput(branch) {
+  clearCiAutoFilledBranch(branch);
+}
+
+function syncCiBranchForResource(item, option, allRepositories) {
+  const branch = item?.querySelector('.ci-branch');
+  if (!branch) return;
+  clearCiAutoFilledBranch(branch, { clearValue: true });
+  if (allRepositories) return;
+  const defaultBranch = String(option?.dataset.defaultBranch || '').trim();
+  if (!branch.value.trim() && defaultBranch) {
+    branch.value = defaultBranch;
+    branch.dataset.ciAutoFilled = '1';
+    branch.dataset.ciAutoFilledValue = defaultBranch;
+  }
+}
+
+function onCiResourceSelected(select) {
+  const item = select?.closest?.('.arr-item');
+  const canonical = ciCanonicalResource(item);
+  if (!item || !canonical) return;
+  const option = select.options[select.selectedIndex];
+  const allRepositories = ciProvider(item) === 'github' && option?.dataset.allRepositories === '1';
+  canonical.value = allRepositories ? '*' : select.value;
+  item.querySelector('.ci-resource-manual').value = allRepositories ? trText('All repositories') : select.value;
+  const flag = item.querySelector('.ci-all-repositories');
+  if (flag) flag.value = allRepositories ? 'true' : 'false';
+  if (ciProvider(item) === 'gitlab') item.querySelector('.ci-project-path').value = option?.dataset.projectPath || '';
+  syncCiBranchForResource(item, option, allRepositories);
+  syncCiAllRepositoriesUi(item);
+  clearCiValidation(select);
+  updateCiHeader(select);
+}
+
+function normalizeCiDiscoveredResource(row, provider) {
+  if (typeof row === 'string') return { value: row, label: row, projectPath: provider === 'gitlab' && !/^\d+$/.test(row) ? row : '', defaultBranch: '' };
+  row = row && typeof row === 'object' ? row : {};
+  const path = String(row.projectPath || row.pathWithNamespace || row.path_with_namespace || row.fullName || row.full_name || row.fullPath || row.full_path || row.repo || '').trim();
+  const value = String(provider === 'gitlab'
+    ? (row.id ?? row.projectId ?? row.value ?? path)
+    : (row.value || path || row.name || '')).trim();
+  const projectPath = provider === 'gitlab' ? (path || String(row.label || '').trim()) : '';
+  const label = String(row.label || path || row.nameWithOwner || row.name_with_namespace || row.name || value).trim();
+  return { value, label, projectPath, defaultBranch: String(row.defaultBranch || row.default_branch || '').trim() };
+}
+
+function populateCiResourceOptions(item, rows = [], { preserveOnly = false, includeAllRepositories = false } = {}) {
+  const select = item?.querySelector('.ci-resource-select');
+  if (!select) return { count: 0 };
+  const provider = ciProvider(item);
+  const current = String(ciCanonicalResource(item)?.value || '').trim();
+  const currentPath = String(item.querySelector('.ci-project-path')?.value || '').trim();
+  const placeholder = document.createElement('option');
+  placeholder.value = '';
+  setCiLocalizedText(placeholder, provider === 'gitlab' ? 'Select a project' : 'Select a repository');
+  select.replaceChildren(placeholder);
+  const normalized = (Array.isArray(rows) ? rows : []).map(row => normalizeCiDiscoveredResource(row, provider)).filter(row => row.value);
+  const seen = new Set();
+  let matched = false;
+  let hasAllRepositoriesOption = false;
+  const allRepositories = provider === 'github' && (ciAllRepositoriesSelected(item) || current === '*');
+  if (provider === 'github' && (includeAllRepositories || allRepositories)) {
+    const option = document.createElement('option');
+    option.value = '*';
+    option.dataset.allRepositories = '1';
+    option.dataset.defaultBranch = '';
+    setCiLocalizedText(option, 'All repositories');
+    if (allRepositories) {
+      option.selected = true;
+      matched = true;
+    }
+    select.appendChild(option);
+    seen.add('*');
+    hasAllRepositoriesOption = true;
+  }
+  normalized.forEach(row => {
+    const key = row.value.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    const option = document.createElement('option');
+    option.value = row.value;
+    option.textContent = row.label || row.value;
+    option.dataset.projectPath = row.projectPath || '';
+    option.dataset.defaultBranch = row.defaultBranch || '';
+    if (current && (row.value === current || (currentPath && row.projectPath === currentPath) || row.projectPath === current)) {
+      option.selected = true;
+      matched = true;
+    }
+    select.appendChild(option);
+  });
+  if (current && !matched) {
+    const option = document.createElement('option');
+    option.value = current;
+    option.textContent = provider === 'github' && current === '*' ? trText('All repositories') : (currentPath || current);
+    option.dataset.projectPath = currentPath;
+    option.selected = true;
+    select.appendChild(option);
+  }
+  select.value = current && [...select.options].some(option => option.value === current) ? current : (matched ? select.value : '');
+  select.disabled = preserveOnly ? !current : (!normalized.length && !current && !hasAllRepositoriesOption);
+  return { count: normalized.length, hasAllRepositoriesOption };
+}
+
+async function loadCiResources(button) {
+  const item = button?.closest?.('.arr-item');
+  if (!item) return;
+  const provider = ciProvider(item);
+  const token = maskedVal(item.querySelector('.ci-token'));
+  if (!token) return;
+  const seq = Number(item.dataset.ciDiscoverySeq || 0) + 1;
+  item.dataset.ciDiscoverySeq = String(seq);
+  item.dataset.ciDiscoveryLoading = '1';
+  setCiLocalizedText(button, 'Loading...');
+  syncCiDiscoveryControls(item);
+  setCiDiscoveryStatus(item, trText(provider === 'gitlab' ? 'Loading projects...' : 'Loading repositories...'));
+  try {
+    const body = {
+      provider,
+      token,
+      baseUrl: provider === 'gitlab' ? (item.querySelector('.ci-base-url')?.value.trim() || undefined) : undefined,
+      configId: item.querySelector('.ci-config-id')?.value || undefined,
+      originalResource: item.querySelector('.ci-original-resource')?.value || undefined,
+      repo: provider === 'github' ? (item.querySelector('.ci-repo')?.value || undefined) : undefined,
+      projectId: provider === 'gitlab' ? (item.querySelector('.ci-project')?.value || undefined) : undefined,
+      projectPath: provider === 'gitlab' ? (item.querySelector('.ci-project-path')?.value || undefined) : undefined,
+    };
+    const result = await fetchJson('/api/cicd/discover', {
+      method: 'POST',
+      headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }, 20000);
+    if (!item.isConnected || Number(item.dataset.ciDiscoverySeq || 0) !== seq) return;
+    const rows = [result.resources, result.repositories, result.projects, result.items, result.data].find(Array.isArray) || [];
+    const summary = populateCiResourceOptions(item, rows, { includeAllRepositories: provider === 'github' });
+    if (summary.count || summary.hasAllRepositoriesOption) {
+      setCiManualMode(item, false, { focus: false });
+      const select = item.querySelector('.ci-resource-select');
+      if (select?.value) onCiResourceSelected(select);
+      setCiDiscoveryStatus(
+        item,
+        trText(result.truncated
+          ? 'First 1000 resources loaded; use manual entry for others'
+          : (provider === 'gitlab' ? 'Projects loaded' : 'Repositories loaded')),
+        result.truncated ? 'warn' : 'ok',
+      );
+    } else {
+      setCiDiscoveryStatus(item, trText(provider === 'gitlab' ? 'No projects found' : 'No repositories found'), 'warn');
+    }
+  } catch (err) {
+    if (!item.isConnected || Number(item.dataset.ciDiscoverySeq || 0) !== seq) return;
+    setCiDiscoveryStatus(item, `${trText('Could not load resources')}: ${err.message}`, 'err');
+  } finally {
+    if (item.isConnected && Number(item.dataset.ciDiscoverySeq || 0) === seq) {
+      item.dataset.ciDiscoveryLoading = '';
+      syncCiDiscoveryControls(item);
+    }
+  }
 }
 
 function updateCiHeader(el) {
@@ -3106,8 +3470,11 @@ function updateCiHeader(el) {
   const provider = item.querySelector('.ci-provider')?.value || 'github';
   const name = item.querySelector('.ci-name')?.value.trim();
   const repo = item.querySelector('.ci-repo')?.value.trim();
-  const project = item.querySelector('.ci-project')?.value.trim();
-  const title = name || (provider === 'gitlab' ? project : repo) || (provider === 'gitlab' ? 'GitLab Project' : 'GitHub Repo');
+  const project = item.querySelector('.ci-project-path')?.value.trim() || item.querySelector('.ci-project')?.value.trim();
+  const allRepositories = provider === 'github' && ciAllRepositoriesSelected(item);
+  const title = allRepositories
+    ? (name ? `${name} · ${trText('All repositories')}` : trText('All repositories'))
+    : (name || (provider === 'gitlab' ? project : repo) || (provider === 'gitlab' ? 'GitLab Project' : 'GitHub Repo'));
   item.querySelector('.arr-hdr-name').textContent = title;
 }
 
@@ -3121,11 +3488,13 @@ function validateCiProjects({ focus = true } = {}) {
     const provider = item.querySelector('.ci-provider')?.value || 'github';
     const requiredInput = provider === 'gitlab' ? item.querySelector('.ci-project') : item.querySelector('.ci-repo');
     const missing = !String(requiredInput?.value || '').trim();
-    requiredInput?.closest('.form-group')?.classList.toggle('required-missing', missing);
-    if (missing && !firstMissing) firstMissing = requiredInput;
+    item.querySelector('.ci-resource-field')?.classList.toggle('required-missing', missing);
+    if (missing && !firstMissing) firstMissing = item.querySelector('.ci-resource-manual') || item.querySelector('.ci-resource-select');
   });
   if (focus && firstMissing) {
     showSettingsSection('cicd');
+    const item = firstMissing.closest('.arr-item');
+    if (item) setCiManualMode(item, true, { focus: false });
     setTimeout(() => firstMissing.focus(), 0);
   }
   return !firstMissing;
@@ -4491,7 +4860,7 @@ function populate(cfg) {
     document.getElementById('en-cicd').checked = cfg.cicd.enabled !== false;
     document.getElementById('cb-cicd').classList.remove('hidden');
     document.getElementById('icon-cicd').value = cfg.cicd.icon || '';
-    uniqueConfigItems(cfg.cicd.projects || cfg.cicd.instances || [], ['provider', 'name', 'repo', 'projectId', 'project']).forEach(addCiProject);
+    uniqueConfigItems(cfg.cicd.projects || cfg.cicd.instances || [], ['provider', 'configId', 'name', 'repo', 'projectId', 'projectPath', 'project']).forEach(addCiProject);
   }
   if (cfg.veeam) {
     document.getElementById('en-veeam').checked = cfg.veeam.enabled !== false;
@@ -5091,20 +5460,29 @@ function collect() {
       const name = item.querySelector('.ci-name').value.trim();
       const repo = item.querySelector('.ci-repo').value.trim();
       const projectId = item.querySelector('.ci-project').value.trim();
+      const allRepositories = provider === 'github'
+        && (item.querySelector('.ci-all-repositories')?.value === 'true' || repo === '*');
       const token = maskedVal(item.querySelector('.ci-token'));
+      const tokenKey = ['token', 'apiToken', 'accessToken', 'bearerToken'].includes(item.querySelector('.ci-token-key').value)
+        ? item.querySelector('.ci-token-key').value
+        : 'token';
       const row = {
+        configId: item.querySelector('.ci-config-id').value || undefined,
+        originalResource: item.querySelector('.ci-original-resource').value || undefined,
         name: name || undefined,
         provider,
-        repo: provider === 'github' ? (repo || undefined) : undefined,
+        repo: provider === 'github' ? (allRepositories ? '*' : (repo || undefined)) : undefined,
+        allRepositories: allRepositories || undefined,
         projectId: provider === 'gitlab' ? (projectId || undefined) : undefined,
+        projectPath: provider === 'gitlab' ? (item.querySelector('.ci-project-path').value.trim() || undefined) : undefined,
         branch: item.querySelector('.ci-branch').value.trim() || undefined,
         baseUrl: provider === 'gitlab' ? (item.querySelector('.ci-base-url').value.trim() || undefined) : undefined,
-        token: token || undefined,
         includeJobs: item.querySelector('.ci-jobs').value !== 'false',
       };
+      row[tokenKey] = token || undefined;
       if (row.name || row.repo || row.projectId) projects.push(row);
     });
-    const uniqueProjects = uniqueConfigItems(projects, ['provider', 'name', 'repo', 'projectId']);
+    const uniqueProjects = uniqueConfigItems(projects, ['provider', 'configId', 'name', 'repo', 'projectId', 'projectPath']);
     if (on || uniqueProjects.length) cfg.cicd = {
       enabled: on,
       projects: uniqueProjects,
@@ -6074,6 +6452,34 @@ const SETTINGS_INFO_CONTENT = {
     title: 'Low I/O mode',
     copy: 'Low I/O mode reduces disk writes by batching runtime snapshots, history writes and agent state updates. Values can appear a little later, but the UI stays responsive and storage load drops.',
   },
+  cloudflareToken: {
+    title: {
+      en: 'Cloudflare API token permissions',
+      tr: 'Cloudflare API token izinleri',
+      de: 'Cloudflare API-Token-Berechtigungen',
+    },
+    items: [
+      'Zone → Zone → Read',
+      'Account → Cloudflare Tunnel → Read',
+      'Account → Cloudflare Registrar → Read',
+    ],
+  },
+  githubToken: {
+    title: {
+      en: 'GitHub token permissions',
+      tr: 'GitHub token izinleri',
+      de: 'GitHub-Token-Berechtigungen',
+    },
+    items: [
+      {
+        en: 'Repository access → All repositories, or Only select repositories → Select the repositories OmniSight will monitor',
+        tr: 'Repository access → All repositories veya Only select repositories → OmniSight’ın izleyeceği repository’leri seçin',
+        de: 'Repository access → All repositories oder Only select repositories → Wählen Sie die von OmniSight zu überwachenden Repositorys',
+      },
+      'Repository permissions → Actions → Read-only',
+      'Repository permissions → Metadata → Read-only',
+    ],
+  },
   resourceThresholds: {
     title: 'Resource thresholds',
     copy: 'Set warning and critical percentages for CPU, RAM and disk usage. When a metric stays beyond its threshold long enough, OmniSight creates the matching alert.',
@@ -6114,7 +6520,25 @@ function openSettingsInfo(event, key) {
   const title = document.getElementById('lowio-info-title');
   const copy = document.getElementById('lowio-info-copy');
   if (title) title.textContent = localizedInfoValue(info.title, lang);
-  if (copy) copy.textContent = localizedInfoValue(info.copy, lang);
+  if (copy) {
+    copy.replaceChildren();
+    if (Array.isArray(info.items)) {
+      const list = document.createElement('ol');
+      info.items.forEach(item => {
+        const li = document.createElement('li');
+        String(localizedInfoValue(item, lang)).split(' → ').forEach((part, index) => {
+          if (index) li.appendChild(document.createTextNode(' → '));
+          const code = document.createElement('code');
+          code.textContent = part;
+          li.appendChild(code);
+        });
+        list.appendChild(li);
+      });
+      copy.appendChild(list);
+    } else {
+      copy.textContent = localizedInfoValue(info.copy, lang);
+    }
+  }
   document.getElementById('lowio-info-modal')?.classList.add('open');
 }
 

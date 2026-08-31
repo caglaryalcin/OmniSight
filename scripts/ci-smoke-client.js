@@ -11,7 +11,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-const BLOCKS = ['fmtChartValue', 'localizeOperationalText', 'offlineRatioLabel', 'offlineRatioBadgeClass', 'mergeNotifySnapshot'];
+const BLOCKS = ['fmtChartValue', 'localizeOperationalText', 'offlineRatioLabel', 'offlineRatioBadgeClass', 'formatDaysLeft', 'mergeNotifySnapshot', 'ciSidebarTitle', 'ciProjectSelection'];
 
 function extract(source, name) {
   const begin = `/* ci-extract:begin ${name} */`;
@@ -232,7 +232,129 @@ function run() {
   const ctx = {};
   vm.createContext(ctx);
   vm.runInContext(BLOCKS.map(name => extract(html, name)).join('\n'), ctx);
-  const { fmtChartValue, localizeOperationalText, offlineRatioLabel, offlineRatioBadgeClass, mergeNotifySnapshot } = ctx;
+  const { fmtChartValue, localizeOperationalText, offlineRatioLabel, offlineRatioBadgeClass, formatDaysLeft, mergeNotifySnapshot, ciSidebarTitle, ciProjectIdentity, ciProjectOptionLabel, selectedCiDetailProject, setCiDetailProject } = ctx;
+
+  const githubApi = {
+    id:101,
+    provider:'github',
+    owner:'acme',
+    repo:'api',
+    name:'Friendly API card',
+    online:true,
+    pipelines:[{ id:1001, name:'API_RUN', success:true, status:'success' }],
+    jobs:[],
+  };
+  const githubWeb = {
+    id:102,
+    provider:'github',
+    owner:'acme',
+    repo:'web',
+    name:'Friendly Web card',
+    online:true,
+    pipelines:[{ id:1002, name:'WEB_RUN', success:true, status:'success' }],
+    jobs:[],
+  };
+  const gitlabWorker = {
+    id:201,
+    provider:'gitlab',
+    projectId:'201',
+    projectPath:'platform/worker',
+    name:'Friendly Worker card',
+    online:true,
+    pipelines:[{ id:2001, name:'WORKER_RUN', success:true, status:'success' }],
+    jobs:[],
+  };
+
+  setCiDetailProject('');
+  const singleCiSelection = selectedCiDetailProject([githubApi]);
+  assert.strictEqual(singleCiSelection.all, false, 'a single configured repository must select that repository instead of an all-projects sentinel');
+  assert.strictEqual(singleCiSelection.project, githubApi, 'the selected CI detail project must be the configured repository');
+  assert.strictEqual(singleCiSelection.key, ciProjectIdentity(githubApi, 0), 'the selected option value must use the project stable identity');
+  assert.strictEqual(ciProjectOptionLabel(githubApi, new Set(['github'])), 'acme/api', 'GitHub options must show canonical owner/repository instead of a custom card name');
+
+  setCiDetailProject('');
+  const allGithubSelection = selectedCiDetailProject([githubApi, githubWeb]);
+  assert.strictEqual(allGithubSelection.all, true, 'multiple expanded GitHub repositories must initially select the all-repositories option');
+  assert.strictEqual(allGithubSelection.key, '__all__', 'the all-repositories option must use the stable sentinel value');
+  assert.strictEqual(allGithubSelection.project, null, 'the all-repositories selection must not masquerade as a concrete project');
+
+  const webKey = ciProjectIdentity(githubWeb, 1);
+  setCiDetailProject(webKey);
+  const refreshedGithubProjects = [
+    { ...githubWeb, pipelines:[{ id:1003, name:'WEB_REFRESHED_RUN', success:true, status:'success' }] },
+    { ...githubApi, pipelines:[{ id:1004, name:'API_REFRESHED_RUN', success:true, status:'success' }] },
+  ];
+  const retainedCiSelection = selectedCiDetailProject(refreshedGithubProjects);
+  assert.strictEqual(retainedCiSelection.all, false, 'a concrete repository choice must remain concrete after live data refresh');
+  assert.strictEqual(retainedCiSelection.project.repo, 'web', 'a concrete repository choice must survive live reordering and fresh object instances');
+  assert.strictEqual(retainedCiSelection.key, webKey, 'live refresh must retain the same stable select value');
+
+  const multiProjectFallback = selectedCiDetailProject([githubApi, gitlabWorker]);
+  assert.strictEqual(multiProjectFallback.all, true, 'a removed concrete choice must fall back to all projects while multiple valid options remain');
+  assert.strictEqual(multiProjectFallback.key, '__all__', 'the multiple-project fallback must replace a stale key with the all-projects sentinel');
+
+  setCiDetailProject(webKey);
+  const remainingGithubProject = [{ ...githubApi }];
+  const fallbackCiSelection = selectedCiDetailProject(remainingGithubProject);
+  assert.strictEqual(fallbackCiSelection.all, false, 'a missing concrete choice must fall back to the only remaining repository');
+  assert.strictEqual(fallbackCiSelection.project.repo, 'api', 'missing live data must never leave the detail view bound to a stale repository');
+  assert.strictEqual(fallbackCiSelection.key, ciProjectIdentity(remainingGithubProject[0], 0), 'fallback must replace the stale selection with a valid option value');
+
+  assert.strictEqual(ciProjectOptionLabel(githubApi, new Set(['github','gitlab'])), 'GitHub · acme/api', 'mixed-provider GitHub options must identify their provider');
+  assert.strictEqual(ciProjectOptionLabel(gitlabWorker, new Set(['github','gitlab'])), 'GitLab · platform/worker', 'mixed-provider GitLab options must identify their provider and canonical project');
+
+  assert.strictEqual(ciSidebarTitle({ enabled:true, projects:[{ provider:'github' }] }), 'GitHub', 'a GitHub-only CI configuration must use the GitHub sidebar label');
+  assert.strictEqual(ciSidebarTitle({ enabled:true, instances:[{ provider:'gitlab' }] }), 'GitLab', 'a legacy GitLab-only instances configuration must use the GitLab sidebar label');
+  assert.strictEqual(ciSidebarTitle({ projects:[{ provider:'github' }, { provider:'gitlab' }] }), 'GitHub/GitLab CI', 'mixed CI providers must retain the combined sidebar label');
+  assert.strictEqual(ciSidebarTitle({ projects:[{ repo:'owner/repo' }] }), 'GitHub', 'legacy CI rows without a provider must retain their GitHub default');
+  assert.strictEqual(ciSidebarTitle({ enabled:false, projects:[{ provider:'github' }] }), 'GitHub/GitLab CI', 'disabled CI configurations must not select a provider-specific sidebar label');
+  assert.strictEqual(ciSidebarTitle({ projects:[{ provider:'github', enabled:false }, { provider:'gitlab' }] }), 'GitLab', 'disabled CI rows must not affect the sidebar label');
+  assert.strictEqual(ciSidebarTitle({ instances:[{ type:'gitlab' }] }), 'GitLab', 'legacy CI type fields must select the matching provider label');
+  assert.strictEqual(ciSidebarTitle({ projects:[{ provider:' GITHUB ' }, { provider:'azure-devops' }] }), 'GitHub', 'provider matching must be case-insensitive and unknown providers must be ignored');
+  assert.strictEqual(ciSidebarTitle({ projects:[{ provider:42 }] }), 'GitHub/GitLab CI', 'unknown provider types must leave the safe combined fallback');
+  assert.strictEqual(ciSidebarTitle({ projects:[] }), 'GitHub/GitLab CI', 'the combined label must remain the fallback before provider data is known');
+  const ciTitleSidebarCardContext = {
+    platformIcon: () => '',
+    escAttr: value => String(value ?? ''),
+    sidebarMetaHtml: value => String(value ?? ''),
+  };
+  vm.createContext(ciTitleSidebarCardContext);
+  vm.runInContext(extractFunction(html, 'sidebarCard'), ciTitleSidebarCardContext);
+  const githubSidebarCard = ciTitleSidebarCardContext.sidebarCard({ id:'cicd', title:'GitHub/GitLab CI', sidebarTitle:'GitHub', badge:'', meta:'' }, false);
+  assert.match(githubSidebarCard, /title="GitHub"/, 'the CI sidebar card tooltip must use its provider-specific title');
+  assert.match(githubSidebarCard, /<span class="sb-title">GitHub<\/span>/, 'the visible CI sidebar card must use its provider-specific title');
+
+  const sidebarCardContext = {
+    platformIcon: () => '',
+    sidebarMetaHtml: () => '',
+    escAttr: value => String(value ?? ''),
+  };
+  vm.runInNewContext(extractFunction(html, 'sidebarCard'), sidebarCardContext);
+  for (const [projects, expectedTitle] of [
+    [[{ provider:'github' }], 'GitHub'],
+    [[{ provider:'gitlab' }], 'GitLab'],
+    [[{ provider:'github' }, { provider:'gitlab' }], 'GitHub/GitLab CI'],
+  ]) {
+    const sidebarTitle = ciSidebarTitle({ projects });
+    const cardHtml = sidebarCardContext.sidebarCard({
+      id:'cicd',
+      title:'GitHub/GitLab CI',
+      sidebarTitle,
+      badge:'',
+      sbSummary:'',
+    }, false);
+    assert.ok(
+      cardHtml.includes(`title="${expectedTitle}"`) && cardHtml.includes(`<span class="sb-title">${expectedTitle}</span>`),
+      `${expectedTitle} must be rendered as the actual CI sidebar card label`,
+    );
+  }
+  const updateSidebarCardSource = extractFunction(html, 'updateSidebarCard');
+  assert.ok(
+    updateSidebarCardSource.includes("const sidebarTitle = panel.sidebarTitle || panel.title || ''")
+      && updateSidebarCardSource.includes('title.textContent !== sidebarTitle')
+      && updateSidebarCardSource.includes('title.textContent = sidebarTitle'),
+    'live sidebar updates must keep the provider-specific CI label instead of restoring the combined title',
+  );
 
   const pendingEnabled = new Map([
     ['lx:host-a', { off:true }],
@@ -508,11 +630,165 @@ function run() {
   assert.ok(serviceKeySource.includes("sv.namespace || 'default'") && serviceKeySource.includes('sv.uid || sv.id || sv.name'), 'Kubernetes service rows must use namespace-scoped native identities');
 
   const ciCdDetailSource = extractFunction(html, 'buildCiCd');
-  assert.ok(ciCdDetailSource.includes('data-morph-key="cicd-project:${escAttr(project.id || project.url || project.name || idx)}"'), 'CI/CD project wrappers must have stable endpoint-scoped identities');
+  const ciCdToggleSource = extractFunction(html, 'toggleCiCdProject');
+  const escapeCiHtml = value => String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+  const ciPanelOpenOverrides = new Map();
+  const ciDetailContext = {
+    escAttr:escapeCiHtml,
+    escHtml:escapeCiHtml,
+    bdg:(badgeClass, text) => `<span class="${escapeCiHtml(badgeClass)}">${escapeCiHtml(text)}</span>`,
+    notifyBell:() => '',
+    offlineRatioBadgeClass:() => 'green',
+    offlineRatioLabel:() => 'Online',
+    platformTitle:(id, title) => String(title || id || ''),
+    configuredCiSidebarTitle:'',
+    ciSidebarTitle:() => 'GitHub/GitLab CI',
+    panelOpenState:(key, fallback) => ciPanelOpenOverrides.has(key) ? ciPanelOpenOverrides.get(key) : fallback,
+  };
+  vm.createContext(ciDetailContext);
+  vm.runInContext(`${extract(html, 'ciProjectSelection')}\n${ciCdDetailSource}`, ciDetailContext);
+  const ciSummary = projects => ({
+    projects:projects.length,
+    up:projects.filter(project => project.online).length,
+    down:projects.filter(project => !project.online).length,
+    partial:0,
+    pipelines:projects.reduce((total, project) => total + (project.pipelines || []).length, 0),
+    success:projects.reduce((total, project) => total + (project.pipelines || []).filter(run => run.success).length, 0),
+    failed:0,
+    running:0,
+    jobsFailed:0,
+    jobsRunning:0,
+  });
+  const ciPanelFor = projects => ciDetailContext.buildCiCd({ online:true, summary:ciSummary(projects), projects });
+  const ciOptions = body => Array.from(String(body).matchAll(/<option\b([^>]*)>([\s\S]*?)<\/option>/g), match => ({
+    attrs:match[1],
+    value:match[1].match(/\bvalue="([^"]*)"/)?.[1] || '',
+    label:match[2].trim(),
+    selected:/\bselected\b/.test(match[1]),
+  }));
+
+  ciDetailContext.setCiDetailProject('');
+  const singleCiPanel = ciPanelFor([githubApi]);
+  const singleCiOptions = ciOptions(singleCiPanel.body);
+  assert.strictEqual(singleCiOptions.length, 1, 'one configured repository must render one concrete dropdown option');
+  assert.strictEqual(singleCiOptions[0].label, 'acme/api', 'the dropdown must show the configured canonical repository, not its custom card name');
+  assert.strictEqual(singleCiOptions[0].value, escapeCiHtml(ciDetailContext.ciProjectIdentity(githubApi, 0)), 'a concrete repository option must expose its stable identity as the select value');
+  assert.strictEqual(singleCiOptions[0].selected, true, 'the only configured repository must be selected');
+  assert.ok(singleCiPanel.body.includes('class="cicd-project-select"') && singleCiPanel.body.includes('data-morph-key="cicd-project-select"'), 'CI detail must render a native, morph-stable repository dropdown');
+
+  ciDetailContext.setCiDetailProject('');
+  const allGithubPanel = ciPanelFor([githubApi, githubWeb]);
+  const allGithubOptions = ciOptions(allGithubPanel.body);
+  assert.deepStrictEqual(Array.from(allGithubOptions, option => option.label), ['All repositories','acme/api','acme/web'], 'expanded GitHub data must expose the all-repositories sentinel plus every concrete repository');
+  assert.strictEqual(allGithubOptions[0].value, '__all__', 'the all-repositories option must have a stable sentinel value');
+  assert.strictEqual(allGithubOptions[0].selected, true, 'expanded GitHub repositories must default to the all-repositories view');
+  assert.ok(allGithubPanel.body.includes('API_RUN') && allGithubPanel.body.includes('WEB_RUN'), 'the all-repositories view must render every expanded GitHub repository body');
+  assert.strictEqual((allGithubPanel.body.match(/class="prom-instance-body open"/g) || []).length, 2, 'repository pipeline bodies must default to expanded');
+  assert.strictEqual((allGithubPanel.body.match(/aria-expanded="true"/g) || []).length, 2, 'repository chevrons must expose their default expanded state');
+
+  const apiPanelStateKey = `cicd:${ciDetailContext.ciProjectIdentity(githubApi, 0)}`;
+  ciPanelOpenOverrides.set(apiPanelStateKey, false);
+  ciDetailContext.setCiDetailProject('');
+  const collapsedApiPanel = ciPanelFor([githubApi, githubWeb]);
+  const apiSectionStart = collapsedApiPanel.body.indexOf(`data-cicd-project-key="${escapeCiHtml(ciDetailContext.ciProjectIdentity(githubApi, 0))}"`);
+  const apiSectionEnd = collapsedApiPanel.body.indexOf('<section class="prom-instance"', apiSectionStart + 1);
+  const collapsedApiSection = collapsedApiPanel.body.slice(apiSectionStart, apiSectionEnd);
+  assert.ok(apiSectionStart >= 0 && collapsedApiSection.includes('aria-expanded="false"') && collapsedApiSection.includes('id="cicd-project-body-0"'), 'a collapsed repository must render a linked closed body and chevron');
+  assert.ok(!collapsedApiSection.includes('class="prom-instance-body open"'), 'collapsing one repository must hide its pipeline body');
+  assert.ok(collapsedApiPanel.body.slice(apiSectionEnd).includes('class="prom-instance-body open"'), 'collapsing one repository must not collapse the next repository');
+  ciPanelOpenOverrides.delete(apiPanelStateKey);
+
+  const detailWebKey = ciDetailContext.ciProjectIdentity(githubWeb, 1);
+  ciDetailContext.setCiDetailProject(detailWebKey);
+  const selectedWebPanel = ciPanelFor(refreshedGithubProjects);
+  const selectedWebOptions = ciOptions(selectedWebPanel.body);
+  assert.strictEqual(selectedWebOptions.find(option => option.selected)?.value, escapeCiHtml(detailWebKey), 'a concrete dropdown selection must survive reordered live data');
+  assert.ok(selectedWebPanel.body.includes('WEB_REFRESHED_RUN'), 'the selected repository body must remain visible after live refresh');
+  assert.ok(!selectedWebPanel.body.includes('API_REFRESHED_RUN'), 'unselected repository bodies must be filtered out after live refresh');
+  assert.ok(selectedWebPanel.meta.includes('2/2 projects') && selectedWebPanel.meta.includes('2/2 green'), 'repository filtering must not replace the global CI summary totals');
+
+  const fallbackCiPanel = ciPanelFor(remainingGithubProject);
+  const fallbackCiOptions = ciOptions(fallbackCiPanel.body);
+  assert.strictEqual(fallbackCiOptions.length, 1, 'removed live repositories must also disappear from the dropdown');
+  assert.strictEqual(fallbackCiOptions[0].label, 'acme/api', 'a removed selection must fall back to the remaining repository');
+  assert.strictEqual(fallbackCiOptions[0].selected, true, 'the fallback repository must become the active dropdown option');
+  assert.ok(fallbackCiPanel.body.includes('API_RUN') && !fallbackCiPanel.body.includes('WEB_REFRESHED_RUN'), 'fallback must render only a repository that still exists');
+
+  ciDetailContext.setCiDetailProject('');
+  const mixedCiPanel = ciPanelFor([githubApi, gitlabWorker]);
+  const mixedCiOptions = ciOptions(mixedCiPanel.body);
+  assert.deepStrictEqual(Array.from(mixedCiOptions, option => option.label), ['All projects','GitHub · acme/api','GitLab · platform/worker'], 'mixed GitHub/GitLab data must use an all-projects sentinel and provider-qualified canonical labels');
+  assert.ok(mixedCiPanel.body.includes('API_RUN') && mixedCiPanel.body.includes('WORKER_RUN'), 'the mixed all-projects option must render both providers');
+  const mixedGitlabKey = ciDetailContext.ciProjectIdentity(gitlabWorker, 1);
+  ciDetailContext.setCiDetailProject(mixedGitlabKey);
+  const selectedGitlabPanel = ciPanelFor([githubApi, gitlabWorker]);
+  assert.ok(selectedGitlabPanel.body.includes('WORKER_RUN') && !selectedGitlabPanel.body.includes('API_RUN'), 'a mixed-provider dropdown must filter the detail body to the selected provider project');
+  assert.ok(selectedGitlabPanel.meta.includes('2/2 projects') && selectedGitlabPanel.meta.includes('2/2 green'), 'mixed-provider filtering must retain global summary totals');
+
+  const unsafeCiProject = {
+    id:'project\"><img src=x onerror=alert(1)>',
+    provider:'github',
+    owner:'evil\"><script>alert(1)</script>',
+    repo:'repo&branch',
+    name:'Unsafe friendly card',
+    online:true,
+    pipelines:[],
+    jobs:[],
+  };
+  ciDetailContext.setCiDetailProject('');
+  const unsafeCiPanel = ciPanelFor([unsafeCiProject]);
+  const unsafeCiOptions = ciOptions(unsafeCiPanel.body);
+  const unsafeCiValue = escapeCiHtml(ciDetailContext.ciProjectIdentity(unsafeCiProject, 0));
+  const unsafeCiLabel = escapeCiHtml(ciDetailContext.ciProjectOptionLabel(unsafeCiProject, new Set(['github'])));
+  assert.strictEqual(unsafeCiOptions[0].value, unsafeCiValue, 'repository option values must be attribute-escaped');
+  assert.strictEqual(unsafeCiOptions[0].label, unsafeCiLabel, 'repository option labels must be HTML-escaped');
+  assert.ok(!unsafeCiPanel.body.includes('<script>') && !unsafeCiPanel.body.includes('<img src=x'), 'repository-controlled labels and identities must not create executable markup');
+
+  const classListMock = initial => {
+    const classes = new Set(initial);
+    return {
+      contains:name => classes.has(name),
+      toggle:(name, force) => {
+        const enabled = force === undefined ? !classes.has(name) : !!force;
+        if(enabled) classes.add(name); else classes.delete(name);
+        return enabled;
+      },
+    };
+  };
+  const toggleBody = { classList:classListMock(['prom-instance-body','open']) };
+  const toggleChevronAttrs = {};
+  const toggleChevron = { classList:classListMock(['chevron','open']), setAttribute:(name, value) => { toggleChevronAttrs[name] = value; } };
+  const toggleHeader = {
+    dataset:{ cicdProjectKey:'github:acme/api:main' },
+    nextElementSibling:toggleBody,
+    querySelector:selector => selector === '.chevron' ? toggleChevron : null,
+  };
+  const toggleWrites = [];
+  const ciToggleContext = { setOverride:(key, open) => toggleWrites.push({ key, open }) };
+  vm.createContext(ciToggleContext);
+  vm.runInContext(ciCdToggleSource, ciToggleContext);
+  ciToggleContext.toggleCiCdProject(toggleHeader);
+  assert.strictEqual(toggleBody.classList.contains('open'), false, 'repository toggle must collapse an open pipeline body');
+  assert.strictEqual(toggleChevron.classList.contains('open'), false, 'repository toggle must collapse its chevron with the body');
+  assert.deepStrictEqual(toggleWrites, [{ key:'cicd:github:acme/api:main', open:false }], 'repository toggle must persist state under its stable repository identity');
+  assert.strictEqual(toggleChevronAttrs['aria-expanded'], 'false', 'repository toggle must expose the collapsed state to assistive technology');
+  ciToggleContext.toggleCiCdProject(toggleHeader);
+  assert.strictEqual(toggleBody.classList.contains('open'), true, 'a second repository toggle must expand the pipeline body again');
+  assert.strictEqual(toggleChevronAttrs['aria-expanded'], 'true', 'repository toggle must expose the expanded state to assistive technology');
+
+  assert.ok(ciCdDetailSource.includes('data-morph-key="cicd-project:${escAttr(projectKey)}"') && ciCdDetailSource.includes('data-detail-order-key="${escAttr(projectKey)}"') && ciCdDetailSource.includes('projectEntries.find(entry => entry.index === idx)?.key'), 'CI/CD project wrappers and order preferences must use the same stable repository identity');
   const ciPipelineKeyStart = ciCdDetailSource.indexOf('const pipelineKey =');
   const ciPipelineKeySource = ciPipelineKeyStart >= 0 ? ciCdDetailSource.slice(ciPipelineKeyStart, ciPipelineKeyStart + 260) : '';
   assert.ok(ciPipelineKeySource.includes("project.id || project.url || project.name || ''") && ciPipelineKeySource.includes('p.id || p.pipelineId || p.runId || p.createdAt || p.name || p.workflowName'), 'CI/CD pipeline keys must combine their parent identity with native run or creation identity');
   assert.ok(ciCdDetailSource.includes('data-morph-key="cicd-pipeline:${escAttr(pipelineKey)}"'), 'CI/CD pipeline rows must expose their scoped key to the morph reconciler');
+  assert.ok(ciCdDetailSource.includes('class="mon-row cicd-pipeline-row"') && ciCdDetailSource.includes('class="cicd-pipeline-meta"') && ciCdDetailSource.includes('class="cicd-pipeline-status"'), 'CI/CD pipeline rows must use the responsive run layout');
+  assert.ok(html.includes('.cicd-pipeline-row{display:grid') && html.includes('.cicd-pipeline-row .mon-name{width:auto;min-width:0;white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere'), 'CI/CD workflow names must wrap instead of being forced into the global fixed-width monitor-name column');
+  assert.ok(html.includes('.cicd-pipeline-meta{grid-column:2 / 4;white-space:normal'), 'CI/CD pipeline metadata must move to its own wrapping row on narrow screens');
 
   const veeamDetailSource = extractFunction(html, 'buildVeeam');
   assert.ok(veeamDetailSource.includes('data-morph-key="veeam-instance:${escAttr(inst.id || inst.url || inst.name || idx)}"'), 'Veeam instance wrappers must have stable endpoint identities');
@@ -596,6 +872,14 @@ function run() {
   }
   const detailSystemSource = extractFunction(html, 'detailSystemUnits');
   assert.ok(detailSystemSource.includes('`${key}:header`') && detailSystemSource.includes('`${key}:body`'), 'detail system header and body identities must carry distinct role suffixes');
+  assert.ok(detailSystemSource.includes('CiCdProject') && detailSystemSource.includes('detailSystemKey(header, body, index)'), 'CI repository sections must participate in the shared detail drag-ordering system');
+  const detailSystemKeySource = extractFunction(html, 'detailSystemKey');
+  assert.ok(detailSystemKeySource.includes("header?.dataset?.detailOrderKey") && detailSystemKeySource.includes('explicit || raw || body?.id'), 'detail drag ordering must prefer a stable explicit repository identity over an index-based body id');
+  const moveDraggedDetailSource = extractFunction(html, 'moveDraggedDetailSystem');
+  const detailDraggabilitySource = extractFunction(html, 'refreshDetailSystemDraggability');
+  const bindDetailDragSource = extractFunction(html, 'bindDetailSystemDragging');
+  assert.ok(moveDraggedDetailSource.includes("panelId !== 'cicd'") && detailDraggabilitySource.includes("panelId === 'cicd'") && bindDetailDragSource.includes("panelId !== 'cicd'"), 'expanded CI repository sections must remain draggable while other detail systems retain collapsed-only dragging');
+  assert.ok(bindDetailDragSource.includes("event.target.closest('button,a,input,select,textarea,.os-sel,.nbell,.notify-wrap") && bindDetailDragSource.includes('detailSystemSuppressClickUntil'), 'repository controls must not start dragging and a completed drag must suppress the following expand/collapse click');
   const annotateMorphSource = extractFunction(html, 'annotateMorphTree');
   const nodeHeaderHeuristicStart = annotateMorphSource.indexOf("root.querySelectorAll('.node-hdr')");
   const nodeHeaderHeuristicEnd = annotateMorphSource.indexOf("root.querySelectorAll('.prom-instance')", nodeHeaderHeuristicStart);
@@ -1026,6 +1310,12 @@ function run() {
   assert.strictEqual(offlineRatioLabel(2, 2), '0/2 Online');
   assert.strictEqual(offlineRatioLabel(1, 0), 'Offline');
   assert.strictEqual(offlineRatioLabel(1, 3, 1), '1/3 Online');
+  assert.strictEqual(formatDaysLeft(2456), '6years 8months 26days left');
+  assert.strictEqual(formatDaysLeft(15), '15days left');
+  assert.strictEqual(formatDaysLeft(396), '1year 1month 1day left');
+  assert.strictEqual(formatDaysLeft(365), '1year left');
+  assert.strictEqual(formatDaysLeft(0), '0days left');
+  assert.strictEqual(formatDaysLeft(null), 'unknown');
   assert.strictEqual(offlineRatioBadgeClass(1, 1), 'red');
   assert.strictEqual(offlineRatioBadgeClass(1, 3), 'yellow');
   assert.strictEqual(offlineRatioBadgeClass(3, 3), 'red');
