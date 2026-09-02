@@ -348,6 +348,23 @@ html[data-theme="light"] #os-hover-dot{box-shadow:0 0 0 3px rgba(255,255,255,.9)
 }
 .vm-chip:hover{border-color:var(--border2)}
 .vm-type{font-size:11px;color:var(--muted);background:var(--border);padding:1px 5px;border-radius:3px}
+.pve-guest-list{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.pve-guest-row{display:flex;align-items:stretch;gap:0;min-width:760px;border:1px solid var(--border);border-radius:9px;overflow:hidden;background:rgba(255,255,255,.012);box-shadow:inset 3px 0 0 rgba(96,165,250,.28)}
+.pve-guest-row.is-lxc{box-shadow:inset 3px 0 0 rgba(34,211,238,.32)}
+.pve-guest-row.is-stopped{opacity:.72;box-shadow:inset 3px 0 0 rgba(248,113,113,.42)}
+.pve-guest-main,.pve-guest-stat{min-width:0;padding:8px 10px;border-left:1px solid var(--border);display:flex;flex-direction:column;justify-content:center}
+.pve-guest-main{flex:1.5 1 190px;border-left:0;padding-left:13px}
+.pve-guest-stat{flex:1 1 92px}
+.pve-guest-stat.is-wide{flex:1.25 1 125px}
+.pve-guest-stat.has-spark{flex:1.45 1 148px;display:grid;grid-template-columns:max-content minmax(48px,1fr);align-items:center;column-gap:8px}
+.pve-guest-stat-text{min-width:0;display:flex;flex-direction:column;justify-content:center}
+.pve-guest-stat.has-spark .mini-hist{width:100%;min-width:48px;height:25px}
+.pve-guest-name-line{display:flex;align-items:center;gap:7px;min-width:0}
+.pve-guest-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13.5px;font-weight:700}
+.pve-guest-meta,.pve-guest-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pve-guest-value{font-size:13px;font-weight:750;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pve-guest-row>.badge{align-self:center;margin:0 10px;min-width:58px;text-align:center}
+html[data-theme="light"] .pve-guest-row{background:rgba(255,255,255,.36)}
 
 .k8s-sum{display:grid;grid-template-columns:repeat(auto-fit,minmax(86px,1fr));gap:8px;border-bottom:1px solid var(--border);padding:10px 12px;background:rgba(0,0,0,.1)}
 .k8s-stat{min-width:0;min-height:58px;padding:9px;text-align:center;background:var(--row);border:1px solid var(--border);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center}
@@ -2470,12 +2487,14 @@ function applyServerUiPreferences(data = {}){
     if(panelOrderLocalEditPending('sidebar') && !sameUiOrder(serverSidebarOrder, sidebarPanelOrder)) resaveAfterHydration = true;
     else {
       sidebarPanelOrder = mergedSidebarOrder;
+      if(Array.isArray(activeSidebarPanelOrder)) activeSidebarPanelOrder = orderIds(activeSidebarPanelOrder, sidebarPanelOrder);
       sidebarOrderSavedRevision = sidebarOrderLocalEditRevision;
       sidebarOrderLocalEditUntil = 0;
     }
     if(panelOrderLocalEditPending('dashboard') && !sameUiOrder(serverDashboardOrder, dashboardPanelOrder)) resaveAfterHydration = true;
     else {
       dashboardPanelOrder = mergedDashboardOrder;
+      if(Array.isArray(activeDashboardPanelOrder)) activeDashboardPanelOrder = orderIds(activeDashboardPanelOrder, dashboardPanelOrder);
       dashboardOrderSavedRevision = dashboardOrderLocalEditRevision;
       dashboardOrderLocalEditUntil = 0;
     }
@@ -2907,7 +2926,8 @@ function setConfiguredIds(ids, opts = {}){
   configuredIds = next;
   if(opts.persist !== false) writeConfiguredCache(configuredIds);
 }
-configuredIds = readConfiguredCache();
+const startupConfiguredIds = readConfiguredCache();
+configuredIds = [...startupConfiguredIds];
 function placeholderPanel(id){
   const m = PLATFORM_META[id] || { title:id, iconKey:id, color:'var(--muted)' };
   if (id === 'linux') {
@@ -3666,6 +3686,26 @@ function pveHeaderLabel(label) {
   if (/^system\s+temp\b/.test(lower)) return 'SYSTEM';
   return raw;
 }
+function pveGuestDiskPresentation(guest = {}) {
+  const guestDisk = guest.guestDisk && typeof guest.guestDisk === 'object' ? guest.guestDisk : null;
+  const guestUsed = hasNum(guestDisk?.usedBytes) ? Number(guestDisk.usedBytes) : null;
+  const guestTotal = hasNum(guestDisk?.totalBytes) ? Number(guestDisk.totalBytes) : null;
+  const mountpoint = String(guestDisk?.mountpoint || '').trim();
+  if (guest.type === 'vm' && guestUsed != null && guestUsed >= 0 && guestTotal != null && guestTotal > 0) {
+    const text = `${fmtBytes(guestUsed)} / ${fmtBytes(guestTotal)}`;
+    return { label: 'Disk', detailLabel: 'Disk', text, title: mountpoint ? `${mountpoint} · ${text}` : text };
+  }
+
+  const diskUsed = hasNum(guest.disk) ? Number(guest.disk) : null;
+  const maxdisk = hasNum(guest.maxdisk) ? Number(guest.maxdisk) : null;
+  if (guest.type === 'lxc' && guest.running && diskUsed != null && diskUsed >= 0 && maxdisk != null && maxdisk > 0) {
+    const text = `${fmtBytes(diskUsed)} / ${fmtBytes(maxdisk)}`;
+    return { label: 'Disk', detailLabel: 'Disk', text, title: text };
+  }
+
+  const text = maxdisk != null && maxdisk > 0 ? fmtBytes(maxdisk) : '--';
+  return { label: 'Provisioned', detailLabel: 'Provisioned storage', text, title: text };
+}
 function buildProxmox(px){
   if(!px?.nodes?.length) return null;
   const cs = px.clusterSummary || {};
@@ -3912,6 +3952,30 @@ function buildProxmox(px){
     });
     const qemu = sortedVms.filter(v => v.type === 'vm');
     const lxc = sortedVms.filter(v => v.type === 'lxc');
+    const guestRows = guests => guests.map(v => {
+      const cpu = boundedPct(v.cpu) ?? 0;
+      const ram = boundedPct(v.ram) ?? 0;
+      const memText = v.maxmem ? `${fmtBytes(v.mem || 0)} / ${fmtBytes(v.maxmem)}` : '--';
+      const disk = pveGuestDiskPresentation(v);
+      const netText = (v.netin || v.netout) ? `${fmtBytes(v.netin || 0)} in · ${fmtBytes(v.netout || 0)} out` : '--';
+      const ioText = (v.diskread || v.diskwrite) ? `${fmtBytes(v.diskread || 0)} read · ${fmtBytes(v.diskwrite || 0)} write` : '--';
+      const meta = [`ID ${v.id}`, v.os || v.ostype, v.tags].filter(Boolean).join(' · ');
+      const cpuSpark = v.running ? miniSparkline(v.history, 'cpu', cpu, bchex, 100, '%', 'CPU', { maxPoints: 80 }) : '';
+      const ramSpark = v.running ? miniSparkline(v.history, 'mem', ram, bchex, 100, '%', 'RAM', { maxPoints: 80 }) : '';
+      return `<div class="pve-guest-row ${v.type === 'lxc' ? 'is-lxc' : 'is-vm'} ${v.running ? '' : 'is-stopped'}">
+        <div class="pve-guest-main">
+          <div class="pve-guest-name-line"><span class="mon-dot ${v.running ? 'md-green' : 'md-red'}"></span><span class="pve-guest-name" title="${escAttr(v.name || v.id)}">${escHtml(v.name || v.id)}</span></div>
+          <div class="pve-guest-meta" title="${escAttr(meta)}">${escHtml(meta)}</div>
+        </div>
+        <div class="pve-guest-stat has-spark" title="CPU: ${escAttr(fmtPct(cpu))}"><div class="pve-guest-stat-text"><span class="pve-guest-label">CPU</span><span class="pve-guest-value" style="color:${bc(cpu)}">${fmtPct(cpu)}</span></div>${cpuSpark}</div>
+        <div class="pve-guest-stat has-spark" title="RAM: ${escAttr(fmtPct(ram))} · ${escAttr(memText)}"><div class="pve-guest-stat-text"><span class="pve-guest-label">RAM</span><span class="pve-guest-value" style="color:${bc(ram)}">${fmtPct(ram)}</span></div>${ramSpark}</div>
+        <div class="pve-guest-stat is-wide"><span class="pve-guest-label">${disk.label}</span><span class="pve-guest-value" title="${escAttr(`${disk.label}: ${disk.title}`)}">${escHtml(disk.text)}</span></div>
+        <div class="pve-guest-stat is-wide"><span class="pve-guest-label">Network</span><span class="pve-guest-value" title="${escAttr(netText)}">${escHtml(netText)}</span></div>
+        <div class="pve-guest-stat is-wide"><span class="pve-guest-label">Disk I/O</span><span class="pve-guest-value" title="${escAttr(ioText)}">${escHtml(ioText)}</span></div>
+        <div class="pve-guest-stat"><span class="pve-guest-label">Uptime</span><span class="pve-guest-value">${v.uptime ? fmtUptime(v.uptime) : '--'}</span></div>
+        ${bdg(v.running ? 'green' : 'gray', v.status || (v.running ? 'running' : 'stopped'))}
+      </div>`;
+    }).join('');
 
     return `
     <div class="node-hdr pve-node-hdr" onclick="toggleNode(${jsStr(nodeKey)})">
@@ -3971,34 +4035,20 @@ function buildProxmox(px){
           ${backup.endtime?`<span style="font-size:12px;color:var(--muted);margin-right:8px">${relTime(new Date(backup.endtime*1000).toISOString())}</span>`:''}
           ${bdg(backup.running?'yellow':backup.ok?'green':'red', backup.running?'running':backup.ok?'OK':(backup.status||'error'))}
         </div>`:''}
+        ${qemu.length?`
+          <div class="syn-section" style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">Virtual Machines</div>
+          <div class="pve-guest-list">${guestRows(qemu)}</div>` : ''}
+
+        ${lxc.length?`
+          <div class="syn-section" style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">LXC Containers</div>
+          <div class="pve-guest-list">${guestRows(lxc)}</div>` : ''}
+
         ${smartRows.length?`
           <div class="syn-section" style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">SMART Health</div>
           <div class="disk-chips" style="padding:4px 0 2px 16px">
             ${smartRows.map(s=>`<button type="button" class="disk-chip clickable" onclick="event.stopPropagation();showSmartDetail(${jsStr(node.name)},${jsStr(s.device || '')})" title="View disk details"><span class="mon-dot ${s.ok?'md-green':'md-red'}"></span>${escHtml(s.device||'disk')}: ${escHtml(s.health||'unknown')}</button>`).join('')}
           </div>
         `:''}
-        
-        ${qemu.length?`
-          <div class="syn-section" style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">Virtual Machines</div>
-          <div class="vm-chips">
-            ${qemu.slice(0,24).map(v=>`
-              <div class="vm-chip clickable" onclick="event.stopPropagation();showPveGuest(${jsStr(node.name)},${jsStr(v.id)},${jsStr(v.type)})" title="View details">
-                <div class="mon-dot" style="width:7px;height:7px;border-radius:50%;background:${v.running?'var(--green)':'var(--red)'}"></div>
-                <span>${v.name}</span>
-              </div>`).join('')}
-            ${qemu.length>24?`<div style="font-size:11px;color:var(--muted);padding:3px 6px">+${qemu.length-24} more</div>`:''}
-          </div>` : ''}
-
-        ${lxc.length?`
-          <div class="syn-section" style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">LXC Containers</div>
-          <div class="vm-chips">
-            ${lxc.slice(0,24).map(v=>`
-              <div class="vm-chip clickable" onclick="event.stopPropagation();showPveGuest(${jsStr(node.name)},${jsStr(v.id)},${jsStr(v.type)})" title="View details">
-                <div class="mon-dot" style="width:7px;height:7px;border-radius:50%;background:${v.running?'var(--green)':'var(--red)'}"></div>
-                <span>${v.name}</span>
-              </div>`).join('')}
-            ${lxc.length>24?`<div style="font-size:11px;color:var(--muted);padding:3px 6px">+${lxc.length-24} more</div>`:''}
-          </div>` : ''}
 
         ${storage && storage.length ? `
           <div class="syn-section" style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">Storages</div>
@@ -7207,25 +7257,66 @@ function orderIds(ids, order){
   const saved = cleanUiOrder(order).filter(id => ids.includes(id));
   return [...saved, ...ids.filter(id => !saved.includes(id))];
 }
+function reconcileActiveUiOrder(previous, ids, preferredOrder = ids){
+  const next = cleanUiOrder(ids);
+  if(!Array.isArray(previous)) return orderIds(next, preferredOrder);
+  const nextSet = new Set(next);
+  const survivors = cleanUiOrder(previous).filter(id => nextSet.has(id));
+  const seen = new Set(survivors);
+  return [...survivors, ...next.filter(id => !seen.has(id) && seen.add(id))];
+}
+let activeSidebarPanelOrder = startupConfiguredIds.length ? orderIds(startupConfiguredIds, sidebarPanelOrder) : null;
+let activeDashboardPanelOrder = startupConfiguredIds.length ? orderIds(startupConfiguredIds, dashboardPanelOrder) : null;
+function persistAutomaticPanelOrder(kind, order){
+  const next = cleanUiOrder(order);
+  if(kind === 'sidebar'){
+    const merged = mergeUiOrder(sidebarPanelOrder, next);
+    if(sameUiOrder(merged, sidebarPanelOrder)) return;
+    sidebarPanelOrder = merged;
+    try { localStorage.setItem('os_sidebar_panel_order', JSON.stringify(sidebarPanelOrder)); } catch {}
+  } else {
+    const merged = mergeUiOrder(dashboardPanelOrder, next);
+    if(sameUiOrder(merged, dashboardPanelOrder)) return;
+    dashboardPanelOrder = merged;
+    try { localStorage.setItem('os_dashboard_panel_order', JSON.stringify(dashboardPanelOrder)); } catch {}
+  }
+  scheduleUiPreferencesSave(true);
+}
 function getSidebarPanelOrder(){ return Array.isArray(sidebarPanelOrder) ? sidebarPanelOrder : []; }
 function saveSidebarPanelOrder(order){
   sidebarPanelOrder = mergeUiOrder(sidebarPanelOrder, order);
+  activeSidebarPanelOrder = cleanUiOrder(order);
   markPanelOrderLocalEdit('sidebar');
   try { localStorage.setItem('os_sidebar_panel_order', JSON.stringify(sidebarPanelOrder)); } catch {}
   scheduleUiPreferencesSave();
 }
 function orderedSidebarIds(ids){
-  return orderIds(ids, getSidebarPanelOrder());
+  const previous = activeSidebarPanelOrder;
+  const preferred = orderIds(ids, getSidebarPanelOrder());
+  activeSidebarPanelOrder = reconcileActiveUiOrder(previous, ids, preferred);
+  if(Array.isArray(previous) && activeSidebarPanelOrder.some(id => !previous.includes(id))) persistAutomaticPanelOrder('sidebar', activeSidebarPanelOrder);
+  return [...activeSidebarPanelOrder];
 }
 function getDashboardPanelOrder(){ return Array.isArray(dashboardPanelOrder) ? dashboardPanelOrder : []; }
 function saveDashboardPanelOrder(order){
   dashboardPanelOrder = mergeUiOrder(dashboardPanelOrder, order);
+  activeDashboardPanelOrder = cleanUiOrder(order);
   markPanelOrderLocalEdit('dashboard');
   try { localStorage.setItem('os_dashboard_panel_order', JSON.stringify(dashboardPanelOrder)); } catch {}
   scheduleUiPreferencesSave();
 }
 function orderedDashboardIds(ids){
-  return orderIds(ids, getDashboardPanelOrder());
+  const previous = activeDashboardPanelOrder;
+  const preferred = orderIds(ids, getDashboardPanelOrder());
+  activeDashboardPanelOrder = reconcileActiveUiOrder(previous, ids, preferred);
+  if(Array.isArray(previous)){
+    const added = activeDashboardPanelOrder.filter(id => !previous.includes(id));
+    if(added.length){
+      forgetOverviewLayoutSlots(added);
+      persistAutomaticPanelOrder('dashboard', activeDashboardPanelOrder);
+    }
+  }
+  return [...activeDashboardPanelOrder];
 }
 (function(){
   const sb = document.getElementById('sidebar');
@@ -7357,6 +7448,27 @@ const overviewCanonicalOrders = {};
 function overviewResponsiveLayoutKey(colCount){
   return `${overviewLayoutKey()}:${Math.max(1, Number(colCount) || 1)}`;
 }
+function removeIdsFromOverviewColumns(columns, ids){
+  const remove = ids instanceof Set ? ids : new Set(cleanUiOrder(ids));
+  return Array.isArray(columns) ? columns.map(col => Array.isArray(col) ? col.filter(id => !remove.has(id)) : []) : columns;
+}
+function forgetOverviewLayoutSlots(ids){
+  const remove = new Set(cleanUiOrder(ids));
+  if(!remove.size) return;
+  Object.keys(overviewResponsiveLayouts).forEach(key => {
+    overviewResponsiveLayouts[key] = removeIdsFromOverviewColumns(overviewResponsiveLayouts[key], remove);
+  });
+  Object.keys(overviewLayouts || {}).forEach(key => {
+    overviewLayouts[key] = removeIdsFromOverviewColumns(overviewLayouts[key], remove);
+  });
+  try {
+    if(Array.isArray(overviewLayouts?.side)) localStorage.setItem('os_overview_layout_side', JSON.stringify(overviewLayouts.side));
+    if(Array.isArray(overviewLayouts?.wide)) localStorage.setItem('os_overview_layout_wide', JSON.stringify(overviewLayouts.wide));
+  } catch {}
+  Object.keys(overviewCanonicalOrders).forEach(key => {
+    overviewCanonicalOrders[key] = cleanUiOrder(overviewCanonicalOrders[key]).filter(id => !remove.has(id));
+  });
+}
 function rememberOverviewLayout(cols, colCount){
   overviewResponsiveLayouts[overviewResponsiveLayoutKey(colCount)] = cols.map(col => [...col]);
 }
@@ -7372,6 +7484,9 @@ function stableOverviewIds(ids){
   const ordered = orderIds(ids, preferred);
   overviewCanonicalOrders[key] = [...preferred, ...ordered.filter(id => !preferred.includes(id))];
   return ordered;
+}
+function syncOverviewCanonicalOrder(ids){
+  overviewCanonicalOrders[overviewLayoutKey()] = cleanUiOrder(ids);
 }
 function getOverviewLayout(colCount){
   const responsive = overviewResponsiveLayouts[overviewResponsiveLayoutKey(colCount)];
@@ -7399,8 +7514,19 @@ function overviewColCount(grid){
   if(cols.length) return cols.length;
   return 1;
 }
+function appendOverviewIdsAtBottom(columns, ids, fallbackCards = []){
+  if(!ids.length || !columns.length) return columns;
+  const byId = new Map(fallbackCards.map(card => [card.dataset.id, card]));
+  const cardHeight = id => (byId.get(id)?.offsetHeight || 180) + 14;
+  const heights = columns.map(col => col.reduce((sum, id) => sum + cardHeight(id), 0));
+  ids.forEach(id => {
+    const col = heights.reduce((best, height, index) => height >= heights[best] ? index : best, 0);
+    columns[col].push(id);
+    heights[col] += cardHeight(id);
+  });
+  return columns;
+}
 function normalizeOverviewColumns(ids, colCount, fallbackCards = []){
-  normalizeOverviewColumns.repaired = false;
   const orderedIds = stableOverviewIds(ids);
   const idSet = new Set(orderedIds);
   const seen = new Set();
@@ -7408,16 +7534,7 @@ function normalizeOverviewColumns(ids, colCount, fallbackCards = []){
   while(saved.length < colCount) saved.push([]);
   let missing = orderedIds.filter(id => !seen.has(id));
   if(saved.some(col => col.length)){
-    const nonEmptyCols = saved.filter(col => col.length).length;
-    const savedCount = saved.reduce((sum, col) => sum + col.length, 0);
-    if(colCount > 1 && ids.length > 1 && savedCount > 1 && nonEmptyCols <= 1){
-      saved = Array.from({ length: colCount }, () => []);
-      missing = [...ids];
-      normalizeOverviewColumns.repaired = true;
-    } else {
-      missing.forEach(id => saved[saved.reduce((best, col, i) => col.length < saved[best].length ? i : best, 0)].push(id));
-      return saved;
-    }
+    return appendOverviewIdsAtBottom(saved, missing, fallbackCards);
   }
   const heights = Array(colCount).fill(0);
   const byId = new Map(fallbackCards.map(card => [card.dataset.id, card]));
@@ -7435,11 +7552,7 @@ function layoutOverviewMasonry(force = false){
   if(!cards.length) return;
   const colCount = overviewColCount(grid);
   const currentCols = [...grid.querySelectorAll('.overview-col')];
-  const currentDegenerate = colCount > 1
-    && cards.length > 1
-    && currentCols.length === colCount
-    && currentCols.filter(col => col.querySelector('.overview-card')).length <= 1;
-  if(!force && currentCols.length === colCount && !currentDegenerate) return;
+  if(!force && currentCols.length === colCount) return;
   const ids = cards.map(c => c.dataset.id);
   const byId = new Map(cards.map(card => [card.dataset.id, card]));
   const columns = normalizeOverviewColumns(ids, colCount, cards);
@@ -8989,6 +9102,7 @@ function dashboardCardTitle(id, panel = {}){
 }
 function renderDashboardOverview(data, ids, panels, opts = {}){
   const showSide = dashboardSidePanelVisible(data);
+  syncOverviewCanonicalOrder(ids);
   const visibleIds = ids.filter(id => !dashboardHiddenPlatforms.has(id));
   const hiddenIds = ids.filter(id => dashboardHiddenPlatforms.has(id));
   const cards = visibleIds.map(id => {
@@ -11208,7 +11322,7 @@ function showPveGuest(nodeName, id, type){
   const guest = (node?.vms || []).find(v => String(v.id) === String(id) && (!type || v.type === type));
   if(!guest) return;
   const memText = guest.maxmem ? `${fmtBytes(guest.mem || 0)} / ${fmtBytes(guest.maxmem)} (${guest.ram || 0}%)` : (guest.ram != null ? `${guest.ram}%` : '');
-  const diskText = guest.maxdisk ? `${fmtBytes(guest.disk || 0)} / ${fmtBytes(guest.maxdisk)}` : (guest.disk ? fmtBytes(guest.disk) : '');
+  const disk = pveGuestDiskPresentation(guest);
   const netText = (guest.netin || guest.netout) ? `${fmtBytes(guest.netin || 0)} in / ${fmtBytes(guest.netout || 0)} out` : '';
   const ioText = (guest.diskread || guest.diskwrite) ? `${fmtBytes(guest.diskread || 0)} read / ${fmtBytes(guest.diskwrite || 0)} write` : '';
   showK8sDetail(`${guest.name || guest.id} — ${guest.type === 'lxc' ? 'LXC' : 'VM'}`, [
@@ -11217,7 +11331,7 @@ function showPveGuest(nodeName, id, type){
     ['Status', guest.status || (guest.running ? 'running' : 'stopped')],
     ['CPU', guest.cpu != null ? `${guest.cpu}%` : ''],
     ['RAM', memText],
-    ['Disk', diskText],
+    [disk.detailLabel, disk.text === '--' ? '' : disk.text],
     ['Network I/O', netText],
     ['Disk I/O', ioText],
     ['Uptime', guest.uptime ? fmtUptime(guest.uptime) : ''],
@@ -11473,10 +11587,11 @@ function mergeCompactHistories(next, prev, depth = 0){
     if(Array.isArray(nv) && Array.isArray(pv)){
       const isSeries = k === 'history' && nv.length && typeof nv[0] === 'object' && nv[0] && 'time' in nv[0];
       if(isSeries){
+        const seriesLimit = Math.max(2, Math.min(HISTORY_MERGE_MAX, Number(next._historyMaxPoints || prev._historyMaxPoints) || HISTORY_MERGE_MAX));
         const firstT = Number(nv[0].time);
         if(Number.isFinite(firstT) && pv.length && Number(pv[pv.length-1]?.time) >= 0){
           const older = pv.filter(pt => pt && Number(pt.time) < firstT);
-          if(older.length) next[k] = [...older, ...nv].slice(-HISTORY_MERGE_MAX);
+          if(older.length) next[k] = [...older, ...nv].slice(-seriesLimit);
         }
       } else if(nv.length && typeof nv[0] === 'object'){
         const prevByKey = new Map();
@@ -11497,12 +11612,13 @@ function mergeHistoryPayload(target, payload, depth = 0){
   if(!target || !payload || typeof target !== 'object' || typeof payload !== 'object' || depth > 10) return target;
   for(const [key, value] of Object.entries(payload)){
     if(key === 'history' && Array.isArray(value)){
+      const seriesLimit = Math.max(2, Math.min(HISTORY_MERGE_MAX, Number(target._historyMaxPoints || payload._historyMaxPoints) || HISTORY_MERGE_MAX));
       const byTime = new Map();
       [...(Array.isArray(target[key]) ? target[key] : []), ...value].forEach(point => {
         const time = Number(point?.time);
         if(Number.isFinite(time)) byTime.set(time, point);
       });
-      target[key] = [...byTime.values()].sort((a,b)=>Number(a.time)-Number(b.time)).slice(-HISTORY_MERGE_MAX);
+      target[key] = [...byTime.values()].sort((a,b)=>Number(a.time)-Number(b.time)).slice(-seriesLimit);
       continue;
     }
     if(Array.isArray(value)){

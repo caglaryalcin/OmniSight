@@ -1,6 +1,7 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const yaml = require('js-yaml');
 const crypto = require('crypto');
 const childProcess = require('child_process');
@@ -142,8 +143,11 @@ const UI_PREFS_PATH = path.join(DATA_DIR, 'ui-preferences.yaml');
 const TOPOLOGY_PATH = path.join(DATA_DIR, 'topology.yaml');
 const CONFIG_BACKUP_DIR = path.join(DATA_DIR, 'config-backups');
 const FULL_BACKUP_MAX_BYTES = 50 * ONE_MB;
-const FULL_BACKUP_EXPORT_TMP_DIR = path.join(DATA_DIR, '.backup-exports');
-const FULL_BACKUP_SKIP = new Set(['sessions.yaml', 'password-resets.yaml', '.backup-exports']);
+// Full exports are base64 encoded and can be ~35% larger than the source data.
+// Keep their short-lived working files off the persistent data volume so a
+// small PVC can still be exported when it is more than roughly half full.
+const FULL_BACKUP_EXPORT_TMP_DIR = path.join(os.tmpdir(), 'omnisight-backup-exports');
+const FULL_BACKUP_SKIP = new Set(['sessions.yaml', 'password-resets.yaml', 'runtime-snapshot.json', '.backup-exports']);
 
 function backupConfigBeforeWrite() {
   try {
@@ -2718,10 +2722,11 @@ function replaceMapContents(target, source) {
 }
 
 function reloadRuntimeHistoryMaps() {
-  cancelHistorySaves(['platform-history', 'docker-history', 'vmware-history', 'uptimekuma-history']);
+  cancelHistorySaves(['platform-history', 'docker-history', 'vmware-history', 'proxmox-guest-history', 'uptimekuma-history']);
   replaceObjectContents(PLATFORM_HISTORY, Object.fromEntries(loadHistoryMap('platform-history', HISTORY_STORE_MAX)));
   replaceMapContents(dockerHistory, loadHistoryMap('docker-history', HISTORY_STORE_MAX));
   replaceMapContents(vmwareHistory, loadHistoryMap('vmware-history', HISTORY_STORE_MAX));
+  replaceMapContents(proxmoxGuestHistory, loadHistoryMap('proxmox-guest-history', PROXMOX_GUEST_HISTORY_MAX));
   replaceMapContents(uptimeKumaHistory, loadHistoryMap('uptimekuma-history', HISTORY_STORE_MAX));
 }
 
@@ -2831,6 +2836,77 @@ function preserveDockerOnTransient(nextRows) {
 
 const dockerHistory = loadHistoryMap('docker-history', HISTORY_STORE_MAX);
 const vmwareHistory = loadHistoryMap('vmware-history', HISTORY_STORE_MAX);
+const PROXMOX_GUEST_HISTORY_MAX = 80;
+const PROXMOX_GUEST_HISTORY_MS = 20 * 60 * 1000;
+const PROXMOX_GUEST_DISK_STALE_MS = 30 * 60 * 1000;
+const proxmoxGuestHistory = loadHistoryMap('proxmox-guest-history', PROXMOX_GUEST_HISTORY_MAX);
+
+function proxmoxGuestHistoryKey(node = {}, guest = {}) {
+  const source = String(node.clusterUrl || node.clusterKey || node.clusterName || node.node?.name || node.name || 'proxmox').trim().toLowerCase();
+  const type = guest.type === 'lxc' ? 'lxc' : 'vm';
+  return `${source}|${type}|${String(guest.id ?? guest.name ?? 'guest').trim().toLowerCase()}`;
+}
+
+function mergeProxmoxGuestHistory(next) {
+  if (!next || !Array.isArray(next.nodes)) return next;
+  const now = Date.now();
+  const cutoff = now - PROXMOX_GUEST_HISTORY_MS;
+  const previousGuests = new Map();
+  for (const previousNode of cache.data?.proxmox?.nodes || []) {
+    for (const previousGuest of previousNode?.vms || []) {
+      previousGuests.set(proxmoxGuestHistoryKey(previousNode, previousGuest), previousGuest);
+    }
+  }
+  let changed = false;
+  const canSample = !next._stale && !next._connecting;
+  const nodes = next.nodes.map(node => {
+    if (!node || !Array.isArray(node.vms)) return node;
+    const nodeOnline = node.node?.online !== false && !node._connecting;
+    const vms = node.vms.map(guest => {
+      if (!guest) return guest;
+      const key = proxmoxGuestHistoryKey(node, guest);
+      const previousDisk = previousGuests.get(key)?.guestDisk;
+      const previousDiskCheckedAt = Number(previousDisk?.checkedAt || 0);
+      const previousDiskIsUsable = Number.isFinite(Number(previousDisk?.usedBytes))
+        && Number.isFinite(Number(previousDisk?.totalBytes))
+        && Number(previousDisk.totalBytes) > 0
+        && previousDiskCheckedAt > 0
+        && now - previousDiskCheckedAt <= PROXMOX_GUEST_DISK_STALE_MS;
+      const guestWithDisk = guest.guestDisk || !previousDiskIsUsable
+        ? guest
+        : { ...guest, guestDisk: { ...previousDisk, stale: true } };
+      let history = (proxmoxGuestHistory.get(key) || []).filter(point => Number(point?.time || 0) >= cutoff).slice(-PROXMOX_GUEST_HISTORY_MAX);
+      const cpu = Number(guestWithDisk.cpu);
+      const mem = Number(guestWithDisk.ram);
+      const point = {
+        time: now,
+        cpu: Number.isFinite(cpu) ? Math.max(0, Math.min(100, cpu)) : null,
+        mem: Number.isFinite(mem) ? Math.max(0, Math.min(100, mem)) : null,
+      };
+      const last = history[history.length - 1];
+      if (canSample && nodeOnline && guestWithDisk.running && (point.cpu != null || point.mem != null)
+          && (!last || now - Number(last.time || 0) > REFRESH_INTERVAL / 2)) {
+        if (!history.length) history.push({ ...point, time: now - REFRESH_INTERVAL });
+        history.push(point);
+        if (history.length > PROXMOX_GUEST_HISTORY_MAX) history = history.slice(-PROXMOX_GUEST_HISTORY_MAX);
+        proxmoxGuestHistory.set(key, history);
+        changed = true;
+      }
+      return { ...guestWithDisk, history: [...history], _historyMaxPoints: PROXMOX_GUEST_HISTORY_MAX };
+    });
+    return { ...node, vms };
+  });
+  if (canSample) {
+    for (const [key, series] of [...proxmoxGuestHistory.entries()]) {
+      if (!(series || []).some(point => Number(point?.time || 0) >= cutoff)) {
+        proxmoxGuestHistory.delete(key);
+        changed = true;
+      }
+    }
+  }
+  if (changed) scheduleSaveHistoryMap('proxmox-guest-history', proxmoxGuestHistory, PROXMOX_GUEST_HISTORY_MAX, 60000);
+  return { ...next, nodes };
+}
 
 function vmwareHistoryKey(instance = {}, host = {}) {
   const endpoint = String(instance.url || instance.name || 'vmware').trim().replace(/\/+$/, '').toLowerCase();
@@ -3588,7 +3664,7 @@ function cloneDashboardValue(value, key = '', limit = dashboardHistoryPointLimit
   return out;
 }
 
-const HISTORY_IDENTITY_KEYS = new Set(['id', 'name', 'host', 'url', 'mac', 'node', 'clusterName', 'source', 'environmentId', 'endpointId']);
+const HISTORY_IDENTITY_KEYS = new Set(['id', 'name', 'host', 'url', 'mac', 'node', 'clusterName', 'source', 'environmentId', 'endpointId', '_historyMaxPoints']);
 
 function cloneDashboardHistories(value, key = '', limit = dashboardHistoryPointLimit()) {
   if (Array.isArray(value)) {
@@ -5145,7 +5221,7 @@ function backgroundRefresh(opts = {}) {
         const v = await factory();
         if (generation !== refreshGeneration) return;
         const next = (v == null ? fb : v);
-        base[key] = key === 'proxmox' ? preserveProxmoxOnTransient(next)
+        base[key] = key === 'proxmox' ? mergeProxmoxGuestHistory(preserveProxmoxOnTransient(next))
           : key === 'vmware' ? preservePlatformOnTransient(key, mergeVmwareHistory(next))
           : key === 'kubernetes' ? keepKubernetesConnectingAfterConfigChange(next)
           : key === 'docker' ? mergeDockerHistory(preserveDockerOnTransient(next))
@@ -5437,6 +5513,15 @@ function pruneRuntimeSnapshot(data = {}) {
   out._snapshot = true;
   out._snapshotLoadedAt = new Date().toISOString();
   out.timestamp = out.timestamp || out._snapshotLoadedAt;
+  if (out.proxmox && Array.isArray(out.proxmox.nodes)) {
+    out.proxmox = {
+      ...out.proxmox,
+      nodes: out.proxmox.nodes.map(node => ({
+        ...node,
+        vms: Array.isArray(node?.vms) ? node.vms.map(({ history, ...guest }) => guest) : node?.vms,
+      })),
+    };
+  }
   assignStatic(out);
   return out;
 }
@@ -5565,7 +5650,8 @@ function flushRuntimeSnapshotSave() {
     runtimeSnapshotSaveTimer = null;
     runtimeSnapshotSaveDue = 0;
   }
-  writeRuntimeSnapshotNow(runtimeSnapshotPending || cache.data);
+  // On shutdown the live cache can be newer than a previously scheduled snapshot.
+  writeRuntimeSnapshotNow(cache.data || runtimeSnapshotPending);
   runtimeSnapshotPending = null;
 }
 
@@ -5720,7 +5806,7 @@ if (startupSnapshot) {
   cache.data = startupSnapshot;
   const enabled = c => c && c.enabled !== false;
   if (enabled(config.proxmox) && !hasProxmoxApi()) {
-    cache.data.proxmox = preserveProxmoxOnTransient(agents.getProxmoxData({ excludedServices: config.excludedServices }));
+    cache.data.proxmox = mergeProxmoxGuestHistory(preserveProxmoxOnTransient(agents.getProxmoxData({ excludedServices: config.excludedServices })));
   }
   if (enabled(config.linux)) {
     cache.data.linux = filterLinuxProxmoxRows(getLinuxData(cache.data.proxmox), cache.data.proxmox);
@@ -7254,6 +7340,7 @@ async function endWriteStream(stream) {
 async function writeBase64FileBlock(stream, file, onBytes) {
   let carry = Buffer.alloc(0);
   let line = '';
+  let bytesRead = 0;
   const flushBase64 = async text => {
     line += text;
     while (line.length >= 76) {
@@ -7262,6 +7349,7 @@ async function writeBase64FileBlock(stream, file, onBytes) {
     }
   };
   for await (const chunk of fs.createReadStream(file, { highWaterMark: 64 * 1024 })) {
+    bytesRead += chunk.length;
     const data = carry.length ? Buffer.concat([carry, chunk]) : chunk;
     const encodeLen = data.length - (data.length % 3);
     if (encodeLen > 0) await flushBase64(data.subarray(0, encodeLen).toString('base64'));
@@ -7270,6 +7358,7 @@ async function writeBase64FileBlock(stream, file, onBytes) {
   }
   if (carry.length) await flushBase64(carry.toString('base64'));
   if (line.length) await writeStreamChunk(stream, `      ${line}\n`);
+  return bytesRead;
 }
 
 function safeUnlink(file) {
@@ -7300,16 +7389,17 @@ async function writeFullBackupArchive(job, entries, state) {
       await writeStreamChunk(stream, `  ${yamlJson(entry.rel)}:\n`);
       await writeStreamChunk(stream, '    encoding: base64\n');
       await writeStreamChunk(stream, `    mode: ${yamlJson(entry.mode)}\n`);
-      await writeStreamChunk(stream, `    size: ${Number(entry.size || 0)}\n`);
       await writeStreamChunk(stream, fullBackupContentHeader(entry.size));
+      let exportedSize = 0;
       if (entry.size > 0) {
-        await writeBase64FileBlock(stream, entry.file, readBytes => {
+        exportedSize = await writeBase64FileBlock(stream, entry.file, readBytes => {
           bytesDone += readBytes;
           job.bytesDone = bytesDone;
           const ratio = Number(state.total || 0) > 0 ? bytesDone / state.total : filesDone / Math.max(1, entries.length);
           job.progress = 5 + Math.floor(Math.max(0, Math.min(1, ratio)) * 83);
         });
       }
+      await writeStreamChunk(stream, `    size: ${exportedSize}\n`);
       filesDone += 1;
       job.filesDone = filesDone;
       await new Promise(resolve => setImmediate(resolve));
@@ -7326,6 +7416,12 @@ async function writeFullBackupArchive(job, entries, state) {
 
 const fullBackupExportJobs = new Map();
 const FULL_BACKUP_EXPORT_JOB_TTL_MS = 10 * 60 * 1000;
+
+function fullBackupExportError(err) {
+  if (err?.code === 'EDQUOT' || err?.errno === -122) return 'Temporary storage quota is full. Free pod ephemeral storage or increase its ephemeral-storage limit.';
+  if (err?.code === 'ENOSPC' || err?.errno === -28) return 'Temporary storage is full. Free pod ephemeral storage or increase its ephemeral-storage limit.';
+  return err?.message || String(err);
+}
 
 function fullBackupJobSnapshot(job) {
   if (!job) return null;
@@ -7351,6 +7447,15 @@ function cleanupFullBackupJobs() {
       fullBackupExportJobs.delete(id);
     }
   }
+  try {
+    for (const name of fs.readdirSync(FULL_BACKUP_EXPORT_TMP_DIR)) {
+      if (!/^[a-z0-9-]+\.yaml$/i.test(name)) continue;
+      const file = path.join(FULL_BACKUP_EXPORT_TMP_DIR, name);
+      try {
+        if (now - fs.statSync(file).mtimeMs > FULL_BACKUP_EXPORT_JOB_TTL_MS) safeUnlink(file);
+      } catch {}
+    }
+  } catch {}
 }
 
 async function buildFullBackupExportJob(job) {
@@ -7378,7 +7483,7 @@ async function buildFullBackupExportJob(job) {
     safeUnlink(job.path);
     job.status = 'failed';
     job.phase = 'Failed';
-    job.error = err.message || String(err);
+    job.error = fullBackupExportError(err);
     job.progress = Math.max(1, Number(job.progress || 0));
   }
 }
@@ -7471,7 +7576,7 @@ app.post('/api/backup/export', async (req, res) => {
     stream.pipe(res);
   } catch (err) {
     safeUnlink(tmpPath);
-    res.status(400).json({ error: err.message });
+    res.status(400).json({ error: fullBackupExportError(err) });
   }
 });
 
@@ -7771,7 +7876,7 @@ app.post('/api/config', async (req, res) => {
             cache.data.proxmox = preserveProxmoxOnTransient({ clusterSummary: null, nodes: [], _connecting: true });
           }
         } else {
-          cache.data.proxmox = agents.getProxmoxData({ excludedServices: config.excludedServices });
+          cache.data.proxmox = mergeProxmoxGuestHistory(agents.getProxmoxData({ excludedServices: config.excludedServices }));
         }
       } else { cache.data.proxmox = { clusterSummary: null, nodes: [] }; }
 
@@ -8483,7 +8588,7 @@ function refreshAgentDerivedCache() {
   cache.data.linux = en(config.linux) ? getLinuxData(cache.data.proxmox) : [];
   cache.data.windows = en(config.windows) ? getWindowsData() : [];
   if (en(config.proxmox) && !hasProxmoxApi()) {
-    cache.data.proxmox = preserveProxmoxOnTransient(agents.getProxmoxData({ excludedServices: config.excludedServices }));
+    cache.data.proxmox = mergeProxmoxGuestHistory(preserveProxmoxOnTransient(agents.getProxmoxData({ excludedServices: config.excludedServices })));
   } else if (!en(config.proxmox)) {
     cache.data.proxmox = { clusterSummary: null, nodes: [] };
   }
@@ -8877,6 +8982,10 @@ function refreshAgentCacheAfterRemoval() {
   refreshAgentDerivedCache();
 }
 
+function acknowledgePendingAgentRevision() {
+  agentDerivedCacheRevision = typeof agents.revision === 'function' ? agents.revision() : agentDerivedCacheRevision;
+}
+
 app.post('/api/agent/uninstall', async (req, res) => {
   try {
     if (sessionRole(req) !== 'admin') return res.status(403).json({ error: 'Forbidden' });
@@ -8959,7 +9068,7 @@ app.post('/api/agent/pending', (req, res) => {
   try {
     const kind = ['linux', 'windows', 'proxmox', 'docker'].includes(req.body?.kind) ? req.body.kind : 'linux';
     const pending = agents.addPendingInstall(kind);
-    refreshAgentDerivedCache();
+    acknowledgePendingAgentRevision();
     auditEvent('agent.pending.add', { kind, id: pending.id }, req);
     res.json({ ok: true, pending, data: withRequestUiPreferences(req, cache.data) });
   } catch (err) { sendServerError(res, err); }
@@ -8970,8 +9079,10 @@ app.post('/api/agent/remove', (req, res) => {
     if (sessionRole(req) !== 'admin') return res.status(403).json({ error: 'Forbidden' });
     const { id } = req.body || {};
     if (!id) return res.status(400).json({ error: 'id required' });
+    const pendingInstall = agents.listPendingInstalls().some(row => row.id === String(id));
     const ok = agents.removeAgent(id);
-    refreshAgentCacheAfterRemoval();
+    if (pendingInstall) acknowledgePendingAgentRevision();
+    else refreshAgentCacheAfterRemoval();
     auditEvent('agent.remove', { id, ok }, req);
     res.json({ ok, data: withRequestUiPreferences(req, cache.data) });
   } catch (err) { sendServerError(res, err); }

@@ -125,6 +125,11 @@ function num(v, max = 1e15) {
   return Number.isFinite(n) && n >= 0 && n <= max ? n : null;
 }
 
+function optionalNum(v, max = 1e15) {
+  if (v === null || v === undefined || v === '') return null;
+  return num(v, max);
+}
+
 function percentValue(value) {
   const n = Number(value);
   if (!Number.isFinite(n) || n < 0) return 0;
@@ -234,11 +239,6 @@ function clearPendingForKinds(kinds) {
       bumpStateVersion();
     }
   }
-}
-
-function pendingByKind(kind) {
-  cleanupPendingInstalls();
-  return [...pendingInstalls.values()].filter(p => p.kind === kind);
 }
 
 function listPendingInstalls() {
@@ -473,20 +473,6 @@ function getAllAgentData(config) {
       history: agentHistoryForUi(a.id),
     };
   });
-  pendingByKind('linux').forEach(p => rows.push({
-    id: p.id,
-    name: p.name,
-    host: 'waiting for agent',
-    ip: '',
-    os: '',
-    platform: 'linux',
-    online: false,
-    _connecting: true,
-    error: 'waiting for first report',
-    lastSeen: p.createdAt,
-    services: [],
-    history: [],
-  }));
   return rows.sort((x, y) => (x._connecting === y._connecting ? x.name.localeCompare(y.name) : x._connecting ? -1 : 1));
 }
 
@@ -536,20 +522,6 @@ function getWindowsData(config) {
       history: agentHistoryForUi(a.id),
     };
   });
-  pendingByKind('windows').forEach(p => rows.push({
-    id: p.id,
-    name: p.name,
-    host: 'waiting for agent',
-    ip: '',
-    os: '',
-    platform: 'windows',
-    online: false,
-    _connecting: true,
-    error: 'waiting for first report',
-    lastSeen: p.createdAt,
-    services: [],
-    history: [],
-  }));
   return rows.sort((x, y) => (x._connecting === y._connecting ? x.name.localeCompare(y.name) : x._connecting ? -1 : 1));
 }
 
@@ -636,16 +608,6 @@ function getDockerData() {
       summary: { total: containers.length, running, stopped, other: containers.length - running - stopped, unused: a.docker.unused ?? null, cpu, memPercent },
     };
   });
-  pendingByKind('docker').forEach(p => rows.push({
-    id: p.id,
-    name: p.name,
-    host: 'waiting for agent',
-    online: false,
-    _connecting: true,
-    error: 'waiting for first report',
-    containers: [],
-    summary: { total: 0, running: 0, stopped: 0, other: 0, unused: null },
-  }));
   return rows.sort((x, y) => (x._connecting === y._connecting ? x.name.localeCompare(y.name) : x._connecting ? -1 : 1));
 }
 
@@ -653,19 +615,7 @@ function getProxmoxData(config) {
   const excluded = (config && config.excludedServices?.proxmox) || {};
   const now = Date.now();
   const pveAgents = [...agents.values()].filter(a => a.pve || a.pveNode || a.platform === 'proxmox');
-  const pendingNodes = pendingByKind('proxmox').map(p => ({
-    id: p.id,
-    node: { name: p.name, online: false, cpuCores: 0, cpuRaw: 0, ram: { used: 0, total: 0 } },
-    host: 'waiting for agent',
-    services: [],
-    vms: [],
-    history: [],
-    backup: null,
-    storage: [],
-    updates: null,
-    _connecting: true,
-  }));
-  if (!pveAgents.length) return { clusterSummary: null, nodes: pendingNodes, ceph: null, clusters: [] };
+  if (!pveAgents.length) return { clusterSummary: null, nodes: [], ceph: null, clusters: [] };
 
   let ceph = null;
   const nodes = pveAgents.map(a => {
@@ -710,7 +660,20 @@ function getProxmoxData(config) {
       status: v.status,
       running: v.status === 'running',
       cpu: percentValue(v.cpu),
+      mem: Number(v.mem) || 0,
+      maxmem: Number(v.maxmem) || 0,
       ram: v.mem && v.maxmem ? Math.round((v.mem / v.maxmem) * 100) : 0,
+      disk: optionalNum(v.disk),
+      maxdisk: optionalNum(v.maxdisk),
+      uptime: Number(v.uptime) || 0,
+      netin: Number(v.netin) || 0,
+      netout: Number(v.netout) || 0,
+      diskread: Number(v.diskread) || 0,
+      diskwrite: Number(v.diskwrite) || 0,
+      os: v.os || v.ostype || v.osType || '',
+      ostype: v.ostype || v.os || v.osType || '',
+      tags: v.tags || '',
+      lock: v.lock || '',
     }));
     const storage = res.filter(r => r.type === 'storage' && r.node === nodeName).map(s => ({
       name: String(s.storage || '').slice(0, 128),
@@ -764,7 +727,6 @@ function getProxmoxData(config) {
       storage,
     };
   });
-  nodes.push(...pendingNodes);
   nodes.sort((x, y) => (x._connecting === y._connecting ? String(x.node.name).localeCompare(String(y.node.name)) : x._connecting ? -1 : 1));
 
   const onlineNodes = nodes.filter(n => n.node.online);
@@ -823,23 +785,19 @@ function getProxmoxData(config) {
 }
 
 function hasPve() {
-  cleanupPendingInstalls();
-  return [...agents.values()].some(a => a.pve || a.pveNode || a.platform === 'proxmox') || pendingByKind('proxmox').length > 0;
+  return [...agents.values()].some(a => a.pve || a.pveNode || a.platform === 'proxmox');
 }
 
 function hasDocker() {
-  cleanupPendingInstalls();
-  return [...agents.values()].some(a => a.role === 'docker' && (a.docker || a.hasDocker)) || pendingByKind('docker').length > 0;
+  return [...agents.values()].some(a => a.role === 'docker' && (a.docker || a.hasDocker));
 }
 
 function hasLinux() {
-  cleanupPendingInstalls();
-  return [...agents.values()].some(a => !a.pve && !a.pveNode && a.platform !== 'proxmox' && a.platform !== 'windows' && a.role !== 'docker' && a.role !== 'windows') || pendingByKind('linux').length > 0;
+  return [...agents.values()].some(a => !a.pve && !a.pveNode && a.platform !== 'proxmox' && a.platform !== 'windows' && a.role !== 'docker' && a.role !== 'windows');
 }
 
 function hasWindows() {
-  cleanupPendingInstalls();
-  return [...agents.values()].some(a => a.platform === 'windows' || a.role === 'windows') || pendingByKind('windows').length > 0;
+  return [...agents.values()].some(a => a.platform === 'windows' || a.role === 'windows');
 }
 
 function findAgent(hostOrName) {

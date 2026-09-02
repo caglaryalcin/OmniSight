@@ -10,6 +10,92 @@ const { normalizeCephStatus } = require('./ceph');
 const PVE_HISTORY_MAX = 5760;
 const pveHistory = loadHistoryMap('proxmox-history', PVE_HISTORY_MAX);
 const pveSshDiskStats = new Map();
+const pveGuestFsCache = new Map();
+const pveGuestFsInflight = new Map();
+
+const PVE_GUEST_FS_CACHE_MS = 5 * 60 * 1000;
+const PVE_GUEST_FS_FAILURE_CACHE_MS = 60 * 1000;
+const PVE_GUEST_FS_STALE_MS = 30 * 60 * 1000;
+const PVE_GUEST_FS_TIMEOUT_MS = 6000;
+const PVE_GUEST_FS_BATCH_BUDGET_MS = 12000;
+
+const PVE_GUEST_FS_PSEUDO_TYPES = new Set([
+  'autofs', 'binfmt_misc', 'cgroup', 'cgroup2', 'configfs', 'debugfs', 'devpts',
+  'devtmpfs', 'erofs', 'fusectl', 'hugetlbfs', 'iso9660', 'mqueue', 'nsfs',
+  'overlay', 'proc', 'pstore', 'ramfs', 'securityfs', 'squashfs', 'sysfs',
+  'tmpfs', 'tracefs', 'udf',
+]);
+const PVE_GUEST_FS_REMOTE_TYPES = new Set([
+  '9p', 'afs', 'ceph', 'cifs', 'fuse.sshfs', 'glusterfs', 'nfs', 'nfs4',
+  'smb2', 'smb3', 'sshfs', 'virtiofs',
+]);
+
+function optionalNonNegativeNumber(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
+function guestFsRows(raw) {
+  if (Array.isArray(raw)) return raw;
+  if (Array.isArray(raw?.result)) return raw.result;
+  if (Array.isArray(raw?.data?.result)) return raw.data.result;
+  if (Array.isArray(raw?.return)) return raw.return;
+  return [];
+}
+
+function isWindowsRootMount(mountpoint) {
+  return /^[a-z]:[\\/]*$/i.test(String(mountpoint || '').trim());
+}
+
+function normalizeGuestFsInfo(raw) {
+  const candidates = [];
+  for (const row of guestFsRows(raw)) {
+    if (!row || typeof row !== 'object') continue;
+    const privilegedTotal = optionalNonNegativeNumber(row['total-bytes-privileged'] ?? row.totalBytesPrivileged);
+    const regularTotal = optionalNonNegativeNumber(row['total-bytes'] ?? row.totalBytes ?? row.total);
+    const totalBytes = privilegedTotal > 0 ? privilegedTotal : regularTotal;
+    const rawUsed = optionalNonNegativeNumber(row['used-bytes'] ?? row.usedBytes ?? row.used);
+    if (!(totalBytes > 0) || rawUsed === null) continue;
+    const mountpoint = String(row.mountpoint ?? row.mountPoint ?? '').trim();
+    const filesystem = String(row.type ?? row.filesystem ?? '').trim().toLowerCase();
+    const device = String(row.name ?? row.device ?? '').trim();
+    const deviceLower = device.toLowerCase();
+    const mountLower = mountpoint.toLowerCase().replace(/\\/g, '/');
+    if (PVE_GUEST_FS_PSEUDO_TYPES.has(filesystem) || PVE_GUEST_FS_REMOTE_TYPES.has(filesystem)) continue;
+    if (/^(?:\/dev\/)?(?:zram|loop)\d*$/.test(deviceLower) || deviceLower === 'tmpfs') continue;
+    if (/^\/(?:proc|sys|dev|run)(?:\/|$)/.test(mountLower)) continue;
+    candidates.push({
+      mountpoint,
+      filesystem,
+      device,
+      usedBytes: Math.min(rawUsed, totalBytes),
+      totalBytes,
+    });
+  }
+  if (!candidates.length) return null;
+
+  const largest = candidates.reduce((best, row) => row.totalBytes > best.totalBytes ? row : best);
+  const windowsRoot = candidates.find(row => /^c:[\\/]*$/i.test(row.mountpoint))
+    || candidates.find(row => isWindowsRootMount(row.mountpoint));
+  const unixRoot = candidates.find(row => row.mountpoint === '/');
+  // Appliance guests such as HAOS expose a tiny read-only root plus a much larger
+  // persistent data filesystem. In that case the data filesystem is the useful metric.
+  const unixRootIsTiny = unixRoot
+    && unixRoot.totalBytes < 2 * 1024 ** 3
+    && largest.totalBytes >= unixRoot.totalBytes * 4;
+  const selected = windowsRoot || (unixRoot && !unixRootIsTiny ? unixRoot : largest);
+  return {
+    usedBytes: selected.usedBytes,
+    totalBytes: selected.totalBytes,
+    percent: Math.round((selected.usedBytes / selected.totalBytes) * 1000) / 10,
+    mountpoint: selected.mountpoint || null,
+    filesystem: selected.filesystem || null,
+    device: selected.device || null,
+    filesystemCount: candidates.length,
+    source: 'qemu-guest-agent',
+  };
+}
 
 function percentValue(value) {
   const n = Number(value);
@@ -99,7 +185,7 @@ function authHeader(cfg) {
   return `PVEAPIToken=${cfg.tokenId}=${cfg.tokenSecret}`;
 }
 
-async function pveFetch(cfg, path) {
+async function pveFetch(cfg, path, options = {}) {
   return new Promise((resolve, reject) => {
     const base = normBase(cfg.url);
     if (!base) return reject(new Error('Proxmox URL is required'));
@@ -112,7 +198,7 @@ async function pveFetch(cfg, path) {
       path: u.pathname + u.search,
       headers: { Authorization: authHeader(cfg) },
       rejectUnauthorized: cfg.insecureTLS ? false : undefined,
-      timeout: 10000,
+      timeout: Math.max(500, Number(options.timeoutMs) || 10000),
     }, res => {
       const chunks = [];
       res.on('data', d => chunks.push(d));
@@ -128,6 +214,91 @@ async function pveFetch(cfg, path) {
     req.on('error', reject);
     req.end();
   });
+}
+
+function guestFsCacheKey(cfg, vmid) {
+  return `${cfg.instanceKey || normBase(cfg.url)}:${vmid}`;
+}
+
+function freshGuestFsCache(key, now = Date.now()) {
+  const entry = pveGuestFsCache.get(key);
+  if (!entry || entry.expiresAt <= now) return { hit: false, entry };
+  return { hit: true, entry, value: entry.value };
+}
+
+function staleGuestFsCacheValue(entry, now = Date.now()) {
+  if (!entry?.value || now - Number(entry.checkedAt || 0) > PVE_GUEST_FS_STALE_MS) return null;
+  return { ...entry.value, stale: true };
+}
+
+async function queryGuestFsUsage(cfg, nodeName, vmid, timeoutMs = PVE_GUEST_FS_TIMEOUT_MS) {
+  const key = guestFsCacheKey(cfg, vmid);
+  const now = Date.now();
+  const cached = freshGuestFsCache(key, now);
+  if (cached.hit) return cached.value;
+  if (pveGuestFsInflight.has(key)) return pveGuestFsInflight.get(key);
+  const pending = (async () => {
+    try {
+      const result = await pveFetch(
+        cfg,
+        `/api2/json/nodes/${encodeURIComponent(nodeName)}/qemu/${encodeURIComponent(vmid)}/agent/get-fsinfo`,
+        { timeoutMs },
+      );
+      const normalized = normalizeGuestFsInfo(result);
+      const checkedAt = Date.now();
+      const value = normalized ? { ...normalized, checkedAt, stale: false } : null;
+      pveGuestFsCache.set(key, {
+        value,
+        checkedAt,
+        expiresAt: checkedAt + (value ? PVE_GUEST_FS_CACHE_MS : PVE_GUEST_FS_FAILURE_CACHE_MS),
+      });
+      return value;
+    } catch {
+      const failedAt = Date.now();
+      const previous = cached.entry;
+      const value = staleGuestFsCacheValue(previous, failedAt);
+      const canUseStale = !!value;
+      pveGuestFsCache.set(key, {
+        value,
+        checkedAt: canUseStale ? previous.checkedAt : failedAt,
+        expiresAt: failedAt + PVE_GUEST_FS_FAILURE_CACHE_MS,
+      });
+      return value;
+    } finally {
+      pveGuestFsInflight.delete(key);
+    }
+  })();
+  pveGuestFsInflight.set(key, pending);
+  return pending;
+}
+
+async function collectGuestFsUsage(cfg, resources) {
+  const runningGuests = (Array.isArray(resources) ? resources : [])
+    .filter(row => row && row.type === 'qemu' && !row.template && row.status === 'running'
+      && row.node && row.vmid !== undefined && row.vmid !== null);
+  if (!runningGuests.length) return new Map();
+  const configuredConcurrency = Number(cfg.guestAgentConcurrency ?? cfg.qgaConcurrency ?? 6);
+  const concurrency = Math.max(1, Math.min(8, Number.isFinite(configuredConcurrency) ? configuredConcurrency : 6));
+  const configuredBudget = Number(cfg.guestAgentCollectionBudgetMs ?? cfg.qgaCollectionBudgetMs ?? PVE_GUEST_FS_BATCH_BUDGET_MS);
+  const budgetMs = Math.max(3000, Math.min(30000, Number.isFinite(configuredBudget) ? configuredBudget : PVE_GUEST_FS_BATCH_BUDGET_MS));
+  const deadline = Date.now() + budgetMs;
+  const rows = await mapLimit(runningGuests, concurrency, async guest => {
+    const id = String(guest.vmid);
+    const cached = freshGuestFsCache(guestFsCacheKey(cfg, id));
+    if (cached.hit) return [id, cached.value];
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) return [id, staleGuestFsCacheValue(cached.entry)];
+    const timeoutMs = Math.max(500, Math.min(PVE_GUEST_FS_TIMEOUT_MS, remaining));
+    const usage = await queryGuestFsUsage(cfg, guest.node, id, timeoutMs);
+    return [id, usage];
+  });
+  if (pveGuestFsCache.size > 10000) {
+    const now = Date.now();
+    for (const [key, entry] of pveGuestFsCache) {
+      if (entry.expiresAt < now - PVE_GUEST_FS_STALE_MS) pveGuestFsCache.delete(key);
+    }
+  }
+  return new Map(rows);
 }
 
 function expandPath(p) {
@@ -626,8 +797,9 @@ async function nodeData(cfg, node, excluded, resource = null) {
         mem: Number(v.mem) || 0,
         maxmem: Number(v.maxmem) || 0,
         ram: v.mem && v.maxmem ? Math.round((v.mem / v.maxmem) * 100) : 0,
-        disk: Number(v.disk) || 0,
-        maxdisk: Number(v.maxdisk) || 0,
+        disk: optionalNonNegativeNumber(v.disk),
+        maxdisk: optionalNonNegativeNumber(v.maxdisk),
+        guestDisk: null,
         uptime: Number(v.uptime) || 0,
         netin: Number(v.netin) || 0,
         netout: Number(v.netout) || 0,
@@ -674,11 +846,18 @@ async function getProxmoxApiData(cfg = {}) {
   ]);
   const cluster = normalizeClusterStatus(clusterStatusRaw, { name: cfg.name || cfg.label, nodesRaw });
   const nodeConfig = { ...cfg, actualClusterName: cluster.name };
+  const guestFsUsagePromise = collectGuestFsUsage(nodeConfig, resourcesRaw).catch(() => new Map());
   const resourcesByNode = new Map((resourcesRaw || [])
     .filter(r => r.type === 'node' && (r.node || r.id))
     .map(r => [String(r.node || r.id).replace(/^node\//, ''), r]));
   const nodes = (await mapLimit((nodesRaw || []), Number(cfg.concurrency || cfg.collectorConcurrency || 3), n => nodeData(nodeConfig, n, excluded, resourcesByNode.get(n.node || n.name))))
     .sort((a, b) => String(a.node.name).localeCompare(String(b.node.name)));
+  const guestFsUsage = await guestFsUsagePromise;
+  for (const nodeRow of nodes) {
+    for (const guest of nodeRow.vms || []) {
+      if (guest.type === 'vm') guest.guestDisk = guestFsUsage.get(String(guest.id)) || null;
+    }
+  }
   const onlineNodes = nodes.filter(n => n.node.online);
   const clusterSummary = {
     nodesOnline: onlineNodes.length,
@@ -759,4 +938,11 @@ async function getAllProxmoxApiData(config = {}) {
   };
 }
 
-module.exports = { getProxmoxApiData, getAllProxmoxApiData, configuredInstances, normalizeClusterStatus, normalizeAptUpdates };
+module.exports = {
+  getProxmoxApiData,
+  getAllProxmoxApiData,
+  configuredInstances,
+  normalizeClusterStatus,
+  normalizeAptUpdates,
+  normalizeGuestFsInfo,
+};

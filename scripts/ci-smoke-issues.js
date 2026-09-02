@@ -291,6 +291,81 @@ function testProxmoxInstances() {
   assert.strictEqual(normalizeAptUpdates(null), null, 'a failed Proxmox update query must remain unknown');
 }
 
+function testProxmoxGuestFsInfo() {
+  const { normalizeGuestFsInfo } = require('../src/proxmox');
+  const gib = 1024 ** 3;
+  const diskUsage = value => value && {
+    usedBytes: value.usedBytes,
+    totalBytes: value.totalBytes,
+    mountpoint: value.mountpoint,
+  };
+
+  const linuxRoot = normalizeGuestFsInfo({ result: [
+    { name: 'sda2', mountpoint: '/', type: 'ext4', 'used-bytes': 48 * gib, 'total-bytes': 120 * gib },
+    { name: 'sda1', mountpoint: '/boot', type: 'ext4', 'used-bytes': 512 * 1024 ** 2, 'total-bytes': gib },
+  ] });
+  assert.deepStrictEqual(diskUsage(linuxRoot), {
+    usedBytes: 48 * gib,
+    totalBytes: 120 * gib,
+    mountpoint: '/',
+  }, 'a normal Linux guest must report its large root filesystem');
+
+  const homeAssistantData = normalizeGuestFsInfo({ result: [
+    { name: 'rootfs', mountpoint: '/', type: 'squashfs', 'used-bytes': 24 * 1024 ** 2, 'total-bytes': 32 * 1024 ** 2, readonly: true },
+    { name: 'data', mountpoint: '/mnt/data', type: 'ext4', 'used-bytes': 12 * gib, 'total-bytes': 64 * gib },
+  ] });
+  assert.deepStrictEqual(diskUsage(homeAssistantData), {
+    usedBytes: 12 * gib,
+    totalBytes: 64 * gib,
+    mountpoint: '/mnt/data',
+  }, 'Home Assistant OS must prefer its persistent data filesystem over the small read-only root');
+
+  const homeAssistantErofs = normalizeGuestFsInfo({ result: [
+    { name: 'sda3', mountpoint: '/', type: 'erofs', 'used-bytes': 256 * 1024 ** 2, 'total-bytes': 256 * 1024 ** 2 },
+    { name: 'sda8', mountpoint: '/mnt/data', type: 'ext4', 'used-bytes': 8 * gib, 'total-bytes': 30 * gib, 'total-bytes-privileged': 31 * gib },
+  ] });
+  assert.deepStrictEqual(diskUsage(homeAssistantErofs), {
+    usedBytes: 8 * gib,
+    totalBytes: 31 * gib,
+    mountpoint: '/mnt/data',
+  }, 'HAOS erofs roots must be ignored and privileged filesystem capacity must take precedence');
+
+  const windowsRoot = normalizeGuestFsInfo({ result: [
+    { name: 'C:', mountpoint: 'C:\\', type: 'ntfs', 'used-bytes': 40 * gib, 'total-bytes': 100 * gib },
+    { name: 'D:', mountpoint: 'D:\\', type: 'ntfs', 'used-bytes': 20 * gib, 'total-bytes': 400 * gib },
+  ] });
+  assert.deepStrictEqual(diskUsage(windowsRoot), {
+    usedBytes: 40 * gib,
+    totalBytes: 100 * gib,
+    mountpoint: 'C:\\',
+  }, 'Windows guests must prefer their C: system volume over a larger data volume');
+
+  const withoutZramTmp = normalizeGuestFsInfo({ result: [
+    { name: 'zram0', mountpoint: '/tmp', type: 'tmpfs', 'used-bytes': gib, 'total-bytes': 512 * gib, disk: [{ dev: '/dev/zram0' }] },
+    { name: 'vda1', mountpoint: '/', type: 'ext4', 'used-bytes': 30 * gib, 'total-bytes': 100 * gib, disk: [{ dev: '/dev/vda1' }] },
+  ] });
+  assert.deepStrictEqual(diskUsage(withoutZramTmp), {
+    usedBytes: 30 * gib,
+    totalBytes: 100 * gib,
+    mountpoint: '/',
+  }, 'zram-backed temporary filesystems must not replace persistent guest disk usage');
+
+  assert.strictEqual(normalizeGuestFsInfo({ result: [
+    { name: '/dev/loop0', mountpoint: '/snap/app', type: 'ext4', 'used-bytes': gib, 'total-bytes': 10 * gib },
+  ] }), null, 'loop-backed mounts must not be reported as the guest disk');
+
+  for (const malformed of [
+    null,
+    {},
+    { result: [] },
+    { result: [{ mountpoint: '/', 'used-bytes': -1, 'total-bytes': 10 }] },
+    { result: [{ mountpoint: '/', 'used-bytes': 1, 'total-bytes': 0 }] },
+    { result: [{ mountpoint: '/', 'used-bytes': 'invalid', 'total-bytes': 10 }] },
+  ]) {
+    assert.strictEqual(normalizeGuestFsInfo(malformed), null, 'empty or malformed QGA filesystem results must remain unavailable');
+  }
+}
+
 function testProxmoxClusterStatus() {
   const { normalizeClusterStatus } = require('../src/proxmox');
   const cluster = normalizeClusterStatus([
@@ -997,14 +1072,60 @@ function testStaticRegressions() {
   const orderContext = {};
   vm.runInNewContext(`const ALL_IDS = ${JSON.stringify(['proxmox','vmware','kubernetes','linux','windows','synology','mikrotik','unifi','snmp','healthchecks','uptimekuma','checks','prometheus','docker','dockhand','firewall','truenas','qnap','ugreen','pbs','cloudflare','cicd','veeam','portainer','database'])};\n${dashboard.slice(orderHelperStart, orderHelperEnd)}\nglobalThis.mergeUiOrder = mergeUiOrder;`, orderContext);
   assert.strictEqual(JSON.stringify(orderContext.mergeUiOrder(['proxmox','kubernetes','linux','docker'], ['docker','proxmox','linux'])), JSON.stringify(['docker','kubernetes','proxmox','linux']), 'temporarily absent sidebar platforms must keep their saved slot during a visible reorder');
+  const activeOrderStart = dashboard.indexOf('function orderIds(ids, order)');
+  const activeOrderEnd = dashboard.indexOf('let activeSidebarPanelOrder', activeOrderStart);
+  const activeOrderContext = {};
+  vm.runInNewContext(`const ALL_IDS = ${JSON.stringify(['proxmox','vmware','kubernetes','linux','windows','synology','mikrotik','unifi','snmp','healthchecks','uptimekuma','checks','prometheus','docker','dockhand','firewall','truenas','qnap','ugreen','pbs','cloudflare','cicd','veeam','portainer','database'])};\n${dashboard.slice(orderHelperStart, orderHelperEnd)}\n${dashboard.slice(activeOrderStart, activeOrderEnd)}\nglobalThis.reconcileActiveUiOrder = reconcileActiveUiOrder;`, activeOrderContext);
+  const originalActiveOrder = ['kubernetes','linux','docker','checks'];
+  const afterRemoval = activeOrderContext.reconcileActiveUiOrder(originalActiveOrder, ['kubernetes','linux','docker'], ['kubernetes','linux','docker']);
+  assert.strictEqual(JSON.stringify(afterRemoval), JSON.stringify(['kubernetes','linux','docker']), 'removing a platform must leave every surviving dashboard card in place');
+  const afterReAdd = activeOrderContext.reconcileActiveUiOrder(afterRemoval, ['proxmox','kubernetes','linux','docker'], ['proxmox','kubernetes','linux','docker']);
+  assert.strictEqual(JSON.stringify(afterReAdd), JSON.stringify(['kubernetes','linux','docker','proxmox']), 'a newly active or re-added platform must be appended after the existing dashboard cards even when its canonical id comes first');
+  const coldAdd = activeOrderContext.reconcileActiveUiOrder(['linux','docker'], ['proxmox','linux','docker'], ['proxmox','linux','docker']);
+  assert.strictEqual(JSON.stringify(coldAdd), JSON.stringify(['linux','docker','proxmox']), 'the configured-id startup baseline must put a platform added before the first render at the bottom');
+  const masonryAppendStart = dashboard.indexOf('function appendOverviewIdsAtBottom');
+  const masonryAppendEnd = dashboard.indexOf('function normalizeOverviewColumns', masonryAppendStart);
+  const masonryContext = {};
+  vm.runInNewContext(`${dashboard.slice(masonryAppendStart, masonryAppendEnd)}\nglobalThis.appendOverviewIdsAtBottom = appendOverviewIdsAtBottom;`, masonryContext);
+  const existingColumns = [['kubernetes','windows'], ['linux']];
+  const cards = [
+    { dataset:{ id:'kubernetes' }, offsetHeight:210 },
+    { dataset:{ id:'windows' }, offsetHeight:170 },
+    { dataset:{ id:'linux' }, offsetHeight:240 },
+    { dataset:{ id:'proxmox' }, offsetHeight:300 },
+  ];
+  const withNewPlatform = masonryContext.appendOverviewIdsAtBottom(existingColumns.map(col => [...col]), ['proxmox'], cards);
+  assert.strictEqual(JSON.stringify(withNewPlatform), JSON.stringify([['kubernetes','windows','proxmox'],['linux']]), 'a new dashboard card must be placed below the lowest existing column without moving survivor cards');
+  const layoutHelpersStart = dashboard.indexOf('function removeIdsFromOverviewColumns');
+  const layoutHelpersEnd = dashboard.indexOf('function rememberOverviewLayout', layoutHelpersStart);
+  const layoutContext = {};
+  vm.runInNewContext(`const ALL_IDS = ${JSON.stringify(['proxmox','vmware','kubernetes','linux','windows','synology','mikrotik','unifi','snmp','healthchecks','uptimekuma','checks','prometheus','docker','dockhand','firewall','truenas','qnap','ugreen','pbs','cloudflare','cicd','veeam','portainer','database'])};\n${dashboard.slice(orderHelperStart, orderHelperEnd)}\nlet overviewResponsiveLayouts = { 'side:2':[['linux','proxmox'],['docker']], 'wide:3':[['proxmox'],['linux'],['docker']] };\nlet overviewLayouts = { side:[['linux'],['proxmox','docker']], wide:[['proxmox'],['linux'],['docker']] };\nlet overviewCanonicalOrders = { side:['linux','proxmox','docker'], wide:['proxmox','linux','docker'] };\nconst localStorage = { setItem(){} };\n${dashboard.slice(layoutHelpersStart, layoutHelpersEnd)}\nforgetOverviewLayoutSlots(['proxmox']);\nglobalThis.result = { overviewResponsiveLayouts, overviewLayouts, overviewCanonicalOrders };`, layoutContext);
+  assert.ok(!JSON.stringify(layoutContext.result).includes('proxmox'), 're-adding a platform must clear all of its stale side, wide, responsive and canonical layout slots');
+  const normalizeStart = dashboard.indexOf('function normalizeOverviewColumns');
+  const normalizeEnd = dashboard.indexOf('function layoutOverviewMasonry', normalizeStart);
+  const normalizeContext = {};
+  vm.runInNewContext(`${dashboard.slice(masonryAppendStart, masonryAppendEnd)}\nfunction stableOverviewIds(ids){ return ids; }\nfunction getOverviewLayout(){ return [['linux','docker'],[]]; }\n${dashboard.slice(normalizeStart, normalizeEnd)}\nglobalThis.result = normalizeOverviewColumns(['linux','docker'], 2, [{dataset:{id:'linux'},offsetHeight:200},{dataset:{id:'docker'},offsetHeight:180}]);`, normalizeContext);
+  assert.strictEqual(JSON.stringify(normalizeContext.result), JSON.stringify([['linux','docker'],[]]), 'platform membership changes must preserve a temporarily sparse survivor layout instead of rebalancing it');
+  assert.ok(dashboard.includes('function forgetOverviewLayoutSlots(ids)') && dashboard.includes('Object.keys(overviewResponsiveLayouts).forEach') && dashboard.includes('Object.keys(overviewLayouts || {}).forEach') && dashboard.includes('forgetOverviewLayoutSlots(added)') && dashboard.includes('syncOverviewCanonicalOrder(ids)'), 'stale side, wide and responsive masonry slots must not pull a re-added platform back into the existing layout');
+  assert.ok(!dashboard.includes('currentDegenerate') && !dashboard.includes('normalizeOverviewColumns.repaired'), 'responsive observers must accept sparse survivor columns without repeatedly rebuilding or rebalancing them');
   assert.ok(i18n.includes("'All hosts':'Tüm hostlar'") && !i18n.includes("'Move up':'Yukarı taşı'") && !i18n.includes("'Move down':'Aşağı taşı'"), 'host filters must stay translated and removed ordering buttons must not leave dead labels');
   const proxmoxOverviewSource = dashboard.slice(dashboard.indexOf('function buildProxmox'), dashboard.indexOf('function buildLinux'));
+  const proxmoxGuestDiskSource = dashboard.slice(dashboard.indexOf('function pveGuestDiskPresentation'), dashboard.indexOf('function buildProxmox'));
   assert.ok(!proxmoxOverviewSource.includes('<div class="sb-csum-lbl">Ceph</div>'), 'Proxmox overview must not repeat the Ceph header badge in its summary metrics');
   assert.ok(proxmoxOverviewSource.includes('cephBad') && proxmoxOverviewSource.includes('Ceph ${ceph.health'), 'Proxmox overview must retain its Ceph header badge');
   assert.ok(proxmoxOverviewSource.includes('<div class="pve-head-main proxmox-head-main">') && dashboard.includes('.proxmox-head-main{flex-wrap:nowrap}') && dashboard.includes('.proxmox-head-main .pve-head-stat.has-spark{min-width:0}'), 'wide Proxmox node summaries must keep all metrics on one row');
   assert.ok(!proxmoxOverviewSource.includes("pveHeadStat('Updates'") && !proxmoxOverviewSource.includes("pveHeadStat('Reboot'"), 'Proxmox update attention must reuse the far-right badge instead of adding a header metric that can wrap');
   assert.ok(proxmoxOverviewSource.includes("<div class=\"pve-head-sub\">${node.online ? 'online' : 'offline'}</div>"), 'Proxmox node subtitle must show only its online state');
   assert.ok(proxmoxOverviewSource.includes('sbMeta: `${online}/${total} hosts · ${vmRunning}/${allVms.length} VMs`'), 'Proxmox sidebar metadata must show host and VM availability like VMware');
+  assert.ok(proxmoxOverviewSource.includes("miniSparkline(v.history, 'cpu', cpu") && proxmoxOverviewSource.includes("miniSparkline(v.history, 'mem', ram") && proxmoxOverviewSource.includes('{ maxPoints: 80 }'), 'Proxmox VM and LXC rows must render bounded CPU and RAM history sparklines');
+  assert.ok(proxmoxGuestDiskSource.includes("const guestDisk = guest.guestDisk") && proxmoxGuestDiskSource.includes("guest.type === 'vm' && guestUsed != null") && proxmoxGuestDiskSource.includes("guest.type === 'lxc' && guest.running") && proxmoxGuestDiskSource.includes("return { label: 'Provisioned'"), 'Proxmox rows must prefer QGA guest usage for QEMU, retain LXC usage, and label unavailable usage as provisioned capacity');
+  assert.ok(proxmoxOverviewSource.indexOf('LXC Containers') < proxmoxOverviewSource.indexOf('SMART Health') && proxmoxOverviewSource.indexOf('SMART Health') < proxmoxOverviewSource.indexOf('Storages'), 'Proxmox SMART health must appear below LXC containers and above storages');
+  assert.ok(server.includes('const PROXMOX_GUEST_HISTORY_MAX = 80') && server.includes('const PROXMOX_GUEST_HISTORY_MS = 20 * 60 * 1000') && server.includes("loadHistoryMap('proxmox-guest-history'") && server.includes("scheduleSaveHistoryMap('proxmox-guest-history'") && server.includes('mergeProxmoxGuestHistory(preserveProxmoxOnTransient(next))'), 'Proxmox guest history must be bounded, persisted, and shared by API and agent collection paths');
+  assert.ok(server.includes("const type = guest.type === 'lxc' ? 'lxc' : 'vm'") && server.includes('node.clusterUrl || node.clusterKey || node.clusterName') && !server.includes('return `${source}|${host}|${type}|'), 'Proxmox guest history identity must survive host migration while separating VM and LXC ids');
+  assert.ok(server.includes('node.vms.map(({ history, ...guest }) => guest)'), 'runtime snapshots must not duplicate separately persisted Proxmox guest histories');
+  assert.ok(server.includes('_historyMaxPoints: PROXMOX_GUEST_HISTORY_MAX') && dashboard.includes('next._historyMaxPoints || prev._historyMaxPoints') && dashboard.includes('target._historyMaxPoints || payload._historyMaxPoints'), 'browser history merges must preserve the 80-point Proxmox guest cap');
+  assert.ok(server.includes('const PROXMOX_GUEST_DISK_STALE_MS = 30 * 60 * 1000') && server.includes('previousGuests.get(key)?.guestDisk') && server.includes('guestDisk: { ...previousDisk, stale: true }'), 'a transient QGA miss must retain the recent guest disk value across refreshes and restarts');
+  assert.ok(server.includes('writeRuntimeSnapshotNow(cache.data || runtimeSnapshotPending)'), 'shutdown must persist the newest live runtime data instead of an older queued snapshot');
   const proxmoxHostHeader = proxmoxOverviewSource.slice(proxmoxOverviewSource.indexOf('<div class="node-hdr pve-node-hdr" onclick="toggleNode'), proxmoxOverviewSource.indexOf('<div class="node-body', proxmoxOverviewSource.indexOf('<div class="node-hdr pve-node-hdr" onclick="toggleNode')));
   assert.ok(proxmoxOverviewSource.includes('const nodeStatus = !node.online') && proxmoxOverviewSource.includes("label: 'reboot required'") && proxmoxOverviewSource.includes('label: `${nodeUpdateCount} updates`') && proxmoxHostHeader.includes('${bdg(nodeStatus.cls, nodeStatus.label)}') && proxmoxOverviewSource.includes('nodeUpdateAttention ? `<div class="pve-update-notice" data-morph-key="pve-updates:${escAttr(nodeKey)}"') && proxmoxOverviewSource.includes("rebootCount ? `${rebootCount} reboot required` : updateCount ? `${updateCount} updates`") && proxmoxOverviewSource.includes("detailSummary: relabelDetailSummary(sbSummaryHtml, 'Nodes', 'Hosts')") && !proxmoxOverviewSource.includes("detailBadge: ''") && proxmoxOverviewSource.includes("detailMeta: ''"), 'Proxmox host and top summaries must preserve their far-right health badge and prioritize reboot or update attention without wrapping');
   assert.ok(server.includes('const updateCount = activeNodes.reduce') && server.includes('badge: quorumLost.length > 0') && settings.includes('Proxmox node reports pending operating system updates'), 'embedded summaries and alert help must include Proxmox update attention');
@@ -1534,6 +1655,7 @@ function testStaticRegressions() {
   assert.ok(server.includes("backgroundRefresh({ force: true, only: connectingPlatforms })"), 'settings saves must refresh only platforms whose connection config changed');
   assert.ok(server.includes("if (connectingPlatforms.has('proxmox') || !cache.data.proxmox)"), 'unrelated settings saves must preserve current Proxmox runtime data');
   assert.ok(server.includes('ensureAgentDerivedCacheCurrent();') && server.includes("broadcastStatusEvent('updated')") && /function refreshAgentCacheAfterRemoval\(\) \{\r?\n\s+refreshAgentDerivedCache\(\);/.test(server), 'agent additions, reports and removals must invalidate and broadcast the derived sidebar state');
+  assert.ok(server.includes('function acknowledgePendingAgentRevision()') && server.includes('const pendingInstall = agents.listPendingInstalls().some') && server.includes('if (pendingInstall) acknowledgePendingAgentRevision();'), 'pending Settings rows must advance the agent revision without rebuilding configured dashboard data');
   assert.ok((settings.match(/class="btn-sm platform-add"/g) || []).length >= 5, 'non-standard platform add buttons must participate in the lock');
 }
 
@@ -1571,6 +1693,68 @@ function testAgentRetirement() {
     assert.throws(() => agents.handleReport(report), /uninstall is in progress/);
     const saved = yaml.load(fs.readFileSync(process.env.OMNISIGHT_AGENTS_PATH, 'utf8')) || {};
     assert.strictEqual(saved['retire-test'], undefined);
+  `;
+  try {
+    execFileSync(process.execPath, ['-e', script], {
+      cwd: root,
+      env: { ...process.env, OMNISIGHT_AGENTS_PATH: agentsPath },
+      stdio: 'pipe',
+    });
+  } finally {
+    try { fs.unlinkSync(agentsPath); } catch {}
+    try { fs.rmdirSync(tempDir); } catch {}
+  }
+}
+
+function testPendingAgentIsolation() {
+  const root = path.join(__dirname, '..');
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'omnisight-agent-pending-'));
+  const agentsPath = path.join(tempDir, 'agents.yaml');
+  const script = `
+    const assert = require('assert');
+    const agents = require(${JSON.stringify(path.join(__dirname, '..', 'src', 'agents.js'))});
+    const kinds = ['linux', 'windows', 'proxmox', 'docker'];
+    const cancelled = agents.addPendingInstall('linux');
+    assert.strictEqual(agents.removeAgent(cancelled.id), true, 'a pending Settings row must remain cancellable through the shared remove endpoint');
+    assert.strictEqual(agents.listPendingInstalls().length, 0);
+    assert.strictEqual(agents.hasLinux(), false, 'cancelling an uninstalled agent must not change platform presence');
+    const pending = kinds.map(kind => agents.addPendingInstall(kind));
+
+    assert.deepStrictEqual(agents.listPendingInstalls().map(row => row.kind).sort(), [...kinds].sort(), 'pending installs must remain visible to the Settings agent list');
+    assert.strictEqual(agents.hasLinux(), false, 'a pending Linux install must not configure the Linux dashboard');
+    assert.strictEqual(agents.hasWindows(), false, 'a pending Windows install must not configure the Windows dashboard');
+    assert.strictEqual(agents.hasPve(), false, 'a pending Proxmox install must not configure the Proxmox dashboard');
+    assert.strictEqual(agents.hasDocker(), false, 'a pending Docker install must not configure the Docker dashboard');
+    assert.deepStrictEqual(agents.getAllAgentData(), [], 'pending Linux installs must stay out of platform collector rows');
+    assert.deepStrictEqual(agents.getWindowsData(), [], 'pending Windows installs must stay out of platform collector rows');
+    assert.deepStrictEqual(agents.getDockerData(), [], 'pending Docker installs must stay out of platform collector rows');
+    assert.deepStrictEqual(agents.getProxmoxData(), { clusterSummary: null, nodes: [], ceph: null, clusters: [] }, 'pending Proxmox installs must stay out of platform collector rows');
+
+    agents.handleReport({ id: 'linux-real', hostname: 'linux-real', platform: 'linux', role: 'linux', interval: 15 });
+    assert.strictEqual(agents.hasLinux(), true, 'the first real Linux report must configure the platform');
+    assert.strictEqual(agents.getAllAgentData().length, 1);
+    assert.ok(!agents.listPendingInstalls().some(row => row.kind === 'linux'), 'a real Linux report must clear its pending Settings row');
+
+    agents.handleReport({ id: 'windows-real', hostname: 'windows-real', platform: 'windows', role: 'windows', interval: 15 });
+    assert.strictEqual(agents.hasWindows(), true, 'the first real Windows report must configure the platform');
+    assert.strictEqual(agents.getWindowsData().length, 1);
+    assert.ok(!agents.listPendingInstalls().some(row => row.kind === 'windows'), 'a real Windows report must clear its pending Settings row');
+
+    agents.handleReport({ id: 'docker-real', hostname: 'docker-real', platform: 'linux', role: 'docker', interval: 15, docker: { containers: [] } });
+    assert.strictEqual(agents.hasDocker(), true, 'the first real Docker report must configure the platform');
+    assert.strictEqual(agents.getDockerData().length, 1);
+    assert.ok(!agents.listPendingInstalls().some(row => row.kind === 'docker'), 'a real Docker report must clear its pending Settings row');
+
+    agents.handleReport({
+      id: 'proxmox-real', hostname: 'proxmox-real', platform: 'proxmox', role: 'proxmox', interval: 15,
+      pve: { node: 'proxmox-real', resources: [{ type: 'node', node: 'proxmox-real', status: 'online', maxcpu: 4, maxmem: 8589934592, mem: 1073741824 }] },
+    });
+    assert.strictEqual(agents.hasPve(), true, 'the first real Proxmox report must configure the platform');
+    assert.strictEqual(agents.getProxmoxData().nodes.length, 1);
+    assert.ok(!agents.listPendingInstalls().some(row => row.kind === 'proxmox'), 'a real Proxmox report must clear its pending Settings row');
+    assert.strictEqual(agents.listPendingInstalls().length, 0);
+    assert.ok(pending.every(row => row.id), 'pending Settings rows must retain removable ids');
+    agents.flushSaves();
   `;
   try {
     execFileSync(process.execPath, ['-e', script], {
@@ -1650,6 +1834,7 @@ async function run() {
   await testDockhandEnvironments();
   testSynologyCpuCounters();
   testProxmoxInstances();
+  testProxmoxGuestFsInfo();
   testProxmoxClusterStatus();
   testVmwareInventoryNormalization();
   await testVmwareSoapFlow();
@@ -1658,6 +1843,7 @@ async function run() {
   testFullBackupEmptyFileCompatibility();
   testPlatformAvailability();
   testUiPreferenceScoping();
+  testPendingAgentIsolation();
   testAgentRetirement();
   testRequestDiagnostics();
   testTopologyProxmoxGuestRows();
