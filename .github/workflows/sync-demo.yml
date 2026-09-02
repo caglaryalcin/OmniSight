@@ -28,6 +28,9 @@ jobs:
             exit 1
           fi
           curl --fail-with-body --silent --show-error \
+            --retry 4 \
+            --retry-all-errors \
+            --retry-delay 2 \
             --request POST \
             --header "Accept: application/vnd.github+json" \
             --header "Authorization: Bearer $DEMO_SYNC_TOKEN" \
