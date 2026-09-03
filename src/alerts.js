@@ -135,6 +135,111 @@ function buildServerUpdateDetections(data = {}) {
   return detections;
 }
 
+const STICKY_ALERT_KEYS = new Set([
+  'cloudflare-domains-expired',
+  'cloudflare-domains-expiring',
+]);
+
+function isStickyAlertKey(key) {
+  return STICKY_ALERT_KEYS.has(String(key || '').trim());
+}
+
+function alertDeliverySucceeded(entry = {}) {
+  if (entry.status === 'sent') return true;
+  return Array.isArray(entry.channels) && entry.channels.some(result => result && result.ok && result.channel !== 'webhook');
+}
+
+function rebuildStickyAlertState(history = []) {
+  const active = new Map();
+  for (const entry of Array.isArray(history) ? history : []) {
+    const key = String(entry?.key || '').trim();
+    if (!isStickyAlertKey(key)) continue;
+    const type = String(entry?.type || '').trim().toLowerCase();
+    if (type === 'recovery') {
+      active.delete(key);
+      continue;
+    }
+    if (type === 'problem' && alertDeliverySucceeded(entry)) {
+      active.set(key, String(entry.severity || 'critical'));
+    }
+  }
+  return active;
+}
+
+function resolveStickyAlertState(document, history = []) {
+  const stored = document && document.version === 1 && document.active
+    && typeof document.active === 'object' && !Array.isArray(document.active);
+  if (!stored) return rebuildStickyAlertState(history);
+  const active = new Map();
+  for (const [key, severity] of Object.entries(document.active)) {
+    if (!isStickyAlertKey(key)) continue;
+    const normalized = String(severity || '').trim();
+    if (normalized) active.set(key, normalized);
+  }
+  return active;
+}
+
+function stickyAlertStateDocument(state) {
+  const active = {};
+  if (state instanceof Map) {
+    for (const [key, severity] of state) {
+      if (!isStickyAlertKey(key)) continue;
+      const normalized = String(severity || '').trim();
+      if (normalized) active[key] = normalized;
+    }
+  }
+  return { version: 1, active };
+}
+
+function stickyAlertDispatchIsCurrent(key, episodeRevision, currentRevision) {
+  if (!isStickyAlertKey(key)) return true;
+  const dispatched = Number(episodeRevision);
+  const current = Number(currentRevision);
+  return Number.isFinite(dispatched) && dispatched > 0 && dispatched === current;
+}
+
+function alertDeliveryCooldownEnabled(key) {
+  return !isStickyAlertKey(key);
+}
+
+function notificationKeyCandidates(key) {
+  const raw = String(key || '').trim();
+  if (!raw) return [];
+  const candidates = [];
+  const add = value => {
+    if (value && !candidates.includes(value)) candidates.push(value);
+  };
+  add(raw);
+  let current = raw;
+  while (current.includes(':')) {
+    current = current.slice(0, current.lastIndexOf(':'));
+    add(current);
+  }
+  if (raw.startsWith('cloudflare-')) add('cloudflare');
+  return candidates;
+}
+
+function buildCloudflareDomainDetections(cloudflare = {}) {
+  if (cloudflare.registrarDomainsAuthoritative !== true) return [];
+  const summary = cloudflare.summary || {};
+  const expired = Math.max(0, Math.floor(Number(summary.domainsExpired) || 0));
+  const expiring = Math.max(0, Math.floor(Number(summary.domainsExpiring) || 0));
+  return [
+    {
+      key: 'cloudflare-domains-expired',
+      ok: expired === 0,
+      label: 'Cloudflare domains',
+      detail: expired === 0 ? 'no domains expired' : `${expired} domain(s) expired`,
+    },
+    {
+      key: 'cloudflare-domains-expiring',
+      ok: expiring === 0,
+      label: 'Cloudflare domains',
+      detail: expiring === 0 ? 'no domains expiring soon' : `${expiring} domain(s) expiring soon`,
+    },
+  ];
+}
+
 function shouldDispatchProblem(activeSeverity, nextSeverity) {
   return !activeSeverity || activeSeverity !== nextSeverity;
 }
@@ -173,6 +278,15 @@ module.exports = {
   dispatchAlert,
   serverUpdateNotificationsEnabled,
   buildServerUpdateDetections,
+  isStickyAlertKey,
+  alertDeliverySucceeded,
+  rebuildStickyAlertState,
+  resolveStickyAlertState,
+  stickyAlertStateDocument,
+  stickyAlertDispatchIsCurrent,
+  alertDeliveryCooldownEnabled,
+  notificationKeyCandidates,
+  buildCloudflareDomainDetections,
   shouldDispatchProblem,
   clearAlertCooldownsForType,
 };

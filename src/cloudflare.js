@@ -266,7 +266,7 @@ async function listRegistrarDomains(config = {}) {
 async function getCloudflareData(config = {}) {
   config = config || {};
   if (!tokenValue(config)) {
-    return { online: false, error: 'No Cloudflare API token configured', summary: summarize(), zones: [], tunnels: [], domains: [] };
+    return { online: false, error: 'No Cloudflare API token configured', registrarDomainsAuthoritative: false, summary: summarize(), zones: [], tunnels: [], domains: [] };
   }
 
   const errors = [];
@@ -298,6 +298,7 @@ async function getCloudflareData(config = {}) {
   }
 
   let domains = [];
+  let registrarDomainsAuthoritative = false;
   if (config.accountId && boolDefault(config.includeRegistrarDomains, true)) {
     try {
       const rows = await listRegistrarDomains(config);
@@ -305,6 +306,7 @@ async function getCloudflareData(config = {}) {
       domains = rows
         .map(row => normalizeRegistrarDomain(row, config))
         .filter(domain => !filters.length || zoneNameSet.has(String(domain.name || '').toLowerCase()) || zoneAllowed({ id: domain.id, name: domain.name }, filters));
+      registrarDomainsAuthoritative = true;
     } catch (err) {
       errors.push(`Registrar domains: ${err.message}`);
     }
@@ -317,6 +319,7 @@ async function getCloudflareData(config = {}) {
     _empty: !online && errors.length === 0,
     error: online ? errors[0] || '' : errors[0] || 'No Cloudflare resources found',
     partial: errors.length > 0,
+    registrarDomainsAuthoritative,
     errors: errors.slice(0, 8),
     summary,
     zones,

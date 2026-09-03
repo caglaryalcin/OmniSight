@@ -44,6 +44,14 @@ const {
   dispatchAlert,
   serverUpdateNotificationsEnabled,
   buildServerUpdateDetections,
+  isStickyAlertKey,
+  alertDeliverySucceeded,
+  resolveStickyAlertState,
+  stickyAlertStateDocument,
+  stickyAlertDispatchIsCurrent,
+  alertDeliveryCooldownEnabled,
+  notificationKeyCandidates,
+  buildCloudflareDomainDetections,
   shouldDispatchProblem,
   clearAlertCooldownsForType,
 } = require('./src/alerts');
@@ -179,6 +187,7 @@ function writePrivateYaml(file, obj) {
 
 const NOTIFY_PATH = path.join(__dirname, 'data', 'notifications.yaml');
 const ALERT_HISTORY_PATH = path.join(__dirname, 'data', 'alerts.yaml');
+const ALERT_EPISODE_STATE_PATH = path.join(__dirname, 'data', 'alert-episodes.yaml');
 const ALERT_MUTES_PATH = path.join(__dirname, 'data', 'alert-mutes.yaml');
 const AUDIT_PATH = path.join(__dirname, 'data', 'audit.yaml');
 function loadNotify() {
@@ -220,6 +229,32 @@ function saveAlertHistory() {
   catch (e) { console.warn('alerts history save failed:', e.message); }
 }
 let alertHistory = loadAlertHistory();
+function saveStickyAlertState(state) {
+  try { writePrivateYaml(ALERT_EPISODE_STATE_PATH, stickyAlertStateDocument(state)); }
+  catch (e) { console.warn('alert episode state save failed:', e.message); }
+}
+function loadStickyAlertState({ ignoreStored = false } = {}) {
+  let document = null;
+  if (!ignoreStored) {
+    try { document = yaml.load(fs.readFileSync(ALERT_EPISODE_STATE_PATH, 'utf8')); }
+    catch {}
+  }
+  const state = resolveStickyAlertState(document, alertHistory);
+  saveStickyAlertState(state);
+  return state;
+}
+let stickyAlertState = loadStickyAlertState();
+function rememberStickyAlert(key, severity) {
+  if (!isStickyAlertKey(key)) return;
+  const normalized = String(severity || 'critical');
+  if (stickyAlertState.get(key) === normalized) return;
+  stickyAlertState.set(key, normalized);
+  saveStickyAlertState(stickyAlertState);
+}
+function forgetStickyAlert(key) {
+  if (!isStickyAlertKey(key) || !stickyAlertState.delete(key)) return;
+  saveStickyAlertState(stickyAlertState);
+}
 let alertSentAtBySignature = new Map();
 const AUDIT_MAX = 2000;
 function loadAuditLog() {
@@ -587,11 +622,6 @@ function pushAlertHistory(entry = {}) {
   return item;
 }
 
-function alertDeliverySucceeded(entry = {}) {
-  if (entry.status === 'sent') return true;
-  return Array.isArray(entry.channels) && entry.channels.some(r => r && r.ok && r.channel !== 'webhook');
-}
-
 function alertDeliverySignature(entry = {}) {
   const type = String(entry.type || '').trim();
   const key = String(entry.key || '').trim();
@@ -702,16 +732,7 @@ function normalizeNotifyTopic(topic) {
 }
 
 function notifyTopicForKey(key) {
-  const raw = String(key || '').trim();
-  if (!raw) return '';
-  const candidates = [raw];
-  let cur = raw;
-  while (cur.includes(':')) {
-    cur = cur.slice(0, cur.lastIndexOf(':'));
-    candidates.push(cur);
-  }
-  if (raw.startsWith('k8s:')) candidates.push('k8s');
-  for (const candidate of candidates) {
+  for (const candidate of notificationKeyCandidates(key)) {
     const topic = normalizeNotifyTopic(notifyTopics.get(candidate));
     if (topic) return topic;
   }
@@ -719,15 +740,7 @@ function notifyTopicForKey(key) {
 }
 
 function notifyDisabledForKey(key) {
-  const raw = String(key || '').trim();
-  if (!raw) return false;
-  if (notifyDisabled.has(raw)) return true;
-  let cur = raw;
-  while (cur.includes(':')) {
-    cur = cur.slice(0, cur.lastIndexOf(':'));
-    if (notifyDisabled.has(cur)) return true;
-  }
-  return raw.startsWith('k8s:') && notifyDisabled.has('k8s');
+  return notificationKeyCandidates(key).some(candidate => notifyDisabled.has(candidate));
 }
 
 function alertConfigForKey(alertConfig, key) {
@@ -4557,8 +4570,7 @@ function extractChecks(data) {
       add('cloudflare', !!cf.online && !cf.partial, 'Cloudflare', cf.error || (cf.partial ? 'partial API data' : 'unreachable'));
       if (cf.online && Number(sm.zonesWarn || 0) > 0) add('cloudflare-zones', false, 'Cloudflare zones', `${sm.zonesWarn} zone(s) need attention`);
       if (cf.online && Number(sm.tunnelsDown || 0) > 0) add('cloudflare-tunnels', false, 'Cloudflare tunnels', `${sm.tunnelsDown} tunnel(s) down`);
-      if (cf.online && Number(sm.domainsExpired || 0) > 0) add('cloudflare-domains-expired', false, 'Cloudflare domains', `${sm.domainsExpired} domain(s) expired`);
-      if (cf.online && Number(sm.domainsExpiring || 0) > 0) add('cloudflare-domains-expiring', false, 'Cloudflare domains', `${sm.domainsExpiring} domain(s) expiring soon`);
+      buildCloudflareDomainDetections(cf).forEach(check => add(check.key, check.ok, check.label, check.detail));
     }
   }
   const ci = data.cicd;
@@ -4596,8 +4608,31 @@ const ALERT_STARTUP_GRACE_MS = 60000;
 let prevChecks = null;
 const alertFirstSeen = new Map();
 const alertProblemSince = new Map();
-const alertActiveSeverity = new Map();
+const alertActiveSeverity = new Map(stickyAlertState);
 const healthcheckGraceDeadlines = new Map();
+let alertEpisodeSequence = 0;
+const alertEpisodeRevisions = new Map();
+function beginAlertEpisode(key) {
+  if (!isStickyAlertKey(key)) return 0;
+  const revision = ++alertEpisodeSequence;
+  alertEpisodeRevisions.set(key, revision);
+  return revision;
+}
+function invalidateAlertEpisode(key) {
+  if (!isStickyAlertKey(key)) return;
+  alertEpisodeRevisions.set(key, ++alertEpisodeSequence);
+}
+function invalidateAllAlertEpisodes() {
+  alertEpisodeSequence += 1;
+  alertEpisodeRevisions.clear();
+}
+function alertDispatchIsCurrent(meta = {}) {
+  return stickyAlertDispatchIsCurrent(
+    meta.key,
+    meta.episodeRevision,
+    alertEpisodeRevisions.get(meta.key),
+  );
+}
 function pctNumber(v) {
   const n = Number(v);
   if (!Number.isFinite(n)) return null;
@@ -4749,7 +4784,7 @@ function logAlertResult(rs) {
   (rs || []).forEach(r => { if (!r.ok) console.warn(`Alert ${r.channel} failed: ${r.error}`); });
 }
 function dispatchTrackedAlert(alertConfig, alert, meta = {}, only) {
-  const signature = alertDeliverySignature(meta);
+  const signature = alertDeliveryCooldownEnabled(meta.key) ? alertDeliverySignature(meta) : '';
   const now = Date.now();
   if (signature && alertNotificationInCooldown(signature, now)) return null;
   if (signature) alertSentAtBySignature.set(signature, now);
@@ -4767,11 +4802,22 @@ function dispatchTrackedAlert(alertConfig, alert, meta = {}, only) {
     .then(results => {
       entry.channels = results;
       entry.status = results.some(r => r.ok) ? 'sent' : 'failed';
+      if (
+        entry.status === 'sent'
+        && meta.type === 'problem'
+        && alertDispatchIsCurrent(meta)
+        && alertActiveSeverity.get(meta.key) === meta.severity
+      ) rememberStickyAlert(meta.key, meta.severity);
       if (signature) {
         if (entry.status === 'sent') alertSentAtBySignature.set(signature, Number(entry.t || Date.now()));
         else alertSentAtBySignature.delete(signature);
       }
-      if (entry.status !== 'sent' && meta.type === 'problem' && alertActiveSeverity.get(meta.key) === meta.severity) {
+      if (
+        entry.status !== 'sent'
+        && meta.type === 'problem'
+        && alertDispatchIsCurrent(meta)
+        && alertActiveSeverity.get(meta.key) === meta.severity
+      ) {
         alertActiveSeverity.delete(meta.key);
       }
       saveAlertHistory();
@@ -4779,7 +4825,11 @@ function dispatchTrackedAlert(alertConfig, alert, meta = {}, only) {
     })
     .catch(err => {
       if (signature) alertSentAtBySignature.delete(signature);
-      if (meta.type === 'problem' && alertActiveSeverity.get(meta.key) === meta.severity) {
+      if (
+        meta.type === 'problem'
+        && alertDispatchIsCurrent(meta)
+        && alertActiveSeverity.get(meta.key) === meta.severity
+      ) {
         alertActiveSeverity.delete(meta.key);
       }
       entry.status = 'failed';
@@ -4804,10 +4854,19 @@ function runAlertChecks(data) {
     if (!cur.has(key) || cur.get(key)?.ok) alertProblemSince.delete(key);
   }
   for (const key of Array.from(alertActiveSeverity.keys())) {
-    if (!cur.has(key)) alertActiveSeverity.delete(key);
+    if (!cur.has(key) && !isStickyAlertKey(key)) alertActiveSeverity.delete(key);
   }
-  if (prevChecks === null) { prevChecks = cur; return; }
-  const sendProblem = c => {
+  if (prevChecks === null) {
+    for (const [key, check] of cur) {
+      if (!isStickyAlertKey(key) || !check.ok) continue;
+      invalidateAlertEpisode(key);
+      alertActiveSeverity.delete(key);
+      forgetStickyAlert(key);
+    }
+    prevChecks = cur;
+    return;
+  }
+  const sendProblem = (c, episodeRevision = 0) => {
     const threshold = c.kind === 'threshold';
     const anomaly = c.kind === 'anomaly';
     const updates = c.kind === 'updates';
@@ -4837,6 +4896,7 @@ function runAlertChecks(data) {
       metric: c.metric || '',
       value: c.value ?? null,
       threshold: c.threshold ?? null,
+      episodeRevision,
     });
   };
   const sendRecovery = c => {
@@ -4871,10 +4931,12 @@ function runAlertChecks(data) {
     const activeSeverity = alertActiveSeverity.get(key);
     const muted = notifyDisabledForKey(key) || isAlertMuted(key, now);
     if (c.ok) {
+      invalidateAlertEpisode(key);
       clearAlertCooldownsForType(alertSentAtBySignature, 'problem', key);
       alertProblemSince.delete(key);
       if (activeSeverity && !muted) sendRecovery(c);
       alertActiveSeverity.delete(key);
+      forgetStickyAlert(key);
       continue;
     }
     if (!alertProblemSince.has(key)) alertProblemSince.set(key, now);
@@ -4884,7 +4946,8 @@ function runAlertChecks(data) {
     const severity = (c.kind === 'threshold' || c.kind === 'anomaly' || c.kind === 'updates') ? c.severity : 'critical';
     if (!shouldDispatchProblem(activeSeverity, severity)) continue;
     clearAlertCooldownsForType(alertSentAtBySignature, 'recovery', key);
-    sendProblem(c);
+    const episodeRevision = beginAlertEpisode(key);
+    sendProblem(c, episodeRevision);
     alertActiveSeverity.set(key, severity || 'critical');
   }
   prevChecks = cur;
@@ -7281,6 +7344,14 @@ function importFullBackupText(text) {
   notifyRevision = Math.max(Date.now(), notifyRevision + 1, notifyState.revision);
   saveNotify();
   alertHistory = loadAlertHistory();
+  const backupIncludesAlertEpisodes = writes.some(w => w.rel === 'alert-episodes.yaml');
+  stickyAlertState = loadStickyAlertState({ ignoreStored: !backupIncludesAlertEpisodes });
+  invalidateAllAlertEpisodes();
+  prevChecks = null;
+  alertFirstSeen.clear();
+  alertProblemSince.clear();
+  alertActiveSeverity.clear();
+  for (const [key, severity] of stickyAlertState) alertActiveSeverity.set(key, severity);
   rebuildAlertSentCooldowns();
   auditLog = loadAuditLog();
   alertMutes = loadAlertMutes();

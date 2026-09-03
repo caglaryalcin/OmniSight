@@ -895,6 +895,8 @@ function testStaticRegressions() {
   const packageJson = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
   const proxmoxCollector = fs.readFileSync(path.join(root, 'src', 'proxmox.js'), 'utf8');
   const vmwareCollector = fs.readFileSync(path.join(root, 'src', 'vmware.js'), 'utf8');
+  const cloudflareCollector = fs.readFileSync(path.join(root, 'src', 'cloudflare.js'), 'utf8');
+  const alertsModule = fs.readFileSync(path.join(root, 'src', 'alerts.js'), 'utf8');
   const server = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
   const ci = fs.readFileSync(path.join(root, '.github', 'workflows', 'ci.yml'), 'utf8');
   const deploy = fs.readFileSync(path.join(root, '.github', 'workflows', 'deploy.yml'), 'utf8');
@@ -1197,6 +1199,9 @@ function testStaticRegressions() {
   assert.ok(cloudflarePanelSource.includes('formatDaysLeft(days)') && cloudflareOverviewSource.includes('formatDaysLeft(days)'), 'both Cloudflare domain render paths must use the shared day-left formatter');
   assert.strictEqual((cloudflarePanelSource.match(/class="mon-row cloudflare-resource-row"/g) || []).length, 3, 'Cloudflare zone, tunnel, and domain rows must share one status-column layout');
   assert.strictEqual((cloudflarePanelSource.match(/class="cloudflare-resource-status"/g) || []).length, 3, 'every Cloudflare resource row must place its badge in the shared status column');
+  assert.ok(cloudflarePanelSource.includes("notifyBell('cloudflare')") && cloudflarePanelSource.includes('detailBadge:'), 'Cloudflare detail must expose a platform notification bell');
+  assert.ok(alertsModule.includes("if (raw.startsWith('cloudflare-')) add('cloudflare')") && server.includes('notificationKeyCandidates(key).some(candidate => notifyDisabled.has(candidate))'), 'the Cloudflare platform bell must mute domain, zone, and tunnel child alerts');
+  assert.ok(cloudflareCollector.includes('registrarDomainsAuthoritative = true') && server.includes('buildCloudflareDomainDetections(cf)') && server.includes('!isStickyAlertKey(key)') && server.includes('ALERT_EPISODE_STATE_PATH') && server.includes('rememberStickyAlert(meta.key, meta.severity)') && server.includes('forgetStickyAlert(key)') && server.includes('alertDispatchIsCurrent(meta)') && server.includes('beginAlertEpisode(key)') && server.includes('invalidateAllAlertEpisodes()') && server.includes('alertFirstSeen.clear()') && server.includes('alertProblemSince.clear()') && server.includes('alertDeliveryCooldownEnabled(meta.key)') && alertsModule.includes('resolveStickyAlertState') && alertsModule.includes('stickyAlertDispatchIsCurrent'), 'Cloudflare domain alerts must persist across transient Registrar failures, history rotation and restarts until an authoritative healthy result resolves them, without stale async deliveries or cooldowns reviving or suppressing episodes');
   assert.ok(dashboard.includes('.cloudflare-resource-row{display:grid;grid-template-columns:18px minmax(180px,560px) minmax(150px,500px) minmax(180px,max-content);justify-content:start'), 'Cloudflare detail rows must keep their shared columns compact and left-aligned while leaving room for long expiration labels');
   assert.ok(dashboard.includes('.cloudflare-resource-status{min-width:180px;justify-self:start;text-align:left}'), 'Cloudflare active, healthy, and remaining-days badges must share the same left edge');
   assert.ok(dashboard.includes('.cloudflare-resource-row{grid-template-columns:9px minmax(0,1fr) 180px;align-items:start') && dashboard.includes('.cloudflare-resource-status{grid-column:3;grid-row:1;min-width:180px}'), 'Cloudflare badges must retain their shared left edge in the narrow layout');

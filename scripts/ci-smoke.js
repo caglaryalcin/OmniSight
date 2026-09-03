@@ -10,6 +10,15 @@ async function main() {
     dispatchAlert,
     serverUpdateNotificationsEnabled,
     buildServerUpdateDetections,
+    isStickyAlertKey,
+    alertDeliverySucceeded,
+    rebuildStickyAlertState,
+    resolveStickyAlertState,
+    stickyAlertStateDocument,
+    stickyAlertDispatchIsCurrent,
+    alertDeliveryCooldownEnabled,
+    notificationKeyCandidates,
+    buildCloudflareDomainDetections,
     shouldDispatchProblem,
     clearAlertCooldownsForType,
   } = require('../src/alerts');
@@ -58,6 +67,44 @@ async function main() {
     'recovery|win:M4A1|normal',
     'problem|win:OTHER|critical',
   ]);
+  assert.deepStrictEqual(notificationKeyCandidates('px:pve01:cpu'), ['px:pve01:cpu', 'px:pve01', 'px']);
+  assert.deepStrictEqual(notificationKeyCandidates('cloudflare-domains-expiring'), ['cloudflare-domains-expiring', 'cloudflare']);
+  assert.strictEqual(isStickyAlertKey('cloudflare-domains-expiring'), true);
+  assert.strictEqual(isStickyAlertKey('cloudflare-zones'), false);
+  assert.strictEqual(alertDeliverySucceeded({ status: 'failed', channels: [{ channel: 'ntfy', ok: true }] }), true);
+  const stickyHistory = [
+    { type: 'problem', key: 'cloudflare-domains-expiring', severity: 'critical', status: 'sent' },
+    { type: 'problem', key: 'cloudflare-domains-expired', severity: 'critical', status: 'failed' },
+    { type: 'problem', key: 'lx:deb01', severity: 'critical', status: 'sent' },
+  ];
+  assert.deepStrictEqual(Array.from(rebuildStickyAlertState(stickyHistory)), [
+    ['cloudflare-domains-expiring', 'critical'],
+  ]);
+  assert.deepStrictEqual(Array.from(resolveStickyAlertState(null, stickyHistory)), [
+    ['cloudflare-domains-expiring', 'critical'],
+  ], 'legacy installs must migrate the unresolved Cloudflare episode from alert history');
+  assert.deepStrictEqual(Array.from(resolveStickyAlertState({ version: 1, active: {} }, stickyHistory)), [], 'a stored healthy state must override old problem history after restart');
+  assert.deepStrictEqual(stickyAlertStateDocument(new Map([
+    ['cloudflare-domains-expiring', 'critical'],
+    ['lx:deb01', 'critical'],
+  ])), { version: 1, active: { 'cloudflare-domains-expiring': 'critical' } });
+  assert.strictEqual(stickyAlertDispatchIsCurrent('cloudflare-domains-expiring', 1, 1), true, 'the active Cloudflare alert episode may persist its successful delivery');
+  assert.strictEqual(stickyAlertDispatchIsCurrent('cloudflare-domains-expiring', 1, 2), false, 'a healthy result or backup import must invalidate an older in-flight delivery');
+  assert.strictEqual(stickyAlertDispatchIsCurrent('cloudflare-domains-expiring', 1, 3), false, 'a new same-severity episode must not accept an older delivery result');
+  assert.strictEqual(stickyAlertDispatchIsCurrent('lx:deb01', 0, undefined), true, 'ordinary alerts must keep their existing dispatch behavior');
+  assert.strictEqual(alertDeliveryCooldownEnabled('cloudflare-domains-expiring'), false, 'persistent Cloudflare alert episodes must not inherit stale hourly cooldowns');
+  assert.strictEqual(alertDeliveryCooldownEnabled('lx:deb01'), true, 'ordinary alerts must retain their hourly delivery cooldown');
+  stickyHistory.push({ type: 'recovery', key: 'cloudflare-domains-expiring', severity: 'normal', status: 'failed' });
+  assert.deepStrictEqual(Array.from(rebuildStickyAlertState(stickyHistory)), []);
+  assert.deepStrictEqual(buildCloudflareDomainDetections({ registrarDomainsAuthoritative: false, summary: { domainsExpiring: 1 } }), []);
+  assert.deepStrictEqual(
+    buildCloudflareDomainDetections({ registrarDomainsAuthoritative: true, summary: { domainsExpired: 0, domainsExpiring: 1 } })
+      .map(check => [check.key, check.ok, check.detail]),
+    [
+      ['cloudflare-domains-expired', true, 'no domains expired'],
+      ['cloudflare-domains-expiring', false, '1 domain(s) expiring soon'],
+    ],
+  );
 
   // 2) Crypto round-trip for a sensitive key
   const enc = encryptConfigValue('password', 's3cret');

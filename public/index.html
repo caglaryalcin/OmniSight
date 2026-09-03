@@ -6749,7 +6749,7 @@ function buildCloudflare(cf){
   ${cf.partial && cf.errors?.length ? `<div class="offline-err" style="margin-top:10px">Partial API data: ${escHtml(cf.errors.join(' - '))}</div>` : ''}` :
   `<div class="offline-row"><div class="mon-dot md-red"></div><div>Cloudflare unreachable<div class="offline-err">${escHtml(cf.error || '')}</div></div></div>`;
   const tunnelMeta = Number(sm.tunnels || 0) ? ` - ${sm.tunnelsHealthy || 0}/${sm.tunnels} tunnels` : '';
-  return { id: 'cloudflare', title: 'Cloudflare', iconKey: 'cloudflare', color: 'var(--orange,#f59e0b)', meta: connecting && !cf.online ? 'connecting...' : `${active}/${total} zones${tunnelMeta}`, badge: bdg(healthCls, healthTxt), sbSummary: sbSummaryHtml, summary: '', body };
+  return { id: 'cloudflare', title: 'Cloudflare', iconKey: 'cloudflare', color: 'var(--orange,#f59e0b)', meta: connecting && !cf.online ? 'connecting...' : `${active}/${total} zones${tunnelMeta}`, badge: bdg(healthCls, healthTxt), detailBadge: `${bdg(healthCls, healthTxt)}${notifyBell('cloudflare')}`, sbSummary: sbSummaryHtml, summary: '', body };
 }
 
 function buildCiCd(ci){
