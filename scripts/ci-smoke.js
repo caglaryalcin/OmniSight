@@ -18,7 +18,11 @@ async function main() {
     stickyAlertDispatchIsCurrent,
     alertDeliveryCooldownEnabled,
     notificationKeyCandidates,
+    cloudflareResourceNotifyKey,
     buildCloudflareDomainDetections,
+    buildCloudflareResourceDetections,
+    migrateCloudflareStickyState,
+    migrateCloudflareNotificationState,
     shouldDispatchProblem,
     clearAlertCooldownsForType,
   } = require('../src/alerts');
@@ -97,14 +101,78 @@ async function main() {
   stickyHistory.push({ type: 'recovery', key: 'cloudflare-domains-expiring', severity: 'normal', status: 'failed' });
   assert.deepStrictEqual(Array.from(rebuildStickyAlertState(stickyHistory)), []);
   assert.deepStrictEqual(buildCloudflareDomainDetections({ registrarDomainsAuthoritative: false, summary: { domainsExpiring: 1 } }), []);
+  const cloudflare = {
+    online: true, zonesAuthoritative: true, tunnelsAuthoritative: true, registrarDomainsAuthoritative: true,
+    zones: [{ id: 'same', name: 'example.test', online: false, paused: true, status: 'active' }],
+    tunnels: [{ id: 'same', name: 'example.test', online: false, status: 'down' }],
+    domains: [
+      { id: 'same', name: 'example.test', daysToExpire: 12, expired: false, expiring: true },
+      { id: 'second', name: 'second.test', daysToExpire: 90, expired: false, expiring: false },
+    ],
+  };
   assert.deepStrictEqual(
-    buildCloudflareDomainDetections({ registrarDomainsAuthoritative: true, summary: { domainsExpired: 0, domainsExpiring: 1 } })
+    buildCloudflareDomainDetections(cloudflare)
       .map(check => [check.key, check.ok, check.detail]),
     [
-      ['cloudflare-domains-expired', true, 'no domains expired'],
-      ['cloudflare-domains-expiring', false, '1 domain(s) expiring soon'],
+      ['cloudflare:domain:same:expired', true, 'not expired'],
+      ['cloudflare:domain:same:expiring', false, 'expiring in 12 day(s)'],
+      ['cloudflare:domain:second:expired', true, 'not expired'],
+      ['cloudflare:domain:second:expiring', true, 'not expiring soon'],
     ],
   );
+  assert.strictEqual(cloudflareResourceNotifyKey('zone', { id: 'a:b/c', name: 'fallback' }), 'cloudflare:zone:a%3Ab%2Fc');
+  assert.strictEqual(cloudflareResourceNotifyKey('domain', { name: 'example.test' }), 'cloudflare:domain:example.test');
+  assert.strictEqual(cloudflareResourceNotifyKey('domain', {}), '');
+  assert.strictEqual(isStickyAlertKey('cloudflare:domain:same:expiring'), true);
+  assert.strictEqual(isStickyAlertKey('cloudflare:domain:same:expired'), true);
+  assert.strictEqual(isStickyAlertKey('cloudflare:zone:same'), false);
+  assert.strictEqual(alertDeliveryCooldownEnabled('cloudflare:domain:same:expiring'), false);
+  assert.deepStrictEqual(notificationKeyCandidates('cloudflare:domain:same:expired'), [
+    'cloudflare:domain:same:expired', 'cloudflare:domain:same', 'cloudflare:domain', 'cloudflare',
+  ]);
+  const resourceChecks = buildCloudflareResourceDetections(cloudflare);
+  assert.deepStrictEqual(resourceChecks.filter(check => !check.ok).map(check => check.key), [
+    'cloudflare:domain:same:expiring', 'cloudflare:zone:same', 'cloudflare:tunnel:same',
+  ]);
+  assert.deepStrictEqual(buildCloudflareResourceDetections({ ...cloudflare, _stale: true }), []);
+  assert.deepStrictEqual(buildCloudflareResourceDetections({ ...cloudflare, _connecting: true }), []);
+  assert.deepStrictEqual(buildCloudflareDomainDetections({ ...cloudflare, domains: [{ id: 'same', daysToExpire: null }] }), [], 'unknown expiration must not resolve an existing problem');
+  assert.deepStrictEqual(buildCloudflareResourceDetections(null), []);
+  assert.ok(!buildCloudflareResourceDetections({ ...cloudflare, tunnelsAuthoritative: false }).some(check => check.key.includes(':tunnel:')), 'a failed tunnel inventory must not create tunnel checks');
+  const legacyEpisode = new Map([['cloudflare-domains-expiring', 'critical']]);
+  const migratedEpisode = migrateCloudflareStickyState(legacyEpisode, cloudflare);
+  assert.deepStrictEqual([...migratedEpisode], [['cloudflare:domain:same:expiring', 'critical']]);
+  assert.deepStrictEqual([...resolveStickyAlertState(stickyAlertStateDocument(migratedEpisode))], [...migratedEpisode]);
+  assert.deepStrictEqual([...migrateCloudflareStickyState(legacyEpisode, { ...cloudflare, _stale: true })], [...legacyEpisode]);
+  assert.deepStrictEqual([...migrateCloudflareStickyState(legacyEpisode, { ...cloudflare, registrarDomainsAuthoritative: false })], [...legacyEpisode]);
+  const withUnknownDomain = { ...cloudflare, domains: [cloudflare.domains[0], { id: 'unknown', daysToExpire: null }] };
+  const migratedUnknown = migrateCloudflareStickyState(legacyEpisode, withUnknownDomain);
+  assert.deepStrictEqual([...migratedUnknown], [
+    ['cloudflare:domain:same:expiring', 'critical'],
+    ['cloudflare:domain:unknown:expiring', 'critical'],
+  ], 'unknown expiry must retain the previous delivered incident on its own row');
+  migratedUnknown.delete('cloudflare:domain:same:expiring');
+  assert.strictEqual(migrateCloudflareStickyState(migratedUnknown, withUnknownDomain).has('cloudflare:domain:same:expiring'), false, 'an unresolved unknown domain must not reseed another domain after recovery');
+  const disabledResources = new Set(['cloudflare', 'lx:example']);
+  const resourceTopics = new Map([['cloudflare', 'cf-topic']]);
+  let legacyNotifications = migrateCloudflareNotificationState(disabledResources, resourceTopics, {}, { ...cloudflare, domains: [] });
+  assert.deepStrictEqual([...disabledResources].sort(), ['cloudflare:api', 'cloudflare:tunnel:same', 'cloudflare:zone:same', 'lx:example']);
+  assert.strictEqual(resourceTopics.get('cloudflare:api'), 'cf-topic', 'the API health alert must retain its previous mute and topic without muting resource children');
+  assert.strictEqual(resourceTopics.get('cloudflare:zone:same'), 'cf-topic');
+  disabledResources.delete('cloudflare:zone:same');
+  legacyNotifications = JSON.parse(JSON.stringify(legacyNotifications));
+  legacyNotifications = migrateCloudflareNotificationState(disabledResources, resourceTopics, legacyNotifications, cloudflare);
+  assert.strictEqual(disabledResources.has('cloudflare:zone:same'), false, 'explicit re-enable must survive refresh and restart');
+  assert.strictEqual(disabledResources.has('cloudflare:domain:same'), true, 'a previously unavailable inventory must inherit the old global mute');
+  assert.strictEqual(disabledResources.has('cloudflare:domain:second'), true);
+  assert.strictEqual(resourceTopics.get('cloudflare:domain:same'), 'cf-topic');
+  legacyNotifications = migrateCloudflareNotificationState(disabledResources, resourceTopics, legacyNotifications, {}, 'cloudflare:domain:late');
+  disabledResources.delete('cloudflare:domain:late');
+  legacyNotifications = migrateCloudflareNotificationState(disabledResources, resourceTopics, legacyNotifications, { domains: [{ id: 'late' }] });
+  assert.strictEqual(disabledResources.has('cloudflare:domain:late'), false, 'a stale browser row enabled before discovery must retain the explicit choice');
+  const rowDisabled = new Set(['cloudflare:domain:same']);
+  const unmutedProblems = resourceChecks.filter(check => !check.ok && !notificationKeyCandidates(check.key).some(key => rowDisabled.has(key)));
+  assert.deepStrictEqual(unmutedProblems.map(check => check.key), ['cloudflare:zone:same', 'cloudflare:tunnel:same'], 'a domain mute must not suppress a zone or tunnel sharing its ID');
 
   // 2) Crypto round-trip for a sensitive key
   const enc = encryptConfigValue('password', 's3cret');
@@ -156,6 +224,9 @@ async function main() {
 
   // 8) Open-issue regressions and collector fixtures
   await require('./ci-smoke-issues').run();
+
+  // Resource notification episodes, failures and delayed delivery callbacks.
+  await require('./ci-smoke-cloudflare').run();
 }
 
 main().catch(err => { console.error(err); process.exit(1); });

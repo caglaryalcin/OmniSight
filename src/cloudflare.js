@@ -278,6 +278,7 @@ async function getCloudflareData(config = {}) {
   const zones = zonesRaw.map(normalizeZone).filter(z => zoneAllowed(z, filters));
 
   let tunnels = [];
+  let tunnelsAuthoritative = false;
   if (config.accountId && boolDefault(config.includeTunnels, true)) {
     try {
       const rows = await listTunnels(config);
@@ -292,6 +293,7 @@ async function getCloudflareData(config = {}) {
         if (!res.ok) errors.push(res.error);
         return normalizeTunnel(row, res.ok ? res.data : []);
       });
+      tunnelsAuthoritative = true;
     } catch (err) {
       errors.push(`Tunnels: ${err.message}`);
     }
@@ -319,6 +321,8 @@ async function getCloudflareData(config = {}) {
     _empty: !online && errors.length === 0,
     error: online ? errors[0] || '' : errors[0] || 'No Cloudflare resources found',
     partial: errors.length > 0,
+    zonesAuthoritative: true,
+    tunnelsAuthoritative,
     registrarDomainsAuthoritative,
     errors: errors.slice(0, 8),
     summary,

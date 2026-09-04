@@ -141,7 +141,8 @@ const STICKY_ALERT_KEYS = new Set([
 ]);
 
 function isStickyAlertKey(key) {
-  return STICKY_ALERT_KEYS.has(String(key || '').trim());
+  const value = String(key || '').trim();
+  return STICKY_ALERT_KEYS.has(value) || /^cloudflare:domain:[^:]+:(expired|expiring)$/.test(value);
 }
 
 function alertDeliverySucceeded(entry = {}) {
@@ -219,25 +220,115 @@ function notificationKeyCandidates(key) {
   return candidates;
 }
 
+function cloudflareResourceNotifyKey(kind, resource = {}) {
+  const id = String(resource?.id || resource?.name || '').trim();
+  return id ? `cloudflare:${kind}:${encodeURIComponent(id)}` : '';
+}
+
 function buildCloudflareDomainDetections(cloudflare = {}) {
-  if (cloudflare.registrarDomainsAuthoritative !== true) return [];
-  const summary = cloudflare.summary || {};
-  const expired = Math.max(0, Math.floor(Number(summary.domainsExpired) || 0));
-  const expiring = Math.max(0, Math.floor(Number(summary.domainsExpiring) || 0));
-  return [
-    {
-      key: 'cloudflare-domains-expired',
-      ok: expired === 0,
-      label: 'Cloudflare domains',
-      detail: expired === 0 ? 'no domains expired' : `${expired} domain(s) expired`,
-    },
-    {
-      key: 'cloudflare-domains-expiring',
-      ok: expiring === 0,
-      label: 'Cloudflare domains',
-      detail: expiring === 0 ? 'no domains expiring soon' : `${expiring} domain(s) expiring soon`,
-    },
+  cloudflare = cloudflare || {};
+  if (cloudflare.registrarDomainsAuthoritative !== true || cloudflare._stale || cloudflare._connecting) return [];
+  return (Array.isArray(cloudflare.domains) ? cloudflare.domains : []).flatMap(domain => {
+    const key = cloudflareResourceNotifyKey('domain', domain);
+    const days = domain?.daysToExpire;
+    if (!key || days === null || days === undefined || days === '' || !Number.isFinite(Number(days))) return [];
+    return ['expired', 'expiring'].map(stage => ({
+      key: `${key}:${stage}`,
+      ok: !domain[stage],
+      label: `Cloudflare domain ${domain.name || domain.id}`,
+      detail: domain[stage]
+        ? (stage === 'expired' ? 'expired' : `expiring in ${Math.max(0, Number(days))} day(s)`)
+        : (stage === 'expired' ? 'not expired' : 'not expiring soon'),
+    }));
+  });
+}
+
+function buildCloudflareResourceDetections(cloudflare = {}) {
+  cloudflare = cloudflare || {};
+  if (cloudflare._stale || cloudflare._connecting) return [];
+  const checks = buildCloudflareDomainDetections(cloudflare);
+  for (const kind of ['zone', 'tunnel']) {
+    if (cloudflare[`${kind}sAuthoritative`] !== true) continue;
+    for (const row of Array.isArray(cloudflare[`${kind}s`]) ? cloudflare[`${kind}s`] : []) {
+      const key = cloudflareResourceNotifyKey(kind, row);
+      if (!key || row._connecting || row._stale) continue;
+      checks.push({
+        key,
+        ok: !!row.online,
+        label: `Cloudflare ${kind} ${row.name || row.id}`,
+        detail: kind === 'zone' && row.paused ? 'paused' : (row.status || (row.online ? 'healthy' : 'down')),
+      });
+    }
+  }
+  return checks;
+}
+
+function migrateCloudflareStickyState(state, cloudflare = {}) {
+  cloudflare = cloudflare || {};
+  if (cloudflare.registrarDomainsAuthoritative !== true || cloudflare._stale || cloudflare._connecting) return state;
+  if (![...STICKY_ALERT_KEYS].some(key => state.has(key))) return state;
+  const next = new Map(state);
+  const checks = buildCloudflareDomainDetections(cloudflare);
+  const knownKeys = new Set(checks.map(check => check.key));
+  for (const stage of ['expired', 'expiring']) {
+    const legacyKey = `cloudflare-domains-${stage}`;
+    if (!next.has(legacyKey)) continue;
+    for (const check of checks) {
+      if (!check.ok && check.key.endsWith(`:${stage}`) && !next.has(check.key)) {
+        next.set(check.key, next.get(legacyKey));
+      }
+    }
+    // An unknown expiry cannot resolve the old incident. Carry its delivered
+    // state onto the row until a known value confirms recovery; consume the
+    // aggregate now so it cannot suppress a later, independent incident.
+    for (const domain of Array.isArray(cloudflare.domains) ? cloudflare.domains : []) {
+      const baseKey = cloudflareResourceNotifyKey('domain', domain);
+      const key = `${baseKey}:${stage}`;
+      if (baseKey && !knownKeys.has(key) && !next.has(key)) next.set(key, next.get(legacyKey));
+    }
+    next.delete(legacyKey);
+  }
+  return next;
+}
+
+function migrateCloudflareNotificationState(disabled, topics, legacy = {}, cloudflare = {}, explicitKey = '') {
+  legacy = legacy || {};
+  // Remember which rows inherited the old global switch. A later explicit
+  // enable must survive refreshes, restarts and temporarily missing inventory.
+  const kinds = ['zone', 'tunnel', 'domain'];
+  const offKinds = new Set((Array.isArray(legacy.disabledKinds) ? legacy.disabledKinds : []).filter(kind => kinds.includes(kind)));
+  const inheritedTopics = { ...(legacy.topics || {}) };
+  const initializedKeys = new Set(Array.isArray(legacy.initializedKeys) ? legacy.initializedKeys : []);
+  if (disabled.has('cloudflare')) disabled.add('cloudflare:api');
+  if (topics.has('cloudflare') && !topics.has('cloudflare:api')) topics.set('cloudflare:api', topics.get('cloudflare'));
+  const groups = [
+    ['cloudflare', kinds],
+    ['cloudflare-zones', ['zone']],
+    ['cloudflare-tunnels', ['tunnel']],
+    ['cloudflare-domains-expired', ['domain']],
+    ['cloudflare-domains-expiring', ['domain']],
   ];
+  for (const [key, targets] of groups) {
+    if (disabled.delete(key)) targets.forEach(kind => offKinds.add(kind));
+    if (topics.has(key)) {
+      targets.forEach(kind => { inheritedTopics[kind] = topics.get(key); });
+      topics.delete(key);
+    }
+  }
+  const initialize = (kind, key) => {
+    if (!key || initializedKeys.has(key) || (!offKinds.has(kind) && !inheritedTopics[kind])) return;
+    if (offKinds.has(kind)) disabled.add(key);
+    if (inheritedTopics[kind] && !topics.has(key)) topics.set(key, inheritedTopics[kind]);
+    initializedKeys.add(key);
+  };
+  const explicit = /^cloudflare:(zone|tunnel|domain):[^:]+$/.exec(explicitKey);
+  if (explicit) initialize(explicit[1], explicitKey);
+  for (const kind of kinds) {
+    for (const row of Array.isArray(cloudflare?.[`${kind}s`]) ? cloudflare[`${kind}s`] : []) {
+      initialize(kind, cloudflareResourceNotifyKey(kind, row));
+    }
+  }
+  return { disabledKinds: [...offKinds], topics: inheritedTopics, initializedKeys: [...initializedKeys] };
 }
 
 function shouldDispatchProblem(activeSeverity, nextSeverity) {
@@ -286,7 +377,11 @@ module.exports = {
   stickyAlertDispatchIsCurrent,
   alertDeliveryCooldownEnabled,
   notificationKeyCandidates,
+  cloudflareResourceNotifyKey,
   buildCloudflareDomainDetections,
+  buildCloudflareResourceDetections,
+  migrateCloudflareStickyState,
+  migrateCloudflareNotificationState,
   shouldDispatchProblem,
   clearAlertCooldownsForType,
 };

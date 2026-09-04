@@ -51,7 +51,9 @@ const {
   stickyAlertDispatchIsCurrent,
   alertDeliveryCooldownEnabled,
   notificationKeyCandidates,
-  buildCloudflareDomainDetections,
+  buildCloudflareResourceDetections,
+  migrateCloudflareStickyState,
+  migrateCloudflareNotificationState,
   shouldDispatchProblem,
   clearAlertCooldownsForType,
 } = require('./src/alerts');
@@ -198,6 +200,7 @@ function loadNotify() {
       disabled: new Set(Array.isArray(a?.disabled) ? a.disabled : []),
       topics: new Map(Object.entries(a?.topics || {}).filter(([, v]) => String(v || '').trim())),
       revision: Math.max(0, Number(a?.revision) || 0),
+      cloudflareLegacy: a?.cloudflareLegacy || {},
     };
   }
   catch { return { disabled: new Set(), topics: new Map(), revision: 0 }; }
@@ -208,6 +211,7 @@ function saveNotify() {
       disabled: Array.from(notifyDisabled),
       topics: Object.fromEntries(notifyTopics),
       revision: notifyRevision,
+      cloudflareLegacy: notifyCloudflareLegacy,
     });
   }
   catch (e) { console.warn('notifications save failed:', e.message); }
@@ -216,6 +220,15 @@ let notifyState = loadNotify();
 let notifyDisabled = notifyState.disabled;
 let notifyTopics = notifyState.topics;
 let notifyRevision = notifyState.revision;
+let notifyCloudflareLegacy = notifyState.cloudflareLegacy || {};
+function migrateCloudflareNotificationPreferences(cloudflare, explicitKey = '') {
+  const before = JSON.stringify([Array.from(notifyDisabled), Object.fromEntries(notifyTopics), notifyCloudflareLegacy]);
+  notifyCloudflareLegacy = migrateCloudflareNotificationState(notifyDisabled, notifyTopics, notifyCloudflareLegacy, cloudflare, explicitKey);
+  const after = JSON.stringify([Array.from(notifyDisabled), Object.fromEntries(notifyTopics), notifyCloudflareLegacy]);
+  if (before === after) return;
+  notifyRevision = Math.max(Date.now(), notifyRevision + 1);
+  saveNotify();
+}
 
 const ALERT_HISTORY_MAX = 2000;
 function loadAlertHistory() {
@@ -3108,6 +3121,7 @@ function publicIconValue(icon) {
 function assignStatic(base) {
   base.publicStatus = !!config.publicStatus;
   base.configured = configuredList();
+  migrateCloudflareNotificationPreferences(base.cloudflare);
   base.notifyDisabled = Array.from(notifyDisabled);
   base.notifyTopics = Object.fromEntries(notifyTopics);
   base.notifyRevision = notifyRevision;
@@ -4565,12 +4579,9 @@ function extractChecks(data) {
   });
   const cf = data.cloudflare;
   if (cf && cf.online !== undefined) {
-    const sm = cf.summary || {};
     if (!cf._connecting) {
-      add('cloudflare', !!cf.online && !cf.partial, 'Cloudflare', cf.error || (cf.partial ? 'partial API data' : 'unreachable'));
-      if (cf.online && Number(sm.zonesWarn || 0) > 0) add('cloudflare-zones', false, 'Cloudflare zones', `${sm.zonesWarn} zone(s) need attention`);
-      if (cf.online && Number(sm.tunnelsDown || 0) > 0) add('cloudflare-tunnels', false, 'Cloudflare tunnels', `${sm.tunnelsDown} tunnel(s) down`);
-      buildCloudflareDomainDetections(cf).forEach(check => add(check.key, check.ok, check.label, check.detail));
+      add('cloudflare:api', !!cf.online && !cf.partial, 'Cloudflare API', cf.error || (cf.partial ? 'partial API data' : 'unreachable'));
+      buildCloudflareResourceDetections(cf).forEach(check => add(check.key, check.ok, check.label, check.detail));
     }
   }
   const ci = data.cicd;
@@ -4632,6 +4643,24 @@ function alertDispatchIsCurrent(meta = {}) {
     meta.episodeRevision,
     alertEpisodeRevisions.get(meta.key),
   );
+}
+function migrateCloudflareAlertEpisodes(cloudflare) {
+  const next = migrateCloudflareStickyState(stickyAlertState, cloudflare);
+  let changed = false;
+  for (const key of stickyAlertState.keys()) {
+    if (next.has(key)) continue;
+    invalidateAlertEpisode(key);
+    alertActiveSeverity.delete(key);
+    changed = true;
+  }
+  for (const [key, severity] of next) {
+    if (stickyAlertState.get(key) === severity) continue;
+    alertActiveSeverity.set(key, severity);
+    changed = true;
+  }
+  if (!changed) return;
+  stickyAlertState = next;
+  saveStickyAlertState(stickyAlertState);
 }
 function pctNumber(v) {
   const n = Number(v);
@@ -4842,6 +4871,7 @@ function alertInfoText(check = {}) {
 }
 function runAlertChecks(data) {
   if (!config.alerts || config.alerts.enabled === false) return;
+  migrateCloudflareAlertEpisodes(data.cloudflare);
   const cur = extractChecks(data);
   const now = Date.now();
   for (const key of Array.from(alertFirstSeen.keys())) {
@@ -7341,6 +7371,7 @@ function importFullBackupText(text) {
   notifyState = loadNotify();
   notifyDisabled = notifyState.disabled;
   notifyTopics = notifyState.topics;
+  notifyCloudflareLegacy = notifyState.cloudflareLegacy || {};
   notifyRevision = Math.max(Date.now(), notifyRevision + 1, notifyState.revision);
   saveNotify();
   alertHistory = loadAlertHistory();
@@ -8512,6 +8543,7 @@ app.post('/api/notifications', (req, res) => {
     const { key, enabled, topic } = req.body || {};
     const cleanKey = String(key || '').trim();
     if (!cleanKey) return res.status(400).json({ error: 'key required' });
+    migrateCloudflareNotificationPreferences(cache.data?.cloudflare, cleanKey);
     if (enabled === false) notifyDisabled.add(cleanKey);
     else if (enabled === true) notifyDisabled.delete(cleanKey);
     if (topic !== undefined) {

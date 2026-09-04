@@ -874,6 +874,70 @@ function testTopologyLinkPorts() {
   assert.ok((server.match(/const link = cleanTopologyLink\(item\);/g) || []).length >= 2 && server.includes('.map(cleanTopologyLink)'), 'config loading, API saves and public topology output must all preserve sanitized link sides');
 }
 
+function testCloudflareResourceNotificationRendering() {
+  const dashboard = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
+  const functionSource = name => {
+    const start = dashboard.indexOf(`function ${name}(`);
+    assert.ok(start >= 0, `dashboard function ${name} must exist`);
+    const end = dashboard.indexOf('\nfunction ', start + 10);
+    return dashboard.slice(start, end > start ? end : undefined);
+  };
+  const mutedKeys = new Set();
+  const domainKey = 'cloudflare:domain:shared%3Aid%2F1';
+  const context = {
+    notifyOff: mutedKeys,
+    ntfyTopics: ['operations', 'domains'],
+    notifyTopicMap: { [domainKey]: 'domains' },
+    BELL_ON: '<svg data-bell="on"></svg>',
+    BELL_OFF: '<svg data-bell="off"></svg>',
+    hasNum: value => value !== null && value !== undefined && Number.isFinite(Number(value)),
+    formatDaysLeft: days => `${days} days left`,
+    pveHeadStat: () => '',
+    offlineRatioBadgeClass: () => 'red',
+    offlineRatioLabel: () => 'offline',
+  };
+  const functions = ['escHtml', 'escAttr', 'bdg', 'notifyBellOnly', 'notifyTopicSelect', 'notifyBell', 'cloudflareResourceNotifyKey', 'buildCloudflare'];
+  vm.runInNewContext(functions.map(functionSource).join('\n'), context);
+  const resources = {
+    online: true,
+    zones: [
+      { id: 'shared:id/1', name: 'same<name>', online: true, status: 'active' },
+      { id: 'shared:id/2', name: 'same<name>', online: true, status: 'active' },
+    ],
+    tunnels: [{ id: 'shared:id/1', name: 'same<name>', online: true, status: 'healthy' }],
+    domains: [
+      { id: 'shared:id/1', name: 'same<name>', daysToExpire: 15, expiring: true },
+      { name: 'fallback.example', daysToExpire: 120 },
+      { daysToExpire: null },
+    ],
+  };
+  const bells = panel => [...panel.body.matchAll(/<button\b[^>]*\bclass="nbell(?: off)?"[^>]*>/g)].map(match => ({
+    key: match[0].match(/data-notify-key="([^"]+)"/)[1],
+    off: match[0].includes('class="nbell off"'),
+    pressed: match[0].match(/aria-pressed="([^"]+)"/)[1],
+  }));
+  const expectedKeys = [
+    'cloudflare:zone:shared%3Aid%2F1',
+    'cloudflare:zone:shared%3Aid%2F2',
+    'cloudflare:tunnel:shared%3Aid%2F1',
+    domainKey,
+    'cloudflare:domain:fallback.example',
+  ];
+  const initial = context.buildCloudflare(resources);
+  assert.deepStrictEqual(bells(initial).map(bell => bell.key), expectedKeys, 'same names must not collide across resource IDs or kinds; identity-free rows must not create a shared mute control');
+  assert.ok(bells(initial).every(bell => !bell.off && bell.pressed === 'true'), 'each resource bell must initially reflect enabled notifications');
+  assert.strictEqual((initial.body.match(/class="cloudflare-resource-status"/g) || []).length, 6, 'every resource must retain its own status badge beside the notification controls');
+  assert.ok(!(initial.detailBadge || initial.badge).includes('nbell'), 'Cloudflare must not expose a platform-wide header bell');
+  assert.ok(initial.body.includes('same&lt;name&gt;') && !initial.body.includes('same<name>'), 'resource names must remain escaped alongside their notification controls');
+  const domainTopic = [...initial.body.matchAll(/<select\b[^>]*data-notify-key="([^"]+)"[^>]*>([\s\S]*?)<\/select>/g)].find(match => match[1] === domainKey);
+  assert.ok(domainTopic && domainTopic[2].includes('<option value="domains" selected>'), 'the per-resource topic selector must retain its saved destination');
+  mutedKeys.add(domainKey);
+  const muted = context.buildCloudflare(resources);
+  assert.deepStrictEqual(bells(muted).filter(bell => bell.off), [{ key: domainKey, off: true, pressed: 'false' }], 'muting a domain must leave same-name zone and tunnel bells enabled');
+  const renamed = context.buildCloudflare({ ...resources, zones: [...resources.zones].reverse().map(zone => ({ ...zone, name: 'renamed.example' })) });
+  assert.deepStrictEqual(bells(renamed).map(bell => bell.key).sort(), [...expectedKeys].sort(), 'resource notification identities must survive renames and row reordering');
+}
+
 function testStaticRegressions() {
   const root = path.join(__dirname, '..');
   const windowsAgent = fs.readFileSync(path.join(root, 'agent', 'omnisight-agent.ps1'), 'utf8');
@@ -1199,12 +1263,11 @@ function testStaticRegressions() {
   assert.ok(cloudflarePanelSource.includes('formatDaysLeft(days)') && cloudflareOverviewSource.includes('formatDaysLeft(days)'), 'both Cloudflare domain render paths must use the shared day-left formatter');
   assert.strictEqual((cloudflarePanelSource.match(/class="mon-row cloudflare-resource-row"/g) || []).length, 3, 'Cloudflare zone, tunnel, and domain rows must share one status-column layout');
   assert.strictEqual((cloudflarePanelSource.match(/class="cloudflare-resource-status"/g) || []).length, 3, 'every Cloudflare resource row must place its badge in the shared status column');
-  assert.ok(cloudflarePanelSource.includes("notifyBell('cloudflare')") && cloudflarePanelSource.includes('detailBadge:'), 'Cloudflare detail must expose a platform notification bell');
-  assert.ok(alertsModule.includes("if (raw.startsWith('cloudflare-')) add('cloudflare')") && server.includes('notificationKeyCandidates(key).some(candidate => notifyDisabled.has(candidate))'), 'the Cloudflare platform bell must mute domain, zone, and tunnel child alerts');
-  assert.ok(cloudflareCollector.includes('registrarDomainsAuthoritative = true') && server.includes('buildCloudflareDomainDetections(cf)') && server.includes('!isStickyAlertKey(key)') && server.includes('ALERT_EPISODE_STATE_PATH') && server.includes('rememberStickyAlert(meta.key, meta.severity)') && server.includes('forgetStickyAlert(key)') && server.includes('alertDispatchIsCurrent(meta)') && server.includes('beginAlertEpisode(key)') && server.includes('invalidateAllAlertEpisodes()') && server.includes('alertFirstSeen.clear()') && server.includes('alertProblemSince.clear()') && server.includes('alertDeliveryCooldownEnabled(meta.key)') && alertsModule.includes('resolveStickyAlertState') && alertsModule.includes('stickyAlertDispatchIsCurrent'), 'Cloudflare domain alerts must persist across transient Registrar failures, history rotation and restarts until an authoritative healthy result resolves them, without stale async deliveries or cooldowns reviving or suppressing episodes');
-  assert.ok(dashboard.includes('.cloudflare-resource-row{display:grid;grid-template-columns:18px minmax(180px,560px) minmax(150px,500px) minmax(180px,max-content);justify-content:start'), 'Cloudflare detail rows must keep their shared columns compact and left-aligned while leaving room for long expiration labels');
+  assert.ok(server.includes('notificationKeyCandidates(key).some(candidate => notifyDisabled.has(candidate))'), 'resource notification preferences must apply to child alert keys');
+  assert.ok(cloudflareCollector.includes('registrarDomainsAuthoritative = true') && server.includes('buildCloudflareResourceDetections(cf)') && server.includes('!isStickyAlertKey(key)') && server.includes('ALERT_EPISODE_STATE_PATH') && server.includes('rememberStickyAlert(meta.key, meta.severity)') && server.includes('forgetStickyAlert(key)') && server.includes('alertDispatchIsCurrent(meta)') && server.includes('beginAlertEpisode(key)') && server.includes('invalidateAllAlertEpisodes()') && server.includes('alertFirstSeen.clear()') && server.includes('alertProblemSince.clear()') && server.includes('alertDeliveryCooldownEnabled(meta.key)') && alertsModule.includes('resolveStickyAlertState') && alertsModule.includes('stickyAlertDispatchIsCurrent'), 'Cloudflare domain alerts must persist across transient Registrar failures, history rotation and restarts until an authoritative healthy result resolves them, without stale async deliveries or cooldowns reviving or suppressing episodes');
+  assert.ok(dashboard.includes('.cloudflare-resource-row{display:grid;grid-template-columns:18px minmax(180px,560px) minmax(150px,500px) minmax(180px,max-content) 126px;justify-content:start'), 'Cloudflare detail rows must keep aligned status labels and a dedicated notification column');
   assert.ok(dashboard.includes('.cloudflare-resource-status{min-width:180px;justify-self:start;text-align:left}'), 'Cloudflare active, healthy, and remaining-days badges must share the same left edge');
-  assert.ok(dashboard.includes('.cloudflare-resource-row{grid-template-columns:9px minmax(0,1fr) 180px;align-items:start') && dashboard.includes('.cloudflare-resource-status{grid-column:3;grid-row:1;min-width:180px}'), 'Cloudflare badges must retain their shared left edge in the narrow layout');
+  assert.ok(dashboard.includes('.cloudflare-resource-row{grid-template-columns:9px minmax(0,1fr) 126px;align-items:start') && dashboard.includes('.cloudflare-resource-status{grid-column:2;grid-row:2;min-width:0}') && dashboard.includes('.cloudflare-resource-notify{grid-column:3;grid-row:1 / 3;align-self:center}'), 'Cloudflare narrow rows must place notification controls beside the name and status without overlapping metadata');
   const ratioFunctions = ['buildProxmox', 'buildLinux', 'buildWindows', 'buildKubernetes', 'buildSynology', 'buildUnifi', 'buildHealthchecks', 'uptimeKumaHealth', 'buildChecks', 'prometheusHealth', 'buildDocker', 'buildDockhand', 'buildFirewall', 'buildTrueNas', 'buildSimpleNasPanel', 'buildPbs', 'buildCloudflare', 'buildCiCd', 'buildVeeam', 'buildPortainer', 'buildDatabase'];
   for (const functionName of ratioFunctions) {
     const start = dashboard.indexOf(`function ${functionName}`);
@@ -1853,6 +1916,7 @@ async function run() {
   testRequestDiagnostics();
   testTopologyProxmoxGuestRows();
   testTopologyLinkPorts();
+  testCloudflareResourceNotificationRendering();
   testStaticRegressions();
   console.log('smoke ok — issue regressions: #4 #5 #6 #7 #9 #10 #12 #18 #20 #22 #23 #24 #25 #27');
 }
