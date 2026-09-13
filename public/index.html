@@ -7322,13 +7322,6 @@ function orderedDashboardIds(ids){
   const previous = activeDashboardPanelOrder;
   const preferred = orderIds(ids, getDashboardPanelOrder());
   activeDashboardPanelOrder = reconcileActiveUiOrder(previous, ids, preferred);
-  if(Array.isArray(previous)){
-    const added = activeDashboardPanelOrder.filter(id => !previous.includes(id));
-    if(added.length){
-      forgetOverviewLayoutSlots(added);
-      persistAutomaticPanelOrder('dashboard', activeDashboardPanelOrder);
-    }
-  }
   return [...activeDashboardPanelOrder];
 }
 (function(){
@@ -7460,27 +7453,6 @@ const overviewResponsiveLayouts = {};
 const overviewCanonicalOrders = {};
 function overviewResponsiveLayoutKey(colCount){
   return `${overviewLayoutKey()}:${Math.max(1, Number(colCount) || 1)}`;
-}
-function removeIdsFromOverviewColumns(columns, ids){
-  const remove = ids instanceof Set ? ids : new Set(cleanUiOrder(ids));
-  return Array.isArray(columns) ? columns.map(col => Array.isArray(col) ? col.filter(id => !remove.has(id)) : []) : columns;
-}
-function forgetOverviewLayoutSlots(ids){
-  const remove = new Set(cleanUiOrder(ids));
-  if(!remove.size) return;
-  Object.keys(overviewResponsiveLayouts).forEach(key => {
-    overviewResponsiveLayouts[key] = removeIdsFromOverviewColumns(overviewResponsiveLayouts[key], remove);
-  });
-  Object.keys(overviewLayouts || {}).forEach(key => {
-    overviewLayouts[key] = removeIdsFromOverviewColumns(overviewLayouts[key], remove);
-  });
-  try {
-    if(Array.isArray(overviewLayouts?.side)) localStorage.setItem('os_overview_layout_side', JSON.stringify(overviewLayouts.side));
-    if(Array.isArray(overviewLayouts?.wide)) localStorage.setItem('os_overview_layout_wide', JSON.stringify(overviewLayouts.wide));
-  } catch {}
-  Object.keys(overviewCanonicalOrders).forEach(key => {
-    overviewCanonicalOrders[key] = cleanUiOrder(overviewCanonicalOrders[key]).filter(id => !remove.has(id));
-  });
 }
 function rememberOverviewLayout(cols, colCount){
   overviewResponsiveLayouts[overviewResponsiveLayoutKey(colCount)] = cols.map(col => [...col]);
