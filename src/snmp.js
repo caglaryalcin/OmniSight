@@ -975,8 +975,12 @@ async function getDiskIO(session, deviceKey, preferSynology = false) {
   return null;
 }
 
-function sumNetworkBandwidth(network) {
+function sumNetworkBandwidth(network, options = {}) {
   if (!Array.isArray(network)) return null;
+  const physical = options.preferPhysical
+    ? network.filter(item => /^(?:eth\d+|en[a-z0-9]+)$/i.test(String(item?.ifName || item?.name || '').trim()))
+    : [];
+  const rows = physical.length ? physical : network;
   let rxBps = 0;
   let txBps = 0;
   let capacityBps = 0;
@@ -985,7 +989,7 @@ function sumNetworkBandwidth(network) {
   let activeInterfaces = 0;
   let hasCapacity = false;
   let any = false;
-  for (const item of network) {
+  for (const item of rows) {
     const rx = isNum(item.rxBps) ? Number(item.rxBps) : (isNum(item.rxMBps) ? Number(item.rxMBps) * 1024 * 1024 : NaN);
     const tx = isNum(item.txBps) ? Number(item.txBps) : (isNum(item.txMBps) ? Number(item.txMBps) * 1024 * 1024 : NaN);
     if (Number.isFinite(rx) && rx >= 0) { rxBps += rx; any = true; }
@@ -1078,8 +1082,8 @@ function shouldUseInterface(iface) {
   const descr = iface.descr || '';
   const combined = `${name} ${descr}`;
   if (!name && !descr) return false;
-  if (/^(lo|dummy|sit|tunl|ip6tnl|veth)/i.test(name)) return false;
-  if (/\b(docker|virbr|vnet|tailscale|wireguard|wg|zt|zerotier)\b/i.test(combined)) return false;
+  if (/^(?:lo\d*|dummy\d*|sit\d*|tunl\d*|tun\d*|tap\d*|ip6tnl\d*|veth|docker|virbr|vnet|tailscale|wireguard|wg\d*|zt\w*|zerotier)/i.test(name)) return false;
+  if (/(?:^|[\s_-])(?:docker|virbr|vnet|tailscale|wireguard|zerotier)(?:[\s_.-]|\d|$)/i.test(combined)) return false;
   if (iface.operStatus != null && iface.operStatus !== 1 && !iface.hasCounters) return false;
   if (iface.hasCounters || iface.rxBps != null || iface.txBps != null) return true;
   return /^(eth|ether|en|lan|wan|ovs_|bond|br|bridge|wlan|wl|wifi|sfp|qsfp|xg|ix|ge|te|port|lte|ppp|vlan)/i.test(name);
@@ -1183,7 +1187,7 @@ async function getDeviceData(device) {
     const networkDiagnostics = network?._diagnostics || null;
     const diskIO = await getDiskIO(session, device.host, isSynology || !!(disks.length || volumes.length))
       .catch(e => { console.error(`[SNMP ${device.name}] disk I/O:`, e.message); return null; });
-    const bandwidth = consumeBandwidthPeak(device.host, sumNetworkBandwidth(network));
+    const bandwidth = consumeBandwidthPeak(device.host, sumNetworkBandwidth(network, { preferPhysical: isSynology }));
     const rawHist = synHistory.get(device.host) || [];
     const sanitized = sanitizeSnmpHistory(rawHist, bandwidth?.historyCapacityBps || bandwidth?.activeCapacityBps || bandwidth?.largestCapacityBps || bandwidth?.capacityBps);
     const hist = sanitized.history;
@@ -1253,7 +1257,8 @@ async function sampleDeviceBandwidth(device) {
   try {
     const network = await getNetwork(session, device.host);
     const networkDiagnostics = network?._diagnostics || null;
-    const bandwidth = sumNetworkBandwidth(network);
+    const preferPhysical = /synology/i.test(String(device.profile || device.preset || ''));
+    const bandwidth = sumNetworkBandwidth(network, { preferPhysical });
     if (bandwidth) recordBandwidthPeak(device.host, bandwidth);
     return {
       name: device.name,
@@ -1304,4 +1309,6 @@ module.exports = {
   ucdRawCpuPercent,
   retainLastKnownTemperature,
   SNMP_SENSOR_LAST_KNOWN_MS,
+  sumNetworkBandwidth,
+  shouldUseInterface,
 };

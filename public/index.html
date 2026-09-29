@@ -2805,6 +2805,39 @@ function formatDaysLeft(value){
   return `${parts.join(' ')} left`;
 }
 /* ci-extract:end formatDaysLeft */
+/* ci-extract:begin healthcheckPeriodLabel */
+function healthcheckDuration(sec){
+  if(sec === null || sec === undefined || sec === '' || !Number.isFinite(Number(sec))) return '—';
+  const value = Number(sec);
+  if(value >= 86400) return (value / 86400).toFixed(value % 86400 ? 1 : 0) + 'd';
+  if(value >= 3600) return (value / 3600).toFixed(value % 3600 ? 1 : 0) + 'h';
+  if(value >= 60) return Math.round(value / 60) + 'm';
+  return value + 's';
+}
+function healthcheckCronPeriod(schedule){
+  const parts = String(schedule || '').trim().split(/\s+/);
+  if(parts.length !== 5) return 'cron';
+  const [minute, hour, dayOfMonth, month, dayOfWeek] = parts;
+  if(dayOfMonth === '*' && month === '*' && dayOfWeek === '*') {
+    if(hour === '*') {
+      if(minute === '*') return '1m';
+      const minuteStep = minute.match(/^\*\/(\d+)$/);
+      if(minuteStep && Number(minuteStep[1]) > 0) return `${Number(minuteStep[1])}m`;
+    }
+    const hourStep = hour.match(/^\*\/(\d+)$/);
+    if(/^\d+$/.test(minute) && hourStep && Number(hourStep[1]) > 0) return `${Number(hourStep[1])}h`;
+    if(/^\d+$/.test(minute) && /^\d+$/.test(hour)) return '1d';
+  }
+  if(/^\d+$/.test(minute) && /^\d+$/.test(hour) && dayOfMonth === '*' && month === '*' && /^\d(?:-\d)?$/.test(dayOfWeek)) return '1w';
+  return 'cron';
+}
+function healthcheckPeriodLabel(check = {}){
+  if(check.periodSec !== null && check.periodSec !== undefined && check.periodSec !== '' && Number.isFinite(Number(check.periodSec))) {
+    return healthcheckDuration(check.periodSec);
+  }
+  return String(check.schedule || '').trim() ? healthcheckCronPeriod(check.schedule) : '—';
+}
+/* ci-extract:end healthcheckPeriodLabel */
 function boundedPct(v){
   if(!hasNum(v)) return null;
   return Math.max(0, Math.min(100, Math.round(Number(v) * 10) / 10));
@@ -5450,13 +5483,6 @@ function buildHealthchecks(hc){
     <div class="csum-item"><div class="csum-val" style="color:var(--muted)">${s.paused??0}</div><div class="csum-lbl">Paused</div></div>
   </div>` : '';
 
-  const fmtDur = sec => {
-    if(sec==null) return '—';
-    if(sec>=86400) return (sec/86400).toFixed(sec%86400?1:0)+'d';
-    if(sec>=3600)  return (sec/3600).toFixed(sec%3600?1:0)+'h';
-    if(sec>=60)    return Math.round(sec/60)+'m';
-    return sec+'s';
-  };
   const hcColHdr = `<div style="display:flex;align-items:center;gap:10px;padding:7px 16px;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);border-bottom:1px solid var(--border)">
     <div style="width:10px;flex-shrink:0"></div>
     <span style="flex:1;min-width:0">Name</span>
@@ -5482,12 +5508,13 @@ function buildHealthchecks(hc){
           const bc2 = c.status==='up'?'green':c.status==='down'?'red':c.status==='grace'?'yellow':'gray';
           const pingUrl = c.pingUrl || '';
           const pingUrlTitle = pingUrl || c.pingUrlHint || 'PING_URL is not available';
+          const scheduleTitle = c.schedule ? `Cron: ${c.schedule}${c.timezone ? ` (${c.timezone})` : ''}` : '';
           return `<div class="mon-row hc-check-row">
             <div class="hc-check-top">
               <div class="mon-dot ${dc2}"></div>
               <div class="mon-name" style="flex:1;width:0;min-width:0" title="${escAttr(c.name || '')}">${escHtml(c.name || '')}</div>
               <span style="width:100px;flex-shrink:0;font-size:13px;color:var(--muted);text-align:center">${c.lastPing?relTime(c.lastPing):'—'}</span>
-              <span style="width:130px;flex-shrink:0;font-size:13px;color:var(--muted);text-align:center">${fmtDur(c.periodSec)} / ${fmtDur(c.graceSec)}</span>
+              <span style="width:130px;flex-shrink:0;font-size:13px;color:var(--muted);text-align:center" title="${escAttr(scheduleTitle)}">${healthcheckPeriodLabel(c)} / ${healthcheckDuration(c.graceSec)}</span>
               <span style="width:74px;flex-shrink:0;display:flex;justify-content:center"><span class="badge bg-${bc2}" style="font-size:13px">${escHtml(c.status || '')}</span></span>
               <span class="notify-col">${notifyBell('hc:'+c.name)}</span>
             </div>

@@ -250,6 +250,8 @@ function testSynologyCpuCounters() {
     ucdRawCpuPercent,
     retainLastKnownTemperature,
     SNMP_SENSOR_LAST_KNOWN_MS,
+    sumNetworkBandwidth,
+    shouldUseInterface,
   } = require('../src/snmp');
   const previous = ucdRawCpuSnapshot([100, 0, 100, 700, 100]);
   const current = ucdRawCpuSnapshot([130, 0, 120, 740, 110]);
@@ -273,6 +275,18 @@ function testSynologyCpuCounters() {
   const expired = retainLastKnownTemperature('fixture-temperature', {}, 1_000 + SNMP_SENSOR_LAST_KNOWN_MS + 1);
   assert.strictEqual(expired.cpuTemp, undefined, 'last-known temperature must expire');
   assert.strictEqual(expired.temperatureStale, false);
+
+  assert.strictEqual(shouldUseInterface({ name: 'docker5a527b0', hasCounters: true, operStatus: 1 }), false, 'Docker bridge interfaces must not contribute to host bandwidth');
+  assert.strictEqual(shouldUseInterface({ name: 'tailscale0', hasCounters: true, operStatus: 1 }), false, 'overlay interfaces must not contribute to host bandwidth');
+  assert.strictEqual(shouldUseInterface({ name: 'eth0', hasCounters: true, operStatus: 1 }), true);
+  const bandwidth = sumNetworkBandwidth([
+    { name: 'eth0', ifName: 'eth0', rxBps: 100, txBps: 20, maxRateBps: 125_000_000 },
+    { name: 'eth1', ifName: 'eth1', rxBps: 50, txBps: 10, maxRateBps: 125_000_000 },
+    { name: 'bond0', ifName: 'bond0', rxBps: 150, txBps: 30, maxRateBps: 250_000_000 },
+  ], { preferPhysical: true });
+  assert.strictEqual(bandwidth.rxBps, 150, 'Synology bandwidth must not count both bond and member interfaces');
+  assert.strictEqual(bandwidth.txBps, 30, 'Synology transmit bandwidth must not count both bond and member interfaces');
+  assert.strictEqual(bandwidth.capacityBps, 250_000_000);
 }
 
 function testProxmoxInstances() {

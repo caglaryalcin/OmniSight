@@ -11,7 +11,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-const BLOCKS = ['fmtChartValue', 'localizeOperationalText', 'offlineRatioLabel', 'offlineRatioBadgeClass', 'formatDaysLeft', 'mergeNotifySnapshot', 'ciSidebarTitle', 'ciProjectSelection'];
+const BLOCKS = ['fmtChartValue', 'localizeOperationalText', 'offlineRatioLabel', 'offlineRatioBadgeClass', 'formatDaysLeft', 'healthcheckPeriodLabel', 'mergeNotifySnapshot', 'ciSidebarTitle', 'ciProjectSelection'];
 
 function extract(source, name) {
   const begin = `/* ci-extract:begin ${name} */`;
@@ -232,7 +232,7 @@ function run() {
   const ctx = {};
   vm.createContext(ctx);
   vm.runInContext(BLOCKS.map(name => extract(html, name)).join('\n'), ctx);
-  const { fmtChartValue, localizeOperationalText, offlineRatioLabel, offlineRatioBadgeClass, formatDaysLeft, mergeNotifySnapshot, ciSidebarTitle, ciProjectIdentity, ciProjectOptionLabel, selectedCiDetailProject, setCiDetailProject } = ctx;
+  const { fmtChartValue, localizeOperationalText, offlineRatioLabel, offlineRatioBadgeClass, formatDaysLeft, healthcheckPeriodLabel, mergeNotifySnapshot, ciSidebarTitle, ciProjectIdentity, ciProjectOptionLabel, selectedCiDetailProject, setCiDetailProject } = ctx;
 
   const githubApi = {
     id:101,
@@ -1350,6 +1350,12 @@ function run() {
   assert.strictEqual(formatDaysLeft(365), '1year left');
   assert.strictEqual(formatDaysLeft(0), '0days left');
   assert.strictEqual(formatDaysLeft(null), 'unknown');
+  assert.strictEqual(healthcheckPeriodLabel({ periodSec: 120 }), '2m');
+  assert.strictEqual(healthcheckPeriodLabel({ schedule: '0 15 * * *' }), '1d');
+  assert.strictEqual(healthcheckPeriodLabel({ schedule: '0 */6 * * *' }), '6h');
+  assert.strictEqual(healthcheckPeriodLabel({ schedule: '*/5 * * * *' }), '5m');
+  assert.strictEqual(healthcheckPeriodLabel({ schedule: '15 3 1 * *' }), 'cron');
+  assert.strictEqual(healthcheckPeriodLabel({}), '—');
   assert.strictEqual(offlineRatioBadgeClass(1, 1), 'red');
   assert.strictEqual(offlineRatioBadgeClass(1, 3), 'yellow');
   assert.strictEqual(offlineRatioBadgeClass(3, 3), 'red');
