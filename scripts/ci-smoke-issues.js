@@ -1159,10 +1159,12 @@ function testStaticRegressions() {
   const originalActiveOrder = ['kubernetes','linux','docker','checks'];
   const afterRemoval = activeOrderContext.reconcileActiveUiOrder(originalActiveOrder, ['kubernetes','linux','docker'], ['kubernetes','linux','docker']);
   assert.strictEqual(JSON.stringify(afterRemoval), JSON.stringify(['kubernetes','linux','docker']), 'removing a platform must leave every surviving dashboard card in place');
-  const afterReAdd = activeOrderContext.reconcileActiveUiOrder(afterRemoval, ['proxmox','kubernetes','linux','docker'], ['proxmox','kubernetes','linux','docker']);
-  assert.strictEqual(JSON.stringify(afterReAdd), JSON.stringify(['kubernetes','linux','docker','proxmox']), 'a newly active or re-added platform must be appended after the existing dashboard cards even when its canonical id comes first');
-  const coldAdd = activeOrderContext.reconcileActiveUiOrder(['linux','docker'], ['proxmox','linux','docker'], ['proxmox','linux','docker']);
-  assert.strictEqual(JSON.stringify(coldAdd), JSON.stringify(['linux','docker','proxmox']), 'the configured-id startup baseline must put a platform added before the first render at the bottom');
+  const afterReAdd = activeOrderContext.reconcileActiveUiOrder(afterRemoval, ['proxmox','kubernetes','linux','docker'], originalActiveOrder);
+  assert.strictEqual(JSON.stringify(afterReAdd), JSON.stringify(['kubernetes','linux','docker','proxmox']), 'a genuinely new platform must be appended without moving the saved dashboard cards');
+  const restoredPlatform = activeOrderContext.reconcileActiveUiOrder(['kubernetes','docker','checks'], originalActiveOrder, originalActiveOrder);
+  assert.strictEqual(JSON.stringify(restoredPlatform), JSON.stringify(originalActiveOrder), 'a temporarily missing platform must return to its saved dashboard slot');
+  const coldAdd = activeOrderContext.reconcileActiveUiOrder(['linux','docker'], ['proxmox','linux','docker'], ['linux','docker','proxmox']);
+  assert.strictEqual(JSON.stringify(coldAdd), JSON.stringify(['linux','docker','proxmox']), 'the configured-id startup baseline must append a platform that is absent from the saved order');
   const masonryAppendStart = dashboard.indexOf('function appendOverviewIdsAtBottom');
   const masonryAppendEnd = dashboard.indexOf('function normalizeOverviewColumns', masonryAppendStart);
   const masonryContext = {};
@@ -1186,6 +1188,7 @@ function testStaticRegressions() {
   assert.strictEqual(JSON.stringify(restoredLayoutContext.result), JSON.stringify([['linux','proxmox'],['docker']]), 'a temporarily absent platform must return to its saved dashboard column and slot');
   const orderedDashboardSource = dashboard.slice(dashboard.indexOf('function orderedDashboardIds'), dashboard.indexOf('\n(function(){', dashboard.indexOf('function orderedDashboardIds')));
   assert.ok(!orderedDashboardSource.includes('forgetOverviewLayoutSlots') && !orderedDashboardSource.includes('persistAutomaticPanelOrder'), 'runtime platform recovery must not erase or rewrite the manually saved dashboard layout');
+  assert.ok(server.includes('function hasConfiguredCiCd(') && server.includes('enabled(config.cicd) && hasConfiguredCiCd(config.cicd)') && server.includes('en(config.cicd) && hasConfiguredCiCd(config.cicd)'), 'CI/CD must stay out of runtime and dashboard data until at least one project or account is configured');
   assert.ok(dashboard.includes('syncOverviewCanonicalOrder(ids)'), 'dashboard renders must keep the current canonical order synchronized without mutating saved layout slots');
   assert.ok(!dashboard.includes('currentDegenerate') && !dashboard.includes('normalizeOverviewColumns.repaired'), 'responsive observers must accept sparse survivor columns without repeatedly rebuilding or rebalancing them');
   assert.ok(i18n.includes("'All hosts':'Tüm hostlar'") && !i18n.includes("'Move up':'Yukarı taşı'") && !i18n.includes("'Move down':'Aşağı taşı'"), 'host filters must stay translated and removed ordering buttons must not leave dead labels');

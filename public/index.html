@@ -2456,7 +2456,11 @@ function applyServerUiPreferences(data = {}){
   if(!data.ui || typeof data.ui !== 'object' || Array.isArray(data.ui)) return;
   const ui = data.ui;
   const signature = uiPreferencesSignature(ui);
-  if(uiPrefsReady && (uiPrefsDirty || signature === uiPrefsLastSignature)) return;
+  // Hydrate once per page load. Later status/summary responses can have been
+  // started before the user's last drag-and-drop save; accepting them would
+  // intermittently restore an older card order. Fresh server preferences are
+  // picked up on the next page load, while this page remains user-controlled.
+  if(uiPrefsReady) return;
   let resaveAfterHydration = false;
   uiPrefsHydrating = true;
   try{
@@ -7299,11 +7303,7 @@ function orderIds(ids, order){
 }
 function reconcileActiveUiOrder(previous, ids, preferredOrder = ids){
   const next = cleanUiOrder(ids);
-  if(!Array.isArray(previous)) return orderIds(next, preferredOrder);
-  const nextSet = new Set(next);
-  const survivors = cleanUiOrder(previous).filter(id => nextSet.has(id));
-  const seen = new Set(survivors);
-  return [...survivors, ...next.filter(id => !seen.has(id) && seen.add(id))];
+  return orderIds(next, preferredOrder);
 }
 let activeSidebarPanelOrder = startupConfiguredIds.length ? orderIds(startupConfiguredIds, sidebarPanelOrder) : null;
 let activeDashboardPanelOrder = startupConfiguredIds.length ? orderIds(startupConfiguredIds, dashboardPanelOrder) : null;

@@ -611,7 +611,7 @@ function run() {
   assert.ok(savePrefsSource.includes('if(!r.ok) throw new Error') && savePrefsSource.includes('scheduleUiPreferencesRetry(revision)'), 'failed preference responses must remain dirty and enter the retry backoff');
   assert.ok(savePrefsSource.includes('acknowledgeUiPreferences(savedUi)') && savePrefsSource.includes('uiPrefsDirty = false'), 'only an acknowledged matching save may clear dirty preference state');
   assert.match(applyPrefsSource, /if\(!data\.ui[^\n]+\) return;/, 'status data without request-scoped UI must not hydrate browser preferences');
-  assert.ok(applyPrefsSource.includes('uiPrefsReady && (uiPrefsDirty || signature === uiPrefsLastSignature)'), 'an in-flight dirty preference must not be overwritten by a status refresh');
+  assert.ok(applyPrefsSource.includes('if(uiPrefsReady) return'), 'status refreshes after initial hydration must never overwrite the user-controlled card order');
   const noUiHydrationContext = {};
   vm.createContext(noUiHydrationContext);
   vm.runInContext(applyPrefsSource, noUiHydrationContext);

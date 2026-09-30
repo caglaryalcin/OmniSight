@@ -3860,6 +3860,10 @@ function topologyViewConfig() {
   };
 }
 
+function hasConfiguredCiCd(conf = config.cicd) {
+  return ciConfigProjects(conf || {}).some(row => row && row.enabled !== false);
+}
+
 function configuredList() {
   const en = c => c && c.enabled !== false;
   const hasPrometheus = c => !!(c && (c.url || (Array.isArray(c.instances) && c.instances.length)));
@@ -3871,7 +3875,6 @@ function configuredList() {
   const hasPbs = c => !!(c && (c.url || (Array.isArray(c.instances) && c.instances.length)));
   const hasVmware = c => !!(c && (c.url || (Array.isArray(c.instances) && c.instances.length)));
   const hasCloudflare = c => !!(c && (c.apiToken || c.token || c.bearerToken));
-  const hasCiCd = c => !!(c && ((Array.isArray(c.projects) && c.projects.length) || (Array.isArray(c.instances) && c.instances.length)));
   const hasVeeam = c => !!(c && (c.url || (Array.isArray(c.instances) && c.instances.length)));
   const hasPortainer = c => !!(c && (c.url || (Array.isArray(c.instances) && c.instances.length)));
   const hasCachedRows = key => {
@@ -3909,7 +3912,7 @@ function configuredList() {
   if (en(config.ugreen)       && hasUgreen(config.ugreen))               ids.push('ugreen');
   if (en(config.pbs)          && hasPbs(config.pbs))                     ids.push('pbs');
   if (en(config.cloudflare)   && hasCloudflare(config.cloudflare))        ids.push('cloudflare');
-  if (en(config.cicd)         && hasCiCd(config.cicd))                   ids.push('cicd');
+  if (en(config.cicd)         && hasConfiguredCiCd(config.cicd))         ids.push('cicd');
   if (en(config.veeam)        && hasVeeam(config.veeam))                  ids.push('veeam');
   if (en(config.portainer)    && hasPortainer(config.portainer))         ids.push('portainer');
   return ids;
@@ -5292,7 +5295,7 @@ function backgroundRefresh(opts = {}) {
     ['unifi',        enabled(config.unifi),        () => getAllUnifiData(config.unifi),           null],
     ['pbs',          enabled(config.pbs),          () => getAllPbsData(config.pbs),               null],
     ['cloudflare',   enabled(config.cloudflare),   () => getCloudflareData(config.cloudflare),    null],
-    ['cicd',         enabled(config.cicd),         () => getAllCiData(config.cicd),               null],
+    ['cicd',         enabled(config.cicd) && hasConfiguredCiCd(config.cicd), () => getAllCiData(config.cicd), null],
     ['veeam',        enabled(config.veeam),        () => getAllVeeamData(config.veeam),           null],
     ['portainer',    enabled(config.portainer),    () => getAllPortainerData(config.portainer),   null],
   ];
@@ -5571,7 +5574,7 @@ function ensureRuntimeShell(data = cache.data) {
   out.cloudflare = en(config.cloudflare)
     ? (out.cloudflare || cloudflareConnectingData(config.cloudflare))
     : null;
-  out.cicd = en(config.cicd)
+  out.cicd = en(config.cicd) && hasConfiguredCiCd(config.cicd)
     ? (out.cicd || cicdConnectingData(config.cicd))
     : null;
   out.veeam = en(config.veeam)
@@ -8108,7 +8111,7 @@ app.post('/api/config', async (req, res) => {
         }
       } else { cache.data.cloudflare = null; }
 
-      if (en(config.cicd)) {
+      if (en(config.cicd) && hasConfiguredCiCd(config.cicd)) {
         if (connectingPlatforms.has('cicd') || !cache.data.cicd) {
           cache.data.cicd = cicdConnectingData(config.cicd);
         }

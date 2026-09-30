@@ -370,6 +370,7 @@ async function testGitlabDiscovery() {
 }
 
 async function testValidation() {
+  assert.deepStrictEqual(configuredProjects({ enabled: true, projects: [] }), [], 'enabling CI/CD without an account must not create a configured project');
   const allProjects = configuredProjects({ projects: [{ provider: 'github', repo: '*', allRepositories: true }] });
   assert.strictEqual(allProjects[0].name, 'All GitHub repositories', 'an unnamed account-wide row must never render as a raw asterisk');
   await assert.rejects(() => listGithubRepositories({}), /GitHub token is required/);
