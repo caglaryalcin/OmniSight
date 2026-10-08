@@ -20,7 +20,7 @@ if (Get-Service -Name $serviceName -ErrorAction SilentlyContinue) { throw "$serv
 if (Test-Path -LiteralPath $dataDir) { throw "$dataDir already exists on the runner" }
 if (Test-Path -LiteralPath $installDir) { throw "$installDir already exists on the runner" }
 $compiledVersion = [Reflection.AssemblyName]::GetAssemblyName($ExecutablePath).Version.ToString(3)
-if ($compiledVersion -ne "1.4.3") { throw "Unexpected precompiled Windows agent version: $compiledVersion" }
+if ($compiledVersion -ne "1.4.4") { throw "Unexpected precompiled Windows agent version: $compiledVersion" }
 
 try {
   $mockSource = @'
@@ -86,7 +86,7 @@ http.createServer((req, res) => {
   if (-not (Test-Path -LiteralPath $reportPath)) { throw "Windows service did not send a report" }
   if (-not (Test-Path -LiteralPath $verificationPath)) { throw "Windows installer did not verify a fresh dashboard report" }
   $report = Get-Content -LiteralPath $reportPath -Raw | ConvertFrom-Json
-  if ($report.id -ne "windows-service-ci" -or $report.platform -ne "windows" -or $report.agentVersion -ne "1.4.3") { throw "Windows service report identity is invalid" }
+  if ($report.id -ne "windows-service-ci" -or $report.platform -ne "windows" -or $report.agentVersion -ne "1.4.4") { throw "Windows service report identity is invalid" }
   if ($null -eq $report.cpu -or $null -eq $report.mem -or $null -eq $report.disk -or $null -eq $report.services) { throw "Windows service report is missing required metrics" }
   Write-Host "Windows service install, lifecycle and fresh-report verification test passed"
 } finally {

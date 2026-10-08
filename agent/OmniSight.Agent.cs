@@ -22,8 +22,8 @@ using Microsoft.Win32;
 [assembly: AssemblyDescription("OmniSight Windows monitoring service")]
 [assembly: AssemblyCompany("OmniSight")]
 [assembly: AssemblyProduct("OmniSight Agent")]
-[assembly: AssemblyVersion("1.4.3.0")]
-[assembly: AssemblyFileVersion("1.4.3.0")]
+[assembly: AssemblyVersion("1.4.4.0")]
+[assembly: AssemblyFileVersion("1.4.4.0")]
 
 namespace OmniSight.Agent
 {
@@ -31,7 +31,7 @@ namespace OmniSight.Agent
     {
         internal const string ServiceName = "OmniSightAgent";
         internal const string DisplayName = "OmniSight Agent";
-        internal const string Version = "1.4.3";
+        internal const string Version = "1.4.4";
         internal static readonly string DataDirectory = ResolveDirectory("OMNISIGHT_AGENT_DATA_DIR", Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "OmniSight"));
         internal static readonly string ConfigPath = Path.Combine(DataDirectory, "agent.json");
         internal static readonly string AgentIdPath = Path.Combine(DataDirectory, "agent.id");
@@ -565,10 +565,7 @@ namespace OmniSight.Agent
                 {
                     if (windowsUpdate != null) return true;
                 }
-                using (RegistryKey key = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Session Manager"))
-                {
-                    return key != null && key.GetValue("PendingFileRenameOperations") != null;
-                }
+                return false;
             }
             catch { return false; }
         }

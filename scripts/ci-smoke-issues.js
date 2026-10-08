@@ -1009,7 +1009,7 @@ function testStaticRegressions() {
   const windowsServiceVersion = (windowsService.match(/internal const string Version = "([^"]+)"/) || [])[1];
   assert.strictEqual(linuxAgentVersion, windowsAgentVersion, 'Linux and Windows agent versions must stay synchronized');
   assert.strictEqual(linuxAgentVersion, windowsServiceVersion, 'Linux and Windows service agent versions must stay synchronized');
-  assert.strictEqual(linuxAgentVersion, '1.4.3', 'agents must advertise the report-liveness-safe 1.4.3 protocol');
+  assert.strictEqual(linuxAgentVersion, '1.4.4', 'agents must advertise the reboot-status-safe 1.4.4 protocol');
   assert.ok(server.includes("const WINDOWS_SERVICE_AGENT_VERSION = '1.4.0'") && server.includes('versionCompare(agent.agentVersion, WINDOWS_SERVICE_AGENT_VERSION) < 0'), 'legacy Windows agents must receive a one-time service migration command instead of a remote update that can stop the scheduled task');
   assert.ok(windowsInstaller.includes('New-Service -Name $script:ServiceName') && windowsInstaller.includes('failureflag') && !windowsInstaller.includes('Register-ScheduledTask'), 'Windows installs must use Service Control Manager rather than a persistent scheduled task');
   assert.ok(windowsInstaller.includes('Repair-AgentDataAccess') && windowsInstaller.includes('Protect-AgentDataAcl') && windowsInstaller.lastIndexOf('    Protect-AgentDataAcl') < windowsInstaller.lastIndexOf('    Start-OmniSightService'), 'Windows agent ACL hardening must be recoverable and complete before the service starts writing logs');
@@ -1019,6 +1019,8 @@ function testStaticRegressions() {
   assert.ok(windowsAgent.includes('Invoke-WindowsServiceMigration') && windowsAgent.includes('$ReportedVersion = "1.3.4"') && windowsAgent.includes('legacy agent will continue'), 'legacy Windows agents must migrate automatically and retain a safe fallback');
   assert.ok(windowsService.includes('class OmniSightAgentService : ServiceBase') && windowsService.includes('protected override void OnStart') && windowsService.includes('protected override void OnStop'), 'the Windows agent must implement the Windows service lifecycle');
   assert.ok(windowsService.includes('--windows-update-probe') && windowsService.includes('new Thread(RefreshUpdateStatus)') && windowsService.includes('WaitForExit(UpdateProbeTimeoutSeconds * 1000)') && windowsService.includes('process.Kill()'), 'Windows Update discovery must run outside the report worker and terminate after a bounded wait');
+  assert.ok(windowsService.includes('Microsoft.Update.SystemInfo') && windowsService.includes('Component Based Servicing\\RebootPending') && windowsService.includes('WindowsUpdate\\Auto Update\\RebootRequired') && !windowsService.includes('PendingFileRenameOperations'), 'Windows service reboot status must use authoritative servicing indicators and ignore unrelated pending file operations');
+  assert.ok(windowsAgent.includes('Microsoft.Update.SystemInfo') && windowsAgent.includes('Component Based Servicing\\RebootPending') && windowsAgent.includes('WindowsUpdate\\Auto Update\\RebootRequired') && !windowsAgent.includes('PendingFileRenameOperations'), 'legacy Windows reboot status must use authoritative servicing indicators and ignore unrelated pending file operations');
   assert.ok(windowsService.includes('CreateWmiSearcher(') && windowsService.includes('searcher.Options.Timeout = TimeSpan.FromSeconds(WmiQueryTimeoutSeconds)') && windowsService.includes('private const int WmiQueryTimeoutSeconds = 3'), 'every native Windows WMI collector must have a bounded query timeout below the heartbeat deadline');
   assert.ok(windowsInstaller.includes('function Wait-OmniSightFreshReport') && windowsInstaller.lastIndexOf('Wait-OmniSightFreshReport $url $token $insecure $agentId $preflightPing') > windowsInstaller.lastIndexOf('  } finally {') && windowsInstaller.indexOf('Wait-OmniSightFreshReport $url $token $insecure $agentId $preflightPing') < windowsInstaller.indexOf('installed and started (id:'), 'Windows repair must verify a new dashboard report after the rollback boundary and before claiming success');
   assert.ok(windowsInstaller.includes('Stop-ScheduledTask -TaskName $script:TaskName') && windowsService.includes('class LegacyTaskCleanup') && windowsService.includes('/End /TN') && windowsService.includes('/Delete /TN'), 'a successful Windows service migration must stop and remove every running legacy scheduled-task instance');
@@ -1351,7 +1353,7 @@ function testStaticRegressions() {
     agentInstallRole: agent => agent.role,
     shQuote: value => `'${String(value ?? '').replace(/'/g, `'\\''`)}'`,
     WINDOWS_TLS12_BOOTSTRAP: '',
-    LATEST_AGENT_VERSION: '1.4.3',
+    LATEST_AGENT_VERSION: '1.4.4',
     t: text => text,
     esc: text => String(text),
   };
@@ -1473,7 +1475,7 @@ function testStaticRegressions() {
     assert.ok(dockerIgnore.includes(pattern), `${pattern} must not enter the Docker build context`);
   }
   assert.ok(deploy.includes("'screenshots/**'") && deploy.includes("'.github/workflows/ci.yml'"), 'non-runtime media and CI-only workflow changes must not publish a Docker image');
-  assert.ok(ci.includes("if ($version -ne '1.4.3')") && dockerIgnore.includes('**/*.txt') && dockerIgnore.includes('!public/docs/en.txt') && dockerIgnore.includes('!public/docs/tr.txt'), 'CI must validate agent 1.4.3 while Docker keeps only runtime documentation text files');
+  assert.ok(ci.includes("if ($version -ne '1.4.4')") && dockerIgnore.includes('**/*.txt') && dockerIgnore.includes('!public/docs/en.txt') && dockerIgnore.includes('!public/docs/tr.txt'), 'CI must validate agent 1.4.4 while Docker keeps only runtime documentation text files');
   assert.ok(docker.includes("reqJson(host, '/info')") && docker.includes("info --format '{{.MemTotal}}'"), 'Docker collectors must read host memory totals');
   assert.ok(fs.existsSync(path.join(root, 'src', 'unifi.js')));
   assert.ok(snmp.includes('session.subtree(oid, 20'), 'SNMP reads must stop at the requested OID subtree');

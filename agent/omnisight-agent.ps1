@@ -1,7 +1,7 @@
 Set-StrictMode -Version 2.0
 $ErrorActionPreference = "SilentlyContinue"
 
-$Version = "1.4.3"
+$Version = "1.4.4"
 $ReportedVersion = $Version
 $Url = [string]$env:OMNISIGHT_URL
 $Url = $Url.TrimEnd("/")
@@ -192,12 +192,6 @@ function Get-UpdateStatus {
       "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired"
     )
     $rebootRequired = @($rebootPaths | Where-Object { Test-Path $_ }).Count -gt 0
-    if (-not $rebootRequired) {
-      try {
-        $pendingRename = (Get-ItemProperty "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager" -Name PendingFileRenameOperations -ErrorAction Stop).PendingFileRenameOperations
-        $rebootRequired = $null -ne $pendingRename
-      } catch {}
-    }
   }
 
   $checkedAt = [int64][math]::Floor(($now.ToUniversalTime() - [datetime]"1970-01-01").TotalSeconds)
