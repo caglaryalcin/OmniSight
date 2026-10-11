@@ -482,7 +482,7 @@ async function getRouterOsHealthMetrics(session) {
 
 async function getScalarTemperatures(session) {
   const scalarOids = [
-    ['1.3.6.1.4.1.6574.1.2.0', 'CPU temperature'],
+    ['1.3.6.1.4.1.6574.1.2.0', 'System temperature'],
     ['1.3.6.1.4.1.14988.1.1.3.5.0', 'Sensor temperature'],
     ['1.3.6.1.4.1.14988.1.1.3.6.0', 'CPU temperature'],
     ['1.3.6.1.4.1.14988.1.1.3.7.0', 'Board temperature'],
@@ -615,6 +615,7 @@ async function getSystemInfo(session, deviceKey) {
     '1.3.6.1.4.1.6574.1.1.1.0',
     '1.3.6.1.4.1.6574.1.1.2.0',
     '1.3.6.1.4.1.6574.1.2.0',
+    '1.3.6.1.4.1.6574.1.8.0',
   ]);
   const synologyCpuUser = synVals['1.3.6.1.4.1.6574.1.4.1.0'];
   const synologyCpuSystem = synVals['1.3.6.1.4.1.6574.1.4.2.0'];
@@ -627,7 +628,11 @@ async function getSystemInfo(session, deviceKey) {
   try {
     sensorMetrics = await getSensorMetrics(session);
   } catch (e) { console.error(`[SNMP ${deviceKey} sensors]`, e.message); }
-  const synologyTemp = { value: normalizeTemperature(synVals['1.3.6.1.4.1.6574.1.2.0']), label: 'CPU temperature' };
+  const synologyTemp = { value: normalizeTemperature(synVals['1.3.6.1.4.1.6574.1.2.0']), label: 'System temperature' };
+  const synologyThermalStatusCode = snmpNumber(synVals['1.3.6.1.4.1.6574.1.8.0']);
+  const thermalStatus = synologyThermalStatusCode === 1 ? 'normal'
+    : synologyThermalStatusCode === 2 ? 'failed'
+    : null;
   const temperatureMetrics = classifyTemperatureMetrics([
     ...(synologyTemp.value != null ? [synologyTemp] : []),
     ...(sensorMetrics.temperatures?.rows || []),
@@ -735,6 +740,7 @@ async function getSystemInfo(session, deviceKey) {
     systemTemperatureLabel: systemTemperature?.label ?? null,
     systemTemp: primaryTemp?.value ?? null,
     systemTempLabel: primaryTemp?.label ?? null,
+    thermalStatus,
     nvmeTemps: temperatureMetrics.nvmeTemps,
     fanSpeeds: sensorMetrics.fanSpeeds || [],
     sensors: {
@@ -776,9 +782,12 @@ async function getDisks(session) {
     const rawName = nameMap[idx];
     const rawModel = modelMap[idx];
     const name = cleanSnmpText(rawName).trim() || cleanSnmpText(rawModel).trim() || `Disk ${idx}`;
+    const model = cleanSnmpText(rawModel).trim();
     const statusCode = snmpNumber(statMap[idx]) || 1;
     return {
       name,
+      model: model || null,
+      type: /(?:ssd|nvme|solid[ -]?state)/i.test(`${name} ${model}`) ? 'ssd' : 'hdd',
       status: DISK_STATUS[statusCode] || 'unknown',
       healthy: statusCode === 1,
       temp: diskTempNum(tempMap[idx]),
@@ -1224,6 +1233,7 @@ async function getDeviceData(device) {
       systemTemperatureLabel: sysInfo.systemTemperatureLabel ?? null,
       systemTemp: sysInfo.systemTemp ?? null,
       systemTempLabel: sysInfo.systemTempLabel ?? null,
+      thermalStatus: sysInfo.thermalStatus ?? null,
       temperatureStale: !!sysInfo.temperatureStale,
       temperatureLastKnownAt: sysInfo.temperatureLastKnownAt ?? null,
       ram:     sysInfo.ram     ?? null,

@@ -11,7 +11,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-const BLOCKS = ['fmtChartValue', 'localizeOperationalText', 'offlineRatioLabel', 'offlineRatioBadgeClass', 'formatDaysLeft', 'healthcheckPeriodLabel', 'mergeNotifySnapshot', 'ciSidebarTitle', 'ciProjectSelection'];
+const BLOCKS = ['fmtChartValue', 'localizeOperationalText', 'offlineRatioLabel', 'offlineRatioBadgeClass', 'formatDaysLeft', 'healthcheckPeriodLabel', 'mergeNotifySnapshot', 'ciSidebarTitle', 'ciProjectSelection', 'deviceTemperature'];
 
 function extract(source, name) {
   const begin = `/* ci-extract:begin ${name} */`;
@@ -232,7 +232,24 @@ function run() {
   const ctx = {};
   vm.createContext(ctx);
   vm.runInContext(BLOCKS.map(name => extract(html, name)).join('\n'), ctx);
-  const { fmtChartValue, localizeOperationalText, offlineRatioLabel, offlineRatioBadgeClass, formatDaysLeft, healthcheckPeriodLabel, mergeNotifySnapshot, ciSidebarTitle, ciProjectIdentity, ciProjectOptionLabel, selectedCiDetailProject, setCiDetailProject } = ctx;
+  const { fmtChartValue, localizeOperationalText, offlineRatioLabel, offlineRatioBadgeClass, formatDaysLeft, healthcheckPeriodLabel, mergeNotifySnapshot, ciSidebarTitle, ciProjectIdentity, ciProjectOptionLabel, selectedCiDetailProject, setCiDetailProject, temperatureSensorKind, deviceTemperatureSeverity, deviceTemperatureColor } = ctx;
+
+  assert.strictEqual(deviceTemperatureSeverity('mikrotik', 57, 'system'), 'normal');
+  assert.strictEqual(deviceTemperatureSeverity('mikrotik', 58, 'system'), 'warm');
+  assert.strictEqual(deviceTemperatureSeverity('mikrotik', 65, 'system'), 'hot');
+  assert.strictEqual(deviceTemperatureSeverity('unifi', 84, 'cpu'), 'warm');
+  assert.strictEqual(deviceTemperatureSeverity('unifi', 85, 'cpu'), 'hot');
+  assert.strictEqual(deviceTemperatureSeverity('qnap', 74, 'cpu'), 'warm');
+  assert.strictEqual(deviceTemperatureSeverity('qnap', 75, 'cpu'), 'hot');
+  assert.strictEqual(deviceTemperatureSeverity('qnap', 52, 'hdd'), 'hot');
+  assert.strictEqual(deviceTemperatureSeverity('ugreen', 55, 'hdd'), 'hot');
+  assert.strictEqual(deviceTemperatureSeverity('ugreen', 70, 'ssd'), 'hot');
+  assert.strictEqual(deviceTemperatureSeverity('synology', 95, 'system', 'normal'), 'normal', 'Synology must use DSM thermal state instead of a universal numeric limit');
+  assert.strictEqual(deviceTemperatureSeverity('synology', 30, 'system', 'failed'), 'hot');
+  assert.strictEqual(deviceTemperatureSeverity('synology', 60, 'system'), 'unknown');
+  assert.strictEqual(deviceTemperatureColor('synology', 60, 'system'), 'var(--muted)');
+  assert.strictEqual(temperatureSensorKind('NVMe SSD temperature'), 'ssd');
+  assert.strictEqual(temperatureSensorKind('CPU temperature'), 'cpu');
 
   const githubApi = {
     id:101,

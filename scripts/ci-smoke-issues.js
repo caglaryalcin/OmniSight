@@ -1486,6 +1486,9 @@ function testStaticRegressions() {
   assert.ok(snmp.includes("const oids = ['50', '51', '52', '53', '54']"), 'UCD CPU must use the canonical non-overlapping counters');
   assert.ok(!snmp.includes("'55', '56'"), 'UCD raw kernel and interrupt counters must not be added to raw system twice');
   assert.ok(snmp.indexOf("snmpWalk(session, '1.3.6.1.2.1.25.3.3.1.2')") < snmp.indexOf('cpuUser == null && synologyCpuUser'), 'HOST-RESOURCES CPU must take priority over Synology vendor CPU');
+  assert.ok(snmp.includes("['1.3.6.1.4.1.6574.1.2.0', 'System temperature']"), 'Synology MIB temperature must be identified as the system temperature');
+  assert.ok(snmp.includes("'1.3.6.1.4.1.6574.1.8.0'") && snmp.includes("synologyThermalStatusCode === 1 ? 'normal'") && snmp.includes("synologyThermalStatusCode === 2 ? 'failed'"), 'Synology temperature colors must use DSM thermal status');
+  assert.ok(snmp.includes('thermalStatus: sysInfo.thermalStatus ?? null'), 'Synology DSM thermal status must reach the dashboard');
   assert.ok(server.includes("const ADMIN_VISIBLE_CONFIG_SECRET_KEYS = new Set(['community'])"), 'admins must see the configured SNMP community');
   assert.ok(server.includes("role === 'admin' ? ADMIN_VISIBLE_CONFIG_SECRET_KEYS : null"), 'SNMP community visibility must remain admin-only');
   assert.ok(settings.includes("const PLATFORM_MUTATION_CONTROL_SELECTOR = '.btn-add,.platform-add,.arr-item .btn-rm,.sys-list .btn-rm,.card-body input[type=\"checkbox\"]'"), 'platform add/remove controls and all subordinate checkboxes must share one lock selector');

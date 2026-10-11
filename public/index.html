@@ -2787,6 +2787,47 @@ function tempColor(v){ return v>=60?'var(--red)':v>=50?'var(--yellow)':'var(--gr
 function tempHex(v){ return v>=60?'#F87171':v>=50?'#FBBF24':'#34D399' }
 function pveTempColor(v){ return v>=60?'var(--red)':'var(--yellow)' }
 function pveTempHex(v){ return v>=60?'#F87171':'#FBBF24' }
+/* ci-extract:begin deviceTemperature */
+const DEVICE_TEMPERATURE_THRESHOLDS = Object.freeze({
+  // Values follow the manufacturers' published fan/protection thresholds.
+  // Synology publishes a model-aware thermal state instead of one universal °C limit.
+  mikrotik: Object.freeze({ cpu:[58,65], system:[58,65], default:[58,65] }),
+  unifi: Object.freeze({ cpu:[70,85], system:[70,85], hdd:[70,85], ssd:[70,85], default:[70,85] }),
+  qnap: Object.freeze({ cpu:[65,75], system:[50,60], hdd:[45,52], ssd:[45,52], default:[50,60] }),
+  ugreen: Object.freeze({ cpu:[70,80], system:[70,80], hdd:[45,55], ssd:[60,70], default:[70,80] }),
+  generic: Object.freeze({ cpu:[50,60], system:[50,60], hdd:[50,60], ssd:[50,60], default:[50,60] }),
+});
+function temperatureSensorKind(label, fallback = 'system'){
+  const text = String(label || '').toLowerCase();
+  if(/nvme|ssd|solid[ -]?state/.test(text)) return 'ssd';
+  if(/hdd|hard disk|drive|disk/.test(text)) return 'hdd';
+  if(/cpu|processor|soc/.test(text)) return 'cpu';
+  if(/system|board|sensor|ambient|chassis/.test(text)) return 'system';
+  return fallback;
+}
+function deviceTemperatureSeverity(profile, value, kind = 'system', thermalStatus = null){
+  const vendor = String(profile || 'generic').toLowerCase();
+  const status = String(thermalStatus || '').toLowerCase();
+  if(vendor === 'synology'){
+    if(/failed|fail|critical|hot|overheat/.test(status)) return 'hot';
+    if(/normal|healthy|ok/.test(status)) return 'normal';
+    return 'unknown';
+  }
+  const numeric = Number(value);
+  if(!Number.isFinite(numeric)) return 'unknown';
+  const thresholds = DEVICE_TEMPERATURE_THRESHOLDS[vendor] || DEVICE_TEMPERATURE_THRESHOLDS.generic;
+  const [warm, hot] = thresholds[kind] || thresholds.default;
+  return numeric >= hot ? 'hot' : numeric >= warm ? 'warm' : 'normal';
+}
+function deviceTemperatureColor(profile, value, kind = 'system', thermalStatus = null){
+  const severity = deviceTemperatureSeverity(profile, value, kind, thermalStatus);
+  return severity === 'hot' ? 'var(--red)' : severity === 'warm' ? 'var(--yellow)' : severity === 'normal' ? 'var(--green)' : 'var(--muted)';
+}
+function deviceTemperatureHex(profile, value, kind = 'system', thermalStatus = null){
+  const severity = deviceTemperatureSeverity(profile, value, kind, thermalStatus);
+  return severity === 'hot' ? '#F87171' : severity === 'warm' ? '#FBBF24' : severity === 'normal' ? '#34D399' : '#94A3B8';
+}
+/* ci-extract:end deviceTemperature */
 function tempHistoryKey(label){
   const clean = String(label || 'temperature').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
   return `temp_${clean || 'temperature'}`;
@@ -5045,7 +5086,7 @@ function nasSummaryMetricHtml({ online = 0, total = 0, cpu = null, ram = null, t
     <div class="${itemCls}"><div class="${valCls}">${online}/${total}</div><div class="${lblCls}">Devices</div></div>
     ${metric(cpu, 'CPU Usage', hasNum(cpu) ? bc(cpu) : 'var(--muted)')}
     ${metric(ram, 'Ram Usage', hasNum(ram) ? bc(ram) : 'var(--muted)')}
-    ${metric(temp, 'CPU Temp', hasNum(temp) ? tempColor(temp) : 'var(--muted)', '°C')}
+    ${metric(temp, opts.tempLabel || 'CPU Temp', hasNum(temp) ? deviceTemperatureColor(opts.tempProfile, temp, opts.tempKind || 'cpu', opts.thermalStatus) : 'var(--muted)', '°C')}
   </div>`;
 }
 
@@ -5060,12 +5101,19 @@ function buildSynology(syn, opts = {}){
   const onlineDevs = syn.filter(d=>d.online);
   const connectingDevs = syn.filter(d=>d._connecting);
   const offline = syn.length - onlineDevs.length - connectingDevs.length;
-  const allOk = onlineDevs.length === syn.length;
   const isConnecting = connectingDevs.length > 0 && offline === 0;
 
   const cpuVals = onlineDevs.filter(d=>d.cpu!=null).map(d=>d.cpu);
   const ramVals = onlineDevs.filter(d=>d.ram).map(d=>d.ram.percent);
   const tempVals = onlineDevs.filter(d=>d.systemTemp!=null && !d.temperatureStale).map(d=>d.systemTemp);
+  const summaryThermalStatus = onlineDevs.some(d=>d.thermalStatus === 'failed') ? 'failed'
+    : onlineDevs.length && onlineDevs.every(d=>d.thermalStatus === 'normal') ? 'normal'
+    : null;
+  const summaryTempKind = temperatureSensorKind(onlineDevs.find(d=>d.systemTempLabel)?.systemTempLabel, 'system');
+  const temperatureStates = onlineDevs.map(d=>deviceTemperatureSeverity(panelId, d.systemTemp, temperatureSensorKind(d.systemTempLabel, 'system'), d.thermalStatus));
+  const thermalHot = temperatureStates.includes('hot');
+  const thermalWarm = temperatureStates.includes('warm');
+  const allOk = onlineDevs.length === syn.length && !thermalHot && !thermalWarm;
   const volCount = onlineDevs.reduce((s,d)=>s+(d.volumes?.length||0),0);
   const metric = (vals, unit, colorFn, limit) => {
     if(!vals.length) return null;
@@ -5073,19 +5121,28 @@ function buildSynology(syn, opts = {}){
     const ok = vals.every(v=>v<limit);
     return { val: ok?'healthy':'high', color: ok?'var(--green)':'var(--red)' };
   };
-  const cpuM = metric(cpuVals,'%',bc,90), ramM = metric(ramVals,'%',bc,90), tempM = metric(tempVals,'°C',tempColor,60);
+  const cpuM = metric(cpuVals,'%',bc,90), ramM = metric(ramVals,'%',bc,90);
+  const tempM = tempVals.length ? (() => {
+    if(tempVals.length === 1) return { val:`${tempVals[0]}°C`, color:deviceTemperatureColor(panelId, tempVals[0], summaryTempKind, summaryThermalStatus) };
+    const severity = thermalHot ? 'hot' : thermalWarm ? 'warm' : temperatureStates.includes('normal') ? 'normal' : 'unknown';
+    return { val:severity === 'hot'?'high':severity === 'warm'?'warm':severity === 'normal'?'healthy':'unknown', color:severity === 'hot'?'var(--red)':severity === 'warm'?'var(--yellow)':severity === 'normal'?'var(--green)':'var(--muted)' };
+  })() : null;
   const cell = (m,lbl,sb) => m ? `<div class="${sb?'sb-csum-item':'csum-item'}"><div class="${sb?'sb-csum-val':'csum-val'}" style="color:${m.color}">${m.val}</div><div class="${sb?'sb-csum-lbl':'csum-lbl'}">${lbl}</div></div>` : '';
 
   const cpuAvg = avgPct(cpuVals);
   const ramAvg = avgPct(ramVals);
   const tempAvg = tempVals.length ? Math.round(tempVals.reduce((a,b)=>a+b,0) / tempVals.length) : null;
-  const sbSummaryHtml = nasSummaryMetricHtml({ online: onlineDevs.length, total: syn.length, cpu: cpuAvg, ram: ramAvg, temp: tempAvg });
+  const summaryTempLabel = panelId === 'synology' ? 'System Temp' : 'Temperature';
+  const sbSummaryHtml = nasSummaryMetricHtml(
+    { online: onlineDevs.length, total: syn.length, cpu: cpuAvg, ram: ramAvg, temp: tempAvg },
+    { tempProfile:panelId, tempKind:summaryTempKind, thermalStatus:summaryThermalStatus, tempLabel:summaryTempLabel },
+  );
 
   const summaryHtml = `<div class="csum">
     <div class="csum-item"><div class="csum-val">${onlineDevs.length}/${syn.length}</div><div class="csum-lbl">Devices</div></div>
     ${cell(cpuM,'CPU',false)}
     ${cell(ramM,'RAM',false)}
-    ${cell(tempM,'CPU temp',false)}
+    ${cell(tempM,summaryTempLabel,false)}
     ${volCount?`<div class="csum-item"><div class="csum-val">${volCount}</div><div class="csum-lbl">Volumes</div></div>`:''}
   </div>`;
 
@@ -5132,9 +5189,18 @@ function buildSynology(syn, opts = {}){
     const nvmeTemps = Array.isArray(dev.nvmeTemps) ? dev.nvmeTemps : [];
     const primaryFan = snmpPrimaryFan(fanSpeeds);
     const extraTempRows = [
-      ...(systemTemperature != null ? [{ label: dev.systemTemperatureLabel || 'System Temp', value: systemTemperature }] : []),
-      ...nvmeTemps.map((t, idx) => ({ label: t.label || t.name || `NVMe ${idx + 1}`, value: t.value })),
+      ...(systemTemperature != null ? [{ label: dev.systemTemperatureLabel || 'System Temp', value: systemTemperature, kind:'system' }] : []),
+      ...nvmeTemps.map((t, idx) => ({ label: t.label || t.name || `NVMe ${idx + 1}`, value: t.value, kind:'ssd' })),
     ];
+    const deviceTemperatureStates = [
+      ...(dev.thermalStatus ? [deviceTemperatureSeverity(panelId, dev.systemTemp, 'system', dev.thermalStatus)] : []),
+      ...(cpuTemp != null ? [deviceTemperatureSeverity(panelId, cpuTemp, 'cpu', dev.thermalStatus)] : []),
+      ...(systemTemperature != null ? [deviceTemperatureSeverity(panelId, systemTemperature, 'system', dev.thermalStatus)] : []),
+      ...extraTempRows.map(t=>deviceTemperatureSeverity(panelId, t.value, t.kind || temperatureSensorKind(t.label), t.kind === 'system' ? dev.thermalStatus : null)),
+      ...(dev.disks || []).filter(d=>d.temp!=null).map(d=>deviceTemperatureSeverity(panelId, d.temp, d.type || temperatureSensorKind(`${d.name} ${d.model || ''}`, 'hdd'))),
+    ];
+    const deviceThermalHot = deviceTemperatureStates.includes('hot');
+    const deviceThermalWarm = deviceTemperatureStates.includes('warm');
     const diskIOHistory = rateHistoryMBps(dev.history, 'diskIO', 'diskIOMbps');
     const bandwidthCapacityBps = hasNum(dev.metrics?.bandwidth?.historyCapacityBps) ? Number(dev.metrics.bandwidth.historyCapacityBps)
       : hasNum(dev.metrics?.bandwidth?.activeCapacityBps) ? Number(dev.metrics.bandwidth.activeCapacityBps)
@@ -5151,7 +5217,7 @@ function buildSynology(syn, opts = {}){
     const auxiliaryStat = primaryFan
       ? pveHeadStat(snmpFanLabel(primaryFan), `${primaryFan.value} RPM`, 'var(--text)')
       : (systemTemperature != null
-          ? pveHeadStat('Sys temp', `${systemTemperature}°C${temperatureSuffix}`, pveTempColor(systemTemperature))
+          ? pveHeadStat('Sys temp', `${systemTemperature}°C${temperatureSuffix}`, deviceTemperatureColor(panelId, systemTemperature, 'system', dev.thermalStatus))
           : (dev.uptimeSeconds == null ? pveHeadStat('Fan', '--', 'var(--muted)') : ''));
     const uptimeStat = dev.uptimeSeconds != null
       ? pveHeadStat('Uptime', fmtUptime(dev.uptimeSeconds), 'var(--text)', '', 'is-uptime')
@@ -5160,7 +5226,7 @@ function buildSynology(syn, opts = {}){
       pveHeadStat('Host', dev.host || '-'),
       dev.cpu != null ? pveHeadStat('CPU', `${dev.cpu}%`, bc(dev.cpu), miniSparkline(dev.history, 'cpu', dev.cpu)) : pveHeadStat('CPU', '--', 'var(--muted)'),
       dev.ram ? pveHeadStat('RAM', `${dev.ram.percent}%`, bc(dev.ram.percent), miniSparkline(dev.history, 'ram', dev.ram.percent)) : pveHeadStat('RAM', '--', 'var(--muted)'),
-      cpuTemp != null ? pveHeadStat('CPU temp', `${cpuTemp}°C${temperatureSuffix}`, pveTempColor(cpuTemp), miniSparkline(dev.history, 'temp', cpuTemp, pveTempHex, 100, '°C', 'CPU temp')) : pveHeadStat('CPU temp', '--', 'var(--muted)'),
+      cpuTemp != null ? pveHeadStat('CPU temp', `${cpuTemp}°C${temperatureSuffix}`, deviceTemperatureColor(panelId, cpuTemp, 'cpu', dev.thermalStatus), miniSparkline(dev.history, 'temp', cpuTemp, v=>deviceTemperatureHex(panelId, v, 'cpu', dev.thermalStatus), 100, '°C', 'CPU temp')) : pveHeadStat('CPU temp', '--', 'var(--muted)'),
       auxiliaryStat,
       pveHeadStat('Disk I/O', diskIOTxt || '--', diskIOTxt ? 'var(--cyan)' : 'var(--muted)', diskIOHeaderMbps != null ? miniSparkline(diskIOHistory, 'diskIOMbps', diskIOHeaderMbps, rateColor, rateSparkMax(diskIOHistory, 'diskIOMbps', diskIOHeaderMbps), ' MB/s', 'Disk I/O') : ''),
       pveHeadStat('Bandwidth', bandwidthTxt || '--', bandwidthTxt ? 'var(--green)' : 'var(--muted)', bandwidthHeaderMbps != null ? miniSparkline(bandwidthHistory, 'bandwidthMbps', bandwidthHeaderMbps, () => '#34D399', rateSparkMax(bandwidthHistory, 'bandwidthMbps', bandwidthHeaderMbps), ' MB/s', 'Bandwidth') : ''),
@@ -5170,7 +5236,7 @@ function buildSynology(syn, opts = {}){
     const snmpHeadClass = snmpStatsArr.length >= 8 ? ' snmp-head-8' : '';
     return `
       <div class="node-hdr pve-node-hdr" onclick="toggleSnmp(${jsStr(skey)},${jsStr(stateKey)})">
-        <div class="mon-dot md-green"></div>
+        <div class="mon-dot ${deviceThermalHot?'md-red':deviceThermalWarm?'md-yellow':'md-green'}"></div>
         <div class="pve-head-main snmp-head-main${snmpHeadClass}">
           <div class="pve-head-title">
           <div class="node-name">${escHtml(dev.name)}</div>
@@ -5178,7 +5244,7 @@ function buildSynology(syn, opts = {}){
           </div>
           ${snmpStats}
         </div>
-        ${bdg('green','healthy')}
+        ${bdg(deviceThermalHot?'red':deviceThermalWarm?'yellow':'green', deviceThermalHot?'hot':deviceThermalWarm?'warm':'healthy')}
         ${notifyBell('snmp:'+dev.name)}
       </div>
       <div class="node-body ${isOpen?'open':''}" id="snmp-${skey}">
@@ -5207,14 +5273,14 @@ function buildSynology(syn, opts = {}){
           </div>` : '' })()}
         ${(()=>{ const lim=historyLimitFor('snmp:'+skey); return cpuTemp!=null ? `
           <div class="chart-row">
-            <div class="chart-hdr"><span class="nb-label">${dev.cpuTempLabel || 'CPU temperature'}${temperatureSuffix}</span><span class="nb-pct" style="color:${pveTempColor(cpuTemp)}">${cpuTemp}°C</span></div>
-            ${histChart(dev.history,'temp',cpuTemp,lim,pveTempHex,100,'°C','Temperature')}
+            <div class="chart-hdr"><span class="nb-label">${dev.cpuTempLabel || 'CPU temperature'}${temperatureSuffix}</span><span class="nb-pct" style="color:${deviceTemperatureColor(panelId, cpuTemp, 'cpu', dev.thermalStatus)}">${cpuTemp}°C</span></div>
+            ${histChart(dev.history,'temp',cpuTemp,lim,v=>deviceTemperatureHex(panelId, v, 'cpu', dev.thermalStatus),100,'°C','Temperature')}
           </div>` : '' })()}
         ${(extraTempRows.length || fanSpeeds.length || dev.uptimeSeconds != null) ? `
           <div class="syn-section" style="margin-top:6px">Sensors</div>
           ${dev.uptimeSeconds != null ? `<div style="display:flex;align-items:center;gap:10px;padding:5px 0 5px 44px;font-size:14px"><span style="width:150px;flex-shrink:0;color:var(--muted)">Uptime</span><span>${fmtUptime(dev.uptimeSeconds)}</span></div>` : ''}
           ${extraTempRows.map(t => {
-            const tc = t.value>=70?'var(--red)':t.value>=55?'var(--yellow)':'var(--green)';
+            const tc = deviceTemperatureColor(panelId, t.value, t.kind || temperatureSensorKind(t.label), t.kind === 'system' ? dev.thermalStatus : null);
             return `<div style="display:flex;align-items:center;gap:10px;padding:5px 0 5px 44px;font-size:14px">
               <span style="width:150px;flex-shrink:0;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(t.label)}${temperatureSuffix}</span>
               <span style="color:${tc};font-weight:800">${t.value}°C</span>
@@ -5236,7 +5302,8 @@ function buildSynology(syn, opts = {}){
         ${dev.disks?.length ? `
           <div class="syn-section" style="margin-top:6px">Disks</div>
           ${dev.disks.map(d => {
-            const tc = d.temp==null?'var(--muted)':d.temp>=60?'var(--red)':d.temp>=50?'var(--yellow)':'var(--green)';
+            const diskKind = d.type || temperatureSensorKind(`${d.name} ${d.model || ''}`, 'hdd');
+            const tc = d.temp==null?'var(--muted)':deviceTemperatureColor(panelId, d.temp, diskKind);
             return `<div style="display:flex;align-items:center;gap:10px;padding:5px 0 5px 44px;font-size:14px">
               <div class="mon-dot ${d.healthy?'md-green':'md-red'}"></div>
               <span style="width:150px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.name}</span>
@@ -5255,7 +5322,7 @@ function buildSynology(syn, opts = {}){
     iconKey: panelIcon,
     color: panelColor,
     meta: `${onlineDevs.length}/${syn.length} online`,
-    badge: bdg(isConnecting ? 'gray' : (allOk ? 'green' : offline ? offlineRatioBadgeClass(offline, syn.length, onlineDevs.length) : 'yellow'), isConnecting ? 'connecting…' : (allOk ? 'healthy' : offlineRatioLabel(offline, syn.length, onlineDevs.length))),
+    badge: bdg(isConnecting ? 'gray' : thermalHot ? 'red' : (allOk ? 'green' : offline ? offlineRatioBadgeClass(offline, syn.length, onlineDevs.length) : 'yellow'), isConnecting ? 'connecting…' : thermalHot ? 'hot' : thermalWarm ? 'warm' : (allOk ? 'healthy' : offlineRatioLabel(offline, syn.length, onlineDevs.length))),
     detailMeta: panelId === 'synology' || panelId === 'mikrotik' ? '' : undefined,
     sbSummary: sbSummaryHtml,
     summary: summaryHtml,
@@ -5294,11 +5361,19 @@ function buildUnifi(data){
   const offlineCount = offlineDevs.length + offlineSnmp.length;
   const warnDevs = devices.filter(d => d.warn);
   const ctrlDown = instances.filter(i => !i.online && !i._connecting);
-  const degraded = warnDevs.length || instances.some(i => i.wanQualityError || (i.wan && i.wan.state === 'degraded') || i.stale);
+  const unifiTemperatureStates = snmpRows.filter(s=>s.online).flatMap(s=>[
+    ...(hasNum(s.cpuTemp) ? [deviceTemperatureSeverity('unifi', s.cpuTemp, 'cpu')] : []),
+    ...(hasNum(s.systemTemperature ?? s.systemTemp) ? [deviceTemperatureSeverity('unifi', s.systemTemperature ?? s.systemTemp, 'system')] : []),
+    ...(Array.isArray(s.nvmeTemps) ? s.nvmeTemps : []).filter(t=>hasNum(t.value)).map(t=>deviceTemperatureSeverity('unifi', t.value, 'ssd')),
+  ]);
+  const unifiThermalHot = unifiTemperatureStates.includes('hot');
+  const unifiThermalWarm = unifiTemperatureStates.includes('warm');
+  const degraded = warnDevs.length || unifiThermalWarm || instances.some(i => i.wanQualityError || (i.wan && i.wan.state === 'degraded') || i.stale);
   const badge = connecting ? bdg('gray','connecting…')
     : wanDown ? bdg('red','WAN DOWN')
     : offlineCount ? bdg(offlineRatioBadgeClass(offlineCount, totalCount, onlineCount), offlineRatioLabel(offlineCount, totalCount, onlineCount))
     : ctrlDown.length ? bdg(offlineRatioBadgeClass(ctrlDown.length, instances.length, instances.filter(i => i.online).length), offlineRatioLabel(ctrlDown.length, instances.length, instances.filter(i => i.online).length))
+    : unifiThermalHot ? bdg('red','hot')
     : degraded ? bdg('yellow','degraded')
     : bdg('green','healthy');
 
@@ -5332,7 +5407,7 @@ function buildUnifi(data){
       const v = snmpRows.filter(s => s.online && !s.temperatureStale).map(s => hasNum(s.cpuTemp) ? Number(s.cpuTemp) : (hasNum(s.systemTemp) ? Number(s.systemTemp) : null)).filter(t => t != null);
       return v.length ? Math.round(v.reduce((a,b)=>a+b,0)/v.length) : null;
     })(),
-  });
+  }, { tempProfile:'unifi', tempKind:'system', tempLabel:'Temperature' });
 
   // Row order (design F1): gateway pinned first, then OFFLINE, warn, online.
   const sorted = [...devices].sort((a, b) =>
@@ -5369,13 +5444,13 @@ function buildUnifi(data){
       const ioMbps = rateToMBps(ioRate);
       const ioHist = rateHistoryMBps(sd.history, 'diskIO', 'diskIOMbps');
       const ioNow = ioMbps != null ? ioMbps : latestHistoryValue(ioHist, 'diskIOMbps');
-      const tempLine = (label, v) => v == null ? '' : `<div style="display:flex;align-items:center;gap:10px;padding:5px 0 5px 44px;font-size:14px"><span style="width:150px;flex-shrink:0;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(label)}${temperatureSuffix}</span><span style="color:${pveTempColor(v)};font-weight:800">${v}°C</span></div>`;
+      const tempLine = (label, v, kind = temperatureSensorKind(label, 'system')) => v == null ? '' : `<div style="display:flex;align-items:center;gap:10px;padding:5px 0 5px 44px;font-size:14px"><span style="width:150px;flex-shrink:0;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(label)}${temperatureSuffix}</span><span style="color:${deviceTemperatureColor('unifi', v, kind)};font-weight:800">${v}°C</span></div>`;
       const parts = [
-        cpuTemp != null ? `<div class="chart-row"><div class="chart-hdr"><span class="nb-label">CPU temperature${temperatureSuffix}</span><span class="nb-pct" style="color:${pveTempColor(cpuTemp)}">${cpuTemp}°C</span></div>${histChart(sd.history,'temp',cpuTemp,lim,pveTempHex,100,'°C','Temperature')}</div>` : '',
+        cpuTemp != null ? `<div class="chart-row"><div class="chart-hdr"><span class="nb-label">CPU temperature${temperatureSuffix}</span><span class="nb-pct" style="color:${deviceTemperatureColor('unifi', cpuTemp, 'cpu')}">${cpuTemp}°C</span></div>${histChart(sd.history,'temp',cpuTemp,lim,v=>deviceTemperatureHex('unifi', v, 'cpu'),100,'°C','Temperature')}</div>` : '',
         bwNow != null ? `<div class="chart-row"><div class="chart-hdr"><span class="nb-label">Bandwidth (interfaces)</span><span class="nb-pct" style="color:var(--green)">${fmtRate(bwRate) || '--'}</span></div>${histChart(bwHist,'bandwidthMbps',bwNow,lim,()=>'#34D399',rateSparkMax(bwHist,'bandwidthMbps',bwNow),' MB/s','Bandwidth')}</div>` : '',
         ioNow != null ? `<div class="chart-row"><div class="chart-hdr"><span class="nb-label">Disk I/O</span><span class="nb-pct" style="color:var(--cyan)">${fmtRate(ioRate) || '--'}</span></div>${histChart(ioHist,'diskIOMbps',ioNow,lim,rateColor,rateSparkMax(ioHist,'diskIOMbps',ioNow),' MB/s','Disk I/O')}</div>` : '',
         tempLine(sd.systemTemperatureLabel || 'System temp', sysTemp),
-        ...nvme.map((t, k) => tempLine(t.label || t.name || `NVMe ${k + 1}`, hasNum(t.value) ? Number(t.value) : null)),
+        ...nvme.map((t, k) => tempLine(t.label || t.name || `NVMe ${k + 1}`, hasNum(t.value) ? Number(t.value) : null, 'ssd')),
         ...fans.map(f => `<div style="display:flex;align-items:center;gap:10px;padding:5px 0 5px 44px;font-size:14px"><span style="width:150px;flex-shrink:0;color:var(--muted)">${escHtml(snmpFanLabel(f))}</span><span style="font-weight:800">${escHtml(String(f.value))} RPM</span></div>`).slice(0, 4),
       ].filter(Boolean);
       return parts.length ? { html: parts.join(''), cpuTemp, temperatureStale: !!sd.temperatureStale } : null;
@@ -5383,7 +5458,7 @@ function buildUnifi(data){
     const stats = [
       d.cpu != null ? pveHeadStat('CPU', `${d.cpu}%`, bc(d.cpu), miniSparkline(d.history, 'cpu', d.cpu)) : '',
       d.ram ? pveHeadStat('RAM', `${d.ram.percent}%`, bc(d.ram.percent), miniSparkline(d.history, 'ram', d.ram.percent)) : '',
-      snmpDetail?.cpuTemp != null ? pveHeadStat('CPU temp', `${snmpDetail.cpuTemp}°C${snmpDetail.temperatureStale ? ' · last known' : ''}`, pveTempColor(snmpDetail.cpuTemp), miniSparkline(matched.history, 'temp', snmpDetail.cpuTemp, pveTempHex, 100, '°C', 'CPU temp')) : '',
+      snmpDetail?.cpuTemp != null ? pveHeadStat('CPU temp', `${snmpDetail.cpuTemp}°C${snmpDetail.temperatureStale ? ' · last known' : ''}`, deviceTemperatureColor('unifi', snmpDetail.cpuTemp, 'cpu'), miniSparkline(matched.history, 'temp', snmpDetail.cpuTemp, v=>deviceTemperatureHex('unifi', v, 'cpu'), 100, '°C', 'CPU temp')) : '',
       d.uptimeSeconds != null ? pveHeadStat('Uptime', fmtUptime(d.uptimeSeconds)) : '',
       d.isGateway && d._inst.wan && (d._inst.wan.rxBps != null) ? pveHeadStat('WAN', `↓${fmtRate(d._inst.wan.rxBps)||'--'} ↑${fmtRate(d._inst.wan.txBps)||'--'}`, 'var(--green)') : '',
     ].join('');
@@ -6529,15 +6604,31 @@ function buildSimpleNasPanel(value, opts){
   const connectingCount = instances.filter(i => i._connecting && !i.online).length;
   const offline = Math.max(instances.filter(i => !i.online && !i._connecting).length, total - up - connectingCount, 0);
   const partial = instances.some(i => i.partial);
-  const healthCls = connecting && !up && !offline ? 'gray' : offline ? offlineRatioBadgeClass(offline, total, up) : (connecting || partial) ? 'yellow' : 'green';
-  const healthTxt = connecting && !up && !offline ? 'connecting...' : offline ? offlineRatioLabel(offline, total, up) : partial ? 'partial' : connecting ? 'connecting...' : 'healthy';
   const onlineInstances = instances.filter(i => i.online);
+  const nasTemperatureStates = onlineInstances.flatMap(inst => {
+    const sys = inst.system || {};
+    return [
+      ...(hasNum(sys.cpuTemp ?? sys.cpuTemperature) ? [deviceTemperatureSeverity(opts.id, sys.cpuTemp ?? sys.cpuTemperature, 'cpu')] : []),
+      ...(hasNum(sys.systemTemp ?? sys.temperature ?? inst.systemTemp) ? [deviceTemperatureSeverity(opts.id, sys.systemTemp ?? sys.temperature ?? inst.systemTemp, 'system')] : []),
+      ...(inst.disks || []).filter(row=>hasNum(row.temperature)).map(row=>deviceTemperatureSeverity(opts.id, row.temperature, row.type || temperatureSensorKind(`${row.name || row.device || ''} ${row.model || ''}`, 'hdd'))),
+    ];
+  });
+  const nasThermalHot = nasTemperatureStates.includes('hot');
+  const nasThermalWarm = nasTemperatureStates.includes('warm');
+  const healthCls = connecting && !up && !offline ? 'gray' : offline ? offlineRatioBadgeClass(offline, total, up) : nasThermalHot ? 'red' : (connecting || partial || nasThermalWarm) ? 'yellow' : 'green';
+  const healthTxt = connecting && !up && !offline ? 'connecting...' : offline ? offlineRatioLabel(offline, total, up) : nasThermalHot ? 'hot' : nasThermalWarm ? 'warm' : partial ? 'partial' : connecting ? 'connecting...' : 'healthy';
   const sysVals = (key) => onlineInstances.map(i => i.system?.[key]).filter(hasNum).map(Number);
   const cpuAvg = avgPct(sysVals('cpuPercent'));
   const ramAvg = avgPct(sysVals('memoryPercent'));
-  const tempVals = onlineInstances.map(i => i.system?.cpuTemp ?? i.system?.cpuTemperature ?? i.system?.temperature ?? i.systemTemp).filter(hasNum).map(Number);
+  const cpuTempVals = onlineInstances.map(i => i.system?.cpuTemp ?? i.system?.cpuTemperature).filter(hasNum).map(Number);
+  const systemTempVals = onlineInstances.map(i => i.system?.systemTemp ?? i.system?.temperature ?? i.systemTemp).filter(hasNum).map(Number);
+  const tempKind = cpuTempVals.length ? 'cpu' : 'system';
+  const tempVals = cpuTempVals.length ? cpuTempVals : systemTempVals;
   const tempAvg = tempVals.length ? Math.round(tempVals.reduce((a,b)=>a+b,0) / tempVals.length) : null;
-  const sbSummaryHtml = nasSummaryMetricHtml({ online: up, total, cpu: cpuAvg, ram: ramAvg, temp: tempAvg });
+  const sbSummaryHtml = nasSummaryMetricHtml(
+    { online: up, total, cpu: cpuAvg, ram: ramAvg, temp: tempAvg },
+    { tempProfile:opts.id, tempKind, tempLabel:tempKind === 'cpu' ? 'CPU Temp' : 'System Temp' },
+  );
   const storageRows = inst => [...(inst.volumes || []), ...(inst.pools || [])].map(row => {
     const used = hasNum(row.usedPercent) ? `used ${fmtPct(row.usedPercent)}` : '';
     const size = hasNum(row.totalBytes) ? fmtBytes(row.totalBytes) : '';
@@ -6555,11 +6646,14 @@ function buildSimpleNasPanel(value, opts){
     const size = hasNum(row.sizeBytes) ? fmtBytes(row.sizeBytes) : '';
     const sub = [row.model, row.status, row.health, temp, size].filter(Boolean).join(' - ');
     const warn = /warn|degrad|fail|error|offline|bad/i.test(String(row.status || row.health || ''));
+    const diskKind = row.type || temperatureSensorKind(`${row.name || row.device || ''} ${row.model || ''}`, 'hdd');
+    const tempSeverity = deviceTemperatureSeverity(opts.id, row.temperature, diskKind);
+    const diskState = tempSeverity === 'hot' ? 'hot' : tempSeverity === 'warm' || warn ? 'warn' : 'ok';
     return `<div class="mon-row" style="grid-template-columns:18px minmax(130px,.8fr) minmax(170px,1.2fr) 84px">
-      <div class="mon-dot ${warn?'md-yellow':'md-green'}"></div>
+      <div class="mon-dot ${diskState==='hot'?'md-red':diskState==='warn'?'md-yellow':'md-green'}"></div>
       <div class="mon-name" title="${escAttr(row.name || row.device || 'disk')}">${escHtml(row.name || row.device || 'disk')}</div>
-      <span style="color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escAttr(sub)}">${escHtml(sub)}</span>
-      <span style="text-align:right">${bdg(warn?'yellow':'green', warn ? 'warn' : 'ok')}</span>
+      <span style="color:${hasNum(row.temperature)?deviceTemperatureColor(opts.id,row.temperature,diskKind):'var(--muted)'};font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escAttr(sub)}">${escHtml(sub)}</span>
+      <span style="text-align:right">${bdg(diskState==='hot'?'red':diskState==='warn'?'yellow':'green', diskState)}</span>
     </div>`;
   }).join('');
   const serviceRows = inst => (inst.services || []).map(row => {
@@ -6577,7 +6671,15 @@ function buildSimpleNasPanel(value, opts){
     const isOpen = panelOpenState(opts.id + ':' + key, true);
     const stateClass = inst._connecting ? 'connecting' : !inst.online ? 'offline' : inst.partial ? 'warn' : 'online';
     const sys = inst.system || {};
-    const cpuTemp = sys.cpuTemp ?? sys.cpuTemperature ?? sys.temperature ?? inst.systemTemp;
+    const cpuTemp = sys.cpuTemp ?? sys.cpuTemperature;
+    const systemTemp = sys.systemTemp ?? sys.temperature ?? inst.systemTemp;
+    const instanceTemperatureStates = [
+      ...(hasNum(cpuTemp) ? [deviceTemperatureSeverity(opts.id, cpuTemp, 'cpu')] : []),
+      ...(hasNum(systemTemp) ? [deviceTemperatureSeverity(opts.id, systemTemp, 'system')] : []),
+      ...(inst.disks || []).filter(row=>hasNum(row.temperature)).map(row=>deviceTemperatureSeverity(opts.id, row.temperature, row.type || temperatureSensorKind(`${row.name || row.device || ''} ${row.model || ''}`, 'hdd'))),
+    ];
+    const instanceThermalHot = instanceTemperatureStates.includes('hot');
+    const instanceThermalWarm = instanceTemperatureStates.includes('warm');
     const instSm = inst.summary || {};
     const storageKnown = inst.available?.storage !== false;
     const disksKnown = inst.available?.disks !== false;
@@ -6586,7 +6688,7 @@ function buildSimpleNasPanel(value, opts){
     const servicesHtml = serviceRows(inst);
     return `<section class="prom-instance">
       <div class="prom-instance-h service-node-hdr ${stateClass}" onclick="toggleSimpleNasInstance(${jsStr(opts.id)},${idx},${jsStr(key)})">
-        <div class="mon-dot ${inst._connecting?'md-gray':inst.online?(inst.partial?'md-yellow':'md-green'):'md-red'}"></div>
+        <div class="mon-dot ${inst._connecting?'md-gray':inst.online?(instanceThermalHot?'md-red':(inst.partial||instanceThermalWarm)?'md-yellow':'md-green'):'md-red'}"></div>
         <div class="prom-instance-main">
           <div class="prom-instance-name">${escHtml(inst.name || sys.hostname || inst.url || opts.title)}</div>
           <div class="prom-instance-url">${escHtml(inst.url || inst.error || '')}</div>
@@ -6604,7 +6706,8 @@ function buildSimpleNasPanel(value, opts){
             </div>
             ${hasNum(sys.cpuPercent) ? pveHeadStat('CPU', fmtPct(sys.cpuPercent), bc(sys.cpuPercent), '', 'is-db-primary') : ''}
             ${hasNum(sys.memoryPercent) ? pveHeadStat('RAM', fmtPct(sys.memoryPercent), bc(sys.memoryPercent), '', 'is-db-primary') : ''}
-            ${hasNum(cpuTemp) ? pveHeadStat('CPU temp', `${cpuTemp}°C`, tempColor(cpuTemp), '', 'is-db-primary') : ''}
+            ${hasNum(cpuTemp) ? pveHeadStat('CPU temp', `${cpuTemp}°C`, deviceTemperatureColor(opts.id, cpuTemp, 'cpu'), '', 'is-db-primary') : ''}
+            ${hasNum(systemTemp) ? pveHeadStat('System temp', `${systemTemp}°C`, deviceTemperatureColor(opts.id, systemTemp, 'system'), '', 'is-db-primary') : ''}
             ${hasNum(instSm.usedPercent) ? pveHeadStat('Storage used', fmtPct(instSm.usedPercent), bc(instSm.usedPercent), '', 'is-db-primary') : ''}
             ${storageKnown ? pveHeadStat('Storage', (instSm.volumes || instSm.pools || 0), 'var(--text)', '', 'is-db-primary') : ''}
             ${disksKnown ? pveHeadStat('Disks', instSm.disks || 0, instSm.disksWarn ? 'var(--yellow)' : 'var(--green)', '', 'is-db-primary') : ''}
