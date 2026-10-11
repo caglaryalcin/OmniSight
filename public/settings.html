@@ -456,6 +456,8 @@ html[data-theme="light"] .ci-help{color:#53657c}
           <option value="6">Last 6 hours</option>
           <option value="12">Last 12 hours</option>
           <option value="24">Last 24 hours</option>
+          <option value="72">Last 3 days</option>
+          <option value="168">Last 1 week</option>
         </select>
       </div>
       <div class="form-group" style="margin-bottom:0;">
@@ -1023,6 +1025,8 @@ html[data-theme="light"] .ci-help{color:#53657c}
           <option value="6">Last 6 hours</option>
           <option value="12">Last 12 hours</option>
           <option value="24">Last 24 hours</option>
+          <option value="72">Last 3 days</option>
+          <option value="168">Last 1 week</option>
         </select>
       </div>
     </div>
@@ -1055,6 +1059,8 @@ html[data-theme="light"] .ci-help{color:#53657c}
         <option value="6">Last 6 hours</option>
         <option value="12">Last 12 hours</option>
         <option value="24">Last 24 hours</option>
+        <option value="72">Last 3 days</option>
+        <option value="168">Last 1 week</option>
       </select>
     </div>
     <div class="section mini-section">
@@ -2603,7 +2609,7 @@ function setTimezoneValue(value) {
 function periodValue(value) {
   const n = Number(value || 1);
   if (!Number.isFinite(n) || n <= 0) return 1;
-  return Math.min(Math.max(n, 0.333333), 24);
+  return Math.min(Math.max(n, 0.333333), 168);
 }
 function periodSelectValue(value) {
   const n = periodValue(value);
@@ -2612,7 +2618,9 @@ function periodSelectValue(value) {
   if (n <= 3) return '3';
   if (n <= 6) return '6';
   if (n <= 12) return '12';
-  return '24';
+  if (n <= 24) return '24';
+  if (n <= 72) return '72';
+  return '168';
 }
 function configBool(value, fallback = false) {
   if (value === undefined || value === null) return fallback;

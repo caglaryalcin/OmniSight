@@ -3,11 +3,11 @@ const http = require('http');
 const fs = require('fs');
 const os = require('os');
 const { Client } = require('ssh2');
-const { loadHistoryMap, scheduleSaveHistoryMap } = require('./historyStore');
+const { loadHistoryMap, scheduleSaveHistoryMap, historyStorageMaxPoints, appendHistoryPoint } = require('./historyStore');
 const { mapLimit } = require('./concurrency');
 const { normalizeCephStatus } = require('./ceph');
 
-const PVE_HISTORY_MAX = 5760;
+const PVE_HISTORY_MAX = historyStorageMaxPoints(30);
 const pveHistory = loadHistoryMap('proxmox-history', PVE_HISTORY_MAX);
 const pveSshDiskStats = new Map();
 const pveGuestFsCache = new Map();
@@ -752,13 +752,11 @@ async function nodeData(cfg, node, excluded, resource = null) {
     const apiTempInfo = apiTempInfos[0] || null;
     const tempInfo = tempInfos[0] ?? (sshMetrics?.error ? null : apiTempInfo);
     const temp = tempInfo?.value ?? null;
-    const hist = pveHistory.get(historyKey) || [];
     const tempHistory = {};
     for (const t of tempInfos) {
       tempHistory[tempHistoryKey(t.label)] = t.value;
     }
-    hist.push({ time: Date.now(), cpu, mem: mem.percent || 0, temp, ...tempHistory, diskIO: finalDiskIOTotal, bandwidth: bandwidthTotal });
-    if (hist.length > PVE_HISTORY_MAX) hist.splice(0, hist.length - PVE_HISTORY_MAX);
+    const hist = appendHistoryPoint(pveHistory.get(historyKey) || [], { time: Date.now(), cpu, mem: mem.percent || 0, temp, ...tempHistory, diskIO: finalDiskIOTotal, bandwidth: bandwidthTotal });
     pveHistory.set(historyKey, hist);
     scheduleSaveHistoryMap('proxmox-history', pveHistory, PVE_HISTORY_MAX);
     const exList = excluded[`${clusterName}:${name}`] || excluded[name] || [];

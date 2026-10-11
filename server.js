@@ -59,7 +59,17 @@ const {
 } = require('./src/alerts');
 const { decryptConfig, encryptConfigValue, isEncrypted, SENSITIVE_KEYS, encryptionEnabled } = require('./src/crypto');
 const { mergePreservingSecrets } = require('./src/config-merge');
-const { loadHistoryMap, scheduleSaveHistoryMap, setHistorySaveDelay, flushHistorySaves, cancelHistorySaves } = require('./src/historyStore');
+const {
+  loadHistoryMap,
+  scheduleSaveHistoryMap,
+  setHistorySaveDelay,
+  flushHistorySaves,
+  cancelHistorySaves,
+  setHistoryRetentionDays,
+  historyStorageMaxPoints,
+  compactHistorySeries,
+  appendHistoryPoint,
+} = require('./src/historyStore');
 const { semverCompare, highestStableVersion } = require('./src/version');
 const { normalizeLegacyEmptyBase64Blocks, fullBackupContentHeader } = require('./src/fullBackupFormat');
 const { platformAvailability } = require('./src/platformAvailability');
@@ -2182,7 +2192,7 @@ function cleanUiPreferences(raw = {}) {
       const k = String(key || '').slice(0, 80);
       const n = Math.round(Number(value));
       if (!k || !Number.isFinite(n) || n <= 0) continue;
-      ui.timeLimits[k] = Math.max(1, Math.min(5760, n));
+      ui.timeLimits[k] = Math.max(1, Math.min(40320, n));
       if (Object.keys(ui.timeLimits).length >= 80) break;
     }
   }
@@ -2482,6 +2492,7 @@ function encryptConfigObj(obj) {
 }
 
 let config = loadConfig();
+setHistoryRetentionDays(config.historyRetentionDays || config.retention?.historyDays || 1);
 process.env.TZ = config.timezone || process.env.TZ || process.env.TIMEZONE || 'UTC';
 applyDiskWritePolicy();
 
@@ -2688,6 +2699,7 @@ function runtimeSnapshotFlushDelayMs(force = false) {
 
 function applyDiskWritePolicy() {
   const low = lowIoModeEnabled(config);
+  setHistoryRetentionDays(historyRetentionDays());
   setHistorySaveDelay(low ? 60000 : 2500);
   if (typeof agents.setSaveDelay === 'function') agents.setSaveDelay(low ? 30000 : 2000);
 }
@@ -2710,7 +2722,6 @@ function broadcastStatusEvent(type = 'updated') {
   }
 }
 
-const HISTORY_STORE_MAX = 30 * 24 * 60 * 4;
 function historyRetentionDays() {
   const n = Number(config.historyRetentionDays || config.retention?.historyDays || 1);
   if (n <= 1) return 1;
@@ -2721,7 +2732,7 @@ function historyRetentionMaxPoints() {
   return historyRetentionDays() * 24 * 60 * 4;
 }
 function trimHistoryRetention(history = []) {
-  return Array.isArray(history) ? history.slice(-historyRetentionMaxPoints()) : [];
+  return compactHistorySeries(history, { days: historyRetentionDays() });
 }
 function configFlag(value, fallback = false) {
   if (value === undefined || value === null) return fallback;
@@ -2732,7 +2743,7 @@ function configFlag(value, fallback = false) {
   if (['0', 'false', 'no', 'off'].includes(text)) return false;
   return fallback;
 }
-const PLATFORM_HISTORY = Object.fromEntries(loadHistoryMap('platform-history', HISTORY_STORE_MAX));
+const PLATFORM_HISTORY = Object.fromEntries(loadHistoryMap('platform-history', historyStorageMaxPoints(30)));
 function savePlatformHistory() {
   scheduleSaveHistoryMap('platform-history', new Map(Object.entries(PLATFORM_HISTORY)), historyRetentionMaxPoints());
 }
@@ -2749,11 +2760,11 @@ function replaceMapContents(target, source) {
 
 function reloadRuntimeHistoryMaps() {
   cancelHistorySaves(['platform-history', 'docker-history', 'vmware-history', 'proxmox-guest-history', 'uptimekuma-history']);
-  replaceObjectContents(PLATFORM_HISTORY, Object.fromEntries(loadHistoryMap('platform-history', HISTORY_STORE_MAX)));
-  replaceMapContents(dockerHistory, loadHistoryMap('docker-history', HISTORY_STORE_MAX));
-  replaceMapContents(vmwareHistory, loadHistoryMap('vmware-history', HISTORY_STORE_MAX));
+  replaceObjectContents(PLATFORM_HISTORY, Object.fromEntries(loadHistoryMap('platform-history', historyStorageMaxPoints(30))));
+  replaceMapContents(dockerHistory, loadHistoryMap('docker-history', historyStorageMaxPoints(30)));
+  replaceMapContents(vmwareHistory, loadHistoryMap('vmware-history', historyStorageMaxPoints(30)));
   replaceMapContents(proxmoxGuestHistory, loadHistoryMap('proxmox-guest-history', PROXMOX_GUEST_HISTORY_MAX));
-  replaceMapContents(uptimeKumaHistory, loadHistoryMap('uptimekuma-history', HISTORY_STORE_MAX));
+  replaceMapContents(uptimeKumaHistory, loadHistoryMap('uptimekuma-history', historyStorageMaxPoints(30)));
 }
 
 function hasProxmoxApi() {
@@ -2860,8 +2871,8 @@ function preserveDockerOnTransient(nextRows) {
   });
 }
 
-const dockerHistory = loadHistoryMap('docker-history', HISTORY_STORE_MAX);
-const vmwareHistory = loadHistoryMap('vmware-history', HISTORY_STORE_MAX);
+const dockerHistory = loadHistoryMap('docker-history', historyStorageMaxPoints(30));
+const vmwareHistory = loadHistoryMap('vmware-history', historyStorageMaxPoints(30));
 const PROXMOX_GUEST_HISTORY_MAX = 80;
 const PROXMOX_GUEST_HISTORY_MS = 20 * 60 * 1000;
 const PROXMOX_GUEST_DISK_STALE_MS = 30 * 60 * 1000;
@@ -3721,7 +3732,7 @@ function cloneDashboardHistories(value, key = '', limit = dashboardHistoryPointL
 }
 
 function requestedHistoryPointLimit(value) {
-  const options = [80, 240, 720, 1440, 2880, 5760];
+  const options = [80, 240, 720, 1440, 2880, 5760, 17280, 40320];
   const requested = Number(value);
   const requestedPoints = Number.isFinite(requested) && requested > 0 ? requested : dashboardHistoryPointLimit();
   const selected = options.find(points => points >= requestedPoints) || options[options.length - 1];
@@ -5066,7 +5077,7 @@ function preserveProxmoxOnTransient(next, err) {
   return { ...prev, _stale: true, _staleSince: staleSince, error: err?.message || 'temporary Proxmox refresh failure' };
 }
 
-const uptimeKumaHistory = loadHistoryMap('uptimekuma-history', HISTORY_STORE_MAX);
+const uptimeKumaHistory = loadHistoryMap('uptimekuma-history', historyStorageMaxPoints(30));
 function heartbeatKey(h) {
   return [h?.time || '', h?.status || '', h?.ping ?? '', h?.message || ''].join('|');
 }
@@ -5099,7 +5110,7 @@ function normalizeUptimeHistoryPoint(h, fallbackStatus = 'unknown') {
 function uptimeKumaHistoryHours(value) {
   const hours = Number(value || 1);
   if (!Number.isFinite(hours) || hours <= 0) return 1;
-  return Math.min(Math.max(hours, 0.25), 24);
+  return Math.min(Math.max(hours, 0.25), 168);
 }
 function mergeHeartbeatHistory(prevHistory = [], nextHistory = [], hours = 1, fallbackStatus = 'unknown') {
   const cutoff = Date.now() - (uptimeKumaHistoryHours(hours) * 60 * 60 * 1000);
@@ -5115,8 +5126,7 @@ function mergeHeartbeatHistory(prevHistory = [], nextHistory = [], hours = 1, fa
     const t = new Date(h?.time || 0).getTime();
     return Number.isFinite(t) && t >= cutoff;
   });
-  return (recent.length ? recent : sorted)
-    .slice(-historyRetentionMaxPoints());
+  return compactHistorySeries(recent.length ? recent : sorted, { days:historyRetentionDays() });
 }
 function uptimeKumaMonitorKeys(m = {}) {
   return [m.id, m.name, m.url].filter(v => v !== undefined && v !== null && String(v).trim() !== '').map(v => String(v));
@@ -5139,7 +5149,7 @@ function mergeUptimeKumaHistory(next) {
   const prev = cache.data?.uptimekuma;
   if (!next?.monitors?.length) return next;
   const hours = uptimeKumaHistoryHours(next.historyHours || uptimeKumaConfig()?.historyHours || defaultTimePeriodHours());
-  const keepHours = 24;
+  const keepHours = historyRetentionDays() * 24;
   const prevByKey = new Map();
   (prev?.monitors || []).forEach(m => {
     uptimeKumaMonitorKeys(m).forEach(k => prevByKey.set(k, m));
@@ -5376,9 +5386,7 @@ function backgroundRefresh(opts = {}) {
       let score = 100;
       if (s.status === 'down') score = 0;
       else if (s.status === 'warn') score = 65;
-      PLATFORM_HISTORY[s.id].push({ health: score, time: Date.now() });
-      const maxHist = historyRetentionMaxPoints();
-      if (PLATFORM_HISTORY[s.id].length > maxHist) PLATFORM_HISTORY[s.id].splice(0, PLATFORM_HISTORY[s.id].length - maxHist);
+      PLATFORM_HISTORY[s.id] = appendHistoryPoint(PLATFORM_HISTORY[s.id], { health: score, time: Date.now() }, { days: historyRetentionDays() });
     });
     savePlatformHistory();
     base._snapshot = false;

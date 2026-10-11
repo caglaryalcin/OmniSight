@@ -1,6 +1,7 @@
 const https = require('https');
 const http = require('http');
 const { io: socketIo } = require('socket.io-client');
+const { historyStorageMaxPoints } = require('./historyStore');
 
 function joinUrl(base, path) {
   return String(base || '').replace(/\/+$/, '') + path;
@@ -67,7 +68,7 @@ const STATUS_BY_NAME = {
   unknown: { status: 'unknown', healthy: true },
 };
 const STATUS_ORDER = { down: 0, pending: 1, maintenance: 2, up: 3, unknown: 4 };
-const HISTORY_MAX_POINTS = 6000;
+const HISTORY_MAX_POINTS = historyStorageMaxPoints(30);
 const SOCKET_TIMEOUT_MS = 12000;
 const SOCKET_EVENT_TIMEOUT_MS = 8000;
 const SOCKET_CONCURRENCY = 4;
@@ -198,7 +199,7 @@ function socketErrorMessage(err) {
 function historyHours(value) {
   const hours = Number(value || 1);
   if (!Number.isFinite(hours) || hours <= 0) return 1;
-  return Math.min(Math.max(hours, 0.25), 24);
+  return Math.min(Math.max(hours, 0.25), 168);
 }
 
 function heartbeatHistory(list, monitor = {}, hours = 1) {

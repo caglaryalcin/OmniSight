@@ -3,9 +3,9 @@ const https = require('https');
 const net = require('net');
 const dns = require('dns').promises;
 const childProcess = require('child_process');
-const { loadHistoryMap, scheduleSaveHistoryMap } = require('./historyStore');
+const { loadHistoryMap, scheduleSaveHistoryMap, historyStorageMaxPoints, appendHistoryPoint } = require('./historyStore');
 
-const CHECK_HISTORY_MAX = 5760;
+const CHECK_HISTORY_MAX = historyStorageMaxPoints(30);
 const checkHistory = loadHistoryMap('checks-history', CHECK_HISTORY_MAX);
 
 function timeoutMs(check) {
@@ -205,14 +205,12 @@ function historyKey(check = {}, result = {}) {
 
 function attachHistory(check, result) {
   const key = historyKey(check, result);
-  const hist = checkHistory.get(key) || [];
-  hist.push({
+  const hist = appendHistoryPoint(checkHistory.get(key) || [], {
     time: result.lastCheck || new Date().toISOString(),
     status: result.status || 'unknown',
     ping: result.responseMs ?? null,
     message: result.error || (result.statusCode ? `HTTP ${result.statusCode}` : ''),
   });
-  if (hist.length > CHECK_HISTORY_MAX) hist.splice(0, hist.length - CHECK_HISTORY_MAX);
   checkHistory.set(key, hist);
   scheduleSaveHistoryMap('checks-history', checkHistory, CHECK_HISTORY_MAX);
   return { ...result, history: [...hist] };

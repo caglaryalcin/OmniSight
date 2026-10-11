@@ -1479,6 +1479,8 @@ function testStaticRegressions() {
   assert.ok(docker.includes("reqJson(host, '/info')") && docker.includes("info --format '{{.MemTotal}}'"), 'Docker collectors must read host memory totals');
   assert.ok(fs.existsSync(path.join(root, 'src', 'unifi.js')));
   assert.ok(snmp.includes('session.subtree(oid, 20'), 'SNMP reads must stop at the requested OID subtree');
+  assert.ok(server.includes('const options = [80, 240, 720, 1440, 2880, 5760, 17280, 40320]'), 'history API must accept three-day and one-week chart windows');
+  assert.ok(server.includes('setHistoryRetentionDays(historyRetentionDays())'), 'runtime history compaction must follow the configured retention period');
   assert.ok(!snmp.includes('session.walk(oid, 20'), 'unbounded SNMP walks must not return unrelated OIDs');
   assert.strictEqual((snmp.match(/retries:\s*1/g) || []).length, 2, 'SNMP v2c and v3 sessions must retry once');
   assert.ok(dashboard.includes('last known'), 'stale SNMP temperatures must be visibly marked last known');

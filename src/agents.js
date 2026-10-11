@@ -2,14 +2,14 @@ const fs = require('fs');
 const path = require('path');
 const yaml = require('js-yaml');
 const crypto = require('crypto');
-const { loadHistoryMap, scheduleSaveHistoryMap, cancelHistorySaves } = require('./historyStore');
+const { loadHistoryMap, scheduleSaveHistoryMap, cancelHistorySaves, historyStorageMaxPoints, appendHistoryPoint } = require('./historyStore');
 const { normalizeCephStatus } = require('./ceph');
 const { normalizeClusterStatus } = require('./proxmox');
 
 const AGENTS_PATH = process.env.OMNISIGHT_AGENTS_PATH
   ? path.resolve(process.env.OMNISIGHT_AGENTS_PATH)
   : path.join(__dirname, '..', 'data', 'agents.yaml');
-const HISTORY_MAX = 5760;
+const HISTORY_MAX = historyStorageMaxPoints(30);
 const CMD_TIMEOUT = 60000;
 const INSTALL_PENDING_TTL = 5 * 60 * 1000;
 const UNINSTALL_REPORT_SUPPRESSION_MS = Math.max(60000, Number(process.env.OMNISIGHT_AGENT_UNINSTALL_SUPPRESSION_MS) || 10 * 60 * 1000);
@@ -354,7 +354,6 @@ function handleReport(r) {
   clearPendingForKinds(reportKinds);
 
   if (cpu != null || a.temp != null) {
-    const hist = history.get(id) || [];
     const point = {
       time: Date.now(),
       cpu: cpu ?? null,
@@ -367,8 +366,7 @@ function handleReport(r) {
       bandwidthTxBps: bandwidth?.txBps ?? null,
     };
     temps.forEach(t => { point[t.historyKey] = t.value; });
-    hist.push(point);
-    if (hist.length > HISTORY_MAX) hist.splice(0, hist.length - HISTORY_MAX);
+    const hist = appendHistoryPoint(history.get(id) || [], point);
     history.set(id, hist);
     scheduleSaveHistoryMap('agent-history', history, HISTORY_MAX, historySaveDelay);
   }

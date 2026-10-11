@@ -27,6 +27,29 @@ async function main() {
     clearAlertCooldownsForType,
   } = require('../src/alerts');
   const { encryptConfigValue, isEncrypted, decryptConfig } = require('../src/crypto');
+  const { compactHistorySeries, historyStorageMaxPoints } = require('../src/historyStore');
+
+  const historyNow = Date.UTC(2026, 9, 11, 12, 0, 0);
+  const weekRaw = Array.from({ length: 7 * 24 * 60 * 4 + 1 }, (_, index) => ({
+    time: historyNow - 7 * 24 * 60 * 60 * 1000 + index * 15000,
+    cpu: index % 100,
+  }));
+  const weekCompacted = compactHistorySeries(weekRaw, { days:7, now:historyNow });
+  assert.ok(weekCompacted.length <= historyStorageMaxPoints(7), 'one-week history must stay within the tiered storage budget');
+  assert.ok(weekCompacted.length < weekRaw.length / 5, 'archived history must be compacted instead of retaining seven days of raw samples');
+  const recentWeekPoints = weekCompacted.filter(point => point.time >= historyNow - 24 * 60 * 60 * 1000);
+  assert.ok(recentWeekPoints.length >= 5759, 'the latest 24 hours must retain native 15-second resolution');
+  const archivedWeekPoints = weekCompacted.filter(point => point.time < historyNow - 24 * 60 * 60 * 1000);
+  const archivedIntervals = archivedWeekPoints.slice(1).map((point, index) => point.time - archivedWeekPoints[index].time);
+  assert.ok(archivedIntervals.every(interval => interval >= 5 * 60 * 1000), 'older history must use five-minute archive buckets');
+  const outageBucketStart = historyNow - 2 * 24 * 60 * 60 * 1000;
+  const outageCompacted = compactHistorySeries([
+    { time:outageBucketStart, status:'up' },
+    { time:outageBucketStart + 15000, status:'down' },
+    { time:outageBucketStart + 30000, status:'up' },
+  ], { days:7, now:historyNow });
+  assert.strictEqual(outageCompacted.length, 1, 'archive points in the same five-minute bucket must be compacted');
+  assert.strictEqual(outageCompacted[0].status, 'down', 'archive compaction must preserve a brief outage');
 
   assert.strictEqual(serverUpdateNotificationsEnabled({}), false);
   assert.strictEqual(serverUpdateNotificationsEnabled({ detections: { serverUpdates: true } }), true);

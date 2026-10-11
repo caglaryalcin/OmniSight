@@ -1,5 +1,5 @@
 const snmp = require('net-snmp');
-const { loadHistoryMap, scheduleSaveHistoryMap } = require('./historyStore');
+const { loadHistoryMap, scheduleSaveHistoryMap, historyStorageMaxPoints, compactHistorySeries } = require('./historyStore');
 const { allSettledLimit } = require('./concurrency');
 
 const DISK_STATUS = { 1: 'normal', 2: 'initialized', 3: 'not initialized', 4: 'sys partition failed', 5: 'crashed' };
@@ -844,7 +844,7 @@ async function probeReachable(session) {
 const netPrev = new Map();
 const diskIoPrev = new Map();
 const bandwidthPeak = new Map();
-const SNMP_HISTORY_MAX = 5760;
+const SNMP_HISTORY_MAX = historyStorageMaxPoints(30);
 const RATE_CAPACITY_HEADROOM = 1.08;
 const BANDWIDTH_PEAK_MAX_AGE_MS = 20000;
 const synHistory = loadHistoryMap('snmp-history', SNMP_HISTORY_MAX);
@@ -1199,7 +1199,7 @@ async function getDeviceData(device) {
     const bandwidth = consumeBandwidthPeak(device.host, sumNetworkBandwidth(network, { preferPhysical: isSynology }));
     const rawHist = synHistory.get(device.host) || [];
     const sanitized = sanitizeSnmpHistory(rawHist, bandwidth?.historyCapacityBps || bandwidth?.activeCapacityBps || bandwidth?.largestCapacityBps || bandwidth?.capacityBps);
-    const hist = sanitized.history;
+    let hist = sanitized.history;
     let shouldSaveHistory = sanitized.changed;
     const historyTemp = sysInfo.temperatureStale ? null : (sysInfo.cpuTemp ?? sysInfo.systemTemp ?? sysInfo.systemTemperature ?? null);
     if (sysInfo.cpu != null || sysInfo.ram || historyTemp != null || diskIO || bandwidth) {
@@ -1211,7 +1211,7 @@ async function getDeviceData(device) {
         diskIO: diskIO ? (Number(diskIO.readBps) || 0) + (Number(diskIO.writeBps) || 0) : null,
         bandwidth: bandwidth ? (Number(bandwidth.rxBps) || 0) + (Number(bandwidth.txBps) || 0) : null,
       });
-      if (hist.length > SNMP_HISTORY_MAX) hist.splice(0, hist.length - SNMP_HISTORY_MAX);
+      hist = compactHistorySeries(hist);
       shouldSaveHistory = true;
     }
     if (shouldSaveHistory) {

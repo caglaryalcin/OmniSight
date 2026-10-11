@@ -1,7 +1,7 @@
 const http = require('http');
 const https = require('https');
 const { mapLimit } = require('./concurrency');
-const { loadHistoryMap, scheduleSaveHistoryMap } = require('./historyStore');
+const { loadHistoryMap, scheduleSaveHistoryMap, historyStorageMaxPoints, appendHistoryPoint } = require('./historyStore');
 
 // UniFi Network collector — official Integration API first, legacy API only for
 // WAN quality (stat/health), per the design doc.
@@ -19,7 +19,7 @@ const { loadHistoryMap, scheduleSaveHistoryMap } = require('./historyStore');
 //   Per-device stats fetched every STATS_EVERY_N refreshes; topology details
 //   every DETAILS_EVERY_N refreshes; device list + WAN state every refresh.
 
-const UNIFI_HISTORY_MAX = 5760;
+const UNIFI_HISTORY_MAX = historyStorageMaxPoints(30);
 const uniHistory = loadHistoryMap('unifi-history', UNIFI_HISTORY_MAX);
 
 const STATS_EVERY_N = 4;      // stats cadence: every 4th refresh (~60s at 15s)
@@ -447,10 +447,8 @@ async function fetchWanQuality(inst) {
 // "ISP events" can be derived from falling edges.
 // ---------------------------------------------------------------------------
 
-function pushHistory(key, point, max = UNIFI_HISTORY_MAX) {
-  const rows = uniHistory.get(key) || [];
-  rows.push(point);
-  if (rows.length > max) rows.splice(0, rows.length - max);
+function pushHistory(key, point) {
+  const rows = appendHistoryPoint(uniHistory.get(key) || [], point);
   uniHistory.set(key, rows);
   return rows;
 }

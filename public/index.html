@@ -1882,7 +1882,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeOsSels(
 function periodHoursValue(value) {
   const n = Number(value || 1);
   if (!Number.isFinite(n) || n <= 0) return 1;
-  return Math.min(Math.max(n, 0.333333), 24);
+  return Math.min(Math.max(n, 0.333333), 168);
 }
 function periodHoursToLimit(hours) {
   return Math.max(1, Math.round(periodHoursValue(hours) * 60 * 4));
@@ -1908,6 +1908,8 @@ function drawTimeSelect(id, currentLimit) {
     { v: 1440, l: '6 Hours' },
     { v: 2880, l: '12 Hours' },
     { v: 5760, l: '24 Hours' },
+    { v: 17280, l: '3 Days' },
+    { v: 40320, l: '1 Week' },
   ];
   const curLbl = opts.find(o => o.v === currentLimit)?.l || '20 Mins';
   const optsHtml = opts.map(o => `<div class="os-sel-opt ${currentLimit === o.v ? 'active' : ''}" onclick="setTimeLimit(${escAttr(jsStr(id))}, ${o.v})">${o.l}</div>`).join('');
@@ -1932,6 +1934,8 @@ const HISTORY_PERIOD_OPTIONS = [
   { h: 6, l: 'Last 6 hours' },
   { h: 12, l: 'Last 12 hours' },
   { h: 24, l: 'Last 24 hours' },
+  { h: 72, l: 'Last 3 days' },
+  { h: 168, l: 'Last 1 week' },
 ];
 function periodLabel(hours) {
   const h = periodHoursValue(hours);
@@ -11702,7 +11706,7 @@ function ensureDashboardContent(reason = ''){
    half of every chart. Merge: keep previously-known points that are older than
    the new payload's first sample. Object arrays (instances/devices/nodes/…)
    are aligned by identity so histories survive reordering. */
-const HISTORY_MERGE_MAX = 5760;
+const HISTORY_MERGE_MAX = 14114;
 function historyItemKey(item){
   if(!item || typeof item !== 'object') return null;
   if(item.node?.name) return `${item.clusterName || item.clusterUrl || ''}|node:${item.node.name}`;
@@ -11779,7 +11783,7 @@ let historyFetchPromise = null;
 let historyFetchedPoints = 0;
 let historyFetchBackoffUntil = 0;
 async function fetchExpandedHistory(points){
-  points = Math.max(30, Math.min(5760, Number(points) || 80));
+  points = Math.max(30, Math.min(40320, Number(points) || 80));
   if(!window._lastData || points <= Math.max(historyFetchedPoints, Number(window._lastData._viewHistoryLimit || 0))) return;
   if(historyFetchPromise) return historyFetchPromise;
   if(Date.now() < historyFetchBackoffUntil) return;

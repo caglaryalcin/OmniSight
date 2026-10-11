@@ -251,6 +251,10 @@ function run() {
   assert.strictEqual(temperatureSensorKind('NVMe SSD temperature'), 'ssd');
   assert.strictEqual(temperatureSensorKind('CPU temperature'), 'cpu');
 
+  assert.ok(html.includes("{ v: 40320, l: '1 Week' }"), 'metric history selectors must offer a one-week window');
+  assert.ok(html.includes("{ h: 168, l: 'Last 1 week' }"), 'uptime history selectors must offer a one-week window');
+  assert.ok(html.includes('Math.min(40320, Number(points) || 80)'), 'expanded history fetches must accept a full week window');
+
   const githubApi = {
     id:101,
     provider:'github',

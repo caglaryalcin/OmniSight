@@ -445,6 +445,8 @@ The live config is `data/config.yaml` (created automatically on first save). Eas
 - `healthchecks` — url, apiKey
 - `checks.services[]` — built-in `http`, `tcp`, `ping` or `dns` checks with name, target, optional port/status/record type and timeout
 - `defaultTimePeriodHours`, `historyRetentionDays`, `timeFormat`, `preferredLanguage`, `appearance.dashboardSidePanel` and `performance.*` — dashboard-wide history period, persistent history retention, 12/24 hour time format, UI language, dashboard side-panel visibility, lower-frequency disk flushes for slower storage, collector concurrency and optional per-platform refresh intervals
+
+History is stored locally under `data/*-history.yaml`. With 7- or 30-day retention, OmniSight keeps the latest 24 hours at the native 15-second resolution and compacts older samples into five-minute archive points. This extends chart history without increasing collector polling; gaps remain visible when OmniSight or the monitored source was offline.
 - `uptimekuma` — url, status page `slug`, optional apiKey, username/password and historyHours
 - `prometheus` — one or more `instances[]` with name, url, optional bearerToken and `insecureTLS`
 - `database.instances[]` — `type: postgresql | mysql | mariadb | mongodb`, name, host, port, user, password, optional `database`
