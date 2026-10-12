@@ -1,8 +1,10 @@
 <img src="./public/assets/omnisight-wordmark.svg" width="512" alt="Omnisight Logo" />
 
-![Status](https://img.shields.io/badge/status-stable-brightgreen) [![Latest Release](https://img.shields.io/github/v/release/caglaryalcin/OmniSight?include_prereleases&color=blue)](https://github.com/caglaryalcin/OmniSight/releases)
+![Status](https://img.shields.io/badge/status-stable-brightgreen) [![Latest Release](https://img.shields.io/github/v/release/caglaryalcin/OmniSight?include_prereleases&color=blue)](https://github.com/caglaryalcin/OmniSight/releases) [![Live Demo](https://img.shields.io/badge/demo-live-22c55e)](https://demo-omnisight.caglaryalcin.com)
 
 A simple, single-glance monitoring dashboard for Proxmox, VMware ESXi/vCenter, Linux servers, Kubernetes, SNMP devices, Docker, Dockhand, firewalls, TrueNAS/QNAP/UGREEN storage, Proxmox Backup Server, Portainer, databases, built-in service checks, Healthchecks, Uptime Kuma and Prometheus.
+
+Try the hosted [live demo](https://demo-omnisight.caglaryalcin.com) with username `demo` and password `demo`.
 
 For deeper architecture, operations and troubleshooting notes, see [DOCUMENTATION.md](DOCUMENTATION.md).
 
@@ -566,6 +568,10 @@ The sidebar footer also links to GitHub and opens a new issue form for help/bug 
 - TLS verification is enabled by default for integrations. Use each platform's explicit self-signed/insecure option only when needed.
 - Config secrets are encrypted at rest by default (see Encryption above).
 
+## Brand assets
+
+The official OmniSight logo is available as a transparent [SVG](public/assets/omnisight-logo.svg) and [512×512 PNG](public/assets/omnisight-logo.png). The [wordmark](public/assets/omnisight-wordmark.svg) is optimized for dark backgrounds.
+
 ## License
 
-[MIT](LICENSE)
+[GNU General Public License v2.0 only](LICENSE)

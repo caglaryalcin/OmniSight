@@ -1,6 +1,6 @@
 {
   "name": "omnisight",
-  "version": "2.7.0",
+  "version": "2.7.1",
   "description": "Monitoring dashboard for Proxmox, VMware ESXi/vCenter, Linux, Docker, Kubernetes, SNMP, storage, services and databases",
   "main": "server.js",
   "scripts": {
@@ -31,5 +31,13 @@
     "qs": "6.16.0"
   },
   "author": "caglaryalcin",
-  "homepage": "https://github.com/caglaryalcin"
+  "license": "GPL-2.0-only",
+  "homepage": "https://demo-omnisight.caglaryalcin.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/caglaryalcin/OmniSight.git"
+  },
+  "bugs": {
+    "url": "https://github.com/caglaryalcin/OmniSight/issues"
+  }
 }
