@@ -165,6 +165,9 @@ docker run -d --name omnisight-agent --restart unless-stopped \
   docker:cli sh -c "apk add --no-cache bash curl coreutils >/dev/null && curl -fsSL http://<omnisight-host>:3000/agent/omnisight-agent.sh -o /usr/local/bin/omnisight-agent && exec bash /usr/local/bin/omnisight-agent"
 ```
 
+**Limited Mobile Responsive**
+![](https://raw.githubusercontent.com/caglaryalcin/OmniSight/refs/heads/main/screenshots/mobile-responsive.png)
+
 **Docker Stack (Swarm):**
 
 ```bash
