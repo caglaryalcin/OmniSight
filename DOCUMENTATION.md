@@ -420,6 +420,8 @@ Alert semantics:
 
 UniFi devices monitored over SNMP (profile `unifi`) and controller-reported devices render in **one merged UniFi card**: controller rows first (offline devices always on top), with matching SNMP detail embedded in each row's expanded view. Rate limiting (HTTP 429) is handled per controller instance with a cooldown that serves the last good data. Multiple controllers and multiple sites per controller are supported — add one instance per site.
 
+If a UniFi SNMP device has no fresh CPU temperature, OmniSight can use `unpoller_device_temperature_celsius` from an enabled Prometheus connection. It queries this optional metric only when a UniFi SNMP device is configured. Fresh SNMP readings take precedence. CPU samples are matched by device IP/MAC or an unambiguous name; for console gateways, the Poller controller URL can also match the SNMP host even when device names differ. Samples older than two minutes are ignored. The SNMP device must still be reachable; this fallback supplies temperature, not device availability.
+
 ### Healthchecks
 
 Healthchecks reads cron/job status through the Healthchecks API.
@@ -736,6 +738,8 @@ The alert engine evaluates runtime cache data for problems and recoveries.
 - Webhook events.
 
 Alert settings can define `durationSeconds` per category. `rules.default` defaults to 60 seconds and applies to checks without a more specific rule, such as Proxmox service state or Prometheus instance reachability. Set it to `0` for immediate notifications.
+
+CPU/RAM threshold and anomaly detections share one notification incident per metric. An absolute threshold takes precedence while exceeded. Each severity must persist for its configured duration before notifying; only escalation sends another problem notification. Recovery requires two continuous minutes of normal readings. Threshold incidents also require a drop of 5 percentage points below warning (10% of warning for thresholds below 50%) to prevent repeated notifications near the boundary.
 
 ### Notification Channels
 

@@ -399,6 +399,8 @@ Bildirim davranışı:
 
 SNMP `unifi` profili ve controller cihazları tek UniFi kartında birleştirilir. Controller satırları önce, çevrimdışı cihazlar en üstte gösterilir; eşleşen SNMP detayları genişletilmiş görünümde yer alır. HTTP 429 rate limit durumunda son başarılı veri geçici olarak gösterilir. Birden fazla controller ve site desteklenir.
 
+UniFi SNMP cihazında güncel CPU sıcaklığı yoksa etkin Prometheus bağlantısından `unpoller_device_temperature_celsius` metriği yedek kaynak olarak okunur. Bu sorgu yalnızca UniFi profilli SNMP cihazı yapılandırılmışsa yapılır. Güncel SNMP sıcaklığı önceliklidir. Cihaz IP/MAC adresi veya benzersiz adıyla eşleştirilir; konsol gateway cihazlarında Poller controller adresi de SNMP host adresiyle eşleşebilir. Böylece Grafana ve OmniSight adları farklı olabilir. İki dakikadan eski ölçümler kullanılmaz. Bu yöntem yalnızca sıcaklığı tamamlar; SNMP cihazının erişilebilir olması gerekir.
+
 ### Healthchecks
 
 Healthchecks cron/job durumunu API üzerinden okur. `up`, `down`, `grace` ve `paused` durumları desteklenir. Grace uyarı, down kritik sorun olarak değerlendirilir.
@@ -684,6 +686,8 @@ Bildirim motoru çalışma zamanı önbelleğini sorunlar ve düzelmeler için d
 - Webhook olayları.
 
 Bildirim ayarları kategori başına `durationSeconds` tanımlayabilir. `rules.default` varsayılan olarak 60 saniyedir ve Proxmox servis durumu ya da Prometheus instance erişimi gibi daha özel kuralı olmayan kontroller için kullanılır. Anında bildirim için `0` yapın.
+
+CPU/RAM eşik ve anomali algılamaları, metrik başına tek bildirim olayı olarak işlenir. Mutlak eşik aşıldığında eşik algılaması önceliklidir. Her seviye, bildirimden önce ayarlanan süre boyunca kalıcı olmalıdır; yalnızca seviye yükselmesi yeni sorun bildirimi gönderir. Normale dönüş için değerlerin kesintisiz 2 dakika normal kalması gerekir. Eşik olaylarında ayrıca uyarı eşiğinin 5 yüzde puan altına inilmelidir (eşik %50'nin altındaysa eşiğin %10'u kadar); böylece sınır çevresindeki dalgalanmalar tekrar bildirim üretmez.
 
 ### Bildirim Kanalları
 

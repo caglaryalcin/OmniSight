@@ -332,7 +332,34 @@ function migrateCloudflareNotificationState(disabled, topics, legacy = {}, cloud
 }
 
 function shouldDispatchProblem(activeSeverity, nextSeverity) {
-  return !activeSeverity || activeSeverity !== nextSeverity;
+  return !activeSeverity || (activeSeverity === 'warning' && nextSeverity === 'critical');
+}
+
+function resourceMetric(check = {}) {
+  const metric = String(check.metric || '').toLowerCase();
+  if (/^cpu\b/.test(metric)) return 'cpu';
+  if (/^(ram|memory)\b/.test(metric)) return 'ram';
+  if (/^disk\b/.test(metric)) return 'disk';
+  return metric;
+}
+
+function isVolatileMetricCheck(check = {}) {
+  return ['threshold', 'anomaly'].includes(check.kind) && ['cpu', 'ram'].includes(resourceMetric(check));
+}
+
+// One resource excursion has one notification episode. Explicit thresholds take
+// precedence; anomalies still detect unusual load below the configured threshold.
+function coalesceMetricChecks(checks) {
+  const merged = new Map(checks);
+  for (const [key, check] of checks) {
+    if (check.kind !== 'anomaly' || !key.endsWith(':anomaly')) continue;
+    const thresholdKey = key.slice(0, -':anomaly'.length);
+    const threshold = checks.get(thresholdKey);
+    if (threshold?.kind !== 'threshold') continue;
+    if (threshold.ok && !check.ok) merged.set(thresholdKey, { ...check, label: threshold.label });
+    merged.delete(key);
+  }
+  return merged;
 }
 
 function clearAlertCooldownsForType(cooldowns, type, key) {
@@ -383,5 +410,8 @@ module.exports = {
   migrateCloudflareStickyState,
   migrateCloudflareNotificationState,
   shouldDispatchProblem,
+  resourceMetric,
+  isVolatileMetricCheck,
+  coalesceMetricChecks,
   clearAlertCooldownsForType,
 };

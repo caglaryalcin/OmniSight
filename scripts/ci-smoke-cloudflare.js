@@ -38,6 +38,8 @@ function createHarness(source, { stored = null, disabled = [] } = {}) {
     prevChecks: null,
     alertFirstSeen: new Map(),
     alertProblemSince: new Map(),
+    alertPendingSeverity: new Map(),
+    alertRecoverySince: new Map(),
     alertActiveSeverity: new Map(stickyState),
     alertEpisodeSequence: 0,
     alertEpisodeRevisions: new Map(),
@@ -270,5 +272,5 @@ async function run() {
   console.log('smoke ok — Cloudflare alert state: per-resource mute, persistence, recovery, retries and async delivery races');
 }
 
-module.exports = { run };
+module.exports = { run, createHarness };
 if (require.main === module) run().catch(err => { console.error(err); process.exit(1); });

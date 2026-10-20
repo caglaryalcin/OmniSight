@@ -6494,7 +6494,11 @@ const SETTINGS_INFO_CONTENT = {
   },
   alertTiming: {
     title: 'Alert timing',
-    copy: 'Control how many seconds a condition must remain active before a notification is sent. Deployment values are loaded into settings, and the latest saved setting is the active value.',
+    copy: {
+      en: 'Control how many seconds a condition must remain active before a notification is sent. CPU/RAM threshold and anomaly alerts share one incident. A severity increase must persist for its configured duration; decreases do not send another problem notification. Recovery requires two normal minutes and a margin below the warning threshold.',
+      tr: 'Bildirimden önce koşulun kaç saniye aktif kalması gerektiğini belirler. CPU/RAM eşik ve anomali uyarıları tek olay olarak işlenir. Seviye artışı ayarlanan süre boyunca kalıcı olmalıdır; düşüşler yeni sorun bildirimi göndermez. Normale dönüş için 2 dakika normal değer ve uyarı eşiğinin altına yeterli düşüş gerekir.',
+      de: 'Legt fest, wie lange ein Zustand vor einer Benachrichtigung bestehen muss. CPU/RAM-Schwellenwerte und Anomalien werden als ein Vorfall behandelt. Eine Eskalation muss für die eingestellte Dauer bestehen; eine niedrigere Stufe löst keine weitere Problemmeldung aus. Die Entwarnung erfordert zwei normale Minuten und einen Abstand unter der Warnschwelle.',
+    },
   },
   maintenanceWindow: {
     title: 'Maintenance Mode',

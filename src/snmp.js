@@ -1,6 +1,7 @@
 const snmp = require('net-snmp');
 const { loadHistoryMap, scheduleSaveHistoryMap, historyStorageMaxPoints, compactHistorySeries } = require('./historyStore');
 const { allSettledLimit } = require('./concurrency');
+const { applyUnpollerTemperature } = require('./unifiTemperature');
 
 const DISK_STATUS = { 1: 'normal', 2: 'initialized', 3: 'not initialized', 4: 'sys partition failed', 5: 'crashed' };
 const VOLUME_STATUS = { 1: 'normal', 2: 'repairing', 3: 'migrating', 4: 'expanding', 5: 'deleting', 6: 'creating', 11: 'degraded', 12: 'crashed' };
@@ -206,7 +207,7 @@ function uniqueSensorRows(rows = []) {
 }
 
 function isCpuTempLabel(label) {
-  return /\bcpu\b|processor/.test(String(label || '').toLowerCase());
+  return /\bcpu\d*\b|processor|\bsoc\b/.test(displaySensorLabel(label).toLowerCase());
 }
 
 function isNvmeTempLabel(label) {
@@ -219,7 +220,8 @@ function isSystemTempLabel(label) {
 }
 
 function classifyTemperatureMetrics(temperatures = []) {
-  const rows = uniqueSensorRows(temperatures).filter(t => Number.isFinite(Number(t.value)));
+  const rows = uniqueSensorRows(temperatures.map(t => t && ({ ...t, label: displaySensorLabel(t.label) })))
+    .filter(t => isNum(t.value));
   const sorted = [...rows].sort((a, b) => tempCandidateScore(b.label) - tempCandidateScore(a.label));
   const cpu = sorted.find(t => isCpuTempLabel(t.label)) || null;
   const system = sorted.find(t => isSystemTempLabel(t.label)) || null;
@@ -1176,16 +1178,17 @@ async function getNetwork(session, deviceKey) {
   return interfaces;
 }
 
-async function getDeviceData(device) {
+async function getDeviceData(device, unifiTemperatures = []) {
   const session = createSession(device);
   const profile = device.profile || device.preset || 'generic';
   try {
     const sysDescr = await probeReachable(session);
     const isSynology = /synology/i.test(profile) || /synology/i.test(sysDescr);
-    const sysInfo = await getSystemInfo(session, device.host).catch(e => {
+    const nativeSystemInfo = await getSystemInfo(session, device.host).catch(e => {
       console.error(`[SNMP ${device.name}] sysInfo:`, e.message);
       return retainLastKnownTemperature(device.host, {});
     });
+    const sysInfo = applyUnpollerTemperature(device, nativeSystemInfo, unifiTemperatures);
     const readSynologyTable = (label, fn) => fn().catch(e => {
       if (isSynology) console.error(`[SNMP ${device.name}] ${label}:`, e.message);
       return [];
@@ -1236,6 +1239,7 @@ async function getDeviceData(device) {
       thermalStatus: sysInfo.thermalStatus ?? null,
       temperatureStale: !!sysInfo.temperatureStale,
       temperatureLastKnownAt: sysInfo.temperatureLastKnownAt ?? null,
+      temperatureSource: sysInfo.temperatureSource || 'snmp',
       ram:     sysInfo.ram     ?? null,
       nvmeTemps: sysInfo.nvmeTemps || [],
       fanSpeeds: sysInfo.fanSpeeds || [],
@@ -1290,9 +1294,10 @@ async function sampleDeviceBandwidth(device) {
   }
 }
 
-async function getAllSynologyData(config) {
+async function getAllSynologyData(config, unifiTemperatures = []) {
   const devices = config.devices || [];
-  const results = await allSettledLimit(devices, Number(config.concurrency || config.collectorConcurrency || 3), getDeviceData);
+  const results = await allSettledLimit(devices, Number(config.concurrency || config.collectorConcurrency || 3),
+    device => getDeviceData(device, unifiTemperatures));
   return results.map((r, i) =>
     r.status === 'fulfilled'
       ? r.value
@@ -1321,4 +1326,5 @@ module.exports = {
   SNMP_SENSOR_LAST_KNOWN_MS,
   sumNetworkBandwidth,
   shouldUseInterface,
+  classifyTemperatureMetrics,
 };

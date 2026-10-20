@@ -83,6 +83,7 @@ async function main() {
   assert.strictEqual(shouldDispatchProblem(undefined, 'critical'), true);
   assert.strictEqual(shouldDispatchProblem('warning', 'critical'), true);
   assert.strictEqual(shouldDispatchProblem('critical', 'critical'), false);
+  assert.strictEqual(shouldDispatchProblem('critical', 'warning'), false, 'severity downgrades must not page again');
   const cooldowns = new Map([
     ['problem|win:M4A1|critical', 1],
     ['problem|win:M4A1|warning', 2],
@@ -250,6 +251,7 @@ async function main() {
 
   // Resource notification episodes, failures and delayed delivery callbacks.
   await require('./ci-smoke-cloudflare').run();
+  await require('./ci-smoke-metrics').run();
 }
 
 main().catch(err => { console.error(err); process.exit(1); });

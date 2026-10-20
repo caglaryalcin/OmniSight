@@ -55,6 +55,9 @@ const {
   migrateCloudflareStickyState,
   migrateCloudflareNotificationState,
   shouldDispatchProblem,
+  resourceMetric,
+  isVolatileMetricCheck,
+  coalesceMetricChecks,
   clearAlertCooldownsForType,
 } = require('./src/alerts');
 const { decryptConfig, encryptConfigValue, isEncrypted, SENSITIVE_KEYS, encryptionEnabled } = require('./src/crypto');
@@ -4230,6 +4233,7 @@ function mergePrometheusConfigured(current, cfg) {
     summary,
     instances,
     targets,
+    unifiTemperatures: instances.filter(i => i.online).flatMap(i => i.unifiTemperatures || []),
   };
 }
 
@@ -4633,6 +4637,8 @@ const ALERT_STARTUP_GRACE_MS = 60000;
 let prevChecks = null;
 const alertFirstSeen = new Map();
 const alertProblemSince = new Map();
+const alertPendingSeverity = new Map();
+const alertRecoverySince = new Map();
 const alertActiveSeverity = new Map(stickyAlertState);
 const healthcheckGraceDeadlines = new Map();
 let alertEpisodeSequence = 0;
@@ -4766,7 +4772,7 @@ function configuredAlertRule(rules, key) {
 function alertRuleForCheck(key, check = {}) {
   const rules = config.alerts?.rules || {};
   const defaultRule = configuredAlertRule(rules, 'default') || DEFAULT_ALERT_RULE;
-  const metric = String(check.metric || '').toLowerCase();
+  const metric = resourceMetric(check);
   if (check.kind === 'anomaly') return config.alerts?.anomaly?.rules?.[metric] || config.alerts?.anomaly || configuredAlertRule(rules, 'anomaly') || defaultRule;
   if (check.kind === 'threshold' && metric) return configuredAlertRule(rules, metric) || defaultRule;
   if (String(key || '').startsWith('snmp:')) return configuredAlertRule(rules, 'snmp') || DEFAULT_SNMP_ALERT_RULE;
@@ -4886,7 +4892,7 @@ function alertInfoText(check = {}) {
 function runAlertChecks(data) {
   if (!config.alerts || config.alerts.enabled === false) return;
   migrateCloudflareAlertEpisodes(data.cloudflare);
-  const cur = extractChecks(data);
+  const cur = coalesceMetricChecks(extractChecks(data));
   const now = Date.now();
   for (const key of Array.from(alertFirstSeen.keys())) {
     if (!cur.has(key)) alertFirstSeen.delete(key);
@@ -4896,6 +4902,11 @@ function runAlertChecks(data) {
   }
   for (const key of Array.from(alertProblemSince.keys())) {
     if (!cur.has(key) || cur.get(key)?.ok) alertProblemSince.delete(key);
+  }
+  for (const timers of [alertPendingSeverity, alertRecoverySince]) {
+    for (const key of timers.keys()) {
+      if (!cur.has(key)) timers.delete(key);
+    }
   }
   for (const key of Array.from(alertActiveSeverity.keys())) {
     if (!cur.has(key) && !isStickyAlertKey(key)) alertActiveSeverity.delete(key);
@@ -4974,7 +4985,21 @@ function runAlertChecks(data) {
     c.key = key;
     const activeSeverity = alertActiveSeverity.get(key);
     const muted = notifyDisabledForKey(key) || isAlertMuted(key, now);
+    const volatile = isVolatileMetricCheck(c);
     if (c.ok) {
+      alertPendingSeverity.delete(key);
+      if (activeSeverity && volatile) {
+        // A small dip below the warning threshold must not close the incident.
+        // Unclassified/anomaly-only checks have no absolute threshold margin.
+        const warning = Number(c.thresholds?.warning);
+        if (Number.isFinite(warning) && c.value > warning - Math.min(5, warning * 0.1)) {
+          alertRecoverySince.delete(key);
+          continue;
+        }
+        if (!alertRecoverySince.has(key)) alertRecoverySince.set(key, now);
+        if (now - alertRecoverySince.get(key) < 120000) continue;
+      }
+      alertRecoverySince.delete(key);
       invalidateAlertEpisode(key);
       clearAlertCooldownsForType(alertSentAtBySignature, 'problem', key);
       alertProblemSince.delete(key);
@@ -4983,11 +5008,17 @@ function runAlertChecks(data) {
       forgetStickyAlert(key);
       continue;
     }
+    alertRecoverySince.delete(key);
     if (!alertProblemSince.has(key)) alertProblemSince.set(key, now);
+    const severity = (c.kind === 'threshold' || c.kind === 'anomaly' || c.kind === 'updates') ? c.severity : 'critical';
+    if (volatile) {
+      const pending = alertPendingSeverity.get(key);
+      if (!pending || pending.severity !== severity) alertPendingSeverity.set(key, { severity, since: now });
+      if (now - alertPendingSeverity.get(key).since < alertDelayMs(key, c)) continue;
+    }
     if (muted || inMaintenanceWindow(now)) continue;
     if (now - (alertFirstSeen.get(key) || now) < ALERT_STARTUP_GRACE_MS) continue;
     if (now - (alertProblemSince.get(key) || now) < alertDelayMs(key, c)) continue;
-    const severity = (c.kind === 'threshold' || c.kind === 'anomaly' || c.kind === 'updates') ? c.severity : 'critical';
     if (!shouldDispatchProblem(activeSeverity, severity)) continue;
     clearAlertCooldownsForType(alertSentAtBySignature, 'recovery', key);
     const episodeRevision = beginAlertEpisode(key);
@@ -5290,11 +5321,13 @@ function backgroundRefresh(opts = {}) {
     ['linux',        enabled(config.linux),        () => Promise.resolve(getLinuxData()),        []],
     ['windows',      enabled(config.windows),      () => Promise.resolve(getWindowsData()),      []],
     ['kubernetes',   enabled(config.kubernetes),   () => getAllKubernetesData(config.kubernetes), null],
-    ['snmp',         enabled(config.snmp),         () => getAllSynologyData(config.snmp),         []],
+    ['snmp',         enabled(config.snmp),         () => getAllSynologyData(config.snmp, base.prometheus?.unifiTemperatures || []), []],
     ['healthchecks', enabled(config.healthchecks), () => getAllHealthchecks(config.healthchecks), null],
     ['uptimekuma',   enabled(config.uptimekuma),   () => getAllUptimeKuma(uptimeKumaConfig()),    null],
     ['checks',       enabled(config.checks),       () => getAllChecks(checksConfig()),            null],
-    ['prometheus',   enabled(config.prometheus),   () => getPrometheusData(config.prometheus),    null],
+    ['prometheus',   enabled(config.prometheus),   () => getPrometheusData(config.prometheus, {
+      collectUnifiTemperatures: enabled(config.snmp) && (config.snmp.devices || []).some(d => (d.profile || d.preset) === 'unifi'),
+    }), null],
     ['docker',       enabled(config.docker),       () => getDockerData(),                        []],
     ['dockhand',     enabled(config.dockhand),     () => getAllDockhand(config.dockhand),         null],
     ['database',     enabled(config.database),     () => getAllDatabaseData(config.database),     []],
@@ -7392,6 +7425,8 @@ function importFullBackupText(text) {
   prevChecks = null;
   alertFirstSeen.clear();
   alertProblemSince.clear();
+  alertPendingSeverity.clear();
+  alertRecoverySince.clear();
   alertActiveSeverity.clear();
   for (const [key, severity] of stickyAlertState) alertActiveSeverity.set(key, severity);
   rebuildAlertSentCooldowns();

@@ -1,6 +1,7 @@
 const http = require('http');
 const https = require('https');
 const { mapLimit } = require('./concurrency');
+const { normalizeUnpollerTemperatures } = require('./unifiTemperature');
 
 function joinUrl(base, path) {
   return String(base || '').replace(/\/+$/, '') + path;
@@ -66,7 +67,7 @@ function normalizeTarget(t = {}, source = {}) {
   };
 }
 
-async function getPrometheusInstance(config = {}, idx = 0) {
+async function getPrometheusInstance(config = {}, idx = 0, collectUnifiTemperatures = false) {
   const source = { ...config, name: instanceName(config, idx) };
   try {
     if (!source.url) throw new Error('Prometheus URL is required');
@@ -86,19 +87,31 @@ async function getPrometheusInstance(config = {}, idx = 0) {
       down: targets.filter(t => t.health === 'down').length,
       unknown: targets.filter(t => t.health === 'unknown').length,
     };
-    return { online: true, name: source.name, url: source.url, summary, targets };
+    let unifiTemperatures = [];
+    if (collectUnifiTemperatures) {
+      try {
+        // A range selector keeps the original scrape timestamp, rather than
+        // presenting an old sample with an instant query's evaluation time.
+        const query = encodeURIComponent('unpoller_device_temperature_celsius[2m]');
+        unifiTemperatures = normalizeUnpollerTemperatures(await httpGetJson(joinUrl(source.url, `/api/v1/query?query=${query}`), source));
+      } catch {
+        // Optional sensor data must not affect target health or connectivity.
+      }
+    }
+    return { online: true, name: source.name, url: source.url, summary, targets, unifiTemperatures };
   } catch (err) {
     console.warn(`Prometheus refresh failed (${source.name || source.url || idx + 1}):`, err.message);
     return { online: false, name: source.name, url: source.url, error: err.message, summary: { total: 0, up: 0, down: 0, unknown: 0 }, targets: [] };
   }
 }
 
-async function getPrometheusData(config = {}) {
+async function getPrometheusData(config = {}, { collectUnifiTemperatures = false } = {}) {
   const instances = configuredInstances(config);
   if (!instances.length) {
     return { online: false, error: 'Prometheus URL is required', summary: { instances: 0, instanceUp: 0, instanceDown: 0, total: 0, up: 0, down: 0, unknown: 0 }, instances: [], targets: [] };
   }
-  const rows = await mapLimit(instances, Number(config.concurrency || config.collectorConcurrency || 3), getPrometheusInstance);
+  const rows = await mapLimit(instances, Number(config.concurrency || config.collectorConcurrency || 3),
+    (source, idx) => getPrometheusInstance(source, idx, collectUnifiTemperatures));
   const targets = rows.flatMap(r => r.targets || []).sort((a, b) => {
     const order = { down: 0, unknown: 1, up: 2 };
     return (order[a.health] ?? 3) - (order[b.health] ?? 3)
@@ -116,7 +129,8 @@ async function getPrometheusData(config = {}) {
     unknown: targets.filter(t => t.health === 'unknown').length,
   };
   const firstError = rows.find(r => !r.online)?.error || '';
-  return { online: summary.instanceUp > 0, error: firstError, summary, instances: rows.map(({ targets: _targets, ...r }) => r), targets };
+  return { online: summary.instanceUp > 0, error: firstError, summary, instances: rows.map(({ targets: _targets, ...r }) => r), targets,
+    unifiTemperatures: rows.filter(r => r.online).flatMap(r => r.unifiTemperatures || []) };
 }
 
 module.exports = { getPrometheusData };
