@@ -3638,6 +3638,12 @@ function copyToClip(text, btn) {
 
 async function exportConfigBackup() {
   try {
+    const password = await askBackupPassword({
+      title: 'Export config backup',
+      desc: 'Enter your current admin password to export platform settings.',
+      action: 'Export',
+    });
+    if (password === null) return;
     const fallbackName = 'omnisight-config-backup-' + new Date().toISOString().slice(0,10) + '.yaml';
     let saveHandle = null;
     const pickerWindow = typeof window.showSaveFilePicker === 'function'
@@ -3654,7 +3660,12 @@ async function exportConfigBackup() {
         saveHandle = null;
       }
     }
-    const r = await fetch('/api/config/export', { headers: authHeaders(), cache: 'no-store' });
+    const r = await fetch('/api/config/export', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      cache: 'no-store',
+      body: JSON.stringify({ password }),
+    });
     handleUnauth(r);
     if (!r.ok) throw new Error((await r.json().catch(()=>({}))).error || 'Export failed');
     const blob = await r.blob();
@@ -3666,18 +3677,6 @@ async function exportConfigBackup() {
       await writable.write(blob);
       await writable.close();
     } else {
-      const direct = '/api/config/export?download=1&t=' + Date.now();
-      try {
-        const a = document.createElement('a');
-        a.href = direct;
-        a.download = filename;
-        a.target = '_top';
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        toast('Config backup exported', 'ok');
-        return;
-      } catch {}
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;

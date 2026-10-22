@@ -7203,8 +7203,13 @@ app.get('/api/settings/agents', (req, res) => {
   sendCachedJson(req, res, `settings:agents:${role}`, sig, () => redactForRole(req, view));
 });
 
-app.get('/api/config/export', (req, res) => {
+app.post('/api/config/export', (req, res) => {
   if (sessionRole(req) !== 'admin') return res.status(403).json({ error: 'Forbidden' });
+  try {
+    verifyAdminPassword(req, req.body?.password || req.body?.currentPassword);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
   const rawConfig = fs.existsSync(CONFIG_PATH) ? fs.readFileSync(CONFIG_PATH, 'utf8') : yaml.dump({});
   const files = { 'config.yaml': rawConfig };
   if (fs.existsSync(UI_PREFS_PATH)) files['ui-preferences.yaml'] = fs.readFileSync(UI_PREFS_PATH, 'utf8');

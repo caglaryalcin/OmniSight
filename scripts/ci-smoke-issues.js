@@ -630,6 +630,81 @@ function testFullBackupEmptyFileCompatibility() {
   assert.strictEqual(fullBackupContentHeader(3), '    content: |-\n');
 }
 
+async function testConfigExportPassword() {
+  const crypto = require('crypto');
+  const express = require('express');
+  const yaml = require('js-yaml');
+  const source = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+  const routeStart = source.indexOf("app.post('/api/config/export'");
+  const routeEnd = source.indexOf('\nfunction backupVersion()', routeStart);
+  const verifyStart = source.indexOf('function verifyAdminPassword(');
+  const verifyEnd = source.indexOf('\nfunction yamlJson(', verifyStart);
+  const hashStart = source.indexOf('function hashPassword(');
+  const hashEnd = source.indexOf('\nfunction genToken(', hashStart);
+  assert.ok(routeStart >= 0 && routeEnd > routeStart && verifyStart >= 0 && verifyEnd > verifyStart && hashStart >= 0 && hashEnd > hashStart);
+  const password = 'BackupTestPassword1';
+  const salt = 'config-export-test';
+  const account = { role: 'admin', salt, hash: crypto.scryptSync(password, salt, 64).toString('hex') };
+  let reads = 0;
+  let audits = 0;
+  const app = express();
+  app.use(express.json());
+  vm.runInNewContext([
+    source.slice(hashStart, hashEnd),
+    source.slice(verifyStart, verifyEnd),
+    source.slice(routeStart, routeEnd),
+  ].join('\n'), {
+    app, crypto, Buffer,
+    // js-yaml requires plain objects from its own VM realm.
+    yaml: { dump: (doc, options) => yaml.dump(JSON.parse(JSON.stringify(doc)), options) },
+    require: name => { assert.strictEqual(name, './package.json'); return { version: '1.0.0' }; },
+    fs: {
+      existsSync: () => true,
+      readFileSync: file => { reads += 1; return `fixture: ${file}\n`; },
+    },
+    CONFIG_PATH: 'config.yaml', UI_PREFS_PATH: 'ui-preferences.yaml', TOPOLOGY_PATH: 'topology.yaml',
+    sessionRole: req => req.headers['x-test-role'] || 'admin',
+    currentAuthUser: () => account,
+    normalizeRole: role => role,
+    encryptionEnabled: () => true,
+    auditEvent: () => { audits += 1; },
+  });
+  const server = await listen(app);
+  try {
+    const url = `http://127.0.0.1:${server.address().port}/api/config/export`;
+    const post = (body, role = 'admin', suffix = '') => fetch(url + suffix, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-test-role': role },
+      body: JSON.stringify(body),
+    });
+    assert.strictEqual((await fetch(url + '?download=1')).status, 404, 'GET must not bypass password verification');
+    for (const role of ['operator', 'read-only']) {
+      assert.strictEqual((await post({ password }, role)).status, 403, 'only admins may export config');
+    }
+    for (const body of [{}, { password: '' }, { password: 'wrong' }]) {
+      const response = await post(body);
+      assert.strictEqual(response.status, 400, 'missing or incorrect passwords must be rejected');
+      assert.match((await response.json()).error, /password/i);
+    }
+    assert.strictEqual((await post({}, 'admin', '?password=' + password)).status, 400, 'passwords must be supplied in the request body');
+    assert.strictEqual(reads, 0, 'rejected exports must not read backup files');
+    assert.strictEqual(audits, 0, 'rejected exports must not record a successful export');
+    for (const body of [{ password }, { currentPassword: password }]) {
+      const response = await post(body);
+      assert.strictEqual(response.status, 200, await response.clone().text());
+      assert.match(response.headers.get('content-disposition'), /attachment; filename="omnisight-config-backup-/);
+      const backup = yaml.load(await response.text());
+      assert.strictEqual(backup.kind, 'omnisight-config-backup');
+      assert.strictEqual(backup.files['config.yaml'], 'fixture: config.yaml\n');
+      assert.strictEqual(backup.files['ui-preferences.yaml'], 'fixture: ui-preferences.yaml\n');
+      assert.strictEqual(backup.files['topology.yaml'], 'fixture: topology.yaml\n');
+    }
+    assert.strictEqual(audits, 2);
+  } finally {
+    await close(server);
+  }
+}
+
 function testPlatformAvailability() {
   const { availabilityCounts, rowAvailability, platformAvailability } = require('../src/platformAvailability');
   assert.deepStrictEqual(availabilityCounts(1, 2), { offline: 1, online: 1, total: 2 });
@@ -1933,6 +2008,7 @@ async function run() {
   testCephNormalization();
   testLatestStableVersion();
   testFullBackupEmptyFileCompatibility();
+  await testConfigExportPassword();
   testPlatformAvailability();
   testUiPreferenceScoping();
   testPendingAgentIsolation();
