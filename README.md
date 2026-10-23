@@ -170,8 +170,9 @@ docker run -d --name omnisight-agent --restart unless-stopped \
 
 **Docker Stack (Swarm):**
 
-```bash
-docker stack deploy -c - omnisight-agent <<'EOF'
+Save the following as `omnisight-agent-stack.yml`, or paste it into your stack editor:
+
+```yaml
 version: "3.8"
 services:
   agent:
@@ -188,18 +189,15 @@ services:
       mode: global
       restart_policy:
         condition: any
-EOF
 ```
 
-**Windows (elevated PowerShell):**
+Deploy from a Swarm manager:
 
-```powershell
-[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12; $env:OMNISIGHT_URL="http://<omnisight-host>:3000"; $env:OMNISIGHT_TOKEN="<token>"; $env:OMNISIGHT_AGENT_ROLE="windows"; iwr -UseBasicParsing "http://<omnisight-host>:3000/agent/install-windows.ps1" | iex
+```bash
+docker stack deploy -c omnisight-agent-stack.yml omnisight-agent
 ```
 
-The Windows installer compiles the agent with the Windows-provided .NET Framework compiler and registers `OmniSightAgent` as an automatic Windows service. Runtime files are stored under `%ProgramFiles%\OmniSight Agent`, configuration and logs under `%ProgramData%\OmniSight`, and no persistent PowerShell process or scheduled task is used.
-
-Windows agents older than v1.4.0 use the legacy scheduled-task runtime. Selecting **Update** for one of these agents shows a one-time elevated PowerShell migration command instead of stopping the running agent. The command installs the Windows service, preserves the existing agent ID, and stops and removes the legacy task only after the service starts successfully.
+For Windows, copy the pre-filled installation command from **Settings → Windows Server → + Add Windows Host** or **Agents → Add Windows Agent** and run it in an elevated PowerShell window. It installs the agent as an automatic Windows service.
 
 3. Run it on the server — the dialog shows a live "✓ connected" confirmation and the system appears on the dashboard within seconds.
 
@@ -249,17 +247,40 @@ State lives in `/opt/omnisight/data`, and the service runs as the unprivileged `
 docker compose up -d
 ```
 
-Nothing to pre-create. The single `data/` directory holds all state (`config.yaml`, `secret.key`, `auth.yaml`, `sessions.yaml`, `agents.yaml`, `kube.bin`); Docker auto-creates it and it persists across restarts. The compose file uses the published image by default (`ghcr.io/caglaryalcin/omnisight:latest`). The app starts empty — set up your account and configure platforms from the Settings UI. Standalone Docker using the published image:
+Nothing to pre-create. The single `data/` directory holds all state (`config.yaml`, `secret.key`, `auth.yaml`, `sessions.yaml`, `agents.yaml`, `kube.bin`); Docker auto-creates it and it persists across restarts. The compose file uses the published image by default (`ghcr.io/caglaryalcin/omnisight:latest`). The app starts empty — set up your account and configure platforms from the Settings UI.
+
+GitHub Actions publishes the same **AMD64 and ARM64** image and tags to both registries:
+
+| Registry | Image |
+| --- | --- |
+| GitHub Container Registry (GHCR) | `ghcr.io/caglaryalcin/omnisight:latest` |
+| Docker Hub | `caglaryalcin/omnisight:latest` |
+
+Choose one of the following standalone Docker commands.
+
+From GitHub Container Registry:
 
 ```bash
 docker run -d --name omnisight -p 3000:3000 \
   --cap-add NET_RAW \
   -e TZ=UTC \
   -v $(pwd)/data:/app/data \
-  ghcr.io/caglaryalcin/omnisight
+  ghcr.io/caglaryalcin/omnisight:latest
+```
+
+From Docker Hub:
+
+```bash
+docker run -d --name omnisight -p 3000:3000 \
+  --cap-add NET_RAW \
+  -e TZ=UTC \
+  -v $(pwd)/data:/app/data \
+  caglaryalcin/omnisight:latest
 ```
 
 `NET_RAW` is only needed for built-in Ping checks. HTTP, TCP and DNS checks work without it.
+
+To use Docker Hub with `docker-compose.yml`, change its `image` value to `caglaryalcin/omnisight:latest`, then run `docker compose up -d`.
 
 To build the image yourself instead, uncomment `build: .` in `docker-compose.yml`, or run `docker build -t omnisight .` and replace the last line with `omnisight`.
 
@@ -272,17 +293,40 @@ docker compose restart omnisight
 
 ### Pre-built image (CI/CD)
 
-A GitHub Actions workflow (`.github/workflows/deploy.yml`) builds and pushes the image to GitHub Container Registry on `main`/`master` and `v*` tags. It also pushes to Docker Hub when `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` are configured for the repository:
+A GitHub Actions workflow (`.github/workflows/deploy.yml`) builds and pushes the image to both registries on code-changing pushes to `main`/`master`, `v*` tags and manual runs. It publishes branch, version-tag and commit-SHA tags, plus `latest` for the default branch. Docker Hub publishing requires the repository variable or secret `DOCKERHUB_USERNAME` and the secret `DOCKERHUB_TOKEN`.
+
+Pull from either registry:
 
 ```bash
 docker pull ghcr.io/caglaryalcin/omnisight:latest
-# Optional Docker Hub mirror, when configured:
-# docker pull docker.io/<namespace>/omnisight:latest
+docker pull caglaryalcin/omnisight:latest
 ```
 
 ### Docker Stack (Swarm)
 
-Use the published image (Swarm ignores `build:`). Enable Swarm once if you haven't, then deploy the stack:
+Save the following as `docker-stack.yml`, or paste it into your stack editor. To use Docker Hub, set `image` to `caglaryalcin/omnisight:latest`.
+
+```yaml
+version: "3.8"
+
+services:
+  omnisight:
+    image: ghcr.io/caglaryalcin/omnisight:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - TZ=${TZ:-UTC}
+      - OMNISIGHT_SECRET=${OMNISIGHT_SECRET:-}
+    volumes:
+      - ./data:/app/data
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+```
+
+Enable Swarm once if you haven't, then deploy the stack:
 
 ```bash
 docker swarm init        # only if this node isn't a Swarm manager yet
