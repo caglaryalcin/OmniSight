@@ -1357,6 +1357,43 @@ function run() {
   assert.strictEqual(localizeOperationalText('Read 287 KB/s / Write 179 KB/s', 'tr', translateText), 'okuma 287 KB/s / yazma 179 KB/s');
   assert.strictEqual(localizeOperationalText('3/3 online', 'en', translateText), '3/3 online');
   assert.strictEqual(localizeOperationalText('download', 'tr', translateText), 'download');
+  assert.strictEqual(localizeOperationalText('3/3 online', 'bg-BG'), '3/3 на линия');
+  assert.strictEqual(localizeOperationalText('4/4 services up', 'bg'), '4/4 работещи услуги');
+  assert.strictEqual(localizeOperationalText('1 reboot required', 'bg'), '1 необходимо е рестартиране');
+  assert.strictEqual(localizeOperationalText('CPU temperature · last known', 'bg'), 'температура на CPU · последно известно');
+  assert.strictEqual(localizeOperationalText('download', 'bg'), 'download');
+
+  const i18nContext = { window: {} };
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '..', 'public', 'i18n.js'), 'utf8'), i18nContext);
+  const localization = i18nContext.window.OmniI18n;
+  const bulgarian = localization.dict('bg');
+  for (const key of Object.keys(localization.dict('tr'))) {
+    assert.ok(bulgarian[key]?.trim(), `Bulgarian translation missing: ${key}`);
+  }
+  for (const language of ['bg', 'bg-BG', 'BG_bg', 'bg.UTF-8']) {
+    assert.strictEqual(localization.normalizeLang(language), 'bg');
+    assert.strictEqual(localization.locale(language), 'bg-BG');
+    assert.strictEqual(localization.t('Settings', language), 'Настройки');
+  }
+  assert.strictEqual(localization.t('Choose your language', 'bg'), 'Изберете езика си');
+  assert.strictEqual(localization.t('unregistered message', 'bg'), 'unregistered message');
+  assert.strictEqual(localization.normalizeLang('unsupported', 'bg'), 'bg');
+  const savedLanguage = new Map();
+  i18nContext.localStorage = {
+    getItem: key => savedLanguage.get(key) ?? null,
+    setItem: (key, value) => savedLanguage.set(key, value),
+  };
+  localization.setLang('bg-BG');
+  assert.strictEqual(savedLanguage.get('os_lang'), 'bg');
+  assert.strictEqual(localization.currentLang('en'), 'bg');
+  localization.setLang('tr');
+  assert.strictEqual(localization.t('Settings'), 'Ayarlar', 'switching away from Bulgarian must restore the chosen language');
+  const server = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+  const languageContext = {};
+  vm.runInNewContext(server.slice(server.indexOf('const SUPPORTED_LANGUAGES ='), server.indexOf('const MAX_KUBECONFIG_BYTES =')), languageContext);
+  assert.strictEqual(languageContext.normalizePreferredLanguage('bg-BG'), 'bg', 'saved and onboarding preferences must accept Bulgarian');
+  assert.strictEqual(languageContext.normalizePreferredLanguage('unsupported', 'bg'), 'bg');
+  assert.strictEqual(languageContext.normalizePreferredLanguage('de-DE'), 'de');
 
   assert.strictEqual(offlineRatioLabel(1, 1), 'Offline');
   assert.strictEqual(offlineRatioLabel(1, 2), '1/2 Online');

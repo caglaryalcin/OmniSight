@@ -1609,9 +1609,10 @@ function normalizedLangKey(lang = currentLang()) {
 }
 function updatedTextLabel(timestamp, lang = currentLang()) {
   const key = normalizedLangKey(lang);
-  const time = new Date(timestamp || Date.now()).toLocaleTimeString('en-GB');
+  const time = new Date(timestamp || Date.now()).toLocaleTimeString(window.OmniI18n?.locale?.(key) || 'en-GB');
   if (key === 'tr') return `Son yenileme ${time}`;
   if (key === 'de') return `Aktualisiert ${time}`;
+  if (key === 'bg') return `Обновено ${time}`;
   return `Updated ${time}`;
 }
 /* ci-extract:begin localizeOperationalText */
@@ -1619,9 +1620,79 @@ function localizeOperationalText(text, lang = 'en', translateText = null) {
   const raw = String(text ?? '');
   const key = String(lang || 'en').trim().toLowerCase().split(/[._-]/)[0] || 'en';
   const direct = typeof translateText === 'function' ? String(translateText(raw, key)) : raw;
-  if (key !== 'tr') return direct;
+  if (key !== 'tr' && key !== 'bg') return direct;
   if (direct !== raw) return direct;
-  const replacements = [
+  const replacements = key === 'bg' ? [
+    [/\bStandalone ESXi\b/gi, "Самостоятелен ESXi"],
+    [/\bpowered on\b/gi, "включено"],
+    [/\bpowered off\b/gi, "изключено"],
+    [/\bhosts online\b/gi, "хостове на линия"],
+    [/\bVMs running\b/gi, "работещи VM"],
+    [/\bvirtual machines\b/gi, "виртуални машини"],
+    [/\bdatastores?\b/gi, "хранилища за данни"],
+    [/\bclusters?\b/gi, "клъстери"],
+    [/\bhosts?\b/gi, "хостове"],
+    [/\bVMs?\b/gi, "VM"],
+    [/\bmaintenance\b/gi, "поддръжка"],
+    [/\bdisconnected\b/gi, "прекъсната връзка"],
+    [/\breboot required\b/gi, "необходимо е рестартиране"],
+    [/\breporting sources?\b/gi, "докладващи източници"],
+    [/\bservices up\b/gi, "работещи услуги"],
+    [/\bCPU temperature\b/gi, "температура на CPU"],
+    [/\bstale data\b/gi, "остарели данни"],
+    [/\blast known\b/gi, "последно известно"],
+    [/\bpartial API data\b/gi, "частични данни от API"],
+    [/\bpartial data\b/gi, "частични данни"],
+    [/\bAPI reachable\b/gi, "API е достъпен"],
+    [/\bwaiting for first check\b/gi, "изчакване на първата проверка"],
+    [/\bno containers\b/gi, "няма контейнери"],
+    [/\ball running\b/gi, "всички работят"],
+    [/\ball ok\b/gi, "всичко е наред"],
+    [/\bdisk warns?\b/gi, "дискови предупреждения"],
+    [/\bunreachable\b/gi, "недостъпно"],
+    [/\breachable\b/gi, "достъпно"],
+    [/\bconnecting\b/gi, "свързване"],
+    [/\bhealthy\b/gi, "в изправност"],
+    [/\bdegraded\b/gi, "с проблеми"],
+    [/\boffline\b/gi, "извън линия"],
+    [/\bonline\b/gi, "на линия"],
+    [/\brunning\b/gi, "работи"],
+    [/\bstopped\b/gi, "спряно"],
+    [/\bfailing\b/gi, "неуспешно"],
+    [/\bfailed\b/gi, "неуспешно"],
+    [/\bsucceeded\b/gi, "успешно"],
+    [/\bpending\b/gi, "изчаква"],
+    [/\bunknown\b/gi, "неизвестно"],
+    [/\battention\b/gi, "изисква внимание"],
+    [/\bup\b/gi, "работи"],
+    [/\bdown\b/gi, "не работи"],
+    [/\bupdates?\b/gi, "актуализации"],
+    [/\bpools?\b/gi, "пулове"],
+    [/\bgreen\b/gi, "успешно"],
+    [/\bjobs?\b/gi, "задачи"],
+    [/\btasks?\b/gi, "задачи"],
+    [/\bstates?\b/gi, "състояния"],
+    [/\bdisks?\b/gi, "дискове"],
+    [/\bused\b/gi, "използвано"],
+    [/\bread\b/gi, "четене"],
+    [/\bwrite\b/gi, "запис"],
+    [/\bservers?\b/gi, "сървъри"],
+    [/\bsystems?\b/gi, "системи"],
+    [/\bdevices?\b/gi, "устройства"],
+    [/\bservices?\b/gi, "услуги"],
+    [/\bcontainers?\b/gi, "контейнери"],
+    [/\bmonitors?\b/gi, "монитори"],
+    [/\btargets?\b/gi, "цели"],
+    [/\bprojects?\b/gi, "проекти"],
+    [/\bgateways?\b/gi, "шлюзове"],
+    [/\btunnels?\b/gi, "тунели"],
+    [/\bzones?\b/gi, "зони"],
+    [/\bcores?\b/gi, "ядра"],
+    [/\bpods?\b/gi, "pod-ове"],
+    [/\bnodes?\b/gi, "възли"],
+    [/\blinks?\b/gi, "връзки"],
+    [/\benv\b/gi, "среда"],
+  ] : [
     [/\bStandalone ESXi\b/gi, 'Bağımsız ESXi'],
     [/\bpowered on\b/gi, 'açık'],
     [/\bpowered off\b/gi, 'kapalı'],

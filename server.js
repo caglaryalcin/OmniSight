@@ -99,7 +99,7 @@ const ONE_MB = 1024 * 1024;
 const MAX_ICON_BYTES = 512 * 1024;
 const MAX_AVATAR_BYTES = 512 * 1024;
 const MAX_CERT_BYTES = 5 * ONE_MB;
-const SUPPORTED_LANGUAGES = new Set(['en', 'tr', 'de']);
+const SUPPORTED_LANGUAGES = new Set(['en', 'tr', 'de', 'bg']);
 
 function preferredLanguageCode(value) {
   return String(value || '').trim().toLowerCase().split(/[._-]/)[0];

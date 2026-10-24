@@ -488,6 +488,7 @@ html[data-theme="light"] .ci-help{color:#53657c}
           <option value="en">🇬🇧 English</option>
           <option value="tr">🇹🇷 Turkish</option>
           <option value="de">🇩🇪 German</option>
+          <option value="bg">🇧🇬 Bulgarian</option>
         </select>
       </div>
       <div class="backup-panel">
@@ -2205,6 +2206,7 @@ function getTagValsWithPending(listId, inputId) {
 const MAINTENANCE_DAYS = ['mon','tue','wed','thu','fri','sat','sun'];
 const MAINTENANCE_DAY_LABELS = {
   en: { mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat', sun: 'Sun' },
+  bg: { mon: 'Пон', tue: 'Вт', wed: 'Ср', thu: 'Чет', fri: 'Пет', sat: 'Съб', sun: 'Нед' },
   tr: { mon: 'Pzt', tue: 'Sal', wed: 'Çar', thu: 'Per', fri: 'Cum', sat: 'Cmt', sun: 'Paz' },
 };
 function normalizeMaintenanceDays(days) {
@@ -2251,6 +2253,7 @@ function renderLocalizedBlocks(lang = currentLang()) {
     const copy = {
       en: `Read-only summary at ${link}, no login required`,
       tr: `${link} adresinde salt okunur özet, oturum açmaya gerek yok`,
+      bg: `Обобщение само за четене на ${link}, не се изисква вход`,
       de: `Schreibgeschützte Übersicht unter ${link}, keine Anmeldung erforderlich`,
     };
     statusDesc.innerHTML = copy[lang] || copy.en;
@@ -6520,7 +6523,7 @@ const SETTINGS_INFO_CONTENT = {
 };
 
 function localizedInfoValue(value, lang = currentLang()) {
-  if (value && typeof value === 'object') return value[lang] || value.en || '';
+  if (value && typeof value === 'object') return value[lang] || trText(value.en || '', lang);
   return trText(value, lang);
 }
 

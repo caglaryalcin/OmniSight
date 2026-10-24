@@ -80,7 +80,7 @@ For deeper architecture, operations and troubleshooting notes, see [DOCUMENTATIO
 - **Onboarding** — first-run setup wizard for admin account, timezone, notifications and the first platform
 - **Users & roles** — multi-user access with admin, operator and read-only roles
 - **Profile** — profile image, password changes, password reset support, passkeys and optional TOTP two-factor authentication
-- **System** — dashboard side panel toggle, default history period, 12/24 hour time format, English/Turkish/German UI language preference and installable PWA manifest
+- **System** — dashboard side panel toggle, default history period, 12/24 hour time format, English/Turkish/German/Bulgarian UI language preference and installable PWA manifest
 - **Backup & restore** — config backup export/restore plus password-gated full backup export for users, secret key, certs and history
 
 ![](https://raw.githubusercontent.com/caglaryalcin/OmniSight/refs/heads/main/screenshots/backup-export.png)

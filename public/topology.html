@@ -293,10 +293,22 @@ function lang(){return window.OmniI18n?OmniI18n.currentLang('en'):'en'}
 function tr(s){return window.OmniI18n?OmniI18n.t(s,lang()):s}
 function localizeTopologyText(text, selectedLang = lang()){
   const raw = String(text ?? '');
-  if(String(selectedLang || '').toLowerCase() !== 'tr') return raw;
-  const direct = tr(raw);
+  const key = String(selectedLang || '').toLowerCase().split(/[._-]/)[0];
+  const direct = window.OmniI18n ? OmniI18n.t(raw, key) : raw;
+  if(key !== 'tr' && key !== 'bg') return direct;
   if(direct !== raw) return direct;
-  const replacements = [
+  const replacements = key === 'bg' ? [
+    [/\bhidden in compact view\b/gi, "скрито в компактния изглед"],
+    [/\baccess points?\b/gi, "точки за достъп"],
+    [/\bgateways?\b/gi, "шлюзове"],
+    [/\bguests?\b/gi, "гости"],
+    [/\bpods?\b/gi, "pod-ове"],
+    [/\bcontainers?\b/gi, "контейнери"],
+    [/\brunning\b/gi, "работи"],
+    [/\bonline\b/gi, "на линия"],
+    [/\boffline\b/gi, "извън линия"],
+    [/\bmore\b/gi, "още"],
+  ] : [
     [/\bhidden in compact view\b/gi, 'kompakt görünümde gizli'],
     [/\baccess points?\b/gi, 'erişim noktası'],
     [/\bgateways?\b/gi, 'ağ geçidi'],
