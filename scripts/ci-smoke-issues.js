@@ -1059,8 +1059,13 @@ function testStaticRegressions() {
   assert.ok(!windowsAgent.includes('Get-Counter') && !windowsService.includes('Get-Counter'), 'localized Windows counters must not return');
   assert.ok(windowsAgent.includes('Win32_PerfFormattedData_PerfDisk_PhysicalDisk') && windowsService.includes('Win32_PerfFormattedData_PerfDisk_PhysicalDisk'));
   assert.ok(windowsAgent.includes('SecurityProtocolType]::Tls12') && windowsInstaller.includes('SecurityProtocolType]::Tls12'));
-  const windowsDownloadLines = [settings, server, readme].flatMap(source => source.split(/\r?\n/).filter(line => /\biwr\b/.test(line)));
-  assert.ok(windowsDownloadLines.length >= 5);
+  const windowsDownloadLines = [];
+  for (const [name, source] of Object.entries({ Settings: settings, Server: server, README: readme })) {
+    const lines = source.split(/\r?\n/).filter(line => /\biwr\b/.test(line));
+    // README examples are optional; both runtime command generators must stay covered.
+    if (name !== 'README') assert.ok(lines.length >= 2, `${name} must include Windows installation and uninstall/migration commands`);
+    windowsDownloadLines.push(...lines);
+  }
   assert.ok(windowsDownloadLines.every(line => /psTLS12|WINDOWS_TLS12_BOOTSTRAP|SecurityProtocolType\]::Tls12/.test(line)), 'every generated Windows download must enable TLS 1.2 before iwr runs');
   assert.ok(windowsAgent.includes('Get-UpdateStatus') && linuxAgent.includes('updates_json'));
   assert.ok(proxmoxCollector.includes('/apt/update`).catch(() => null)') && proxmoxCollector.includes('updates: normalizeAptUpdates(aptUpdates)'), 'Proxmox API update failures must stay unknown without taking a node offline');
