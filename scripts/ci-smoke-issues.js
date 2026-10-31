@@ -1488,8 +1488,29 @@ function testStaticRegressions() {
     const encodedQuery = Buffer.from(windowsQuery, 'utf16le').toString('base64');
     const parserProbe = `$command = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String('${encodedQuery}')); $tokens = $null; $errors = $null; [void][System.Management.Automation.Language.Parser]::ParseInput($command, [ref]$tokens, [ref]$errors); if ($errors.Count) { $errors | ForEach-Object { Write-Error $_.Message }; exit 1 }`;
     execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', parserProbe], { stdio: 'pipe' });
-    const diagnosticOutput = execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', windowsQuery], { encoding: 'utf8' }).trim();
-    assert.match(diagnosticOutput, /^RESULT=(?:HEALTHY|REPAIR_WINDOWS_AGENT|CHECK_FAILED)$/);
+    // Shadow host access in this child session: a smoke test must never read
+    // the developer's real agent credentials or contact its monitoring server.
+    const diagnosticCases = [
+      { service: 'Running', agentId: 'M4A1-cc94c7b9', ping: '@{report=@{known=$true;fresh=$true}}', expected: 'HEALTHY' },
+      { service: 'Stopped', agentId: 'M4A1-cc94c7b9', ping: "throw 'must not contact server'", expected: 'REPAIR_WINDOWS_AGENT' },
+      { service: 'Running', agentId: 'different-agent', ping: "throw 'must not contact server'", expected: 'REPAIR_WINDOWS_AGENT' },
+      { service: 'Running', agentId: 'M4A1-cc94c7b9', ping: '@{report=@{known=$true;fresh=$false}}', expected: 'REPAIR_WINDOWS_AGENT' },
+      { service: 'Running', agentId: 'M4A1-cc94c7b9', ping: "throw 'connection failed'", expected: 'CHECK_FAILED' },
+    ];
+    for (const fixture of diagnosticCases) {
+      const agentConfig = JSON.stringify({ agentId: fixture.agentId, url: 'http://fixture.invalid', token: 'fixture-token' });
+      const fixtureScript = [
+        "$ProgressPreference='SilentlyContinue';",
+        `function Get-Service { @{Status='${fixture.service}'} }`,
+        'function Test-Path { $true }',
+        `function Get-Content { '${agentConfig}' }`,
+        `function Invoke-RestMethod { ${fixture.ping} }`,
+        windowsQuery,
+      ].join('\n');
+      const encodedFixture = Buffer.from(fixtureScript, 'utf16le').toString('base64');
+      const diagnosticOutput = execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand', encodedFixture], { encoding: 'utf8', timeout: 15000 }).trim();
+      assert.strictEqual(diagnosticOutput, `RESULT=${fixture.expected}`);
+    }
   }
   assert.ok(server.includes('report: agents.reportStatus(id)') && server.includes('Math.floor(Date.now() / 5000)'), 'agent ping must expose non-mutating report freshness and cached online state must expire with time');
   assert.ok(server.includes("agentVersion: agent.agentVersion || ''") && server.includes('role: agentInstallRole(agent)'), 'repair command responses must include the selected agent version and role');

@@ -1,15 +1,17 @@
 async function mapLimit(items, limit, mapper) {
   const list = Array.isArray(items) ? items : [];
-  const max = Math.max(1, Math.min(Number(limit) || 1, list.length || 1));
-  const out = new Array(list.length);
-  let index = 0;
-  await Promise.all(Array.from({ length: max }, async () => {
-    while (index < list.length) {
-      const current = index++;
-      out[current] = await mapper(list[current], current);
+  const workerCount = Math.max(1, Math.floor(Math.min(Number(limit) || 1, list.length || 1)));
+  const results = new Array(list.length);
+  let nextIndex = 0;
+  // Workers claim indices before awaiting, so each item runs once and results
+  // retain input order even when requests complete in a different order.
+  await Promise.all(Array.from({ length: workerCount }, async () => {
+    while (nextIndex < list.length) {
+      const currentIndex = nextIndex++;
+      results[currentIndex] = await mapper(list[currentIndex], currentIndex);
     }
   }));
-  return out;
+  return results;
 }
 
 async function allSettledLimit(items, limit, mapper) {

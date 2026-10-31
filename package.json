@@ -1,6 +1,6 @@
 {
   "name": "omnisight",
-  "version": "2.7.5",
+  "version": "2.7.6",
   "description": "Monitoring dashboard for Proxmox, VMware ESXi/vCenter, Linux, Docker, Kubernetes, SNMP, storage, services and databases",
   "main": "server.js",
   "scripts": {
@@ -28,7 +28,7 @@
   },
   "overrides": {
     "ip-address": "10.7.4",
-    "qs": "6.16.0"
+    "qs": "6.17.1"
   },
   "author": "caglaryalcin",
   "license": "GPL-2.0-only",

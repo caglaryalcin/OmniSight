@@ -5,6 +5,7 @@ const os = require('os');
 const { execFile } = require('child_process');
 const { Client } = require('ssh2');
 const { imageUpdateInfo } = require('./imageUpdates');
+const { mapLimit } = require('./concurrency');
 
 const warnTimes = new Map();
 
@@ -304,19 +305,6 @@ function unusedImageCount(imageRows, containers, refFn) {
     if (!refs.size) return count;
     return [...refs].some(ref => used.has(ref)) ? count : count + 1;
   }, 0);
-}
-
-async function mapLimit(items, limit, fn) {
-  const out = new Array(items.length);
-  let next = 0;
-  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
-    while (next < items.length) {
-      const idx = next++;
-      out[idx] = await fn(items[idx], idx);
-    }
-  });
-  await Promise.all(workers);
-  return out;
 }
 
 function dockerSudoAttempts(host) {
