@@ -356,7 +356,10 @@ function parseChartVolumes(body) {
       ?? bytesValue(rowValue(row, ['free_size', 'freeSize', 'available']), 'B');
     const explicitUsed = bytesValue(rowValue(usage, ['used_size', 'usedSize']), 'B')
       ?? bytesValue(rowValue(row, ['used_size', 'usedSize']), 'B');
-    const usedBytes = explicitUsed ?? (totalBytes != null && freeBytes != null ? Math.max(0, totalBytes - freeBytes) : null);
+    // Nested used_size fields can describe categories rather than the entire volume.
+    const usedBytes = totalBytes != null && freeBytes != null
+      ? Math.max(0, totalBytes - freeBytes)
+      : explicitUsed;
     const status = rowValue(row, ['volumeStat', 'status', 'state']);
     const statusCode = numberValue(rowValue(row, ['volumeStatus', 'statusCode']));
     return {

@@ -132,6 +132,62 @@ async function testQnap() {
   }
 }
 
+async function testQnapVolumeUsage() {
+  let chartBody = '';
+  const server = await listen((req, res) => {
+    const url = new URL(req.url, 'http://127.0.0.1');
+    if (url.pathname === '/cgi-bin/management/chartReq.cgi') return res.end(chartBody);
+    res.setHeader('Content-Type', 'application/json');
+    if (url.pathname === '/cgi-bin/filemanager/utilRequest.cgi') {
+      return res.end(url.searchParams.get('func') === 'check_sid'
+        ? JSON.stringify({ status: 1, server_name: 'qnap-volume-regression' }) : '[]');
+    }
+    if (url.pathname === '/cgi-bin/management/manaRequest.cgi') return res.end(JSON.stringify({ cpu_usage: 10, total_memory: 1024, free_memory: 512 }));
+    if (url.pathname === '/cgi-bin/disk/qsmart.cgi') return res.end(JSON.stringify({ Disk_Info: [] }));
+    res.statusCode = 404;
+    res.end('missing');
+  });
+  try {
+    const { getAllQnapData } = require('../src/qnap');
+    const url = `http://127.0.0.1:${server.address().port}`;
+    const cases = [
+      // Issue #29 supplies these capacities; category nesting is a synthetic fixture.
+      { name: 'issue #29 nested category', total_size: 3917790765056, free_size: 2569561358336, categoryUsed: 8491008, expectedUsed: 1348229406720, expectedPercent: 34.4 },
+      { name: 'conflicting explicit usage', total_size: 1000, free_size: 250, used_size: 10, expectedUsed: 750, expectedPercent: 75 },
+      { name: 'explicit usage without free capacity', total_size: 1000, used_size: 400, expectedUsed: 400, expectedPercent: 40 },
+      { name: 'empty volume', total_size: 1000, free_size: 1000, used_size: 10, expectedUsed: 0, expectedPercent: 0 },
+      { name: 'full volume', total_size: 1000, free_size: 0, used_size: 10, expectedUsed: 1000, expectedPercent: 100 },
+      { name: 'zero category usage', total_size: 1000, free_size: 250, categoryUsed: 0, expectedUsed: 750, expectedPercent: 75 },
+    ];
+    for (const format of ['xml', 'json']) {
+      for (const scenario of cases) {
+        const fields = Object.fromEntries(['total_size', 'free_size', 'used_size']
+          .filter(key => scenario[key] != null).map(key => [key, scenario[key]]));
+        const volume = { volumeValue: 1, volumeLabel: 'DataVol1', volumeStat: 'mirror', volumeStatus: 0 };
+        const usage = { volumeValue: 1, ...fields };
+        if (scenario.categoryUsed != null) usage.categories = { category: [{ used_size: scenario.categoryUsed }, { used_size: 123 }] };
+        const xmlFields = object => Object.entries(object).map(([key, value]) => `<${key}><![CDATA[${value}]]></${key}>`).join('');
+        chartBody = format === 'json'
+          ? JSON.stringify({ volumeList: { volume }, volumeUseList: { volumeUse: usage } })
+          : `<QDocRoot><volumeList><volume>${xmlFields(volume)}</volume></volumeList><volumeUseList><volumeUse>${xmlFields({ volumeValue: 1, ...fields })}${scenario.categoryUsed != null ? `<categories><category><used_size>${scenario.categoryUsed}</used_size></category><category><used_size>123</used_size></category></categories>` : ''}</volumeUse></volumeUseList></QDocRoot>`;
+        const data = await getAllQnapData({ url, sid: 'volume-regression-sid' });
+        const instance = data.instances[0];
+        const label = `${format}: ${scenario.name}`;
+        assert.strictEqual(instance.partial, false, label);
+        assert.strictEqual(instance.volumes.length, 1, label);
+        assert.strictEqual(instance.volumes[0].totalBytes, scenario.total_size, label);
+        assert.strictEqual(instance.volumes[0].usedBytes, scenario.expectedUsed, label);
+        assert.strictEqual(instance.volumes[0].usedPercent, scenario.expectedPercent, label);
+        assert.strictEqual(instance.summary.usedBytes, scenario.expectedUsed, label);
+        assert.strictEqual(instance.summary.usedPercent, scenario.expectedPercent, label);
+        assert.strictEqual(data.summary.usedPercent, scenario.expectedPercent, label);
+      }
+    }
+  } finally {
+    await close(server);
+  }
+}
+
 async function testPbs() {
   const server = await listen((req, res) => {
     const url = new URL(req.url, 'http://127.0.0.1');
@@ -2022,6 +2078,7 @@ function testRequestDiagnostics() {
 
 async function run() {
   await testQnap();
+  await testQnapVolumeUsage();
   await testPbs();
   testDockerAndDockhand();
   await testDockhandEnvironments();
@@ -2044,7 +2101,7 @@ async function run() {
   testTopologyLinkPorts();
   testCloudflareResourceNotificationRendering();
   testStaticRegressions();
-  console.log('smoke ok — issue regressions: #4 #5 #6 #7 #9 #10 #12 #18 #20 #22 #23 #24 #25 #27');
+  console.log('smoke ok — issue regressions: #4 #5 #6 #7 #9 #10 #12 #18 #20 #22 #23 #24 #25 #27 #29');
 }
 
 module.exports = { run };
