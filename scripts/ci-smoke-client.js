@@ -51,6 +51,80 @@ function extractFunction(source, name) {
   throw new Error(`unterminated function "${name}" in public/index.html`);
 }
 
+function testHistoryRetentionSelectors(html) {
+  const context = {
+    window: { _lastData: null },
+    escAttr: value => String(value).replace(/"/g, '&quot;'),
+    escHtml: value => String(value),
+    jsStr: value => JSON.stringify(value),
+    trText: value => value,
+    scheduleUiPreferencesSave: () => {},
+  };
+  vm.createContext(context);
+  const periodsStart = html.indexOf('const HISTORY_PERIOD_OPTIONS = [');
+  const periodsEnd = html.indexOf('function periodLabel(', periodsStart);
+  assert.ok(periodsStart >= 0 && periodsEnd > periodsStart);
+  vm.runInContext([
+    'let timeLimits = {}; let lastDefaultPeriodHours = null;',
+    html.slice(periodsStart, periodsEnd),
+    ...['historyRetentionHours', 'periodHoursValue', 'periodHoursToLimit', 'defaultPeriodHours',
+      'platformPeriodHours', 'defaultHistoryLimit', 'clampHistoryLimit', 'historyLimitFor',
+      'drawTimeSelect', 'periodLabel', 'drawUptimeHistorySelect', 'syncDefaultPeriodOverride']
+      .map(name => extractFunction(html, name)),
+  ].join('\n'), context);
+
+  for (const days of [1, 7, 30]) {
+    context.window._lastData = { historyRetentionDays: days, defaultTimePeriodHours: 720, checks: { historyHours: 720 } };
+    assert.strictEqual(context.defaultPeriodHours(), days * 24);
+    assert.strictEqual(context.platformPeriodHours('checks'), days * 24);
+    for (const [markup, weekLabel, monthLabel] of [
+      [context.drawTimeSelect('lx:fixture', 172800), '1 Week', '30 Days'],
+      [context.drawUptimeHistorySelect(720), 'Last 1 week', 'Last 30 days'],
+      [context.drawUptimeHistorySelect(720, 'setChecksHistoryHours'), 'Last 1 week', 'Last 30 days'],
+    ]) {
+      const options = [...markup.matchAll(/<div class="os-sel-opt[^"]*"([^>]*)>([^<]*)<\/div>/g)];
+      assert.strictEqual(options.length, 9, 'every range must remain visible, including disabled ranges');
+      for (const [label, disabled] of [[weekLabel, days < 7], [monthLabel, days < 30]]) {
+        const option = options.find(match => match[2] === label);
+        assert.ok(option, `${label} must remain visible`);
+        assert.strictEqual(option[1].includes('aria-disabled="true"'), disabled, `${label} availability must follow retention`);
+        assert.strictEqual(option[1].includes('onclick='), !disabled, 'disabled ranges must not be selectable');
+        if (disabled) assert.match(option[1], /title="[^"]*History retention/, 'disabled ranges must explain the retention limit on hover');
+      }
+      assert.strictEqual(options.filter(match => !match[1].includes('aria-disabled="true"')).length, days === 1 ? 6 : days === 7 ? 8 : 9);
+    }
+  }
+
+  context.window._lastData = { historyRetentionDays: 1, defaultTimePeriodHours: 1 };
+  vm.runInContext("timeLimits = { 'lx:fixture': 172800, 'win:fixture': 240 }; lastDefaultPeriodHours = null;", context);
+  context.syncDefaultPeriodOverride(context.window._lastData);
+  assert.strictEqual(context.historyLimitFor('lx:fixture'), 5760, 'saved long ranges must clamp after retention is reduced');
+  assert.strictEqual(context.historyLimitFor('win:fixture'), 240, 'valid saved ranges must remain unchanged');
+
+  const settings = fs.readFileSync(path.join(__dirname, '..', 'public', 'settings.html'), 'utf8');
+  const fields = { 'cfg-history-retention': { value: '1' } };
+  for (const id of ['cfg-default-period', 'uk-history-hours', 'checks-history-hours']) {
+    fields[id] = { value: '720', options: [0.333333, 1, 3, 6, 12, 24, 72, 168, 720].map(value => ({ value: String(value) })) };
+  }
+  const settingsContext = { document: { getElementById: id => fields[id] }, trText: value => value };
+  vm.createContext(settingsContext);
+  vm.runInContext(['retentionDaysValue', 'periodValue', 'periodSelectValue', 'syncHistoryPeriodOptions']
+    .map(name => extractFunction(settings, name)).join('\n'), settingsContext);
+  for (const days of [1, 7, 30]) {
+    fields['cfg-history-retention'].value = String(days);
+    for (const id of ['cfg-default-period', 'uk-history-hours', 'checks-history-hours']) fields[id].value = '720';
+    settingsContext.syncHistoryPeriodOptions();
+    for (const id of ['cfg-default-period', 'uk-history-hours', 'checks-history-hours']) {
+      assert.strictEqual(Number(fields[id].value), days * 24, 'settings must clamp selected periods to retention');
+      for (const option of fields[id].options) {
+        assert.strictEqual(option.hidden, false, 'settings must keep unavailable ranges visible');
+        assert.strictEqual(option.disabled, Number(option.value) > days * 24);
+        if (option.disabled) assert.match(option.title, /History retention/);
+      }
+    }
+  }
+}
+
 function createMorphFixture() {
   class FakeNode {
     get nextSibling() {
@@ -253,7 +327,7 @@ function run() {
 
   assert.ok(html.includes("{ v: 40320, l: '1 Week' }"), 'metric history selectors must offer a one-week window');
   assert.ok(html.includes("{ h: 168, l: 'Last 1 week' }"), 'uptime history selectors must offer a one-week window');
-  assert.ok(html.includes('Math.min(40320, Number(points) || 80)'), 'expanded history fetches must accept a full week window');
+  testHistoryRetentionSelectors(html);
 
   const githubApi = {
     id:101,

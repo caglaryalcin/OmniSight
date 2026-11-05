@@ -2195,7 +2195,7 @@ function cleanUiPreferences(raw = {}) {
       const k = String(key || '').slice(0, 80);
       const n = Math.round(Number(value));
       if (!k || !Number.isFinite(n) || n <= 0) continue;
-      ui.timeLimits[k] = Math.max(1, Math.min(40320, n));
+      ui.timeLimits[k] = Math.max(1, Math.min(172800, n));
       if (Object.keys(ui.timeLimits).length >= 80) break;
     }
   }
@@ -3735,7 +3735,7 @@ function cloneDashboardHistories(value, key = '', limit = dashboardHistoryPointL
 }
 
 function requestedHistoryPointLimit(value) {
-  const options = [80, 240, 720, 1440, 2880, 5760, 17280, 40320];
+  const options = [80, 240, 720, 1440, 2880, 5760, 17280, 40320, 172800];
   const requested = Number(value);
   const requestedPoints = Number.isFinite(requested) && requested > 0 ? requested : dashboardHistoryPointLimit();
   const selected = options.find(points => points >= requestedPoints) || options[options.length - 1];
@@ -5141,7 +5141,7 @@ function normalizeUptimeHistoryPoint(h, fallbackStatus = 'unknown') {
 function uptimeKumaHistoryHours(value) {
   const hours = Number(value || 1);
   if (!Number.isFinite(hours) || hours <= 0) return 1;
-  return Math.min(Math.max(hours, 0.25), 168);
+  return Math.min(Math.max(hours, 0.25), historyRetentionDays() * 24);
 }
 function mergeHeartbeatHistory(prevHistory = [], nextHistory = [], hours = 1, fallbackStatus = 'unknown') {
   const cutoff = Date.now() - (uptimeKumaHistoryHours(hours) * 60 * 60 * 1000);

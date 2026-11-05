@@ -199,7 +199,7 @@ function socketErrorMessage(err) {
 function historyHours(value) {
   const hours = Number(value || 1);
   if (!Number.isFinite(hours) || hours <= 0) return 1;
-  return Math.min(Math.max(hours, 0.25), 168);
+  return Math.min(Math.max(hours, 0.25), 720);
 }
 
 function heartbeatHistory(list, monitor = {}, hours = 1) {

@@ -781,6 +781,8 @@ html[data-theme="light"] .db-head-main .pve-head-title,html[data-theme="light"] 
 .os-sel-opt { padding: 7px 12px; color: var(--text); transition: background 0.1s; border-radius:6px; }
 .os-sel-opt:hover { background: rgba(255,255,255,.06); }
 .os-sel-opt.active { color: var(--green); font-weight: 600; }
+.os-sel-opt[aria-disabled="true"] { color: var(--muted); cursor: not-allowed; opacity: .55; }
+.os-sel-opt[aria-disabled="true"]:hover { background: transparent; }
 .os-sel-branch{position:relative;display:flex;align-items:center;justify-content:space-between;gap:18px;padding:7px 8px 7px 12px;color:var(--text);border-radius:6px;transition:background .1s}
 .os-sel-branch:hover,.os-sel-branch.open{background:rgba(255,255,255,.06)}
 .os-sel-branch.active>.os-sel-branch-label{color:var(--green);font-weight:600}
@@ -1945,33 +1947,45 @@ document.addEventListener('pointerdown', e => {
   closeOsSels();
 }, true);
 document.addEventListener('click', e => {
-  if (e.target.closest?.('.os-sel-opt')) setTimeout(() => closeOsSels(), 0);
+  const option = e.target.closest?.('.os-sel-opt');
+  if (option?.getAttribute('aria-disabled') === 'true') return;
+  if (option) setTimeout(() => closeOsSels(), 0);
   else if (!e.target.closest?.('.os-sel')) closeOsSels();
 }, true);
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeOsSels(); });
 
-function periodHoursValue(value) {
+function historyRetentionHours(data = window._lastData) {
+  const days = Number(data?.historyRetentionDays || 1);
+  return (Number.isFinite(days) && days > 0 ? (days <= 1 ? 1 : days <= 7 ? 7 : 30) : 1) * 24;
+}
+function periodHoursValue(value, data = window._lastData) {
   const n = Number(value || 1);
   if (!Number.isFinite(n) || n <= 0) return 1;
-  return Math.min(Math.max(n, 0.333333), 168);
+  return Math.min(Math.max(n, 0.333333), historyRetentionHours(data));
 }
-function periodHoursToLimit(hours) {
-  return Math.max(1, Math.round(periodHoursValue(hours) * 60 * 4));
+function periodHoursToLimit(hours, data = window._lastData) {
+  return Math.max(1, Math.round(periodHoursValue(hours, data) * 60 * 4));
 }
 function defaultPeriodHours(data = window._lastData) {
-  return periodHoursValue(data?.defaultTimePeriodHours || 1);
+  return periodHoursValue(data?.defaultTimePeriodHours || 1, data);
 }
 function platformPeriodHours(platform, data = window._lastData) {
   const value = data?.[platform]?.historyHours;
-  return periodHoursValue(value == null ? defaultPeriodHours(data) : value);
+  return periodHoursValue(value == null ? defaultPeriodHours(data) : value, data);
 }
 function defaultHistoryLimit(data = window._lastData) {
-  return periodHoursToLimit(defaultPeriodHours(data));
+  return periodHoursToLimit(defaultPeriodHours(data), data);
+}
+function clampHistoryLimit(value, data = window._lastData) {
+  const n = Number(value);
+  const limit = Number.isFinite(n) && n > 0 ? n : defaultHistoryLimit(data);
+  return Math.max(1, Math.min(limit, periodHoursToLimit(historyRetentionHours(data), data)));
 }
 function historyLimitFor(id) {
-  return Number(timeLimits[id]) || defaultHistoryLimit();
+  return clampHistoryLimit(timeLimits[id]);
 }
 function drawTimeSelect(id, currentLimit) {
+  currentLimit = clampHistoryLimit(currentLimit);
   const opts = [
     { v: 80, l: '20 Mins' },
     { v: 240, l: '1 Hour' },
@@ -1981,9 +1995,16 @@ function drawTimeSelect(id, currentLimit) {
     { v: 5760, l: '24 Hours' },
     { v: 17280, l: '3 Days' },
     { v: 40320, l: '1 Week' },
+    { v: 172800, l: '30 Days' },
   ];
+  const maxLimit = periodHoursToLimit(historyRetentionHours());
+  const disabledHint = escAttr(trText('Disabled by the History retention setting. Increase retention in Settings to select this range.'));
   const curLbl = opts.find(o => o.v === currentLimit)?.l || '20 Mins';
-  const optsHtml = opts.map(o => `<div class="os-sel-opt ${currentLimit === o.v ? 'active' : ''}" onclick="setTimeLimit(${escAttr(jsStr(id))}, ${o.v})">${o.l}</div>`).join('');
+  const optsHtml = opts.map(o => {
+    const disabled = o.v > maxLimit;
+    const action = disabled ? `aria-disabled="true" title="${disabledHint}"` : `onclick="setTimeLimit(${escAttr(jsStr(id))}, ${o.v})"`;
+    return `<div class="os-sel-opt ${currentLimit === o.v ? 'active' : ''}" ${action}>${o.l}</div>`;
+  }).join('');
   return `<div class="os-sel" onclick="event.stopPropagation()">
     <div class="os-sel-btn" onclick="openOsSel(this)">
       ${curLbl} <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
@@ -2007,6 +2028,7 @@ const HISTORY_PERIOD_OPTIONS = [
   { h: 24, l: 'Last 24 hours' },
   { h: 72, l: 'Last 3 days' },
   { h: 168, l: 'Last 1 week' },
+  { h: 720, l: 'Last 30 days' },
 ];
 function periodLabel(hours) {
   const h = periodHoursValue(hours);
@@ -2015,9 +2037,13 @@ function periodLabel(hours) {
 }
 function drawUptimeHistorySelect(currentHours, handler = 'setUptimeKumaHistoryHours') {
   const current = periodHoursValue(currentHours);
-  const optsHtml = HISTORY_PERIOD_OPTIONS.map(o =>
-    `<div class="os-sel-opt ${Math.abs(o.h - current) < 0.01 ? 'active' : ''}" onclick="${handler}(${o.h})">${trText(o.l)}</div>`
-  ).join('');
+  const maxHours = historyRetentionHours();
+  const disabledHint = escAttr(trText('Disabled by the History retention setting. Increase retention in Settings to select this range.'));
+  const optsHtml = HISTORY_PERIOD_OPTIONS.map(o => {
+    const disabled = o.h > maxHours;
+    const action = disabled ? `aria-disabled="true" title="${disabledHint}"` : `onclick="${handler}(${o.h})"`;
+    return `<div class="os-sel-opt ${Math.abs(o.h - current) < 0.01 ? 'active' : ''}" ${action}>${trText(o.l)}</div>`;
+  }).join('');
   return `<div class="os-sel" onclick="event.stopPropagation()">
     <div class="os-sel-btn" onclick="openOsSel(this)" title="${escAttr(periodLabel(current))}">
       <span>${escHtml(periodLabel(current))}</span>
@@ -2032,18 +2058,28 @@ try { timeLimits = JSON.parse(localStorage.getItem('os_time_limits') || '{}'); }
 let lastDefaultPeriodHours = null;
 function syncDefaultPeriodOverride(data) {
   const current = String(defaultPeriodHours(data));
+  let changed = false;
   if (lastDefaultPeriodHours !== null && lastDefaultPeriodHours !== current) {
     timeLimits = {};
-    scheduleUiPreferencesSave();
+    changed = true;
   }
+  for (const [id, value] of Object.entries(timeLimits)) {
+    const limit = clampHistoryLimit(value, data);
+    if (limit !== value) {
+      timeLimits[id] = limit;
+      changed = true;
+    }
+  }
+  if (changed) scheduleUiPreferencesSave();
   lastDefaultPeriodHours = current;
 }
 window.setTimeLimit = async function(id, val) {
-  timeLimits[id] = Number(val);
+  const limit = clampHistoryLimit(val);
+  timeLimits[id] = limit;
   scheduleUiPreferencesSave();
   if (window._lastData) render(window._lastData);
   try {
-    await fetchExpandedHistory(Number(val));
+    await fetchExpandedHistory(limit);
     if (window._lastData) render(window._lastData);
   } catch (err) {
     console.warn('History range fetch failed:', err.message || err);
@@ -11854,7 +11890,7 @@ let historyFetchPromise = null;
 let historyFetchedPoints = 0;
 let historyFetchBackoffUntil = 0;
 async function fetchExpandedHistory(points){
-  points = Math.max(30, Math.min(40320, Number(points) || 80));
+  points = Math.max(30, Math.min(periodHoursToLimit(historyRetentionHours()), Number(points) || 80));
   if(!window._lastData || points <= Math.max(historyFetchedPoints, Number(window._lastData._viewHistoryLimit || 0))) return;
   if(historyFetchPromise) return historyFetchPromise;
   if(Date.now() < historyFetchBackoffUntil) return;

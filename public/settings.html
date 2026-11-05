@@ -458,11 +458,12 @@ html[data-theme="light"] .ci-help{color:#53657c}
           <option value="24">Last 24 hours</option>
           <option value="72">Last 3 days</option>
           <option value="168">Last 1 week</option>
+          <option value="720">Last 30 days</option>
         </select>
       </div>
       <div class="form-group" style="margin-bottom:0;">
         <label>History retention</label>
-        <select id="cfg-history-retention">
+        <select id="cfg-history-retention" onchange="syncHistoryPeriodOptions(); applySettingsPreview()">
           <option value="1">1 day</option>
           <option value="7">7 days</option>
           <option value="30">30 days</option>
@@ -1028,6 +1029,7 @@ html[data-theme="light"] .ci-help{color:#53657c}
           <option value="24">Last 24 hours</option>
           <option value="72">Last 3 days</option>
           <option value="168">Last 1 week</option>
+          <option value="720">Last 30 days</option>
         </select>
       </div>
     </div>
@@ -1062,6 +1064,7 @@ html[data-theme="light"] .ci-help{color:#53657c}
         <option value="24">Last 24 hours</option>
         <option value="72">Last 3 days</option>
         <option value="168">Last 1 week</option>
+        <option value="720">Last 30 days</option>
       </select>
     </div>
     <div class="section mini-section">
@@ -2477,8 +2480,10 @@ function previewConnectingPlatform(data, id, cfg = {}) {
 function applySettingsPreview(cfgPayload = null) {
   let payload = cfgPayload;
   try { if (!payload) payload = collect(); } catch { payload = {}; }
-  const period = periodValue(payload.defaultTimePeriodHours || 1);
-  const ukPeriod = periodValue(payload.uptimekuma?.historyHours || period);
+  const retentionDays = retentionDaysValue(payload.historyRetentionDays || payload.retention?.historyDays || 1);
+  const period = periodValue(payload.defaultTimePeriodHours || 1, retentionDays);
+  const ukPeriod = periodValue(payload.uptimekuma?.historyHours || period, retentionDays);
+  const checksPeriod = periodValue(payload.checks?.historyHours || period, retentionDays);
   const lang = OmniI18n.normalizeLang ? OmniI18n.normalizeLang(payload.preferredLanguage || currentLang()) : (payload.preferredLanguage || currentLang());
   localStorage.setItem('os_lang', lang);
   try {
@@ -2487,9 +2492,11 @@ function applySettingsPreview(cfgPayload = null) {
     if (p.window?._lastData && typeof p.render === 'function') {
       const data = JSON.parse(JSON.stringify(p.window._lastData));
       data.defaultTimePeriodHours = period;
+      data.historyRetentionDays = retentionDays;
       data.preferredLanguage = lang;
       data.appearance = { ...(data.appearance || {}), ...(payload.appearance || {}) };
       if (data.uptimekuma) data.uptimekuma.historyHours = ukPeriod;
+      if (data.checks) data.checks.historyHours = checksPeriod;
       const configured = previewConfiguredIds(payload);
       const configuredSet = new Set(configured);
       data.configured = configured;
@@ -2609,10 +2616,10 @@ function setTimezoneValue(value) {
   sel.value = val;
 }
 
-function periodValue(value) {
+function periodValue(value, retentionDays = document.getElementById('cfg-history-retention')?.value || 1) {
   const n = Number(value || 1);
   if (!Number.isFinite(n) || n <= 0) return 1;
-  return Math.min(Math.max(n, 0.333333), 168);
+  return Math.min(Math.max(n, 0.333333), retentionDaysValue(retentionDays) * 24);
 }
 function periodSelectValue(value) {
   const n = periodValue(value);
@@ -2623,7 +2630,24 @@ function periodSelectValue(value) {
   if (n <= 12) return '12';
   if (n <= 24) return '24';
   if (n <= 72) return '72';
-  return '168';
+  if (n <= 168) return '168';
+  return '720';
+}
+function syncHistoryPeriodOptions() {
+  const maxHours = retentionDaysValue(document.getElementById('cfg-history-retention')?.value || 1) * 24;
+  const disabledHint = trText('Disabled by the History retention setting. Increase retention in Settings to select this range.');
+  for (const id of ['cfg-default-period', 'uk-history-hours', 'checks-history-hours']) {
+    const select = document.getElementById(id);
+    if (!select) continue;
+    const value = periodSelectValue(select.value || 1);
+    for (const option of select.options) {
+      option.hidden = false;
+      option.disabled = Number(option.value) > maxHours;
+      option.title = option.disabled ? disabledHint : '';
+    }
+    select.title = [...select.options].some(option => option.disabled) ? disabledHint : '';
+    select.value = value;
+  }
 }
 function configBool(value, fallback = false) {
   if (value === undefined || value === null) return fallback;
@@ -4618,11 +4642,11 @@ function populate(cfg) {
   if (document.getElementById('cfg-timeformat')) {
     document.getElementById('cfg-timeformat').value = cfg.timeFormat || '24h';
   }
-  if (document.getElementById('cfg-default-period')) {
-    document.getElementById('cfg-default-period').value = periodSelectValue(cfg.defaultTimePeriodHours || cfg.defaultPeriodHours || cfg.uptimekuma?.historyHours || 1);
-  }
   if (document.getElementById('cfg-history-retention')) {
     document.getElementById('cfg-history-retention').value = String(retentionDaysValue(cfg.historyRetentionDays || cfg.retention?.historyDays || 1));
+  }
+  if (document.getElementById('cfg-default-period')) {
+    document.getElementById('cfg-default-period').value = periodSelectValue(cfg.defaultTimePeriodHours || cfg.defaultPeriodHours || cfg.uptimekuma?.historyHours || 1);
   }
   if (document.getElementById('cfg-low-io')) {
     document.getElementById('cfg-low-io').checked = cfg.performance?.lowIoMode === true || cfg.lowIoMode === true;
@@ -4987,6 +5011,7 @@ function populate(cfg) {
     toggleAlertBody('al-mm-en', 'al-mm-body');
     toggleAlertBody('al-smtp-en', 'al-smtp-body');
   }
+  syncHistoryPeriodOptions();
 }
 
 /* ── Collect config ── */
@@ -4999,6 +5024,7 @@ function collectPerformanceConfig(currentConfig, lowIoMode) {
 }
 
 function collect() {
+  syncHistoryPeriodOptions();
   const cfg = {};
   
   const tzEl = document.getElementById('cfg-timezone');
