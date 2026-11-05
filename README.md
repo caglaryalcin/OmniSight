@@ -4,8 +4,6 @@
 
 A simple, single-glance monitoring dashboard for Proxmox, VMware ESXi/vCenter, Linux servers, Kubernetes, SNMP devices, Docker, Dockhand, firewalls, TrueNAS/QNAP/UGREEN storage, Proxmox Backup Server, Portainer, databases, built-in service checks, Healthchecks, Uptime Kuma and Prometheus.
 
-Try the hosted [live demo](https://demo-omnisight.caglaryalcin.com) with username `demo` and password `demo`.
-
 For deeper architecture, operations and troubleshooting notes, see [DOCUMENTATION.md](DOCUMENTATION.md).
 
 ## Features
