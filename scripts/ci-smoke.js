@@ -241,7 +241,7 @@ async function main() {
   await require('./ci-smoke-cicd').run();
 
   // 6) Pure helpers extracted from public/index.html (no browser)
-  require('./ci-smoke-client').run();
+  await require('./ci-smoke-client').run();
 
   // 7) Native installer defaults, input validation, and failed-LXC cleanup
   require('./ci-smoke-lxc').run();

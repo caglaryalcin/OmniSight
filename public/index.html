@@ -2005,7 +2005,7 @@ function drawTimeSelect(id, currentLimit) {
     const action = disabled ? `aria-disabled="true" title="${disabledHint}"` : `onclick="setTimeLimit(${escAttr(jsStr(id))}, ${o.v})"`;
     return `<div class="os-sel-opt ${currentLimit === o.v ? 'active' : ''}" ${action}>${o.l}</div>`;
   }).join('');
-  return `<div class="os-sel" onclick="event.stopPropagation()">
+  return `<div class="os-sel" data-history-limit="${currentLimit}" onclick="event.stopPropagation()">
     <div class="os-sel-btn" onclick="openOsSel(this)">
       ${curLbl} <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
     </div>
@@ -2079,8 +2079,7 @@ window.setTimeLimit = async function(id, val) {
   scheduleUiPreferencesSave();
   if (window._lastData) render(window._lastData);
   try {
-    await fetchExpandedHistory(limit);
-    if (window._lastData) render(window._lastData);
+    if (await fetchExpandedHistory(limit) && window._lastData) render(window._lastData, { soft:true });
   } catch (err) {
     console.warn('History range fetch failed:', err.message || err);
   }
@@ -10294,6 +10293,7 @@ function selectPanel(id, opts = {}){
   }
   applyLanguage(currentLang(data));
   prepareDetailSystemOrdering(detail, id);
+  syncPanelHistory(detail);
 }
 function selectPanelGroup(id, grpId){
   selectPanel(id);
@@ -10376,6 +10376,10 @@ function render(data, opts = {}){
   }
   if(opts.live && window._lastData && (data?.loading || data?.refreshing)){
     data = { ...window._lastData, ...data };
+  }
+  if(window._lastData && Number(data?._viewHistoryLimit || 0) < Number(window._lastData._viewHistoryLimit || 0)){
+    mergeCompactHistories(data, window._lastData);
+    data._viewHistoryLimit = window._lastData._viewHistoryLimit;
   }
   if(opts.live && window._lastData) data = mergeLiveInventory(window._lastData, data);
   const pageScroll = capturePageScroll();
@@ -11887,22 +11891,42 @@ function mergeHistoryPayload(target, payload, depth = 0){
   return target;
 }
 let historyFetchPromise = null;
-let historyFetchedPoints = 0;
+let historyRequestedPoints = 0;
 let historyFetchBackoffUntil = 0;
+async function syncPanelHistory(detail){
+  if(!detail || !window._lastData || window._lastData.loading) return;
+  const points = [...detail.querySelectorAll('[data-history-limit]')]
+    .reduce((max, el) => Math.max(max, Number(el.dataset.historyLimit) || 0), 0);
+  if(!points) return;
+  try{
+    const loaded = await fetchExpandedHistory(points);
+    if(loaded && !embedOpen && !dashboardOpen && window._lastData){
+      render(window._lastData, { soft:true });
+    }
+  }catch(err){
+    console.warn('History range fetch failed:', err.message || err);
+  }
+}
 async function fetchExpandedHistory(points){
   points = Math.max(30, Math.min(periodHoursToLimit(historyRetentionHours()), Number(points) || 80));
-  if(!window._lastData || points <= Math.max(historyFetchedPoints, Number(window._lastData._viewHistoryLimit || 0))) return;
-  if(historyFetchPromise) return historyFetchPromise;
-  if(Date.now() < historyFetchBackoffUntil) return;
+  if(!window._lastData || points <= Math.max(historyRequestedPoints, Number(window._lastData._viewHistoryLimit || 0))) return false;
+  if(historyFetchPromise){
+    await historyFetchPromise;
+    return fetchExpandedHistory(points);
+  }
+  if(Date.now() < historyFetchBackoffUntil) return false;
   historyFetchPromise = (async()=>{
     const r = await fetch(`/api/status/history?points=${encodeURIComponent(points)}`, { headers:{...authHeaders(), 'Cache-Control':'no-store'}, cache:'no-store' });
     handleUnauth(r);
     if(!r.ok) throw new Error('HTTP ' + r.status);
     const body = await r.json();
     mergeHistoryPayload(window._lastData, body.data || {});
-    historyFetchedPoints = Math.max(historyFetchedPoints, Number(body._historyPoints || points));
-    window._lastData._viewHistoryLimit = Math.max(Number(window._lastData._viewHistoryLimit || 0), historyFetchedPoints);
+    // Remember the requested range too: the server may cap the returned points.
+    // Automatic panel hydration must not keep requesting that capped range.
+    historyRequestedPoints = Math.max(historyRequestedPoints, points);
+    window._lastData._viewHistoryLimit = Math.max(Number(window._lastData._viewHistoryLimit || 0), Number(body._historyPoints || points));
     writeStatusCache(window._lastData);
+    return true;
   })().catch(err => {
     historyFetchBackoffUntil = Date.now() + 15000;
     throw err;
@@ -11923,10 +11947,8 @@ async function fetchStatus(opts = {}){
     if(!ct.toLowerCase().includes('application/json')) throw new Error(`Expected JSON from ${url}, got ${ct || 'unknown content type'}`);
     let data = statusCachedFallback(await r.json());
     const previous = window._lastData || readStatusCache();
-    if(!(opts.detail || opts.full)) {
-      mergeCompactHistories(data, previous);
-      data._viewHistoryLimit = Math.max(Number(data._viewHistoryLimit || 0), Number(previous?._viewHistoryLimit || 0));
-    }
+    mergeCompactHistories(data, previous);
+    data._viewHistoryLimit = Math.max(Number(data._viewHistoryLimit || 0), Number(previous?._viewHistoryLimit || 0));
     if(previous) data = mergeLiveInventory(previous, data);
     writeStatusCache(data);
     return data;

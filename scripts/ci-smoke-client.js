@@ -125,6 +125,146 @@ function testHistoryRetentionSelectors(html) {
   }
 }
 
+async function testHistoryHydration(html) {
+  const now = Date.now();
+  const full = Array.from({ length: 5760 }, (_, index) => ({ time: now - (5759 - index) * 15000, cpu: 20 + index % 10 }));
+  const recent = full.slice(-120);
+  const platforms = [
+    ['Proxmox', 'px:lab:node', history => ({ proxmox: { nodes: [{ clusterName: 'lab', node: { name: 'node' }, history }] } })],
+    ['VMware', 'vmware:host', history => ({ vmware: { instances: [{ url: 'https://vcenter.test', hosts: [{ id: 'host', history }] }] } })],
+    ['Linux', 'lx:host', history => ({ linux: [{ host: 'host', history }] })],
+    ['Windows', 'win:host', history => ({ windows: [{ host: 'host', history }] })],
+    ['Docker', 'docker:host', history => ({ docker: [{ name: 'host', history }] })],
+    ...['snmp', 'synology', 'mikrotik', 'unifi'].map(profile => [profile, `snmp:${profile}`, history => ({ snmp: [{ id: profile, history }] })]),
+    ['UniFi controller', 'unifi:gateway', history => ({ unifi: { instances: [{ url: 'https://unifi.test', devices: [{ id: 'gateway', history }], wan: { history } }] } })],
+  ];
+  const allPlatforms = history => {
+    const data = {};
+    for (const [, , wrap] of platforms) {
+      for (const [key, value] of Object.entries(wrap(history))) {
+        data[key] = Array.isArray(value) ? [...(data[key] || []), ...value] : value;
+      }
+    }
+    return data;
+  };
+  function histories(value) {
+    if (!value || typeof value !== 'object') return [];
+    return Object.entries(value).flatMap(([key, child]) => key === 'history' ? [child] : histories(child));
+  }
+  function response(data, points) {
+    return { ok: true, headers: { get: () => 'application/json' }, json: async () => points == null ? data : { _historyPoints: points, data } };
+  }
+  function harness(data, request, savedLimits = {}) {
+    const renders = [];
+    const context = {
+      window: { _lastData: { historyRetentionDays: 7, _viewHistoryLimit: 120, ...data } },
+      savedLimits, embedOpen: false, dashboardOpen: false,
+      fetch: request, AbortController, setTimeout, clearTimeout,
+      authHeaders: () => ({}), handleUnauth: () => {},
+      trackStatusController: () => {}, untrackStatusController: () => {},
+      readStatusCache: () => null, writeStatusCache: () => {},
+      statusCachedFallback: value => value, mergeLiveInventory: (_, next) => next,
+      escAttr: String, trText: String, jsStr: JSON.stringify,
+      render: value => renders.push(value), console,
+    };
+    vm.createContext(context);
+    const start = html.indexOf('const HISTORY_MERGE_MAX =');
+    const end = html.indexOf('async function fetchStatusSummary(', start);
+    assert.ok(start >= 0 && end > start, 'history loading and refresh helpers must be extractable');
+    vm.runInContext([
+      'let timeLimits = savedLimits;',
+      ...['historyRetentionHours', 'periodHoursValue', 'periodHoursToLimit', 'defaultPeriodHours',
+        'defaultHistoryLimit', 'clampHistoryLimit', 'historyLimitFor', 'drawTimeSelect', 'chartHeader',
+        'hasNum', 'bchex', 'histChart'].map(name => extractFunction(html, name)),
+      html.slice(start, end),
+    ].join('\n'), context);
+    function detail(...keys) {
+      return {
+        querySelectorAll: () => keys.map(key => {
+          const markup = context.chartHeader(key);
+          const match = markup.match(/data-history-limit="(\d+)"/);
+          assert.ok(match, 'chart headers must expose the range that their charts render');
+          return { dataset: { historyLimit: match[1] } };
+        }),
+      };
+    }
+    return { context, detail, renders };
+  }
+
+  for (const [name, key, wrap] of platforms) {
+    const requests = [];
+    const { context, detail, renders } = harness(wrap(recent), async url => {
+      requests.push(url);
+      return response(wrap(full), 5760);
+    }, { [key]: 5760 });
+    const firstX = () => {
+      const chart = context.histChart(histories(context.window._lastData)[0], 'cpu', 25, 5760);
+      return JSON.parse(chart.match(/data-pts='([^']+)'/)[1])[0].x;
+    };
+    assert.ok(firstX() > 0.95, `${name}: the fixture must reproduce history compressed against the right edge`);
+    await context.syncPanelHistory(detail(key));
+    assert.deepStrictEqual(requests, ['/api/status/history?points=5760'], `${name}: opening a saved 24-hour chart must request its full range`);
+    assert.ok(histories(context.window._lastData).every(series => series.length === 5760), `${name}: every returned host series must be hydrated`);
+    assert.ok(firstX() < 0.01, `${name}: the loaded history must span the full 24-hour chart`);
+    assert.strictEqual(renders.length, 1, `${name}: hydration must redraw the active platform`);
+    await context.syncPanelHistory(detail(key));
+    assert.strictEqual(requests.length, 1, `${name}: an already loaded range must not be fetched again`);
+    assert.strictEqual(renders.length, 1, `${name}: an already loaded range must not trigger another render`);
+  }
+
+  {
+    const pending = [];
+    const { context, detail, renders } = harness(allPlatforms(recent), url => new Promise(resolve => {
+      pending.push({ url, resolve });
+    }), { day: 5760, threeDays: 17280 });
+    const first = context.syncPanelHistory(detail('day'));
+    const duplicate = context.syncPanelHistory(detail('day'));
+    const wider = context.syncPanelHistory(detail('threeDays'));
+    assert.strictEqual(pending.length, 1, 'concurrent platform loads must share an in-flight history request');
+    pending[0].resolve(response(allPlatforms(full), 5760));
+    await first;
+    await duplicate;
+    assert.strictEqual(pending.length, 2, 'a wider selection made during loading must issue a follow-up request');
+    assert.strictEqual(pending[1].url, '/api/status/history?points=17280');
+    pending[1].resolve(response(allPlatforms(full), 17280));
+    await wider;
+    assert.strictEqual(context.window._lastData._viewHistoryLimit, 17280);
+    assert.strictEqual(renders.length, 2, 'each newly loaded range must redraw the current platform');
+  }
+
+  {
+    let requests = 0;
+    const { context, detail } = harness(allPlatforms(recent), async () => {
+      requests += 1;
+      return response(allPlatforms(full.slice(-720)), 720);
+    }, { day: 5760 });
+    await context.syncPanelHistory(detail('day'));
+    await context.syncPanelHistory(detail('day'));
+    assert.strictEqual(requests, 1, 'a server point cap must not cause an automatic fetch/render loop');
+    assert.strictEqual(context.window._lastData._viewHistoryLimit, 720, 'returned history metadata must reflect the actual server cap');
+  }
+
+  for (const detailed of [false, true]) {
+    const { context } = harness({ ...allPlatforms(full), _viewHistoryLimit: 5760 }, async () => response({
+      ...allPlatforms(recent), historyRetentionDays: 7, _viewHistoryLimit: detailed ? 240 : 120,
+    }));
+    const next = await context.fetchStatus({ detail: detailed });
+    assert.ok(histories(next).every(series => series.length === 5760), `${detailed ? 'detailed' : 'compact'} refreshes must preserve every platform's expanded history`);
+    assert.strictEqual(next._viewHistoryLimit, 5760, 'refreshes must retain the expanded history limit');
+  }
+
+  {
+    let requests = 0;
+    const { context } = harness(allPlatforms(recent), async () => {
+      requests += 1;
+      throw new Error('fixture network failure');
+    });
+    await assert.rejects(context.fetchExpandedHistory(5760), /fixture network failure/);
+    assert.strictEqual(await context.fetchExpandedHistory(5760), false, 'a failed automatic request must respect the retry backoff');
+    assert.strictEqual(requests, 1);
+  }
+}
+
 function createMorphFixture() {
   class FakeNode {
     get nextSibling() {
@@ -301,7 +441,7 @@ function createMorphFixture() {
   return { FakeNode, FakeText, FakeElement, FakeInputElement, FakeTextAreaElement, FakeSelectElement, text, element };
 }
 
-function run() {
+async function run() {
   const html = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
   const ctx = {};
   vm.createContext(ctx);
@@ -328,6 +468,7 @@ function run() {
   assert.ok(html.includes("{ v: 40320, l: '1 Week' }"), 'metric history selectors must offer a one-week window');
   assert.ok(html.includes("{ h: 168, l: 'Last 1 week' }"), 'uptime history selectors must offer a one-week window');
   testHistoryRetentionSelectors(html);
+  await testHistoryHydration(html);
 
   const githubApi = {
     id:101,
@@ -1563,10 +1704,10 @@ function run() {
     assert.doesNotThrow(() => prefetchContext.scheduleEmbedPrefetch(options), 'embed prefetch scheduling must run without undefined options');
   }
 
-  console.log('smoke ok — client helpers: formatting, localization, keyed live refresh, shell status, notification guards, scroll preservation');
+  console.log('smoke ok — client helpers: formatting, localization, keyed live refresh, host history hydration, shell status, notification guards, scroll preservation');
 }
 
 module.exports = { run };
 if (require.main === module) {
-  try { run(); } catch (err) { console.error(err); process.exit(1); }
+  run().catch(err => { console.error(err); process.exit(1); });
 }
