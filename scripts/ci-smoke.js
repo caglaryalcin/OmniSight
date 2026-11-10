@@ -252,6 +252,9 @@ async function main() {
   // Resource notification episodes, failures and delayed delivery callbacks.
   await require('./ci-smoke-cloudflare').run();
   await require('./ci-smoke-metrics').run();
+  await require('./ci-smoke-ugreen').run();
+  await require('./ci-smoke-ugreen-snmp').run();
+  require('./ci-smoke-ugreen-settings').run();
 }
 
 main().catch(err => { console.error(err); process.exit(1); });

@@ -3885,7 +3885,7 @@ function configuredList() {
   const hasFirewall = c => !!(c && (c.url || (Array.isArray(c.instances) && c.instances.length)));
   const hasTrueNas = c => !!(c && (c.url || (Array.isArray(c.instances) && c.instances.length)));
   const hasQnap = c => !!(c && (c.url || (Array.isArray(c.instances) && c.instances.length)));
-  const hasUgreen = c => !!(c && (c.url || (Array.isArray(c.instances) && c.instances.length)));
+  const hasUgreen = c => ugreenConfigInstances(c).length > 0;
   const hasPbs = c => !!(c && (c.url || (Array.isArray(c.instances) && c.instances.length)));
   const hasVmware = c => !!(c && (c.url || (Array.isArray(c.instances) && c.instances.length)));
   const hasCloudflare = c => !!(c && (c.apiToken || c.token || c.bearerToken));
@@ -4585,7 +4585,7 @@ function extractChecks(data) {
   if (ugreen && Array.isArray(ugreen.instances)) ugreen.instances.forEach(i => {
     if (i._connecting) return;
     const nm = i.name || i.url || 'Ugreen';
-    add('ugreen:' + nm, !!i.online && !i.partial, 'Ugreen ' + nm, i.error || (i.partial ? 'partial API data' : 'unreachable'));
+    add('ugreen:' + nm, !!i.online && !i.partial && !i.degraded, 'Ugreen ' + nm, i.error || (i.partial ? 'partial collection data' : i.degraded ? 'disk or storage warning' : 'unreachable'));
   });
   const pbs = data.pbs;
   if (pbs && Array.isArray(pbs.instances)) pbs.instances.forEach(i => {
@@ -7977,6 +7977,11 @@ app.post('/api/config', async (req, res) => {
     }
     preservePlatformsOnPartialConfig(incoming, existing);
 
+    // Settings expands inherited UGREEN options into individual cards. Resolve
+    // masked row secrets against the effective previous options as well.
+    if (incoming.ugreen && existing.ugreen) {
+      existing.ugreen = { ...existing.ugreen, instances: ugreenConfigInstances(existing.ugreen) };
+    }
     const merged = mergePreservingSecrets(incoming, existing);
     merged.security = merged.security && typeof merged.security === 'object' ? merged.security : {};
     merged.security.allowedPublicIps = normalizeAllowedPublicIps(merged.security.allowedPublicIps || []);
@@ -9746,7 +9751,8 @@ function buildPublicSummary(data) {
     const sm = ugreen.summary || {};
     const up = Number(sm.up || 0);
     const total = Number(sm.instances || (ugreen.instances || []).length || 0);
-    const status = ugreen._connecting && !ugreen.online ? 'connecting' : !ugreen.online || up === 0 ? 'down' : (up < total ? 'warn' : 'ok');
+    const warning = (ugreen.instances || []).some(instance => instance.partial || instance.degraded);
+    const status = ugreen._connecting && !ugreen.online ? 'connecting' : !ugreen.online || up === 0 ? 'down' : (up < total || warning ? 'warn' : 'ok');
     const meta = ugreen._connecting && !ugreen.online ? 'connecting...' : ugreen.online ? `${up}/${total} systems` : 'unreachable';
     out.push({ id: 'ugreen', title: 'Ugreen', status, meta });
   }

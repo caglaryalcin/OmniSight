@@ -1639,7 +1639,18 @@ function testStaticRegressions() {
   assert.ok(server.includes('const options = [80, 240, 720, 1440, 2880, 5760, 17280, 40320, 172800]'), 'history API must accept chart windows through thirty days');
   assert.ok(server.includes('setHistoryRetentionDays(historyRetentionDays())'), 'runtime history compaction must follow the configured retention period');
   assert.ok(!snmp.includes('session.walk(oid, 20'), 'unbounded SNMP walks must not return unrelated OIDs');
-  assert.strictEqual((snmp.match(/retries:\s*1/g) || []).length, 2, 'SNMP v2c and v3 sessions must retry once');
+  const snmpDefaultsContext = { snmp: {
+    Version2c: 1, AuthProtocols: { sha: 1 }, PrivProtocols: { aes: 1 }, SecurityLevel: { authPriv: 3 },
+    createSession: (_host, _community, options) => options,
+    createV3Session: (_host, _user, options) => options,
+  } };
+  vm.runInNewContext(snmp.slice(snmp.indexOf('const AUTH_MAP ='), snmp.indexOf('function snmpGet(')), snmpDefaultsContext);
+  for (const snmpVersion of [2, 3]) {
+    const options = snmpDefaultsContext.createSession({ host: 'fixture.invalid', community: 'fixture', snmpVersion });
+    assert.strictEqual(options.retries, 1, 'SNMP v2c and v3 sessions must retry once by default');
+    assert.strictEqual(options.timeout, 5000, 'existing SNMP sessions must retain their default timeout');
+    assert.strictEqual(options.port, 161, 'existing SNMP sessions must retain the standard port');
+  }
   assert.ok(dashboard.includes('last known'), 'stale SNMP temperatures must be visibly marked last known');
   assert.ok(snmp.indexOf('const raw = await ucdRawCpu') < snmp.indexOf('cpuUser == null && synologyCpuUser'), 'UCD CPU must take priority over Synology vendor CPU');
   assert.ok(snmp.includes("const oids = ['50', '51', '52', '53', '54']"), 'UCD CPU must use the canonical non-overlapping counters');

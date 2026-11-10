@@ -27,6 +27,9 @@ function configItemIdentityKeys(item) {
   for (const field of ENDPOINT_FIELDS) {
     const value = item[field];
     if (value != null && value !== '') {
+      if (field === 'host' && item.port != null && item.port !== '') {
+        keys.push(`hostPort:${normalizedIdentityValue(value)}:${normalizedIdentityValue(item.port)}`);
+      }
       const identityField = field === 'configId' && ['github', 'gitlab'].includes(provider)
         ? `${field}:${provider}`
         : field;

@@ -81,7 +81,7 @@ The center of the application is `server.js`. It owns the Express server, authen
 | `src/firewall.js` | OPNsense gateways and compatible firewall APIs |
 | `src/truenas.js` | TrueNAS SCALE/CORE storage appliances |
 | `src/qnap.js` | QNAP QTS systems using official HTTP auth and File Station SID checks |
-| `src/ugreen.js` | UGREEN UGOS Pro web endpoint reachability checks |
+| `src/ugreen.js` | UGREEN UGOS Pro web reachability, local API and SNMP collection |
 | `src/pbs.js` | Proxmox Backup Server management API |
 | `src/veeam.js` | Veeam Backup & Replication REST API |
 | `src/portainer.js` | Portainer instances and environments |
@@ -529,13 +529,17 @@ Collected data:
 
 ### UGREEN
 
-UGREEN publishes product documentation and downloads, but does not currently expose a stable public UGOS Pro monitoring API. OmniSight therefore treats UGREEN entries as web reachability checks for the configured UGOS Pro endpoint.
+Choose the collection method separately for each UGREEN instance:
 
-Collected data:
+- `method: web` (default): checks the configured HTTP(S) endpoint and reports reachability and HTTP status. It does not authenticate or collect NAS metrics. A healthy web check does not imply disk or storage health.
+- `method: api`: connects to the local UGOS Pro API with `url`, `username`/`password`, or an optional `token`. Use the LAN API address, commonly port 9999, rather than a remote relay URL. The API is unofficial and firmware dependent; supported responses provide CPU, memory, temperatures, uptime, system identity, storage and disk details. Missing endpoints or permissions produce explicit collection warnings instead of silently falling back to a healthy web check.
+- `method: snmp`: queries an SNMP service already enabled on the NAS. Configure `host`, `port` (default 161), and `snmpVersion: 2` with `community`, or version `3` with `username`, `securityLevel`, `authProtocol`/`authPassword`, and `privProtocol`/`privPassword`. Selecting this mode does not install or enable an SNMP server. Service availability depends on the installed software and firmware; CPU, memory, uptime, network and storage information depend on the exposed MIBs. Physical disk health and temperature may be unavailable.
 
-- Endpoint online/offline state.
-- HTTP status code when reachable.
-- Configured system name and URL.
+For web/API connections, enable `insecureTLS` only when the local server uses a certificate you cannot otherwise trust. Secrets are stored using OmniSight's existing encrypted configuration handling. Metrics that are unavailable are left unknown rather than displayed as zero.
+
+API mode encrypts the password with the NAS login challenge key, reuses sessions and renews an expired session once. Accounts requiring two-factor authentication need an existing authenticated session token; OmniSight does not automatically enroll a trusted device. The telemetry WebSocket keeps live usage updates awake on affected firmware. Disk requests use the session's RSA/AES-GCM transport when the NAS supplies its encryption key. A token-only connection without that key may have incomplete disk information on newer firmware. Pool allocation and filesystem usage are kept separate.
+
+Protocol evidence: [Home Assistant UGOS implementation](https://github.com/Tom-Bom-badil/home-assistant_ugreen-nas/blob/f6b2d7cb7dd1653e59e1688f017c31cc30eb0718/custom_components/ugreen/api.py), [published DXP4800+/DXP2800 responses](https://github.com/Tom-Bom-badil/home-assistant_ugreen-nas/discussions/43), [telemetry keepalive reports](https://github.com/Tom-Bom-badil/home-assistant_ugreen-nas/discussions/125), and [UGOS encrypted request format](https://github.com/metaneutrons/ugos-cli/blob/9545ff511fc0ceaa44d53a11b373a4a75023a783/crates/ugos-client/src/crypto.rs). Automated HTTP/WebSocket/SNMP fixtures exercise these protocols; they are synthetic and do not replace verification on the target NAS model and firmware. UGREEN's UPS SNMP-client settings do not enable a NAS monitoring server.
 
 ### Proxmox Backup Server
 

@@ -43,6 +43,15 @@ const SEC_MAP = {
 
 function createSession(device) {
   const ver = Number(device.snmpVersion);
+  const port = device.port == null || device.port === '' ? 161 : Number(device.port);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('SNMP port must be an integer between 1 and 65535');
+  const configuredTimeout = device.timeoutMs == null || device.timeoutMs === '' ? 5000 : Number(device.timeoutMs);
+  const configuredRetries = device.retries == null || device.retries === '' ? 1 : Number(device.retries);
+  const options = {
+    port,
+    timeout: Number.isFinite(configuredTimeout) ? Math.max(500, Math.min(60000, Math.round(configuredTimeout))) : 5000,
+    retries: Number.isFinite(configuredRetries) ? Math.max(0, Math.min(3, Math.floor(configuredRetries))) : 1,
+  };
   if (ver === 3) {
     const secLevel  = (SEC_MAP[device.securityLevel]  || SEC_MAP.authPriv)();
     const authProto = (AUTH_MAP[device.authProtocol] || AUTH_MAP.sha)();
@@ -56,17 +65,15 @@ function createSession(device) {
       privKey: device.privPassword || '',
     };
     return snmp.createV3Session(device.host, user, {
+      ...options,
       context: '',
       transport: 'udp4',
-      timeout: 5000,
-      retries: 1,
     });
   }
   if (!device.community) throw new Error('SNMP community is required for SNMP v1/v2c devices');
   return snmp.createSession(device.host, device.community, {
+    ...options,
     version: snmp.Version2c,
-    timeout: 5000,
-    retries: 1,
   });
 }
 
@@ -242,7 +249,7 @@ function clampMemoryFree(totalKB, freeKB) {
   return Math.max(0, Math.min(Number(totalKB), Number(freeKB)));
 }
 
-async function getHrMemory(session) {
+async function getHrMemory(session, options = {}) {
   const rows = await snmpWalk(session, '1.3.6.1.2.1.25.2.3.1');
   const BASE = '1.3.6.1.2.1.25.2.3.1.';
   const PREFIX_LEN = BASE.split('.').length - 1;
@@ -265,12 +272,14 @@ async function getHrMemory(session) {
   for (const idx of Object.keys(sizeMap)) {
     const type = String(typeMap[idx] || '');
     const descr = Buffer.isBuffer(descrMap[idx]) ? descrMap[idx].toString('utf8') : String(descrMap[idx] || '');
-    if (type.endsWith('25.2.1.2') || /physical memory|real memory|^\s*ram\b/i.test(descr)) { target = idx; break; }
+    if (type.endsWith('25.2.1.2') || (options.generic && type === '2') || /physical memory|real memory|^\s*ram\b/i.test(descr)) { target = idx; break; }
   }
   if (target == null) return null;
-  const units = toNum(unitMap[target]) || 1;
+  const rawUnits = snmpNumber(unitMap[target]);
+  const units = options.generic ? rawUnits : (rawUnits || 1);
   const size = toNum(sizeMap[target]);
   const used = toNum(usedMap[target]);
+  if (options.generic && (!Number.isFinite(units) || units <= 0 || !Number.isFinite(size) || size <= 0 || !Number.isFinite(used) || used < 0 || used > size)) return null;
   if (!size) return null;
   return { totalKB: (size * units) / 1024, freeKB: used != null ? ((size - used) * units) / 1024 : null };
 }
@@ -516,7 +525,7 @@ async function getUptimeSeconds(session) {
   return normalizeUptimeSeconds(values[oid]);
 }
 
-async function getSensorMetrics(session) {
+async function getSensorMetrics(session, options = {}) {
   const temperatures = [];
   const fanSpeeds = [];
   try {
@@ -526,26 +535,29 @@ async function getSensorMetrics(session) {
   } catch {
     // ENTITY-SENSOR-MIB is optional.
   }
-  for (const reader of [getUcdSensorTemperatures, getScalarTemperatures]) {
+  const temperatureReaders = options.generic ? [getUcdSensorTemperatures] : [getUcdSensorTemperatures, getScalarTemperatures];
+  for (const reader of temperatureReaders) {
     try {
       temperatures.push(...await reader(session));
     } catch {
       // Many devices expose only one of these tables.
     }
   }
-  for (const reader of [getScalarFanSpeeds]) {
+  for (const reader of options.generic ? [] : [getScalarFanSpeeds]) {
     try {
       fanSpeeds.push(...await reader(session));
     } catch {
       // Fan speed is optional and often absent.
     }
   }
-  try {
-    const routerOs = await getRouterOsHealthMetrics(session);
-    temperatures.push(...routerOs.temperatures);
-    fanSpeeds.push(...routerOs.fanSpeeds);
-  } catch {
-    // Non-MikroTik devices do not expose the RouterOS health gauge table.
+  if (!options.generic) {
+    try {
+      const routerOs = await getRouterOsHealthMetrics(session);
+      temperatures.push(...routerOs.temperatures);
+      fanSpeeds.push(...routerOs.fanSpeeds);
+    } catch {
+      // Non-MikroTik devices do not expose the RouterOS health gauge table.
+    }
   }
   return {
     temperatures: classifyTemperatureMetrics(temperatures),
@@ -610,8 +622,8 @@ function retainLastKnownTemperature(deviceKey, sysInfo = {}, now = Date.now(), t
   };
 }
 
-async function getSystemInfo(session, deviceKey) {
-  const synVals = await snmpGet(session, [
+async function getSystemInfo(session, deviceKey, options = {}) {
+  const synVals = options.generic ? {} : await snmpGet(session, [
     '1.3.6.1.4.1.6574.1.4.1.0',
     '1.3.6.1.4.1.6574.1.4.2.0',
     '1.3.6.1.4.1.6574.1.1.1.0',
@@ -628,7 +640,7 @@ async function getSystemInfo(session, deviceKey) {
   let memSource = memTotalKB != null ? 'synology' : null;
   let sensorMetrics = { temperatures: classifyTemperatureMetrics([]), fanSpeeds: [] };
   try {
-    sensorMetrics = await getSensorMetrics(session);
+    sensorMetrics = await getSensorMetrics(session, options);
   } catch (e) { console.error(`[SNMP ${deviceKey} sensors]`, e.message); }
   const synologyTemp = { value: normalizeTemperature(synVals['1.3.6.1.4.1.6574.1.2.0']), label: 'System temperature' };
   const synologyThermalStatusCode = snmpNumber(synVals['1.3.6.1.4.1.6574.1.8.0']);
@@ -701,7 +713,7 @@ async function getSystemInfo(session, deviceKey) {
 
   if (memTotalKB == null) {
     try {
-      const hr = await getHrMemory(session);
+      const hr = await getHrMemory(session, options);
       if (hr) { memTotalKB = hr.totalKB; memFreeKB = hr.freeKB; memSource = 'hrStorage'; }
     } catch (e) { console.error('[SNMP hrStorage mem]', e.message); }
   }
@@ -709,7 +721,7 @@ async function getSystemInfo(session, deviceKey) {
   const memTotal = memTotalKB != null ? memTotalKB * 1024 : null;
   const memFree  = memFreeKB  != null ? memFreeKB  * 1024 : null;
   const memUsed  = memTotal != null && memFree != null ? Math.max(0, Math.min(memTotal, memTotal - memFree)) : null;
-  let ram = memTotal ? {
+  let ram = memTotal && (!options.generic || memUsed != null) ? {
     percent: clampPercent((memUsed / memTotal) * 100),
     usedBytes: memUsed,
     totalBytes: memTotal,
@@ -719,18 +731,18 @@ async function getSystemInfo(session, deviceKey) {
   } : null;
 
   const prevMem = memPrev.get(deviceKey);
-  if (ram && memSource !== 'ucd' && ucdMemError && prevMem?.ram) {
+  if (!options.generic && ram && memSource !== 'ucd' && ucdMemError && prevMem?.ram) {
     const jump = Math.abs((ram.percent ?? 0) - (prevMem.ram.percent ?? 0));
     const suspiciousFull = ram.percent >= 95 && prevMem.ram.percent <= 90;
     if (suspiciousFull || jump >= 35) {
       ram = { ...prevMem.ram, stale: true };
     }
-  } else if (ram && memSource !== 'ucd' && ucdMemError && !prevMem && ram.percent >= 95) {
+  } else if (!options.generic && ram && memSource !== 'ucd' && ucdMemError && !prevMem && ram.percent >= 95) {
     ram = null;
-  } else if (!ram && ucdMemError && prevMem?.ram && Date.now() - prevMem.time < 10 * 60 * 1000) {
+  } else if (!options.generic && !ram && ucdMemError && prevMem?.ram && Date.now() - prevMem.time < 10 * 60 * 1000) {
     ram = { ...prevMem.ram, stale: true };
   }
-  if (ram && !ram.stale && (memSource === 'ucd' || ram.percent < 95 || !ucdMemError)) {
+  if (ram && !ram.stale && (options.generic || memSource === 'ucd' || ram.percent < 95 || !ucdMemError)) {
     memPrev.set(deviceKey, { ram, time: Date.now() });
   }
 
@@ -1178,6 +1190,79 @@ async function getNetwork(session, deviceKey) {
   return interfaces;
 }
 
+async function getGenericNasVolumes(session) {
+  const base = '1.3.6.1.2.1.25.2.3.1';
+  const columns = parseTableRows(await snmpWalk(session, base), base);
+  const types = columns['2'] || {};
+  const descriptions = columns['3'] || {};
+  const units = columns['4'] || {};
+  const sizes = columns['5'] || {};
+  const used = columns['6'] || {};
+  return Object.keys(sizes).map(index => {
+    // HOST-RESOURCES-MIB hrStorageFixedDisk; memory/swap and removable media
+    // are not NAS volumes. This table does not report RAID or SMART health.
+    const type = cleanSnmpText(types[index]).trim().replace(/^\./, '');
+    if (type !== '1.3.6.1.2.1.25.2.1.4' && type !== '4') return null;
+    const allocationUnits = snmpNumber(units[index]);
+    const size = snmpNumber(sizes[index]);
+    const usedUnits = snmpNumber(used[index]);
+    if (!Number.isFinite(allocationUnits) || allocationUnits <= 0 || !Number.isFinite(size) || size <= 0) return null;
+    const totalBytes = allocationUnits * size;
+    if (!Number.isFinite(totalBytes) || totalBytes <= 0) return null;
+    const usedBytes = Number.isFinite(usedUnits) && usedUnits >= 0 && usedUnits <= size ? allocationUnits * usedUnits : null;
+    const name = cleanSnmpText(descriptions[index]).trim() || `Storage ${index}`;
+    return {
+      name,
+      mountpoint: /^(?:\/|[A-Za-z]:[\\/])/.test(name) ? name : null,
+      totalBytes,
+      usedBytes,
+      usedPercent: usedBytes != null ? Math.round(usedBytes / totalBytes * 1000) / 10 : null,
+    };
+  }).filter(Boolean);
+}
+
+async function getGenericNasData(device) {
+  const session = createSession(device);
+  const key = `generic-nas:${device.host}:${Number(device.port) || 161}`;
+  try {
+    const sysDescr = await probeReachable(session);
+    const [systemResult, networkResult, storageResult] = await Promise.allSettled([
+      getSystemInfo(session, key, { generic: true }),
+      getNetwork(session, key),
+      getGenericNasVolumes(session),
+    ]);
+    const errors = [];
+    const system = systemResult.status === 'fulfilled' ? systemResult.value : {};
+    const network = networkResult.status === 'fulfilled' ? networkResult.value : [];
+    const volumes = storageResult.status === 'fulfilled' ? storageResult.value : [];
+    for (const [label, result] of [['System metrics', systemResult], ['Network interfaces', networkResult], ['Storage capacity', storageResult]]) {
+      if (result.status === 'rejected') errors.push(`${label}: ${result.reason?.message || 'SNMP request failed'}`);
+    }
+    const diagnostics = network._diagnostics;
+    if (diagnostics?.ifTable?.error && diagnostics?.ifXTable?.error) {
+      errors.push(`Network interfaces: ${diagnostics.ifTable.error}`);
+    }
+    const systemAvailable = isNum(system.cpu) || !!system.ram
+      || isNum(system.uptimeSeconds) || isNum(system.systemTemp)
+      || (system.sensors?.temperatures || []).length > 0
+      || (system.fanSpeeds || []).length > 0;
+    if (!systemAvailable && systemResult.status === 'fulfilled') {
+      errors.push('SNMP agent did not expose CPU, memory, uptime or sensor metrics');
+    }
+    return {
+      online: true,
+      sysDescr,
+      system,
+      network,
+      volumes,
+      available: { system: systemAvailable, storage: volumes.length > 0, disks: false, services: false },
+      errors,
+    };
+  } finally {
+    session.close();
+  }
+}
+
 async function getDeviceData(device, unifiTemperatures = []) {
   const session = createSession(device);
   const profile = device.profile || device.preset || 'generic';
@@ -1319,6 +1404,7 @@ async function sampleSnmpBandwidth(config) {
 
 module.exports = {
   getAllSynologyData,
+  getGenericNasData,
   sampleSnmpBandwidth,
   ucdRawCpuSnapshot,
   ucdRawCpuPercent,

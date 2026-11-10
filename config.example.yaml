@@ -183,12 +183,31 @@ qnap:
 
 ugreen:
   enabled: false
-  # UGREEN UGOS Pro does not publish a stable public monitoring API; OmniSight
-  # checks the configured web endpoint reachability.
+  # method: web (default), api, or snmp. Web checks reachability only.
+  # Local UGOS API endpoints are unofficial and firmware dependent.
   # instances:
   #   - name: Ugreen
-  #     url: "https://ugreen.example.com"
+  #     method: api
+  #     url: "http://192.168.1.10:9999"
+  #     username: "monitoring"
+  #     password: "${UGREEN_PASSWORD:-}"
+  #     # token: "${UGREEN_TOKEN:-}" # optional existing access token instead of login
   #     insecureTLS: false
+  #   - name: Ugreen SNMP
+  #     method: snmp
+  #     host: "192.168.1.10"
+  #     port: 161
+  #     snmpVersion: 2
+  #     community: "${UGREEN_SNMP_COMMUNITY:-}"
+  #     # The NAS must already run an enabled SNMP service. Firmware/software
+  #     # determines which metrics are available. For SNMP v3 instead, use:
+  #     # snmpVersion: 3
+  #     # username: "monitoring"
+  #     # securityLevel: authPriv
+  #     # authProtocol: sha
+  #     # authPassword: "${UGREEN_SNMP_AUTH_PASSWORD:-}"
+  #     # privProtocol: aes
+  #     # privPassword: "${UGREEN_SNMP_PRIV_PASSWORD:-}"
 
 pbs:
   enabled: false

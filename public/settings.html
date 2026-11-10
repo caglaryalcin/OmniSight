@@ -1280,7 +1280,7 @@ html[data-theme="light"] .ci-help{color:#53657c}
         <h3 id="ugreen-section-title">Storage systems</h3>
         <button class="btn-add" type="button" onclick="addUgreenInstance()">+ Add Ugreen</button>
       </div>
-      <div id="ugreen-section-desc" style="font-size:12px;color:var(--muted);line-height:1.35;margin-bottom:10px">Choose the collection method inside the Ugreen platform. Web check is the default until a stable UGOS API is available.</div>
+      <div id="ugreen-section-desc" style="font-size:12px;color:var(--muted);line-height:1.35;margin-bottom:10px">Web check measures reachability only. Choose UGOS API or an enabled SNMP service to collect the metrics your NAS exposes.</div>
       <div id="ugreen-list"></div>
     </div>
   </div>
@@ -2318,9 +2318,9 @@ function renderLocalizedBlocks(lang = currentLang()) {
     },
     'ugreen-section-title': { en: 'Storage systems', tr: 'Depolama sistemleri', de: 'Speichersysteme' },
     'ugreen-section-desc': {
-      en: 'Choose the collection method inside the Ugreen platform. Web check is the default until a stable UGOS API is available.',
-      tr: 'Ugreen platformunda veri toplama yöntemini seçin. Kararlı bir UGOS API çıkana kadar varsayılan yöntem web kontrolüdür.',
-      de: 'Wählen Sie die Erfassungsmethode innerhalb der Ugreen-Plattform. Web Check ist die Vorgabe, bis eine stabile UGOS API verfügbar ist.',
+      en: 'Web check measures reachability only. Choose UGOS API or an enabled SNMP service to collect the metrics your NAS exposes.',
+      tr: 'Web kontrolü yalnızca erişilebilirliği ölçer. NAS cihazınızın sunduğu metrikleri toplamak için UGOS API veya etkin bir SNMP hizmeti seçin.',
+      de: 'Web Check prüft nur die Erreichbarkeit. Wählen Sie UGOS API oder einen aktivierten SNMP-Dienst, um die vom NAS bereitgestellten Messwerte zu erfassen.',
     },
     'cloudflare-section-desc': {
       en: 'Use a scoped Cloudflare API token with Zone Read and, if tunnels are enabled, Cloudflare Tunnel read access for the account. Domain expiration needs Cloudflare Registrar read access and only reports domains registered with Cloudflare Registrar.',
@@ -2417,7 +2417,7 @@ function previewConfiguredIds(cfg = {}) {
   if (en(cfg.unifi) && hasInstances(cfg.unifi) && !ids.includes('unifi')) ids.push('unifi');
   if (en(cfg.truenas) && hasInstances(cfg.truenas)) ids.push('truenas');
   if (en(cfg.qnap) && hasInstances(cfg.qnap)) ids.push('qnap');
-  if (en(cfg.ugreen) && hasInstances(cfg.ugreen)) ids.push('ugreen');
+  if (en(cfg.ugreen) && (hasInstances(cfg.ugreen) || cfg.ugreen.host)) ids.push('ugreen');
   if (en(cfg.pbs) && hasInstances(cfg.pbs)) ids.push('pbs');
   if (en(cfg.cloudflare) && (cfg.cloudflare.apiToken || cfg.cloudflare.token || cfg.cloudflare.bearerToken)) ids.push('cloudflare');
   if (en(cfg.cicd) && ((cfg.cicd?.projects || []).length || (cfg.cicd?.instances || []).length)) ids.push('cicd');
@@ -2458,8 +2458,8 @@ function previewConnectingPlatform(data, id, cfg = {}) {
     const instances = Array.isArray(cfg.qnap?.instances) ? cfg.qnap.instances : (cfg.qnap?.url ? [cfg.qnap] : []);
     data.qnap = { _connecting: true, online: false, summary: { instances: instances.length, up: 0, down: 0 }, instances: instances.map((inst, idx) => ({ name: inst.name || inst.url || `QNAP ${idx + 1}`, url: inst.url || '', online: false, _connecting: true, summary: { instances: 1, up: 0, down: 0 } })) };
   } else if (id === 'ugreen') {
-    const instances = Array.isArray(cfg.ugreen?.instances) ? cfg.ugreen.instances : (cfg.ugreen?.url ? [cfg.ugreen] : []);
-    data.ugreen = { _connecting: true, online: false, summary: { instances: instances.length, up: 0, down: 0 }, instances: instances.map((inst, idx) => ({ name: inst.name || inst.url || `Ugreen ${idx + 1}`, url: inst.url || '', online: false, _connecting: true, summary: { instances: 1, up: 0, down: 0 } })) };
+    const instances = Array.isArray(cfg.ugreen?.instances) ? cfg.ugreen.instances : (cfg.ugreen?.url || cfg.ugreen?.host ? [cfg.ugreen] : []);
+    data.ugreen = { _connecting: true, online: false, summary: { instances: instances.length, up: 0, down: 0 }, instances: instances.map((inst, idx) => ({ name: inst.name || inst.url || inst.host || `Ugreen ${idx + 1}`, url: inst.url || '', host: inst.host || '', method: inst.method || inst.connectionMethod || 'web', online: false, _connecting: true, summary: { instances: 1, up: 0, down: 0 } })) };
   } else if (id === 'pbs') {
     const instances = Array.isArray(cfg.pbs?.instances) ? cfg.pbs.instances : (cfg.pbs?.url ? [cfg.pbs] : []);
     data.pbs = { _connecting: true, online: false, summary: { instances: instances.length, up: 0, down: 0, datastores: 0, datastoresWarn: 0, snapshots: 0, groups: 0, failedTasks: 0 }, instances: instances.map((inst, idx) => ({ name: inst.name || inst.url || `PBS ${idx + 1}`, url: inst.url || '', online: false, _connecting: true, summary: { datastores: 0, datastoresWarn: 0, snapshots: 0, groups: 0, failedTasks: 0 } })) };
@@ -3087,31 +3087,151 @@ function addQnapInstance(data = {}) {
   applyLanguageFragment(item);
 }
 
+function ugreenSettingsInstances(config = {}) {
+  const rows = Array.isArray(config.instances) && config.instances.length
+    ? config.instances : (config.url || config.host ? [config] : []);
+  const defaults = {};
+  for (const key of ['method','connectionMethod','username','user','password','token','insecureTLS','timeoutMs','timeout','port','community','snmpVersion','securityLevel','authProtocol','authPassword','privProtocol','privPassword']) {
+    if (config[key] !== undefined) defaults[key] = config[key];
+  }
+  return rows.filter(row => row && (row.url || row.host || row.name)).map(row => {
+    const merged = { ...defaults, ...row };
+    if (row.method == null && row.connectionMethod != null) merged.method = row.connectionMethod;
+    if (row.username == null && row.user != null) merged.username = row.user;
+    return merged;
+  });
+}
+
+function collectUgreenInstances() {
+  const instances = [];
+  document.querySelectorAll('#ugreen-list .arr-item').forEach(item => {
+    const url = item.querySelector('.ugreen-url').value.trim();
+    const name = item.querySelector('.ugreen-name').value.trim();
+    const host = item.querySelector('.ugreen-host').value.trim();
+    const method = item.querySelector('.ugreen-method').value;
+    const inst = {
+      ...item._ugreenConnectionOptions,
+      name: name || undefined,
+      url: url || undefined,
+      method,
+      insecureTLS: item.querySelector('.ugreen-insecure').value === 'true' || undefined,
+    };
+    if (method === 'api') {
+      inst.username = item.querySelector('.ugreen-api-username').value.trim();
+      inst.password = maskedVal(item.querySelector('.ugreen-password'));
+      inst.token = maskedVal(item.querySelector('.ugreen-token'));
+    }
+    if (method === 'snmp') {
+      inst.host = host || undefined;
+      inst.port = Number(item.querySelector('.ugreen-port').value) || 161;
+      inst.snmpVersion = Number(item.querySelector('.ugreen-snmp-version').value) === 3 ? 3 : 2;
+      if (inst.snmpVersion === 3) {
+        inst.username = item.querySelector('.ugreen-snmp-username').value.trim();
+        inst.securityLevel = item.querySelector('.ugreen-security-level').value;
+        inst.authProtocol = item.querySelector('.ugreen-auth-protocol').value;
+        inst.authPassword = maskedVal(item.querySelector('.ugreen-auth-password'));
+        inst.privProtocol = item.querySelector('.ugreen-priv-protocol').value;
+        inst.privPassword = maskedVal(item.querySelector('.ugreen-priv-password'));
+      } else {
+        inst.community = maskedVal(item.querySelector('.ugreen-community'));
+      }
+    }
+    if (url || name || host) instances.push(inst);
+  });
+  return uniqueConfigItems(instances, ['name', 'url', 'host', 'port']);
+}
+
 function addUgreenInstance(data = {}) {
   const idx = ugreenCount++;
   const id = `ugreen-${idx}`;
-  const method = String(data.method || data.connectionMethod || 'web').toLowerCase();
+  const rawMethod = String(data.method || data.connectionMethod || 'web').toLowerCase();
+  const method = ['api', 'snmp'].includes(rawMethod) ? rawMethod : 'web';
+  const version = Number(data.snmpVersion) === 3 ? '3' : '2';
+  const securityLevel = data.securityLevel || 'authPriv';
   const item = document.createElement('div');
   item.className = 'arr-item';
+  item._ugreenConnectionOptions = Object.fromEntries(['timeoutMs','timeout'].filter(key => data[key] !== undefined).map(key => [key, data[key]]));
   item.innerHTML = `
     <div class="arr-hdr" onclick="toggleArr('${id}')">
-      <span class="arr-hdr-name">${escHtml(data.name || data.url || 'Ugreen')}</span>
+      <span class="arr-hdr-name">${escHtml(data.name || data.url || data.host || 'Ugreen')}</span>
       <button class="btn-rm" type="button" onclick="event.stopPropagation();this.closest('.arr-item').remove()">x</button>
     </div>
     <div class="arr-body" id="ab-${id}">
       <div class="form-grid">
         <div class="form-group"><label>Name</label><input type="text" class="ugreen-name" value="${escHtml(data.name||'')}" placeholder="ugreen01" oninput="this.closest('.arr-item').querySelector('.arr-hdr-name').textContent=this.value||'Ugreen'"></div>
-        <div class="form-group"><label>Connection method</label><select class="ugreen-method">
-          <option value="web" ${method==='web'||method==='web-check'?'selected':''}>UGOS web check</option>
+        <div class="form-group"><label>Connection method</label><select class="ugreen-method" onchange="syncUgreenFields(this.closest('.arr-item'))">
+          <option value="web" ${method==='web'?'selected':''}>UGOS web check</option>
           <option value="api" ${method==='api'?'selected':''}>UGOS API</option>
           <option value="snmp" ${method==='snmp'?'selected':''}>SNMP</option>
         </select></div>
+      </div>
+      <div class="ugreen-web-fields">
+        <div class="form-grid">
         <div class="form-group"><label>URL</label><input type="text" class="ugreen-url" value="${escHtml(data.url||'')}" placeholder="https://ugreen.yourdomain.com"></div>
         <div class="form-group"><label>TLS</label><select class="ugreen-insecure"><option value="false" ${!data.insecureTLS?'selected':''}>Verify certificate</option><option value="true" ${data.insecureTLS?'selected':''}>Allow self-signed</option></select></div>
+        </div>
       </div>
+      <div class="ugreen-api-fields">
+        <div class="form-grid">
+          <div class="form-group"><label>Username</label><input type="text" class="ugreen-api-username" value="${escHtml(data.username||data.user||'')}" autocomplete="username"></div>
+          <div class="form-group"><label>Password</label><input type="password" class="ugreen-password" autocomplete="new-password" placeholder="leave blank to keep current password"></div>
+          <div class="form-group"><label>Access token (optional)</label><input type="password" class="ugreen-token" autocomplete="new-password" placeholder="leave blank to keep current token"></div>
+        </div>
+        <div style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:10px">Use the local UGOS API address, commonly port 9999, with a local account or access token. This unofficial API depends on the NAS firmware; remote relay URLs and MFA login may not be supported.</div>
+      </div>
+      <div class="ugreen-snmp-fields">
+        <div class="form-grid">
+          <div class="form-group"><label>Host / IP</label><input type="text" class="ugreen-host" value="${escHtml(data.host||'')}" placeholder="192.168.1.5"></div>
+          <div class="form-group"><label>SNMP port</label><input type="number" class="ugreen-port" value="${escHtml(data.port||161)}" min="1" max="65535"></div>
+          <div class="form-group"><label>SNMP Version</label><select class="ugreen-snmp-version" onchange="syncUgreenFields(this.closest('.arr-item'))"><option value="2" ${version==='2'?'selected':''}>v2c — Community string</option><option value="3" ${version==='3'?'selected':''}>v3 — Username + Password (SHA / AES)</option></select></div>
+        </div>
+        <div class="ugreen-snmp-v2-fields form-group"><label>Community</label><input type="password" class="ugreen-community" autocomplete="new-password"></div>
+        <div class="ugreen-snmp-v3-fields">
+          <div class="form-grid">
+            <div class="form-group"><label>Username</label><input type="text" class="ugreen-snmp-username" value="${escHtml(data.username||'')}"></div>
+            <div class="form-group"><label>Security Level</label><select class="ugreen-security-level" onchange="syncUgreenFields(this.closest('.arr-item'))"><option value="authPriv" ${securityLevel==='authPriv'?'selected':''}>authPriv (auth + encrypt)</option><option value="authNoPriv" ${securityLevel==='authNoPriv'?'selected':''}>authNoPriv (auth only)</option><option value="noAuthNoPriv" ${securityLevel==='noAuthNoPriv'?'selected':''}>noAuthNoPriv (none)</option></select></div>
+          </div>
+          <div class="ugreen-snmp-auth-fields form-grid">
+            <div class="form-group"><label>Auth Protocol</label><select class="ugreen-auth-protocol"><option value="sha" ${(data.authProtocol||'sha')==='sha'?'selected':''}>SHA-1 (default)</option><option value="sha256" ${data.authProtocol==='sha256'?'selected':''}>SHA-256</option><option value="sha512" ${data.authProtocol==='sha512'?'selected':''}>SHA-512</option><option value="md5" ${data.authProtocol==='md5'?'selected':''}>MD5</option></select></div>
+            <div class="form-group"><label>Auth Password</label><input type="password" class="ugreen-auth-password" autocomplete="new-password" placeholder="leave blank to keep current password"></div>
+          </div>
+          <div class="ugreen-snmp-priv-fields form-grid">
+            <div class="form-group"><label>Priv Protocol</label><select class="ugreen-priv-protocol"><option value="aes" ${(data.privProtocol||'aes')==='aes'?'selected':''}>AES-128 (default)</option><option value="aes256b" ${data.privProtocol==='aes256b'?'selected':''}>AES-256</option><option value="des" ${data.privProtocol==='des'?'selected':''}>DES</option></select></div>
+            <div class="form-group"><label>Priv Password</label><input type="password" class="ugreen-priv-password" autocomplete="new-password" placeholder="leave blank to keep current password"></div>
+          </div>
+        </div>
+        <div style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:10px">SNMP requires an enabled SNMP service on the NAS. Availability and exposed metrics depend on the installed software and firmware; selecting this mode does not enable SNMP on the NAS.</div>
+      </div>
+      <div class="ugreen-web-hint" style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:10px">Web check reports endpoint reachability and HTTP status only. Select UGOS API or SNMP for supported NAS metrics.</div>
     </div>`;
   document.getElementById('ugreen-list').appendChild(item);
+  secVal(data.password, item.querySelector('.ugreen-password'));
+  secVal(data.token || data.apiToken || data.accessToken, item.querySelector('.ugreen-token'));
+  secVal(data.community || 'public', item.querySelector('.ugreen-community'));
+  secVal(data.authPassword, item.querySelector('.ugreen-auth-password'));
+  secVal(data.privPassword, item.querySelector('.ugreen-priv-password'));
+  syncUgreenFields(item);
   applyLanguageFragment(item);
+}
+
+function syncUgreenFields(item) {
+  if (!item) return;
+  const method = item.querySelector('.ugreen-method').value;
+  const version = item.querySelector('.ugreen-snmp-version').value;
+  const securityLevel = item.querySelector('.ugreen-security-level').value;
+  const show = (selector, visible) => {
+    const el = item.querySelector(selector);
+    el.hidden = !visible;
+    el.style.display = visible ? '' : 'none';
+  };
+  show('.ugreen-web-fields', method !== 'snmp');
+  show('.ugreen-api-fields', method === 'api');
+  show('.ugreen-snmp-fields', method === 'snmp');
+  show('.ugreen-web-hint', method === 'web');
+  show('.ugreen-snmp-v2-fields', version !== '3');
+  show('.ugreen-snmp-v3-fields', version === '3');
+  show('.ugreen-snmp-auth-fields', securityLevel !== 'noAuthNoPriv');
+  show('.ugreen-snmp-priv-fields', securityLevel === 'authPriv');
 }
 
 function addPbsInstance(data = {}) {
@@ -4856,14 +4976,8 @@ function populate(cfg) {
     document.getElementById('en-ugreen').checked = cfg.ugreen.enabled !== false;
     document.getElementById('cb-ugreen').classList.remove('hidden');
     document.getElementById('icon-ugreen').value = cfg.ugreen.icon || '';
-    const instances = Array.isArray(cfg.ugreen.instances) && cfg.ugreen.instances.length
-      ? cfg.ugreen.instances
-      : (cfg.ugreen.url ? [{
-          name: cfg.ugreen.name || 'Ugreen',
-          url: cfg.ugreen.url,
-          insecureTLS: cfg.ugreen.insecureTLS,
-        }] : []);
-    uniqueConfigItems(instances, ['name', 'url']).forEach(addUgreenInstance);
+    const instances = ugreenSettingsInstances(cfg.ugreen);
+    uniqueConfigItems(instances, ['name', 'url', 'host', 'port']).forEach(addUgreenInstance);
   }
   if (cfg.pbs) {
     document.getElementById('en-pbs').checked = cfg.pbs.enabled !== false;
@@ -5425,18 +5539,7 @@ function collect() {
 
   {
     const on = document.getElementById('en-ugreen').checked;
-    const instances = [];
-    document.querySelectorAll('#ugreen-list .arr-item').forEach(item => {
-      const url = item.querySelector('.ugreen-url').value.trim();
-      const name = item.querySelector('.ugreen-name').value.trim();
-      if (url || name) instances.push({
-        name: name || undefined,
-        url: url || undefined,
-        method: item.querySelector('.ugreen-method')?.value || 'web',
-        insecureTLS: item.querySelector('.ugreen-insecure').value === 'true' || undefined,
-      });
-    });
-    const uniqueInstances = uniqueConfigItems(instances, ['name', 'url']);
+    const uniqueInstances = collectUgreenInstances();
     if (on || uniqueInstances.length) cfg.ugreen = {
       enabled: on,
       instances: uniqueInstances,

@@ -81,7 +81,7 @@ Uygulamanın merkezinde `server.js` bulunur. Express sunucusunu, kimlik doğrula
 | `src/firewall.js` | OPNsense gatewayleri ve uyumlu güvenlik duvarı API'leri |
 | `src/truenas.js` | TrueNAS SCALE/CORE depolama sistemleri |
 | `src/qnap.js` | Resmî HTTP doğrulaması ve File Station SID kontrolleri kullanan QNAP QTS sistemleri |
-| `src/ugreen.js` | UGREEN UGOS Pro web endpoint erişilebilirlik kontrolleri |
+| `src/ugreen.js` | UGREEN UGOS Pro web erişilebilirliği, yerel API ve SNMP veri toplama |
 | `src/pbs.js` | Proxmox Backup Server yönetim API'si |
 | `src/veeam.js` | Veeam Backup & Replication REST API |
 | `src/portainer.js` | Portainer instance ve environment verileri |
@@ -468,13 +468,13 @@ Toplanan veriler:
 
 ### UGREEN
 
-UGREEN ürün dokümanları ve indirmeler yayınlasa da kararlı, herkese açık bir UGOS Pro izleme API'si sunmuyor. Bu nedenle OmniSight yapılandırılan UGOS Pro endpointini web erişilebilirlik kontrolü olarak izler.
+Her UGREEN instance için veri toplama yöntemini ayrı seçin:
 
-Toplanan veriler:
+- `method: web` (varsayılan): yapılandırılan HTTP(S) endpointinin erişilebilirliğini ve HTTP durumunu bildirir. Kimlik doğrulamaz ve NAS metriklerini toplamaz. Sağlıklı bir web kontrolü disk veya depolama sağlığını göstermez.
+- `method: api`: `url`, `username`/`password` veya isteğe bağlı `token` ile yerel UGOS Pro API'ye bağlanır. Uzak bağlantı/relay URL'si yerine, genellikle 9999 portundaki LAN API adresini kullanın. API resmî değildir ve firmware'e bağlıdır; desteklenen yanıtlar CPU, bellek, sıcaklıklar, çalışma süresi, sistem kimliği, depolama ve disk ayrıntılarını sağlar. Eksik endpointler veya izinler sessizce sağlıklı bir web kontrolüne geçmek yerine açık veri toplama uyarıları üretir.
+- `method: snmp`: NAS üzerinde önceden etkinleştirilmiş bir SNMP hizmetini sorgular. `host`, varsayılanı 161 olan `port` ve `snmpVersion: 2` için `community` yapılandırın. Sürüm `3` için `username`, `securityLevel`, `authProtocol`/`authPassword` ve `privProtocol`/`privPassword` kullanın. Bu yöntem NAS üzerinde SNMP sunucusu kurmaz veya etkinleştirmez. Hizmetin kullanılabilirliği kurulu yazılım ve firmware'e, CPU/bellek/çalışma süresi/ağ/depolama bilgileri ise sunulan MIB'lere bağlıdır. Fiziksel disk sağlığı ve sıcaklığı sunulmayabilir.
 
-- Endpoint çevrimiçi/çevrimdışı durumu.
-- Erişilebildiğinde HTTP durum kodu.
-- Yapılandırılan sistem adı ve URL.
+Web/API bağlantılarında `insecureTLS` seçeneğini yalnızca yerel sunucunun sertifikasına başka şekilde güvenemiyorsanız açın. Gizli değerler OmniSight'ın mevcut şifreli yapılandırma sistemiyle saklanır. Kullanılamayan metrikler sıfır olarak gösterilmez; bilinmiyor olarak bırakılır.
 
 ### Proxmox Backup Server
 
